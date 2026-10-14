@@ -3094,6 +3094,7 @@ export default function GameDetails() {
         else if (game.status === 'open') text = t('homecard.open')
         return (
           <EventHero
+            roundBottom
             kind={kind}
             imageUrl={game.image_url || null}
             chip={chip}
@@ -3127,8 +3128,9 @@ export default function GameDetails() {
             ) : null}
             status={{
               faces: people.map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url })),
-              // Tracejados só nos jogos de até 4 lugares (UX, 14 out).
-              slots: done || capacity > 4 ? 0 : free,
+              // Tracejados só nos jogos em aberto de até 4 lugares; nos mixes
+              // nunca, seja qual for o tamanho (R1; UX e QA, 14 out).
+              slots: done || !isOpenGame(game) || capacity > 4 ? 0 : free,
               text,
               tone,
               dot,
@@ -3136,7 +3138,175 @@ export default function GameDetails() {
               meta: [t('homecard.hero_meta', { n: peopleCount, total: capacity }),
                 new Date(game.date).toDateString() === new Date().toDateString() ? t('ui.today') : null].filter(Boolean).join(' · '),
             }}
-          />
+          >
+          {/* A folha branca continua até ao fim da morada, com tudo dentro: os
+              vencedores, os avisos, os botões de quem joga, os quadrados e a
+              morada (protótipo; o cinzento sobre cinzento não se via, UX e
+              Francisco, 14 out). Os blocos de baixo ficam cartões à parte. */}
+          {/* Os vencedores no fim (#622, design-handoff/2026-10-11-vencedores-em-
+              todos-os-jogos): em cima da página do mix acabado, o vencedor e o
+              pódio, e «↗ Partilhar os vencedores» para quem jogou e tem conta, e
+              para quem organizou. O voucher do americano vem para aqui. */}
+          {winnersInfo && (
+            <MixWinnersBlock
+              winner={winnersInfo.winner}
+              rows={winnersInfo.rows}
+              note={winnersInfo.note}
+              extra={winnersInfo.extra}
+              onShare={canShareWinners ? openWinnersShare : null}
+            />
+          )}
+          {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
+              dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
+          {/* Mix que não encheu (pacote do mix, ponto 7): à hora do jogo a base
+              de dados pô-lo em rascunho (games.unfilled_at, Dev 3) e avisou quem
+              organiza. Sem resposta até ao fim do dia, cancela-se sozinho. */}
+          {isDraftMix(game) && isAdmin && game.unfilled_at && (
+            <div role="status" className="rounded-card bg-warning/10 px-4 py-3 text-sm text-[#92400E]">
+              <b>{t('mixdraft.unfilled_title')}</b> {t('mixdraft.unfilled_text')}
+            </div>
+          )}
+          {isDraftMix(game) && isAdmin && (
+            <div className="rounded-card border-2 border-dashed border-ink-200 bg-surface p-4 space-y-3">
+              <div>
+                <p className="font-extrabold text-ink-900">{t('mixdraft.banner_title')}</p>
+                <p className="text-sm text-muted mt-0.5">{t('mixdraft.banner_text')}</p>
+              </div>
+              <button type="button" onClick={() => setPublishOpen(true)}
+                className="w-full min-h-[48px] rounded-ctrl bg-ink-900 px-4 text-base font-extrabold text-white">
+                {t('mixdraft.publish')}
+              </button>
+            </div>
+          )}
+          {/* Mix cancelado (Trello #464): diz-se logo em cima, a toda a gente —
+              quem lá esteve chega aqui pelo link ou pelo grupo. */}
+          {game.status === 'cancelled' && (
+            <div className="rounded-card border border-line bg-surface p-4">
+              {/* Cancelado sozinho por não encher: só «Cancelado porque não encheu.»,
+                  nunca «Quem organiza cancelou» (ponto 7; UX, 2 out). */}
+              {game.unfilled_at ? (
+                <p className="font-extrabold text-ink-900">{t('mixcancel.banner_text_unfilled')}</p>
+              ) : (
+                <>
+                  <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
+                  <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
+              duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
+              não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
+              da barra (barPrimary), por isso fazem sempre o mesmo. */}
+
+          {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
+              ainda não existe. Os outros caminhos (suplente, escalão etário,
+              admin) continuam em "Ações de inscrição" mais abaixo. */}
+          {game.status === 'in_progress' ? (
+            myMatch ? (
+              <PrimaryButton onClick={() => goToMatch(myMatch.id)} className="w-full">
+                <Play size={18} /> {t('gamedetails.your_game_court', { number: myMatch.court_number })}
+              </PrimaryButton>
+            ) : isUserJoined && maxRound > 0 ? (
+              <p className="rounded-card bg-[#F4F5F1] py-3.5 text-center text-sm font-extrabold text-ink-700">{t('gamedetails.resting_this_round')}</p>
+            ) : null
+          ) : !mixStarted && !isUserJoined && waGuestName ? (
+            // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
+            // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
+            // robô do #537; a validação vai ser por SMS, mais tarde).
+            <div className="rounded-card bg-[#F4F5F1] p-4">
+              <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
+            </div>
+          // Quem organiza só vê o verde de jogador enquanto não tiver um botão
+          // preto para carregar (UX, 2 out: dois botões grandes, não).
+          ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
+            <div className="space-y-2">
+              <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
+                {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : isOpenGame(game) ? 'openday.join' : 'gamedetails.join_mix')}
+              </PrimaryButton>
+              {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
+              {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
+                  conta ou não (Trello #339). Num mix que roda parceiros a dupla
+                  desfazia-se na ronda seguinte, por isso não aparece lá. */}
+              {!game.rotate_partners && game.allow_pair_signup && (
+                <PrimaryButton variant="ghost" onClick={withGender(() => setPartnerSheet(true))} disabled={joining} className="w-full !bg-white !border-ink-900">
+                  <Users size={20} /> {t('gamedetails.join_with_partner')}
+                </PrimaryButton>
+              )}
+            </div>
+          ) : !mixStarted && isUserRequested && !mixCancelled ? (
+            // Pedido enviado: não ocupa vaga e não aparece nos inscritos até
+            // quem organiza aceitar.
+            <div className="space-y-2">
+              <p className="rounded-card bg-[#F4F5F1] px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
+              <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full !bg-white !border-ink-900">
+                {t('mixrequest.cancel')}
+              </PrimaryButton>
+            </div>
+          ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
+            // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
+            // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
+            // refazem-se as duplas primeiro.
+            <div className="space-y-1.5">
+              {/* R3: já dentro, a caixa verde-clara por cima do «Sair» (protótipo). */}
+              <p className="flex min-h-[52px] items-center justify-center rounded-ctrl bg-lime-100 px-4 font-display text-[15px] font-extrabold text-[#3F6212]">
+                ✓ {t('home.next_in')}
+              </p>
+              <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
+                {t(isOpenGame(game) ? 'openday.leave' : 'gamedetails.leave_mix')}
+              </PrimaryButton>
+              {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
+            </div>
+          ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
+            // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
+            // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
+            // recebe aviso (base de dados).
+            <div className="space-y-1.5">
+              <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
+                {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.stay_suplente')}
+              </PrimaryButton>
+              <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
+            </div>
+          ) : null}
+
+          {/* R3 (13 out): depois dos botões, os dados do mix em quadrados (EventFacts, Dev 1) e, a
+              seguir, a morada com «Abrir com…». Quem ganha, em cada formato, fica
+              escrito por baixo (Francisco, 22 set). */}
+          {(() => {
+            const lvl = parseLevel(game.level)
+            const gender = game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null
+            const age = game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null
+            const items = isOpenGame(game) ? [
+              { key: 'courts', label: t('homecard.fact_courts'), value: t('gamedetails.court_count', { count: numCourts }) },
+              { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
+              { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
+            ] : [
+              { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
+              { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
+            ]
+            items.push(
+              { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
+              { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
+              { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
+              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
+              { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
+            )
+            return (
+              <div className="space-y-2.5">
+                <EventFacts items={items} />
+                {!isOpenGame(game) && (
+                  <p className="px-0.5 text-sm text-muted">
+                    {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
+                  </p>
+                )}
+                {game.location && (
+                  <LocationOpenWith location={game.location} latitude={game.latitude} longitude={game.longitude} />
+                )}
+              </div>
+            )
+          })()}
+          </EventHero>
         )
       })()}
 
@@ -3159,19 +3329,6 @@ export default function GameDetails() {
         />
       )}
 
-      {/* Os vencedores no fim (#622, design-handoff/2026-10-11-vencedores-em-
-          todos-os-jogos): em cima da página do mix acabado, o vencedor e o
-          pódio, e «↗ Partilhar os vencedores» para quem jogou e tem conta, e
-          para quem organizou. O voucher do americano vem para aqui. */}
-      {winnersInfo && (
-        <MixWinnersBlock
-          winner={winnersInfo.winner}
-          rows={winnersInfo.rows}
-          note={winnersInfo.note}
-          extra={winnersInfo.extra}
-          onShare={canShareWinners ? openWinnersShare : null}
-        />
-      )}
       {shareAsAsk && (
         <ShareAsSheet
           kind={isAmericano ? 'americano' : 'mix'}
@@ -3202,28 +3359,6 @@ export default function GameDetails() {
       )}
 
 
-      {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
-          dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
-      {/* Mix que não encheu (pacote do mix, ponto 7): à hora do jogo a base
-          de dados pô-lo em rascunho (games.unfilled_at, Dev 3) e avisou quem
-          organiza. Sem resposta até ao fim do dia, cancela-se sozinho. */}
-      {isDraftMix(game) && isAdmin && game.unfilled_at && (
-        <div role="status" className="rounded-card bg-warning/10 px-4 py-3 text-sm text-[#92400E]">
-          <b>{t('mixdraft.unfilled_title')}</b> {t('mixdraft.unfilled_text')}
-        </div>
-      )}
-      {isDraftMix(game) && isAdmin && (
-        <div className="rounded-card border-2 border-dashed border-ink-200 bg-surface p-4 space-y-3">
-          <div>
-            <p className="font-extrabold text-ink-900">{t('mixdraft.banner_title')}</p>
-            <p className="text-sm text-muted mt-0.5">{t('mixdraft.banner_text')}</p>
-          </div>
-          <button type="button" onClick={() => setPublishOpen(true)}
-            className="w-full min-h-[48px] rounded-ctrl bg-ink-900 px-4 text-base font-extrabold text-white">
-            {t('mixdraft.publish')}
-          </button>
-        </div>
-      )}
       {/* «Abrem as inscrições» ao publicar (28 set): «Já» ou um dia e hora. */}
       <PublishDraftSheet
         game={publishOpen ? game : null}
@@ -3233,135 +3368,6 @@ export default function GameDetails() {
         errorOf={(error) => (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', gameMembership?.organization?.plan_tier))
           || describeError(t, error, 'mixdraft.publish_error')}
       />
-
-      {/* Mix cancelado (Trello #464): diz-se logo em cima, a toda a gente —
-          quem lá esteve chega aqui pelo link ou pelo grupo. */}
-      {game.status === 'cancelled' && (
-        <div className="rounded-card border border-line bg-surface p-4">
-          {/* Cancelado sozinho por não encher: só «Cancelado porque não encheu.»,
-              nunca «Quem organiza cancelou» (ponto 7; UX, 2 out). */}
-          {game.unfilled_at ? (
-            <p className="font-extrabold text-ink-900">{t('mixcancel.banner_text_unfilled')}</p>
-          ) : (
-            <>
-              <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
-              <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
-          duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
-          não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
-          da barra (barPrimary), por isso fazem sempre o mesmo. */}
-
-      {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
-          ainda não existe. Os outros caminhos (suplente, escalão etário,
-          admin) continuam em "Ações de inscrição" mais abaixo. */}
-      {game.status === 'in_progress' ? (
-        myMatch ? (
-          <PrimaryButton onClick={() => goToMatch(myMatch.id)} className="w-full">
-            <Play size={18} /> {t('gamedetails.your_game_court', { number: myMatch.court_number })}
-          </PrimaryButton>
-        ) : isUserJoined && maxRound > 0 ? (
-          <p className="card !shadow-none py-3.5 text-center text-sm font-extrabold text-ink-700">{t('gamedetails.resting_this_round')}</p>
-        ) : null
-      ) : !mixStarted && !isUserJoined && waGuestName ? (
-        // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
-        // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
-        // robô do #537; a validação vai ser por SMS, mais tarde).
-        <div className="card">
-          <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
-        </div>
-      // Quem organiza só vê o verde de jogador enquanto não tiver um botão
-      // preto para carregar (UX, 2 out: dois botões grandes, não).
-      ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
-        <div className="space-y-2">
-          <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : isOpenGame(game) ? 'openday.join' : 'gamedetails.join_mix')}
-          </PrimaryButton>
-          {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
-          {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
-              conta ou não (Trello #339). Num mix que roda parceiros a dupla
-              desfazia-se na ronda seguinte, por isso não aparece lá. */}
-          {!game.rotate_partners && game.allow_pair_signup && (
-            <PrimaryButton variant="ghost" onClick={withGender(() => setPartnerSheet(true))} disabled={joining} className="w-full !bg-white !border-ink-900">
-              <Users size={20} /> {t('gamedetails.join_with_partner')}
-            </PrimaryButton>
-          )}
-        </div>
-      ) : !mixStarted && isUserRequested && !mixCancelled ? (
-        // Pedido enviado: não ocupa vaga e não aparece nos inscritos até
-        // quem organiza aceitar.
-        <div className="space-y-2">
-          <p className="rounded-card bg-white px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
-          <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full !bg-white !border-ink-900">
-            {t('mixrequest.cancel')}
-          </PrimaryButton>
-        </div>
-      ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
-        // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
-        // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
-        // refazem-se as duplas primeiro.
-        <div className="space-y-1.5">
-          {/* R3: já dentro, a caixa verde-clara por cima do «Sair» (protótipo). */}
-          <p className="flex min-h-[52px] items-center justify-center rounded-ctrl bg-[#F4F8DC] px-4 font-display text-[15px] font-extrabold text-[#3F6212]">
-            ✓ {t('home.next_in')}
-          </p>
-          <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
-            {t(isOpenGame(game) ? 'openday.leave' : 'gamedetails.leave_mix')}
-          </PrimaryButton>
-          {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
-        </div>
-      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
-        // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
-        // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
-        // recebe aviso (base de dados).
-        <div className="space-y-1.5">
-          <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.stay_suplente')}
-          </PrimaryButton>
-          <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
-        </div>
-      ) : null}
-
-      {/* R3 (13 out): depois dos botões, os dados do mix em quadrados (EventFacts, Dev 1) e, a
-          seguir, a morada com «Abrir com…». Quem ganha, em cada formato, fica
-          escrito por baixo (Francisco, 22 set). */}
-      {(() => {
-        const lvl = parseLevel(game.level)
-        const gender = game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null
-        const age = game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null
-        const items = isOpenGame(game) ? [
-          { key: 'courts', label: t('homecard.fact_courts'), value: t('gamedetails.court_count', { count: numCourts }) },
-          { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
-          { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
-        ] : [
-          { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
-          { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
-        ]
-        items.push(
-          { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
-          { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
-          { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
-          { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
-          { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
-        )
-        return (
-          <div className="space-y-2.5">
-            <EventFacts items={items} />
-            {!isOpenGame(game) && (
-              <p className="px-0.5 text-sm text-muted">
-                {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
-              </p>
-            )}
-            {game.location && (
-              <LocationOpenWith location={game.location} latitude={game.latitude} longitude={game.longitude} />
-            )}
-          </div>
-        )
-      })()}
 
       {/* 👍 da noite — cada participante dá 1 kudos a um colega do mix
           (+1 XP para quem recebe; guardas todas no RPC). Janela: 48h após

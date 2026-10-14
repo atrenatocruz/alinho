@@ -137,11 +137,17 @@
   }
 
   /* Secondary — quiet ink outline. */
+  /* Botão secundário (UX, 14 out): branco com contorno de 1,5 px #CFD2D7 —
+     a regra é lima ou preto cheio + contorno; o #F4F5F1 é só das caixas.
+     Desde o R12 ficava cinzento cheio. O escurecer só com rato. */
   .btn-secondary {
-    @apply bg-surface text-ink-900 font-extrabold py-3.5 px-6 rounded-ctrl
-           border border-line transition-all duration-fast
-           hover:border-ink-200 hover:bg-ink-50 active:scale-[0.98]
+    @apply bg-white text-ink-900 font-extrabold py-3.5 px-6 rounded-ctrl
+           border-[1.5px] border-[#CFD2D7] transition-all duration-fast
+           active:bg-ink-50 active:scale-[0.98]
            min-h-[48px] text-base;
+  }
+  @media (hover: hover) {
+    .btn-secondary:hover { @apply border-ink-200 bg-ink-50; }
   }
 
   /* Cartão: branco, sem contorno, sombra muito suave, sobre o fundo

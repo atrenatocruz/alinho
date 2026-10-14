@@ -916,14 +916,17 @@ export function StickyTop({ children, belowBackBar = false, className = '' }) {
 }
 
 export function PrimaryButton({ variant = 'lime', className = '', children, ...props }) {
+  // O escurecer só enquanto o dedo está no botão: no telemóvel o hover ficava
+  // preso depois de deslizar a página (o lima a verde-escuro, Francisco, 14 out).
   const variants = {
-    lime:     'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card',
-    navy:     'bg-ink-700 text-white hover:bg-ink-500 shadow-card',
+    lime:     'bg-lime-400 text-ink-900 [@media(hover:hover)]:hover:bg-lime-600 active:bg-lime-600 shadow-card',
+    navy:     'bg-ink-700 text-white [@media(hover:hover)]:hover:bg-ink-500 active:bg-ink-500 shadow-card',
     // A preto: as ações de quem organiza (o lima é das de jogador).
-    ink:      'bg-ink-900 text-white hover:bg-ink-700 shadow-card',
-    ghost:    'bg-surface text-ink-900 border border-line hover:bg-ink-50 hover:border-ink-200',
-    danger:   'bg-danger/10 text-danger hover:bg-danger/15',
-    whatsapp: 'bg-[#25D366] text-white hover:bg-[#20bd5a] shadow-card',
+    ink:      'bg-ink-900 text-white [@media(hover:hover)]:hover:bg-ink-700 active:bg-ink-700 shadow-card',
+    // Secundário: branco com contorno de 1,5 px (UX, 14 out; o #F4F5F1 é só das caixas).
+    ghost:    'bg-white text-ink-900 border-[1.5px] border-[#CFD2D7] [@media(hover:hover)]:hover:bg-ink-50 active:bg-ink-50 [@media(hover:hover)]:hover:border-ink-200 active:border-ink-200',
+    danger:   'bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger/15 active:bg-danger/15',
+    whatsapp: 'bg-[#25D366] text-white [@media(hover:hover)]:hover:bg-[#20bd5a] active:bg-[#20bd5a] shadow-card',
   }
   return (
     <button
@@ -1723,8 +1726,10 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
 // Vouchers» do Gerir, 7 out). Sem `onBack` nem `to`, o lugar do «‹» fica vazio.
 // `solid`: fundo branco opaco em vez do vidro — no Gerir via-se o texto a
 // passar por trás da barra presa (UX, 7 out).
-// Com `solid`, os cantos de baixo a 16 px (R12b): parada não se veem (o bloco
-// branco de baixo está por trás), presa sozinha ao descer ficam como o topo.
+// Com `solid` (R12b): sem margem por baixo, colada ao bloco branco que vem a
+// seguir, e os cantos de baixo a 16 px só quando esse bloco já saiu do ecrã
+// (presa sozinha ao descer) — parada, os cantos e a sombra são do último
+// bloco (QA, 14 out: via-se uma falha cinzenta entre a barra e o nome).
 export function BackBar({ onBack, to, label, title, onShare, right, solid = false }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
@@ -1742,7 +1747,7 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
   return (
-    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 px-4 ${solid ? 'bg-white rounded-b-[16px]' : 'bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 px-4 ${solid ? `mb-0 bg-white ${showTitle ? 'rounded-b-[16px]' : ''}` : 'mb-1 bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
       <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
