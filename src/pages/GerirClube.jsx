@@ -3708,9 +3708,8 @@ export default function GerirClube() {
                     // Um estado por cartão (UX, 9 out): com «Por terminar», a
                     // linha deixa de dizer «A decorrer».
                     if (tipo === 'mix') {
-                      // «MIX · RECORRENTE», colado a etiqueta como na pagina do
-                      // evento e na Home (#383) -- nunca numa etiqueta a parte.
-                      if (row.recurrence_id) sufixo = t('ui.recurring')
+                      // Sem «· recorrente» no fim: o detalhe já diz «todas as
+                      // semanas» (UX, 14 out).
                       // R9 (UX, 13 out): sem a linha «Editar» por baixo — toda a
                       // linha abre o mix, e o Editar está lá. Só o rascunho leva
                       // os dois botões empilhados.

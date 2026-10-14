@@ -82,9 +82,11 @@ export default function SpecialPriceField({ value, onChange, normalPrice, orgId,
             <p className="mb-1.5 text-sm font-extrabold text-ink-900">{howMuchLabel || t('special_price.how_much')}</p>
             <div className="relative">
               <input type="number" min="0" step="0.5" inputMode="decimal" value={value.price}
-                onChange={(e) => set({ price: e.target.value })} className="input-field pr-24" />
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted">{t('special_price.free_hint')}</span>
+                onChange={(e) => set({ price: e.target.value })} className="input-field pr-10" />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted">€</span>
             </div>
+            {/* «€ = Grátis» dentro do campo lia-se como «5 € é grátis» (UX, 14 out). */}
+            <p className="mt-1 text-xs text-muted">{t('special_price.free_hint')}</p>
           </div>
 
           <div>

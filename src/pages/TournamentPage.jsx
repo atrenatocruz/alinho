@@ -300,7 +300,7 @@ export default function TournamentPage() {
     if (location.state?.adminFromPage) { navigate(-1); return }
     // Chegou direto ao ?admin=… (do Gerir, de um link): troca-se a entrada,
     // para o ?admin não ficar no histórico.
-    const next = new URLSearchParams(params); next.delete('admin'); setParams(next, { replace: true })
+    const next = new URLSearchParams(params); next.delete('admin'); next.delete('cat'); setParams(next, { replace: true })
   }
 
   const saveEdit = async (draft) => {
@@ -314,7 +314,13 @@ export default function TournamentPage() {
       closeAdmin()
       window.dispatchEvent(new Event('tournament:reload'))
     } catch (err) {
-      setAdminError(err?.code === 'special_prices_failed' ? t('tournament.edit.special_failed') : describeError(t, err))
+      setAdminError(err?.code === 'special_prices_failed' ? t('tournament.edit.special_failed')
+        // Com inscritos, o máximo de categorias só sobe (Dev 3: o atual no hint).
+        : String(err?.message || '').includes('max_categories_only_up') ? t('tournament.edit.max_only_up', { n: err?.hint || '' })
+        // A hora de uma categoria com inscritos (Dev 3, 13 out): o código no hint.
+        : String(err?.message || '').includes('category_already_drawn') ? t('tournament.edit.category_already_drawn', { code: err?.hint || '' })
+        : String(err?.message || '').includes('day_outside_tournament') ? t('tournament.edit.day_outside_tournament', { code: err?.hint || '' })
+        : describeError(t, err))
     } finally {
       setSavingEdit(false)
     }
@@ -345,6 +351,7 @@ export default function TournamentPage() {
           club={clubForForm}
           initial={editing}
           locked={!!editing.has_entries}
+          focusCode={params.get('cat')}
           danger={canCancel(tour) ? cancelDanger(tour, t, (deleted) => {
             if (deleted) { navigate('/gerir'); return }
             closeAdmin()
