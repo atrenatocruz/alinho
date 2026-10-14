@@ -18,7 +18,7 @@ import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
 import { KIND_STYLE, CardClub } from '../agenda/EventCard'
-import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from '../agenda/HomeCard'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardButton, kindColorsOf } from '../agenda/HomeCard'
 import FaceCircles from '../event/FaceCircles'
 import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
@@ -263,18 +263,17 @@ function EventRow({ event, member }) {
       <CardTitle>{event.title}</CardTitle>
       {chips && <CardChips>{chips}</CardChips>}
       {stateRow}
-      {event.myState === 'in' && to ? (
-        <CardFoot>
-          <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
-        </CardFoot>
-      ) : count && (
-        // Os círculos e o «Entrar», como na Home (R1; UX, 14 out). A lista do
-        // clube só traz quantos estão, por isso o cinzento cheio com o número
-        // e os tracejados dos lugares que faltam — nunca caras inventadas.
-        // «Entrar» leva à página do mix, onde se entra.
+      {/* Os círculos e o botão, como na Home (R1; UX, 14 out), em todos os
+          cartões — também quando já estou dentro (QA, 14 out). A lista do
+          clube só traz quantos estão: o cinzento cheio com o número e os
+          tracejados dos lugares que faltam — nunca caras inventadas.
+          «Entrar» leva à página do mix, onde se entra; dentro, «Ver». */}
+      {(count || (event.myState === 'in' && to)) && (
         <div className="mt-3 flex items-center gap-2.5">
-          <FaceCircles count={count.n} free={free || 0} size="sm" />
-          {to && free > 0 && !event.myState && (
+          {count && <FaceCircles count={count.n} free={free || 0} size="sm" />}
+          {event.myState === 'in' && to ? (
+            <span className="pointer-events-none ml-auto whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
+          ) : to && free > 0 && !event.myState && (
             <div className="relative ml-auto"><CardButton onClick={() => navigate(to)}>{t('home.join_short')}</CardButton></div>
           )}
         </div>
