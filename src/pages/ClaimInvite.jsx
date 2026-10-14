@@ -120,13 +120,13 @@ export default function ClaimInvite() {
   // conta — «Este convite já foi aceite», com «Entrar» à frente.
   if (state === 'invalid') {
     const claimed = invalid === 'claimed'
-    const home = <Link to="/" className={`${claimed ? 'btn-secondary' : 'btn-primary'} w-full inline-flex items-center justify-center`}>{t('notfound.go_home')}</Link>
-    const login = <Link to="/login" className={`${claimed ? 'btn-primary' : 'btn-secondary'} w-full inline-flex items-center justify-center`}>{t('landing.login_link')}</Link>
+    const home = <Link to="/" className={`${claimed ? `btn-secondary !bg-white !border-[1.5px] !border-[#CFD2D7]` : 'btn-primary'} w-full inline-flex items-center justify-center`}>{t('notfound.go_home')}</Link>
+    const login = <Link to="/login" className={`${claimed ? 'btn-primary' : `btn-secondary !bg-white !border-[1.5px] !border-[#CFD2D7]`} w-full inline-flex items-center justify-center`}>{t('landing.login_link')}</Link>
     return (
       <div className="p-4 max-w-md mx-auto">
         <EmptyState
           title={t(claimed ? 'partner.claim_claimed_title' : 'shortlink.invalid_title')}
-          subtitle={t(claimed ? 'partner.claim_claimed_sub' : `partner.claim_error_invite_${invalid}`)}
+          subtitle={t(claimed ? 'partner.claim_claimed_sub' : `${isFriends ? 'friends' : 'partner'}.claim_error_invite_${invalid}`)}
           action={<div className="flex flex-col gap-2 max-w-xs mx-auto">{claimed ? <>{login}{home}</> : <>{home}{login}</>}</div>}
         />
       </div>

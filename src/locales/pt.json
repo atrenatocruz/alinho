@@ -2692,6 +2692,8 @@
   "friends.not_enough": "Só {{count}} disseram que sim. São precisas pelo menos 4 pessoas.",
   "friends.waiting_creator": "À espera que {{name}} forme as equipas.",
   "friends.claim_title": "Inscreveram-te num jogo de padel",
+  "friends.claim_error_invite_not_found": "Este convite já não existe. Pede outro a quem te convidou.",
+  "friends.claim_error_invite_expired": "Este convite já passou do prazo. Pede outro a quem te convidou.",
   "friends.form_teams_now": "Todos aceitaram: falta formar as equipas.",
   "friends.waiting_teams": "À espera das equipas.",
   "friends.notice_invite": "{{name}} convidou-te para um jogo entre amigos · {{when}}.",
