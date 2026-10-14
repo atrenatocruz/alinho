@@ -18,6 +18,7 @@ import PlayerDetails from './pages/PlayerDetails'
 import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
+import ProfileXp from './pages/ProfileXp'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -593,6 +594,15 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <Profile />
+            </Guard>
+          }
+        />
+        {/* R15 · A página do XP de atividade (UX, 14 out). */}
+        <Route
+          path="/perfil/xp"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <ProfileXp />
             </Guard>
           }
         />
