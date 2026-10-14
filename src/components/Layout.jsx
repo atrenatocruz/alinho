@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, ClipboardList, LogOut, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
+import { Link, useLocation, useNavigationType } from 'react-router-dom'
+import { Home, Users, Trophy, ClipboardList, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
@@ -145,8 +145,7 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 
 export default function Layout({ children }) {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled, isLessonsEnabled } = useAuth()
+  const { profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled, isLessonsEnabled } = useAuth()
   const { t, i18n } = useTranslation()
 
   // Conta com pedido de apagar (Trello #306): em vez da app, o ecrã de
@@ -566,11 +565,6 @@ export default function Layout({ children }) {
     }
   }, [locationKey, navigationType])
 
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
-
   // Guests only see Jogos + Perfil
   // `icon` is omitted for Perfil — the render loop always shows the real
   // Avatar there instead of an icon (see isPerfil below).
@@ -593,7 +587,8 @@ export default function Layout({ children }) {
     navItems.push({ path: '/gerir', icon: ClipboardList, label: t('layout.nav_manage') })
   }
 
-  // Notificações + logout — só o que sobra do antigo header escuro (o
+  // Notificações — só o que sobra do antigo header escuro (o «Sair» passou
+  // para o fim do Perfil a 13 out; o
   // logótipo, o nível e a ajuda saíram de vez). Definidos aqui porque é onde
   // vive toda a lógica (pedidos, convites…), mas mostrados dentro do título
   // fixo de cada página principal via HeaderActionsContext — já não há uma
@@ -811,13 +806,6 @@ export default function Layout({ children }) {
           document.body
         )}
       </div>
-      <button
-        onClick={handleSignOut}
-        title={t('layout.sign_out')}
-        className="w-10 h-10 flex items-center justify-center rounded-full text-ink-700 hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
-      >
-        <LogOut size={20} />
-      </button>
     </>
   )
 
