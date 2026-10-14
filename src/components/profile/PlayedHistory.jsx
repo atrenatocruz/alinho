@@ -9,6 +9,8 @@ import { KIND_COLORS } from '../../lib/kindColors'
 import { FRAME_TITLE_KEY } from '../../lib/frames'
 import { medalUrl } from '../../lib/achievementMedals'
 import { FilterBar, FilterPill, EmptyState } from '../ui'
+import { Realce } from '../SearchField'
+import { semAcentos } from '../../lib/semAcentos'
 import { Crown } from '../rankings/RankPodium'
 
 /* Perfil › Jogos «com vida» (#636, design-handoff/2026-10-12-perfil-jogos-
@@ -210,7 +212,7 @@ function PointsCol({ delta }) {
   )
 }
 
-function PlayedCard({ r }) {
+function PlayedCard({ r, query = '' }) {
   const { t, i18n } = useTranslation()
   const lang = lang2(i18n.language)
   const color = KIND_COLORS[r.kind] || KIND_COLORS.mix
@@ -265,6 +267,10 @@ function PlayedCard({ r }) {
   if (friends && r.location && !pending) lines.push(r.location)
   lines = lines.filter(Boolean)
 
+  // A parte encontrada a lima-claro (SPEC da pesquisa, 14 out). Os nomes
+  // levam espaço que não parte («Rui C.»): a pesquisa «rui c» também o acha.
+  const hit = (text) => (semAcentos(text).includes(semAcentos(query).trim()) ? query : query.replace(/ /g, ' '))
+
   // Em baixo: conquistas, kudos, o estado nos amigos e «↗».
   const pills = [
     ...(r.achievements || []).map((a) => (
@@ -291,9 +297,9 @@ function PlayedCard({ r }) {
       <Link to={to} className="flex items-center gap-3 px-3.5 pb-3 pt-4">
         {square}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-[17px] font-extrabold leading-tight text-ink-900">{title}</p>
+          <p className="truncate font-display text-[17px] font-extrabold leading-tight text-ink-900">{friends ? title : <Realce text={title || ''} query={hit(title)} />}</p>
           {accent && <p className={`mt-0.5 truncate text-[13px] font-extrabold ${accent.className || ''}`} style={accent.style}>{accent.text}</p>}
-          {lines.map((l) => <p key={l} className="mt-0.5 text-[12.5px] leading-snug text-muted">{l}</p>)}
+          {lines.map((l) => <p key={l} className="mt-0.5 text-[12.5px] leading-snug text-muted"><Realce text={l} query={hit(l)} /></p>)}
         </div>
         {!pending && <PointsCol delta={r.rating_delta} />}
       </Link>
@@ -387,7 +393,7 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
   const q = query.trim()
   if (!rows.length) {
     return q
-      ? <EmptyState title={t('played.nothing_with', { q })} subtitle={t('played.nothing_with_hint')} />
+      ? <EmptyState title={t('comunidade.nothing_found_title')} subtitle={t('comunidade.try_another_name')} />
       : <EmptyState title={t('played.empty_title')} subtitle={t('played.empty_body')} />
   }
   const oldest = rows[rows.length - 1]?.starts_at
@@ -424,7 +430,7 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
                 </div>
               )}
             </div>
-            {g.rows.map((r) => <PlayedCard key={`${r.kind}:${r.event_id}:${r.category_code || ''}`} r={r} />)}
+            {g.rows.map((r) => <PlayedCard key={`${r.kind}:${r.event_id}:${r.category_code || ''}`} r={r} query={query} />)}
           </section>
         )
       })}

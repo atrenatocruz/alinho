@@ -12,7 +12,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { SearchX } from 'lucide-react'
 import { semAcentos, contemTexto } from '../../lib/semAcentos'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { fromDayKey } from '../../lib/agenda'
@@ -22,25 +21,14 @@ import { followPlayer, removeFollow } from '../../lib/follows'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { friendsMatchTitle, KIND_STYLE } from './EventCard'
+// A parte encontrada e o vazio são os comuns a todas as pesquisas (SPEC
+// 2026-10-14-pesquisa-regra-unica): o lima-claro colado à palavra e o Alino.
+import { Realce } from '../SearchField'
+import { EmptyState } from '../ui'
 
 import { eventTitle, eventMatches } from './homeSearchMatch'
 
 export { eventMatches }
-
-// O pedaço que bate com a pesquisa, realçado. NFD + tirar os acentos não muda
-// o número de letras de um nome já composto, por isso as posições batem.
-function Realce({ text, query }) {
-  const q = semAcentos(query).trim()
-  const i = q ? semAcentos(text).indexOf(q) : -1
-  if (i < 0) return text
-  return (
-    <>
-      {text.slice(0, i)}
-      <mark className="bg-lime-200 text-ink-900 rounded-sm px-0.5">{text.slice(i, i + q.length)}</mark>
-      {text.slice(i + q.length)}
-    </>
-  )
-}
 
 // ── Pesquisas recentes (só neste telemóvel) ────────────────────────────────
 const RECENT_KEY = 'home.recentSearches'
@@ -67,19 +55,22 @@ function whenShort(dayKey, todayKey, t, lang) {
 }
 
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+// Cada grupo num cartão branco sobre o fundo da página (proposta da pesquisa, 14 out).
+const Group = ({ children }) => <div className="rounded-[16px] bg-white px-3.5">{children}</div>
 const Title = ({ children }) => <p className="mt-5 mb-1.5 text-[11px] font-extrabold uppercase tracking-widest text-muted first:mt-0">{children}</p>
 
 /** «Seguir» em contorno; «A seguir» / «Pedido enviado» apagados. */
 function FollowButton({ state, busy, onFollow, onUnfollow }) {
   const { t } = useTranslation()
-  const base = 'shrink-0 min-h-[40px] rounded-full px-4 text-sm font-extrabold disabled:opacity-40'
+  // O botão pequeno de contorno das linhas («Abrir com…», «Falar»): 1 px #D5D8DE, 12,5 px, 700 (UX, 14 out).
+  const base = 'shrink-0 min-h-[36px] rounded-full px-3.5 font-display text-[12.5px] font-bold disabled:opacity-40'
   if (state === 'following') {
     // Nos clubes e grupos não se deixa de seguir daqui (faz-se na página deles).
-    if (!onUnfollow) return <span className={`${base} inline-flex items-center border border-ink-900 bg-white text-ink-900`}>{t('homesearch.following')}</span>
-    return <button type="button" disabled={busy} onClick={onUnfollow} className={`${base} border border-ink-900 bg-white text-ink-900`}>{t('homesearch.following')}</button>
+    if (!onUnfollow) return <span className={`${base} inline-flex items-center border border-[#D5D8DE] bg-white text-ink-900`}>{t('homesearch.following')}</span>
+    return <button type="button" disabled={busy} onClick={onUnfollow} className={`${base} border border-[#D5D8DE] bg-white text-ink-900`}>{t('homesearch.following')}</button>
   }
   if (state === 'pending') return <span className={`${base} inline-flex items-center border border-line bg-ink-50 text-muted`}>{t('homesearch.requested')}</span>
-  return <button type="button" disabled={busy} onClick={onFollow} className={`${base} border border-ink-900 bg-white text-ink-900`}>{t('homesearch.follow')}</button>
+  return <button type="button" disabled={busy} onClick={onFollow} className={`${base} border border-[#D5D8DE] bg-white text-ink-900`}>{t('homesearch.follow')}</button>
 }
 
 function OrgRow({ org, query, state, busy, onFollow }) {
@@ -222,14 +213,14 @@ export default function HomeSearch({ events, query, todayKey, linkFor, location,
         {nearby?.length > 0 && (
           <>
             <Title>{t('homesearch.clubs_near')}</Title>
-            {nearby.map((o) => <OrgRow key={o.id} org={o} query="" state={orgState(o)} busy={busy === o.id} onFollow={() => followOrg(o)} />)}
+            <Group>{nearby.map((o) => <OrgRow key={o.id} org={o} query="" state={orgState(o)} busy={busy === o.id} onFollow={() => followOrg(o)} />)}</Group>
           </>
         )}
         {suggested?.length > 0 && (
           <>
             <Title>{t('homesearch.people_maybe')}</Title>
-            {suggested.map((p) => <PersonRow key={p.id} person={p} query="" state={personState(p.id)} busy={busy === p.id}
-              onFollow={() => follow(p.id)} onUnfollow={() => unfollow(p.id)} />)}
+            <Group>{suggested.map((p) => <PersonRow key={p.id} person={p} query="" state={personState(p.id)} busy={busy === p.id}
+              onFollow={() => follow(p.id)} onUnfollow={() => unfollow(p.id)} />)}</Group>
           </>
         )}
       </div>
@@ -240,11 +231,7 @@ export default function HomeSearch({ events, query, todayKey, linkFor, location,
     .sort((a, b) => a.startsAt - b.startsAt).slice(0, 20)
   if (games.length + orgs.length + people.length === 0) {
     return (
-      <div className="px-4 py-12 text-center">
-        <SearchX size={28} className="mx-auto text-muted" />
-        <p className="mt-3 font-extrabold text-ink-900">{t('homesearch.none_title', { q })}</p>
-        <p className="mt-1 text-sm text-muted">{t('homesearch.none_hint')}</p>
-      </div>
+      <EmptyState title={t('comunidade.nothing_found_title')} subtitle={t('comunidade.try_another_name')} />
     )
   }
   const remember = () => rememberSearch(q)
@@ -253,7 +240,7 @@ export default function HomeSearch({ events, query, todayKey, linkFor, location,
       {games.length > 0 && (
         <>
           <Title>{t('homesearch.games', { count: games.length })}</Title>
-          {games.map((e) => {
+          <Group>{games.map((e) => {
             const title = eventTitle(e) || (e.kind === 'friends' ? friendsMatchTitle(e.raw || {}, user?.id, t) : '') || e.orgName || ''
             const sub = [e.orgName, KIND_STYLE[e.kind] ? t(KIND_STYLE[e.kind].labelKey) : null].filter(Boolean)
             const to = linkFor(e)
@@ -287,20 +274,20 @@ export default function HomeSearch({ events, query, todayKey, linkFor, location,
               {err && <p role="alert" className="mt-1.5 text-xs font-extrabold text-danger">{err}</p>}
               </div>
             )
-          })}
+          })}</Group>
         </>
       )}
       {orgs.length > 0 && (
         <>
           <Title>{t('homesearch.orgs', { count: orgs.length })}</Title>
-          {orgs.slice(0, 10).map((o) => <OrgRow key={o.id} org={o} query={q} state={orgState(o)} busy={busy === o.id} onFollow={() => { remember(); followOrg(o) }} />)}
+          <Group>{orgs.slice(0, 10).map((o) => <OrgRow key={o.id} org={o} query={q} state={orgState(o)} busy={busy === o.id} onFollow={() => { remember(); followOrg(o) }} />)}</Group>
         </>
       )}
       {people.length > 0 && (
         <>
           <Title>{t('homesearch.people', { count: people.length })}</Title>
-          {people.slice(0, 10).map((p) => <PersonRow key={p.id} person={p} query={q} state={personState(p.id)} busy={busy === p.id}
-            onFollow={() => { remember(); follow(p.id) }} onUnfollow={() => unfollow(p.id)} />)}
+          <Group>{people.slice(0, 10).map((p) => <PersonRow key={p.id} person={p} query={q} state={personState(p.id)} busy={busy === p.id}
+            onFollow={() => { remember(); follow(p.id) }} onUnfollow={() => unfollow(p.id)} />)}</Group>
         </>
       )}
     </div>

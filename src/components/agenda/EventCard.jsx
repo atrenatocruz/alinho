@@ -11,6 +11,7 @@ import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import { MascotPill } from './CardMascot'
 import { isMixLive } from '../../lib/mixLive'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from './HomeCard'
+import FaceCircles from '../event/FaceCircles'
 import { ratingBand, peopleRatingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 import { KIND_COLORS } from '../../lib/kindColors'
@@ -366,8 +367,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
         </span>
       )}
       {stateRow}
-      {/* Nos mixes não há tracejados, seja qual for o tamanho (R1; QA, 14 out). */}
-      <CardFoot people={players} slots={event.kind === 'mix' ? 0 : capacity}>{button}</CardFoot>
+      <CardFoot people={players} slots={capacity}>{button}</CardFoot>
     </HomeCard>
   )
 }
@@ -470,15 +470,19 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
         </span>
       )}
       {pending && <CardState tone="warn">{t('agenda.state_line_request_sent')}</CardState>}
+      {/* O nível médio de quem vai, com o nome à frente (QA, 13 out: a
+          pastilha sozinha não se percebia). A letra vem do avg_gender. Numa
+          linha sua, para os círculos caberem ao lado do botão. */}
+      {peopleRatingBand(avgRating, exploreGenders(avgGender, game.gender_restriction)) && (
+        <span className="mt-2 flex items-center gap-1.5 font-display text-[12px] font-semibold text-[#5B6068]">
+          {t('homecard.avg_level')}
+          <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
+        </span>
+      )}
       <div className="mt-3 flex items-center gap-2.5">
-        {/* O nível médio de quem vai, com o nome à frente (QA, 13 out: a
-            pastilha sozinha não se percebia). A letra vem do avg_gender. */}
-        {peopleRatingBand(avgRating, exploreGenders(avgGender, game.gender_restriction)) && (
-          <span className="flex items-center gap-1.5 font-display text-[12px] font-semibold text-[#5B6068]">
-            {t('homecard.avg_level')}
-            <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
-          </span>
-        )}
+        {/* Sem a lista de quem vai: quantos já estão num círculo cinzento e os
+            lugares que faltam a tracejado (R1; UX, 14 out). */}
+        <FaceCircles count={peopleCount || 0} free={Math.max(0, capacity - (peopleCount || 0))} size="sm" />
         {!pending && onJoin && (
           <div className="relative ml-auto">
             <CardButton variant={openJoin ? 'lime' : 'out'} disabled={busy} onClick={onJoin}>

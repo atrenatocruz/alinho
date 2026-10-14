@@ -5843,8 +5843,6 @@
   "played.points_when_sent": "Points count once you send it",
   "played.send": "Send",
   "played.share_aria": "Open and share this game",
-  "played.nothing_with": "Nothing with «{{q}}»",
-  "played.nothing_with_hint": "Search by game, club or who played with you.",
   "played.empty_title": "You haven't played yet",
   "played.empty_body": "Your mixes, tournaments and games with friends all show up here.",
   "played.found_one": "{{count}} {{what}}",

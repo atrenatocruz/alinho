@@ -5858,8 +5858,6 @@
   "played.points_when_sent": "Os pontos contam quando enviares",
   "played.send": "Enviar",
   "played.share_aria": "Abrir e partilhar este jogo",
-  "played.nothing_with": "Nada com «{{q}}»",
-  "played.nothing_with_hint": "Procura pelo nome do jogo, do clube ou de quem jogou contigo.",
   "played.empty_title": "Ainda não jogaste",
   "played.empty_body": "Os teus mixes, torneios e jogos entre amigos aparecem aqui, todos.",
   "played.found_one": "{{count}} {{what}}",

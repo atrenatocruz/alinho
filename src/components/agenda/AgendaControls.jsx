@@ -510,7 +510,7 @@ export { useDragScroll }
 const BAR_KINDS = ['mix', 'open', 'free', 'tournament', 'lesson', 'friends']
 const BAR_LABEL_KEY = { ...KIND_FILTER_KEY, friends: 'agenda.filter_kind_friends_short' }
 
-export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilters, onKinds }) {
+export function HomeBar({ filters, dayKey, search = null, onOpenDay, onOpenFilters, onKinds }) {
   const { t, i18n } = useTranslation()
   const { isLessonsEnabled } = useAuth()
   const kinds = BAR_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled)
@@ -518,18 +518,14 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
   const badge = filtersBadge(filters)
   // Um tipo de cada vez; tocar no escolhido, ou em «Tudo», volta a tudo.
   const pick = (k) => onKinds(k === null || (filters.kinds.length === 1 && filters.kinds[0] === k) ? [...EVENT_KINDS] : [k])
-  // R4 (13 out): a barra comum do Bugs (FilterBar/FilterPill). A pastilha
-  // do dia vai antes da lupa (R2: só com a barra presa), por isso a lupa vai
-  // no «lead» e não pelo onSearch da FilterBar.
+  // R4 (13 out): a barra comum do Bugs (FilterBar/FilterPill). A pesquisa é
+  // a comum (SPEC 2026-10-14-pesquisa-regra-unica): a lupa é o primeiro botão
+  // e a caixa abre no sítio da barra; `search` traz o texto e o aberto/fechado,
+  // que vivem na Home (os resultados ficam no lugar da lista do dia).
   const lead = (
     <>
       {onOpenDay && (
         <FilterPill chevron onClick={onOpenDay}>{dayHeading(dayKey, i18n.language).short}</FilterPill>
-      )}
-      {onOpenSearch && (
-        <FilterPill onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}>
-          <Search size={16} />
-        </FilterPill>
       )}
       <FilterPill onClick={onOpenFilters} aria-label={badge ? t('agenda.filters_on', { count: badge }) : undefined}>
         <SlidersHorizontal size={14} /> {t('agenda.filters')}
@@ -538,7 +534,7 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
     </>
   )
   return (
-    <FilterBar lead={lead} label={t('agenda.filters')}>
+    <FilterBar search={search} lead={lead} label={t('agenda.filters')}>
       <FilterPill on={all} onClick={() => pick(null)}>{t('agenda.kind_everything')}</FilterPill>
       {kinds.map((k) => {
         const on = !all && filters.kinds.includes(k)
