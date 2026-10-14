@@ -51,14 +51,14 @@ function StatePills({ s }) {
   const { t } = useTranslation()
   const out = []
   if (s.i_won) out.push(<span key="won" className={`${pill} bg-lime-400 text-ink-900`}>{t('friends.list_you_won')}</span>)
-  if (s.ranking_state === 'counted') out.push(<span key="st" className={`${pill} bg-[#DCFCE7] text-[#14532D]`}>{t('friends.list_counted')}</span>)
+  if (s.ranking_state === 'counted') out.push(<span key="st" className={`${pill} bg-lime-100 text-[#3F6212]`}>{t('friends.list_counted')}</span>)
   else if (s.ranking_state === 'rejected') out.push(<span key="st" className={`${pill} bg-danger/10 text-danger`}>{t('friends.list_rejected')}</span>)
   else if (s.ranking_state === 'waiting') {
     // Com mais de uma pessoa por aceitar, quantas (QA, 12 out: só nomeava uma).
     const who = s.waiting_for || []
     const text = who.length > 1 ? t('friends.list_waiting_many', { count: who.length })
       : who[0]?.name ? t('friends.list_waiting', { name: shortName(who[0].name) }) : t('friends.list_waiting_some')
-    out.push(<span key="st" className={`${pill} bg-[#FEF3C7] text-[#92400E]`}>{text}</span>)
+    out.push(<span key="st" className={`${pill} bg-warning/15 text-[#92400E]`}>{text}</span>)
   } else out.push(<span key="st" className={`${pill} bg-white text-ink-700`}>{t('friends.list_friendly')}</span>)
   return <span className="flex shrink-0 flex-wrap justify-end gap-1">{out}</span>
 }

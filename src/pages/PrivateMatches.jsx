@@ -35,7 +35,7 @@ const slotName = (m, key) => m[`${key}_name`] || m[`${key}_guest_name`]
 const STATUS_META = {
   pending: { labelKey: 'privatematches.status_pending', className: 'bg-ink-50 text-muted' },
   accepted_all: { labelKey: 'privatematches.status_accepted_all', className: 'bg-ok/15 text-ok' },
-  accepted_no_ranking: { labelKey: 'privatematches.status_accepted_no_ranking', className: 'bg-amber-100 text-amber-700' },
+  accepted_no_ranking: { labelKey: 'privatematches.status_accepted_no_ranking', className: 'bg-warning/15 text-[#92400E]' },
   rejected: { labelKey: 'privatematches.status_rejected', className: 'bg-danger/10 text-danger' },
   guest: { labelKey: 'privatematches.status_guest', className: 'bg-ink-50 text-muted' },
 }
@@ -113,7 +113,7 @@ function MyResponsePrompt({ match, onRespond, responding }) {
               type="button"
               disabled={responding}
               onClick={() => onRespond(match.id, 'accept_no_ranking')}
-              className="px-3 py-2 rounded-ctrl bg-amber-100 text-amber-700 text-xs font-extrabold hover:bg-amber-200 disabled:opacity-40"
+              className="px-3 py-2 rounded-ctrl bg-warning/15 text-[#92400E] text-xs font-extrabold hover:bg-warning/25 disabled:opacity-40"
             >
               {t('privatematches.respond_accept_no_ranking')}
             </button>
