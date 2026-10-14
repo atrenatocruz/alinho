@@ -17,6 +17,10 @@ describe('mixChanges (só este ou os seguintes)', () => {
   it('vazio e null são o mesmo; o que não vem não conta', () => {
     expect(mixChanges(base, { title: 'Mix de terça', prize: '' })).toEqual([])
   })
+  it('sem horas do WhatsApp escolhidas, as de omissão não contam (QA, 14 out)', () => {
+    expect(mixChanges({ ...base, whatsapp_post_times: null }, { ...base, whatsapp_post_times: ['10:00'] })).toEqual([])
+    expect(mixChanges(base, { ...base, whatsapp_post_times: ['12:00'] }).map((x) => x.field)).toEqual(['whatsapp_post_times'])
+  })
   it('a frase do aviso', () => {
     const t = (k, o) => ({ 'seriescope.field_price_per_player': 'Preço', 'seriescope.field_title': 'Nome' }[k] || k)
     expect(changesText(t, [{ field: 'title', value: 'Mix novo' }], 'pt')).toBe('nome Mix novo')

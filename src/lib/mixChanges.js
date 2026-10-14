@@ -53,6 +53,9 @@ export function mixChanges(before, after) {
       continue
     }
     if (!(field in (after || {}))) continue
+    // Sem horas do WhatsApp escolhidas, o editor mostra as de omissão
+    // (10:00): não é uma mudança de quem organiza (QA, 14 out).
+    if (field === 'whatsapp_post_times' && norm(field, before?.[field]) == null) continue
     if (norm(field, before?.[field]) !== norm(field, after[field])) out.push({ field, value: after[field] ?? null })
   }
   return out
