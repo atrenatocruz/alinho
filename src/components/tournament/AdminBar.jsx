@@ -23,6 +23,7 @@ import CloseCategories from './CloseCategories'
 import { deadlinePassed, drawProgress, statusKey } from './drawProgress'
 import { ConfirmSheet } from '../ui'
 import EventActionsSheet from '../EventActionsSheet'
+import OrganizerBox from '../event/OrganizerBox'
 
 /** O passo seguinte de cada estado. Do sorteio em diante não se anda à mão:
  *  é o que a `set_tournament_status` deixa fazer, e a barra não promete o
@@ -119,6 +120,83 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   // Cancelado: cada ação só aparece quando faz sentido, como no mix
   // cancelado — sem «Editar», e no «Mais ⋯» só ver e inscritos (UX, 5 out).
   const cancelled = status === 'cancelado'
+  const stateText = t(statusKey(status, progress, tournament?.entries_deadline), { drawn: progress.drawn, total: progress.total })
+  // A folha do «Editar e mais opções» (R3b): «Editar o torneio» primeiro, as
+  // de hoje pela ordem de hoje e «Cancelar…» a vermelho em último.
+  const sheetActions = [
+    !cancelled && { key: 'edit', label: t('organizer.edit_tournament'), hint: t('eventactions.edit_hint'), onClick: () => onEdit?.() },
+    live && { key: 'score', label: t('tournament.score.link_cta'), hint: t('tournament.admin.more_score_hint'),
+      onClick: () => navigate(`/torneio/${tournament.slug || tournament.id}/marcar`) },
+    live && { key: 'schedule', label: t('tournament.admin.schedule'), hint: t('tournament.admin.more_schedule_hint'), onClick: () => onSchedule?.() },
+    { key: 'entries', label: t('tournament.admin.more_entries'), hint: t(cancelled ? 'tournament.admin.more_entries_hint_cancelled' : 'tournament.admin.more_entries_hint'), onClick: () => onEntries?.() },
+    !cancelled && { key: 'scorekeepers', label: t('tournament.admin.more_scorekeepers'), hint: t('tournament.admin.more_scorekeepers_hint'), onClick: () => onScorekeepers?.() },
+    !cancelled && { key: 'notice', label: t('tournament.admin.more_notice'), hint: t('tournament.admin.more_notice_hint'),
+      onClick: () => window.dispatchEvent(new CustomEvent('tournament:new-notice')) },
+    { key: 'public', label: t('tournament.admin.view_public'), hint: t('tournament.admin.more_public_hint'), onClick: () => {
+      const url = new URL(window.location.href)
+      url.searchParams.set('ver', 'publico')
+      navigate(`${url.pathname}${url.search}`)
+    } },
+    canCancel(tournament) && { key: 'cancel', danger: true, label: cancel.label, hint: cancel.hint, onClick: () => setAsk('cancel') },
+  ].filter(Boolean)
+
+  // R3b (13 out, design-handoff/2026-10-13-acoes-de-quem-organiza): a caixa
+  // de quem organiza logo a seguir à data (OrganizerBox, peça comum do Dev 2)
+  // — «● ORGANIZAS ESTE TORNEIO · <ESTADO>», o passo seguinte a preto com a
+  // frase por baixo, e «✎ Editar e mais opções» que abre a folha. Com o
+  // sorteio feito, o terminar das categorias vive mais abaixo (perto do
+  // quadro): fica lá, e a caixa leva «Próximo passo: … ↓» até ele.
+  if (part === 'box') {
+    const nextBtn = next
+      ? {
+        label: t(`tournament.admin.to_${next}`),
+        // Fechar as inscrições pergunta antes (Trello #500).
+        onClick: () => (next === 'fechado' ? setAsk('close') : go(next)),
+        disabled: busy,
+        hint: next === 'fechado' && closesAlone ? t('tournament.admin.closes_alone', { deadline: whenDeadline(tournament.entries_deadline, i18n.language) }) : null,
+        error,
+      }
+      : canDraw ? { label: t('tournament.admin.do_draw'), onClick: draw, disabled: busy, error } : null
+    const nextLink = !nextBtn && live ? {
+      label: t('organizer.finish_categories'),
+      onClick: () => document.getElementById('tournament-close-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    } : null
+    return (
+      <>
+        <OrganizerBox kind="tournament" label={t('organizer.label_tournament', { state: stateText })}
+          next={nextBtn} nextLink={nextLink} onMore={() => setMoreOpen(true)} />
+        <EventActionsSheet
+          open={moreOpen}
+          title={tournament?.name || ''}
+          eyebrow={t('eventactions.bar_label', { state: stateText })}
+          onClose={() => setMoreOpen(false)}
+          actions={sheetActions}
+        />
+        <ConfirmSheet
+          open={ask === 'cancel'}
+          danger
+          title={cancel.title}
+          message={cancel.message}
+          cancelLabel={cancel.cancelLabel}
+          confirmLabel={cancel.confirmLabel}
+          onConfirm={cancel.onConfirm}
+          onClose={() => setAsk(null)}
+          errorOf={cancel.errorOf}
+        />
+        <ConfirmSheet
+          open={ask === 'close'}
+          title={t('tournament.admin.close_title', { name: tournament?.name })}
+          message={t('tournament.admin.close_consequence')}
+          confirmLabel={t('tournament.admin.to_fechado')}
+          cancelLabel={t('tournament.admin.close_not_now')}
+          onConfirm={async () => { await setTournamentStatus(tournament.id, 'fechado'); onChanged?.() }}
+          onClose={() => setAsk(null)}
+          errorOf={(err) => describeError(t, err)}
+        />
+      </>
+    )
+  }
+
   if (part === 'top') {
     return (
       <div>

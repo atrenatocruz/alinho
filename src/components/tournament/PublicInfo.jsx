@@ -54,6 +54,8 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
           senão, depois do sorteio da M4, lia-se que o formato ainda não era
           conhecido (ensaio do QA, 30 set). */}
       {(() => {
+        // Terminado ou cancelado já não se anuncia nada (UX, 13 out).
+        if (['terminado', 'cancelado'].includes(tournament.status)) return null
         const unknown = categories.filter((c) => formatWords(c).key === 'tpublic.format_unknown')
         if (!unknown.length) return null
         const text = unknown.length === categories.length

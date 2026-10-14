@@ -50,14 +50,17 @@ function useStuck(ref, onMeasure) {
 /** Leva a lista ao início, logo abaixo da barra presa — só quando já se
  *  desceu para lá dela (em cima, nada mexe). Vê-se pelo marcador que fica no
  *  sítio da barra: se já passou para cima do topo preso, desceu-se. */
-function useBackToListStart(resetKey, sentinel, topPx) {
+function useBackToListStart(resetKey, sentinel, topPx, { pullUp = false } = {}) {
   const first = useRef(true)
   useLayoutEffect(() => {
     if (first.current) { first.current = false; return }
     if (!sentinel.current) return
     const box = scroller(sentinel.current)
     const offset = sentinel.current.getBoundingClientRect().top - topOf(box) - topPx()
-    if (offset >= -1) return
+    // Sem `pullUp`, só sobe (quem já desceu volta ao início da lista). Com
+    // `pullUp`, também desce até a barra ficar presa em cima, com o conteúdo
+    // à vista (Francisco, 14 out: «deveria puxar a tab para cima»).
+    if (pullUp ? Math.abs(offset) <= 1 : offset >= -1) return
     box.scrollTo({ top: Math.max(0, box.scrollTop + offset) })
   }, [resetKey]) // eslint-disable-line react-hooks/exhaustive-deps
 }
@@ -73,7 +76,9 @@ export function StickyTabs({ children, resetKey, shadow = true }) {
   }).current
   const stuck = useStuck(ref, measure)
   useEffect(() => () => document.documentElement.style.removeProperty('--t-sticky-bottom'), [])
-  useBackToListStart(resetKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0)
+  // Tocar num separador ou mudar a categoria puxa a barra para cima (presa
+  // por baixo do topo) e o conteúdo fica logo à vista (Francisco, 14 out).
+  useBackToListStart(resetKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0, { pullUp: true })
   return (
     <>
       <div ref={sentinel} aria-hidden />

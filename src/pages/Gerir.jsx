@@ -224,16 +224,18 @@ export default function Gerir() {
       // Nasce sempre grupo, em Free: o tipo segue o plano e é a base de
       // dados que o decide (migration_kind_follows_plan.sql). Passa a
       // clube quando o plano mudar para Club, nas Definições.
-      const { slug: newSlug } = await createOrganization(name.trim(), selectedAdmin.id)
+      // Sem ninguém escolhido, o admin é quem está a criar (Francisco, 14 out).
+      const admin = selectedAdmin || { id: profile?.id, name: profile?.name }
+      const { slug: newSlug } = await createOrganization(name.trim(), admin.id)
       // The appointed admin gets the only membership create_organization
       // creates (see migration_platform_admin_create_organization.sql) — if
       // that's someone else, the platform admin has no membership to land
       // on and GerirClube would show "Sem acesso". Only navigate in when
       // they appointed themselves; otherwise confirm success right here.
-      if (selectedAdmin.id === profile?.id) {
+      if (admin.id === profile?.id) {
         navigate(`/gerir/${newSlug}`)
       } else {
-        setCreatedClub({ name: name.trim(), adminName: selectedAdmin.name })
+        setCreatedClub({ name: name.trim(), adminName: admin.name })
         resetCreateForm()
         if (isPlatformAdmin) {
           const { data } = await supabase.from('organizations').select('*').order('name')
@@ -252,7 +254,11 @@ export default function Gerir() {
   const createClubPanel = isPlatformAdmin && (
     <div className="card space-y-4">
       {!showCreateForm ? (
-        <PrimaryButton onClick={() => setShowCreateForm(true)} className="w-full">
+        <PrimaryButton onClick={() => {
+          // O admin vem já preenchido com quem está a criar (Francisco, 14 out).
+          if (profile?.id) setSelectedAdmin({ id: profile.id, name: profile.name, avatar_url: profile.avatar_url })
+          setShowCreateForm(true)
+        }} className="w-full">
           <Plus size={18} />
           {t('gerir.create_new_group')}
         </PrimaryButton>
@@ -274,7 +280,10 @@ export default function Gerir() {
             <OrgNameTakenHint taken={clubNameTaken} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerir.admin_label')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('gerir.admin_label')}</label>
+            {/* Ficas tu como admin; para criar para um cliente, procura-o
+                (Francisco, 14 out). */}
+            <p className="mb-2 text-xs text-muted">{t('gerir.admin_default_hint')}</p>
             <PlayerSearch
               label={t('gerir.search_admin_placeholder')}
               searchFn={searchAnyPlayer}
@@ -288,15 +297,17 @@ export default function Gerir() {
             <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</div>
           )}
 
-          <div className="flex gap-3">
+          {/* Empilhados, a ação cheia em cima (regra de 6 out). */}
+          <div className="space-y-2">
             <PrimaryButton
+              variant="ink"
               onClick={handleCreate}
-              disabled={!name.trim() || !selectedAdmin || saving}
-              className="flex-1"
+              disabled={!name.trim() || saving}
+              className="w-full"
             >
               {saving ? t('gerir.creating') : t('gerir.create_group_button')}
             </PrimaryButton>
-            <PrimaryButton variant="ghost" onClick={resetCreateForm} disabled={saving} className="flex-1">
+            <PrimaryButton variant="ghost" onClick={resetCreateForm} disabled={saving} className="w-full !border-[1.5px] !border-[#CFD2D7] !bg-white">
               {t('gerir.cancel')}
             </PrimaryButton>
           </div>

@@ -409,11 +409,11 @@ export default function TournamentPage() {
         dateLine={longDate(tour.starts_on, i18n.language)}
         onBack={goBack}
         onShare={tour.status === 'rascunho' ? null : shareTournament}
-        // Quem organiza (UX, 13 out — a regra do mix, Francisco 2 out):
-        // «Editar · Mais ⋯» na primeira linha do cartão e o passo seguinte,
-        // preto, logo depois da data, antes da inscrição pessoal.
-        manage={isAdmin ? (
+        // R3b (13 out): a caixa de quem organiza logo a seguir à data, antes
+        // da faixa e da inscrição pessoal. Sai a linha «Editar · Mais» de cima.
+        nextStep={isAdmin ? (
           <AdminBar
+            part="box"
             tournament={tour}
             categories={categories}
             onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
@@ -422,15 +422,6 @@ export default function TournamentPage() {
             onSchedule={() => openAdmin('horario')}
             onScorekeepers={() => openAdmin('marcadores')}
             onEntries={() => setParam('tab', 'entries')}
-          />
-        ) : null}
-        nextStep={isAdmin ? (
-          <AdminBar
-            part="next"
-            tournament={tour}
-            categories={categories}
-            onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
-            onDraw={() => openAdmin('sorteio')}
           />
         ) : null}
         status={ended || cancelled ? {
@@ -559,7 +550,10 @@ export default function TournamentPage() {
       />
       </StickyTabs>
 
-      <div>
+      {/* Pelo menos um ecrã de altura por baixo da barra: assim, ao tocar
+          num separador com pouco conteúdo, a barra ainda consegue subir até
+          ficar presa em cima (Francisco, 14 out). */}
+      <div style={{ minHeight: 'calc(100dvh - var(--t-sticky-bottom, 12rem) - 7rem)' }}>
         {/* O pódio vive DENTRO de «Os meus jogos», em cima — é onde o desenho
             de 23 set o põe. Estava acima dos separadores desde ontem; foi
             engano meu. Ele próprio só aparece com o torneio terminado.
