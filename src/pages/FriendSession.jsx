@@ -12,7 +12,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Trans, useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
-import { Lock, MapPin, MoreHorizontal, Pencil, Share2, X, Plus, Check } from 'lucide-react'
+import { MapPin, X, Plus, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee, leaveFriendMatch, correctFriendMatchResult } from '../lib/privateMatches'
 import AddPersonSheet from '../components/friends/AddPersonSheet'
@@ -23,6 +23,8 @@ import { Sheet } from '../components/agenda/AgendaControls'
 import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
 import EventHero from '../components/event/EventHero'
+import OrganizerBox from '../components/event/OrganizerBox'
+import EventActionsSheet from '../components/EventActionsSheet'
 import { formatDate } from '../lib/formatDate'
 import { beforeStart } from '../lib/friendGames'
 import { currentGame } from '../components/friends/FriendGameNow'
@@ -228,8 +230,6 @@ export default function FriendSession() {
   const back = <BackBar onBack={goBack} label={t('createprivatematch.title')} title={barTitle} />
   // Quem organiza: «✎ Editar» e «Mais ⋯», como no mix (MixAdminBar). O ⋯ não
   // vai na barra de cima — a BackBar não tem menu (Francisco, 27 set).
-  const sheetButton = 'press inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900'
-  const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
   // Depois de enviado sai o «Editar» de cima (ponto 4); fica o «Mais».
   const finished = !!match?.finished_at
   useEffect(() => {
@@ -253,6 +253,10 @@ export default function FriendSession() {
     try { if (clockKey) localStorage.removeItem(clockKey) } catch { /* sem armazenamento */ }
   }
   const iSent = finished && !!profile?.id && match?.sent_by?.user_id === profile.id
+  // R3b: o estado de quem organiza, na caixa e na folha.
+  const orgStateText = finished ? t('agenda.state_finished')
+    : games.some((g) => g.started_at || g.score_a != null) ? t('ui.status_live')
+      : games.length ? t('organizer.state_formed') : t('organizer.state_teams_missing')
   // Jogo acabado com um resultado por responder: quem está nas equipas vê
   // «Está certo» / «Não está certo» no sítio do «Vou» (UX, 13 out). A base de
   // dados já deixa responder a quem jogou, com ou sem o «Vou».
@@ -273,23 +277,6 @@ export default function FriendSession() {
       : t('friends.toast_sent_not_ranked'))
   // Enviado, o «Editar» fica à vista, apagado e com a razão por baixo — antes
   // sumia sem dizer porquê (#586, 13 out).
-  const creatorBar = iOrganize && match && (
-    <>
-      <div className="flex gap-1.5">
-        {!finished
-          ? <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>
-          : <span aria-disabled="true" className={`${pill} cursor-not-allowed text-ink-500 opacity-60`}><Lock size={14} /> {t('friends.edit_short')}</span>}
-        {(!finished || iSent) && <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
-          {t('friends.more')} <MoreHorizontal size={16} />
-        </button>}
-      </div>
-      {finished && (
-        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-500">
-          <Lock size={12} className="mt-0.5 shrink-0" /> {t('friends.edit_locked_sent')}
-        </p>
-      )}
-    </>
-  )
   // Quem aceitou e não criou: a linha verde (SPEC amigos-convidado, ponto 2).
   const organizerLine = iOrganize && !iAmCreator && (
     <p className="mt-3 rounded-card border border-[#BBF7D0] bg-[#DCFCE7] px-3.5 py-2.5 text-sm text-[#14532D]">{t('friends.organizer_line')}</p>
@@ -311,43 +298,24 @@ export default function FriendSession() {
   // «Cancelar o jogo», empilhados em contorno (SPEC amigos-convidado, ponto 5).
   const actions = match && (
     <>
-      {actionsOpen && (
-        <Sheet title={t('friends.more')} onClose={() => setActionsOpen(false)}>
-          {finished ? (
-            // Depois de enviado, só «Corrigir o resultado» para quem enviou:
-            // partilhar passou para o bloco «Vencedores» (#622, UX, 11 out).
-            <div className="space-y-2.5">
-              {iSent && (
-                <button type="button" onClick={() => { setActionsOpen(false); setCorrecting(true) }} className={sheetButton}>
-                  {t('friends.correct_the_result')}
-                </button>
-              )}
-            </div>
-          ) : (
-          <div className="space-y-2.5">
-            <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={sheetButton}>
-              <Pencil size={16} /> {t('friends.edit_game')}
-            </Link>
-            {pending > 0 && (
-              <button type="button" onClick={() => { setActionsOpen(false); shareWithMissing(t('friends.share_text', {
-                name: creator?.name || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id) })) }}
-                className={sheetButton}>
-                <Share2 size={16} /> {t('friends.share_missing')}
-              </button>
-            )}
-            {canLeave && (
-              <button type="button" onClick={() => { setActionsOpen(false); setAskLeave(true) }} className={sheetButton}>
-                {t('friends.leave_game')}
-              </button>
-            )}
-            <button type="button" onClick={() => { setActionsOpen(false); setAskCancel(true) }}
-              className={`${sheetButton} !border-danger/40 !text-danger`}>
-              {t('friends.cancel_game')}
-            </button>
-          </div>
-          )}
-        </Sheet>
-      )}
+      {/* R3b (13 out): a folha de quem organiza é a comum (EventActionsSheet):
+          «Editar o jogo» em primeiro, o cancelar a vermelho em último. Depois
+          de enviado, só «Corrigir o resultado» para quem enviou (#622). */}
+      <EventActionsSheet
+        open={actionsOpen}
+        title={t('agenda.played_friends_title', { name: iAmCreator ? t('agenda.you') : (creator?.name || '').split(/\s+/)[0] })}
+        eyebrow={t('eventactions.bar_label', { state: orgStateText })}
+        onClose={() => setActionsOpen(false)}
+        actions={(finished ? [
+          iSent && { key: 'correct', label: t('friends.correct_the_result'), onClick: () => setCorrecting(true) },
+        ] : [
+          { key: 'edit', label: t('friends.edit_game'), hint: t('eventactions.edit_hint'), onClick: () => navigate(`/jogos-privados/sessao/${match.id}/editar`, { state: { fromSession: true } }) },
+          pending > 0 && { key: 'share', label: t('friends.share_missing'), onClick: () => shareWithMissing(t('friends.share_text', {
+            name: creator?.name || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id) })) },
+          canLeave && { key: 'leave', label: t('friends.leave_game'), onClick: () => setAskLeave(true) },
+          { key: 'cancel', danger: true, label: t('friends.cancel_game'), onClick: () => setAskCancel(true) },
+        ]).filter(Boolean)}
+      />
       {sharingWinners && <FriendWinnersShare match={match} games={games} me={me} onClose={() => setSharingWinners(false)} />}
       {finishedPage && (
         <FinishedPage match={match} games={games} toast={finishedPage.toast} me={me} onClose={() => setFinishedPage(null)} />
@@ -451,9 +419,12 @@ export default function FriendSession() {
             time={match.scheduled_time ? match.scheduled_time.slice(0, 5) : null}
             dateLine={match.scheduled_date ? formatDate(new Date(`${match.scheduled_date}T12:00`), i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language) : null}
             onBack={goBack}
-            // «Editar · Mais ⋯» na primeira linha do cartão, como no mix e no
-            // torneio (QA e UX, 13 out).
-            manage={creatorBar || null}
+            // R3b (13 out): a caixa de quem organiza logo depois da data, com
+            // «Editar e mais opções» (a folha comum).
+            nextStep={iOrganize && (!finished || iSent) ? (
+              <OrganizerBox kind={inClub ? 'open' : 'friends'} onMore={() => setActionsOpen(true)}
+                label={t('organizer.label_friends', { state: orgStateText })} />
+            ) : null}
             status={{
               faces: accepted.map((i) => ({ id: i.invitee_id, name: i.name, avatar_url: i.avatar_url })),
               slots: finished ? 0 : Math.max(0, slots - accepted.length),

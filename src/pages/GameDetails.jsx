@@ -7,6 +7,8 @@ import { BackBar } from '../components/ui'
 import { parseLevel } from '../lib/mixLevels'
 import EventHero from '../components/event/EventHero'
 import EventFacts from '../components/event/EventFacts'
+import OrganizerBox from '../components/event/OrganizerBox'
+import { isMixLive } from '../lib/mixLive'
 import { SkeletonGate } from '../components/Skeleton'
 import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
 import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
@@ -50,7 +52,6 @@ import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
-import MixAdminBar from '../components/mix/MixAdminBar'
 import { usePriceRoster, PriceRosterSummary, PriceRosterTag, useSpecialPriceLine } from '../components/SpecialPriceRoster'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
@@ -2761,8 +2762,20 @@ export default function GameDetails() {
     : matches.length > 0 ? 'rounds'
     : teams.length > 0 ? 'duplas'
     : 'hero'
+  // R3b (13 out): o estado de quem organiza, na caixa e na folha.
+  const orgStateText = (() => {
+    if (isDraftMix(game)) return t('mixdraft.draft')
+    if (game?.status === 'pending') return t('organizer.state_pending')
+    if (game?.status === 'open') return t('organizer.state_open')
+    if (game?.status === 'closed') return mixPaused ? t('eventactions.state_stopped') : t('organizer.state_closed')
+    if (game?.status === 'in_progress') return isMixLive(game, { scored: matches.some((m) => m.score_a != null) }) ? t('ui.status_live') : t('organizer.state_formed')
+    if (game?.status === 'finished') return t('agenda.state_finished')
+    if (game?.status === 'cancelled') return t('homecard.cancelled')
+    return ''
+  })()
+  const goToStep = () => document.getElementById('mix-next-step')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   const renderStepButton = () => (
-    <div className="space-y-1.5">
+    <div id="mix-next-step" className="space-y-1.5 scroll-mt-24">
       <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
         className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
         {barPrimary.label}
@@ -3099,16 +3112,16 @@ export default function GameDetails() {
               ? () => window.open(`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`, '_blank', 'noopener') : null}
             onBack={goBack}
             onShare={isDraftMix(game) ? null : () => (canShareWinners ? openWinnersShare() : setShowShare(true))}
-            // Quem organiza (UX e Dev 1, 13 out — a regra do mix de 2 out):
-            // «Editar · Mais ⋯» na primeira linha do cartão e o passo seguinte
-            // («Sortear duplas») logo depois da hora, antes da faixa.
-            manage={showAdminBar ? (
-              <MixAdminBar
-                onEdit={orgSlug ? () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) : null}
-                onMore={() => setMoreOpen(true)}
-              />
+            // R3b (13 out, opção A + B da UX): a caixa de quem organiza logo
+            // depois da data — a etiqueta, o próximo passo e «Editar e mais
+            // opções». Com o passo mais abaixo (duplas ou rondas), fica lá e a
+            // caixa diz «Próximo passo: … ↓», que desce até ele.
+            nextStep={showAdminBar ? (
+              <OrganizerBox kind={kindOf(game)} onMore={() => setMoreOpen(true)}
+                label={t(isOpenGame(game) ? 'organizer.label_open' : 'organizer.label_mix', { state: orgStateText })}
+                next={stepSlot === 'hero' ? { label: barPrimary.label, onClick: barPrimary.onClick, disabled: barPrimary.disabled, hint: barPrimary.hint, error: mixError } : null}
+                nextLink={stepSlot && stepSlot !== 'hero' ? { label: barPrimary.label, onClick: goToStep } : null} />
             ) : null}
-            nextStep={stepSlot === 'hero' ? renderStepButton() : null}
             status={{
               faces: people.map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url })),
               slots: done ? 0 : free,
@@ -5195,6 +5208,9 @@ export default function GameDetails() {
         const notStarted = (['pending', 'open', 'closed'].includes(game.status) || (isDraftMix(game) && !!game.unfilled_at)) && !mixPaused
         const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
         const actions = [
+          // R3b: «Editar o mix» é a primeira linha (saiu o «Editar» do topo).
+          orgSlug && !['finished', 'cancelled'].includes(game.status) && { key: 'edit', label: t(isOpenGame(game) ? 'organizer.edit_open' : 'organizer.edit_mix'), hint: t('eventactions.edit_hint'),
+            onClick: () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) },
           isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
           // «Voltar a rascunho» (unpublish_mix, Dev 3) — regra nova do
           // Francisco (6 out): sempre, até o mix terminar, também com
@@ -5216,7 +5232,7 @@ export default function GameDetails() {
             <EventActionsSheet
               open={moreOpen}
               title={dateTitle}
-              subtitle={isSeriesDate ? [time, game.location].filter(Boolean).join(' · ') : `${shortDay} · ${time}`}
+              eyebrow={t('eventactions.bar_label', { state: orgStateText })}
               actions={actions}
               onClose={() => setMoreOpen(false)}
             />
