@@ -5855,5 +5855,20 @@
   "played.sum_points": "pontos",
   "played.sum_kudos_one": "kudo",
   "played.sum_kudos_other": "kudos",
-  "ui.load_error_title": "Não foi possível carregar"
+  "ui.load_error_title": "Não foi possível carregar",
+  "terms.updated_kicker": "Última atualização · {{date}}",
+  "terms.lead": "O que combinamos contigo quando usas o alinho.",
+  "terms.summary_title": "Em poucas palavras",
+  "terms.summary_1": "Para quem joga, o alinho é grátis. Os preços dos jogos são de cada clube ou grupo e pagam-se a eles.",
+  "terms.summary_2": "Uma conta por pessoa, com o teu nome verdadeiro, a partir dos 13 anos.",
+  "terms.summary_3": "Inscreve-te só nos jogos a que vais e marca só resultados verdadeiros.",
+  "terms.summary_4": "Quem organiza decide os seus jogos. O alinho dá as ferramentas, mas não reserva campos.",
+  "terms.summary_5": "Podes apagar a tua conta quando quiseres, no Perfil.",
+  "terms.summary_6": "O padel é um desporto físico: jogas por tua conta e risco.",
+  "terms.summary_note": "Isto é só um resumo. O que vale é o texto completo, a seguir.",
+  "terms.toc": "Índice",
+  "terms.back_to_toc": "Índice",
+  "terms.help_title": "Tens alguma dúvida?",
+  "terms.help_body": "Escreve-nos e respondemos.",
+  "terms.help_whatsapp": "Falar pelo WhatsApp"
 }
