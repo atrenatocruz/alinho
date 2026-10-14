@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
+import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
@@ -121,7 +121,6 @@ export default function Profile() {
   const fileInputRef = useRef(null)
   // Explicação do XP: ecrã cheio (ver render mais abaixo) em vez de popover
   // pequeno — esse ficava cortado em ecrãs estreitos.
-  const [xpHelpOpen, setXpHelpOpen] = useState(false)
 
   useEffect(() => {
     if (profile) {
@@ -818,53 +817,6 @@ export default function Profile() {
         <FollowListModal userId={profile.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} manageable />
       )}
 
-      {/* Ecrã cheio da explicação de XP — substitui o antigo popover do (?),
-          que ficava cortado nas larguras estreitas. Mesmo conteúdo de
-          sempre (instructions.xp_*), só que sem limite de largura/altura e
-          com "Voltar" em vez de fechar ao tocar fora.
-          Portal para o body (Francisco, 27 set): dentro do bloco animado da
-          página (transform) o `fixed` ficava preso a ele — o ecrã tinha a
-          altura do Perfil inteiro e deslizava muito para lá do último nível.
-          A mesma causa da pesquisa da Home (#547) e da tira do Gerir (#565). */}
-      {xpHelpOpen && createPortal(
-        <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto animate-fade-in">
-          <div className="sticky top-0 bg-canvas border-b border-line flex items-center gap-3 px-4 py-3.5">
-            <button
-              type="button"
-              onClick={() => setXpHelpOpen(false)}
-              aria-label={t('profile.xp_back')}
-              className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full text-ink-900 hover:bg-ink-50"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h2 className="text-lg text-ink-900 font-extrabold">{t('profile.card_xp_heading')}</h2>
-          </div>
-          {/* Em baixo, só o espaço da barra de navegação. */}
-          <div className="max-w-lg mx-auto px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+112px)] space-y-4">
-            <p className="text-sm text-ink-700 leading-relaxed">{t('instructions.xp_intro')}</p>
-            <ul className="space-y-1.5 text-sm text-muted">
-              <li>• {t('instructions.xp_v1')}</li>
-              <li>• {t('instructions.xp_v2')}</li>
-              <li>• {t('instructions.xp_v3')}</li>
-              <li>• {t('instructions.xp_v4')}</li>
-            </ul>
-            <div className="pt-2 border-t border-line">
-              <p className="text-sm font-extrabold text-ink-900 mb-2">{t('instructions.xp_shields_intro')}</p>
-              <div className="space-y-2">
-                {[...XP_TIERS].reverse().map((tierRow) => (
-                  <div key={tierRow.key} className="flex items-center gap-2.5 text-sm text-muted tabular-nums card py-2.5">
-                    <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${tierRow.dotClass}`} />
-                    <span className="text-ink-900 font-extrabold">{tierRow.level}</span> {t(tierRow.labelKey)}
-                    <span className="ml-auto">{formatXp(tierRow.min)} XP</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
-
       {photoError && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
           {photoError}
@@ -932,7 +884,7 @@ export default function Profile() {
         return (
           <button
             type="button"
-            onClick={() => setXpHelpOpen(true)}
+            onClick={() => navigate('/perfil/xp')}
             aria-label={t('profile.xp_help_aria')}
             className="w-full text-left rounded-card bg-white border border-line p-3.5"
           >
@@ -973,6 +925,8 @@ export default function Profile() {
                 {nextTier ? t('profile.r7_xp_missing', { missing: formatXp(missing), name: t(nextTier.labelKey) }) : t('profile.card_xp_missing', { missing: formatXp(missing) })}
               </p>
             )}
+            {/* R15: a página do XP abre pelo cartão todo; a frase diz isso. */}
+            <p className="mt-2 text-xs font-extrabold text-ink-900">{t('xp_page.see_how')} ›</p>
           </button>
         )
       })()}

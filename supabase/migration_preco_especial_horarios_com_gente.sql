@@ -27,7 +27,9 @@ DECLARE
   -- vivo pode tê-los, e o pedaço a trocar tem duas linhas.
   v_def  TEXT := replace(pg_get_functiondef('public.set_event_special_price(text,uuid,numeric,text,uuid[])'::regprocedure), E'\r', '');
 BEGIN
-  IF v_def LIKE '%fica o preço de antes%' THEN
+  -- A guarda procura uma frase que fica numa linha só (SI, 14 out: a de
+  -- antes partia-se em duas linhas e nunca dizia «já estava»).
+  IF v_def LIKE '%nos horários em que já há quem jogue%' THEN
     RAISE NOTICE 'set_event_special_price: já estava';
     RETURN;
   END IF;
@@ -47,4 +49,4 @@ END $$;
 COMMIT;
 
 -- Verificar depois de correr:
---   SELECT pg_get_functiondef('public.set_event_special_price(text,uuid,numeric,text,uuid[])'::regprocedure) LIKE '%fica o preço de antes%';  -- true
+--   SELECT pg_get_functiondef('public.set_event_special_price(text,uuid,numeric,text,uuid[])'::regprocedure) LIKE '%nos horários em que já há quem jogue%';  -- true

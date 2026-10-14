@@ -2079,6 +2079,15 @@ const OPEN_BATCH = () => {
   return [g('ob-1', 18, 0, ['confirmed', 'confirmed']), g('ob-2', 19, 30, []), g('ob-3', 21, 0, [])]
 }
 RPC_MOCKS.update_open_slot_batch = () => ['ob-1', 'ob-2', 'ob-3']
+// R15: o XP do mês, por jogo. localStorage.mockXpMonth = 'empty' → mês vazio.
+const xpAgo = (d) => { const x = new Date(); x.setDate(Math.max(1, x.getDate() - d)); x.setHours(20, 0, 0, 0); return x.toISOString() }
+TABLE_MOCKS.xp_events = () => (localStorage.getItem('mockXpMonth') === 'empty' ? [] : [
+  ...[['mix_participation', 20], ['mix_games', 20], ['mix_win', 30]].map(([kind, amount]) => ({ kind, amount, occurred_at: xpAgo(1), source_game_id: 'xp-g1', source_private_match_id: null, games: { title: 'Mix de segunda' } })),
+  ...[['friendly_match', 10], ['friendly_win', 5]].map(([kind, amount]) => ({ kind, amount, occurred_at: xpAgo(5), source_game_id: null, source_private_match_id: 'xp-p1', games: null })),
+  ...[['mix_participation', 20], ['mix_games', 20]].map(([kind, amount]) => ({ kind, amount, occurred_at: xpAgo(7), source_game_id: 'xp-g2', source_private_match_id: null, games: { title: 'Mix de terça' } })),
+  { kind: 'friendly_match', amount: 10, occurred_at: xpAgo(12), source_game_id: null, source_private_match_id: 'xp-p2', games: null },
+])
+
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)

@@ -5,14 +5,25 @@
 // enquanto escreve — e some assim que o email fica certo.
 // `checkNow`: um número que o formulário aumenta ao carregar no botão com o
 // email mal escrito (aí também o «Escreve o teu email.» de um campo vazio).
-import { useEffect, useState } from 'react'
+// Nesse momento a página leva ao campo (ao centro) e o cursor fica lá: o
+// botão está lá em baixo e o erro não se via (UX, 14 out — vale para qualquer
+// erro de formulário: leva-se ao primeiro campo com problema).
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { emailProblem } from '../lib/emailCheck'
 
 export default function EmailField({ value, onChange, checkNow = 0, placeholder, autoComplete = 'email', id, autoFocus = false }) {
   const { t } = useTranslation()
   const [shown, setShown] = useState(false) // já se pode mostrar o erro
-  useEffect(() => { if (checkNow > 0) setShown(true) }, [checkNow])
+  const inputRef = useRef(null)
+  useEffect(() => {
+    if (checkNow <= 0) return
+    setShown(true)
+    if (emailProblem(inputRef.current?.value)) {
+      inputRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      inputRef.current.focus({ preventScroll: true })
+    }
+  }, [checkNow])
   const problem = emailProblem(value)
   // Ao sair do campo vazio não se diz nada; o «vazio» é só do botão.
   const visible = shown && problem && (problem !== 'empty' || checkNow > 0)
@@ -21,6 +32,7 @@ export default function EmailField({ value, onChange, checkNow = 0, placeholder,
     <>
       <input
         id={id}
+        ref={inputRef}
         type="text"
         inputMode="email"
         autoCapitalize="none"

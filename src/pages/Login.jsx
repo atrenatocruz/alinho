@@ -123,6 +123,12 @@ export default function Login() {
   // campo, em vez da bolha do browser (13 out).
   const [checkLoginEmail, setCheckLoginEmail] = useState(0)
   const [checkSignupEmail, setCheckSignupEmail] = useState(0)
+  // Nome vazio ao carregar no botão: o erro por baixo do campo, como o do
+  // email (QA, 14 out); some assim que se escreve.
+  const [nameMissing, setNameMissing] = useState(false)
+  // O nome está no topo e o botão lá em baixo: o cursor vai para o campo,
+  // para o erro se ver no telemóvel.
+  const nameRef = useRef(null)
   const [loginPassword, setLoginPassword] = useState('')
 
   // Signup form state
@@ -163,7 +169,12 @@ export default function Login() {
 
   const handleSignup = async (e) => {
     e.preventDefault()
-    if (!signupName.trim()) { setError(t('login.error_missing_name')); return }
+    if (!signupName.trim()) {
+      setNameMissing(true)
+      nameRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      nameRef.current?.focus({ preventScroll: true })
+      return
+    }
     if (emailProblem(signupEmail)) { setCheckSignupEmail((n) => n + 1); return }
     setLoading(true)
     setError('')
@@ -382,14 +393,23 @@ export default function Login() {
               <div>
                 <label className={inputLabel}>{t('login.fullname_label')}</label>
                 <input
+                  id="signup-name"
+                  ref={nameRef}
                   type="text"
                   value={signupName}
-                  onChange={(e) => setSignupName(e.target.value)}
-                  className="input-field"
+                  onChange={(e) => { setSignupName(e.target.value); if (e.target.value.trim()) setNameMissing(false) }}
+                  className={`input-field ${nameMissing ? '!border-danger focus:!border-danger focus:!ring-danger/20' : ''}`}
                   placeholder={t('login.fullname_placeholder')}
                   autoComplete="name"
-                  required
+                  aria-invalid={nameMissing || undefined}
+                  aria-describedby={nameMissing ? 'signup-name-erro' : undefined}
                 />
+                {nameMissing && (
+                  <p id="signup-name-erro" role="alert" className="mt-1.5 flex items-start gap-1.5 text-[13px] font-extrabold text-danger">
+                    <span aria-hidden="true">⚠</span>
+                    <span>{t('login.error_missing_name')}</span>
+                  </p>
+                )}
               </div>
 
               <div>

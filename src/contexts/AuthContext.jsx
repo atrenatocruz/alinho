@@ -22,6 +22,8 @@ const MOCK_ADMIN_PROFILE = {
   gender: typeof localStorage !== 'undefined' && localStorage.getItem('mockNoGender') === 'true' ? null : 'masculino',
   phone_hash: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneUnconfirmed') === 'true' ? 'hash-de-teste' : 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass; mockPhoneUnconfirmed mostra o «Confirma o teu número» (#537)
   phone_verified_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneConfirmed') === 'true' ? '2026-09-24T20:00:00Z' : null,
+  // localStorage.mockXp = '8100' → XP de atividade do perfil de teste (R15).
+  xp: typeof localStorage !== 'undefined' && localStorage.getItem('mockXp') ? Number(localStorage.getItem('mockXp')) : 0,
   // localStorage.mockPlatformAdmin = 'true' → vê o seletor de plano no Gerir.
   is_platform_admin: typeof localStorage !== 'undefined' && localStorage.getItem('mockPlatformAdmin') === 'true',
   // Rating fictício (11 set 2026) — sem isto o aro de progresso do Perfil
