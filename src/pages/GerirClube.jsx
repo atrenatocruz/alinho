@@ -39,7 +39,7 @@ import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
 import { isDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
-import { PastByMonth, PastSection, SectionLabel } from '../components/gerir/PastEvents'
+import { PastByMonth, PastMonths, SectionLabel } from '../components/gerir/PastEvents'
 import OpenDayCard from '../components/gerir/OpenDayCard'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
@@ -457,8 +457,11 @@ export default function GerirClube() {
     if (item.terminado || !['mix', 'torneio'].includes(item.tipo)) return false
     const row = item.tipo === 'mix' ? item.entry?.game : item.row
     if (!row) return false
-    if (item.tipo === 'mix' && (isDraftMix(row) || isMixLive(row))) return false
-    if (item.tipo === 'torneio' && ['rascunho', 'a_decorrer'].includes(row.status)) return false
+    // Rascunhos nunca; o resto, se o dia já acabou e não foi dado como
+    // terminado — mesmo que tenha ficado «a decorrer» (UX, 9 out; QA, 14 out:
+    // um mix a decorrer desde ontem e um torneio de 8 out ficavam em «A seguir»).
+    if (item.tipo === 'mix' && isDraftMix(row)) return false
+    if (item.tipo === 'torneio' && row.status === 'rascunho') return false
     const ultimoDia = item.tipo === 'torneio' ? (row.ends_on || row.starts_on) : (row.date ? String(row.date).slice(0, 10) : null)
     return !!ultimoDia && new Date(`${String(ultimoDia).slice(0, 10)}T23:59`) < new Date()
   }
@@ -3823,7 +3826,10 @@ export default function GerirClube() {
                     {/* Com pesquisa e nada encontrado, o vazio comum da pesquisa (com o
                         Alino); sem pesquisa, a frase da lista vazia (Bugs/UX, 14 out). */}
                     {aSeguir.length === 0 && (eventQuery.trim() ? (
-                      porTerminarLista.length === 0 && <EmptyState title={t('comunidade.nothing_found_title')} subtitle={t('comunidade.try_another_name')} />
+                      // Só sem resultado em lado nenhum (nem em «Já passaram»): o vazio
+                      // aparecia por cima de um torneio encontrado (QA, 14 out).
+                      porTerminarLista.length === 0 && passadosPorData().length === 0
+                        && <EmptyState title={t('comunidade.nothing_found_title')} subtitle={t('comunidade.try_another_name')} />
                     ) : (
                       <p className="text-sm text-muted text-center py-6">
                         {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
@@ -3843,9 +3849,10 @@ export default function GerirClube() {
                 })()}
               </div>
 
-              {/* «JÁ PASSARAM · N»: os 3 mais recentes e o resto numa página
-                  (SPEC 9 out). Datas de uma série e eventos soltos, juntos. */}
-              <PastSection items={passadosPorData()} onSeeAll={() => navigate(`/gerir/${org.slug}/ja-passaram`, { state: { fromGerir: true } })} />
+              {/* «JÁ PASSARAM · N» por mês («SETEMBRO 2026»), a carregar ao descer,
+                  sem «Ver mais» (regra das listas grandes, Francisco 14 out).
+                  Datas de uma série e eventos soltos, juntos (SPEC 9 out). */}
+              <PastMonths items={passadosPorData()} query={eventQuery} />
               </div>
 
               {/* Publicar pergunta uma vez: a mensagem do robô não se apaga
