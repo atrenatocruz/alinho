@@ -45,13 +45,15 @@ import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import MixImageField from '../components/mix/MixImageField'
 import SpecialPriceField, { specialPriceMissing } from '../components/SpecialPriceField'
-import { saveEventSpecialPrice } from '../lib/specialPrice'
+import { saveEventSpecialPrice, getEventSpecialPrice } from '../lib/specialPrice'
+import SeriesScopeSheet from '../components/mix/SeriesScopeSheet'
+import { mixChanges, changeLabel, changesText } from '../lib/mixChanges'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
 import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
-import { weekdayShort, launchDate } from '../lib/launchDay'
+import { weekdayShort, weekdayLong, isMasculineWeekday, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
 import { Realce } from '../components/SearchField'
@@ -158,6 +160,10 @@ const EMPTY_RECURRENCE = {
   launchDaysBefore: '',
   launchTime: '09:00',
 }
+
+// Os mixes seguintes de uma série que ainda se podem mudar: os que não
+// começaram nem acabaram (Dev 3, 14 out).
+const SERIES_FOLLOWING_STATUSES = ['pending', 'open', 'closed', 'draft']
 
 const EMPTY_GAME_FORM = {
   title: '',
@@ -407,6 +413,11 @@ export default function GerirClube() {
   // devolve true (sim) ou false (a segura, fechar).
   const [ask, setAsk] = useState(null)
   const askConfirm = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }))
+  // «Só este mix / Este e os seguintes» (SPEC 2026-10-13-serie-so-este-ou-
+  // seguintes): a folha devolve 'this', 'following' ou null (voltar sem guardar).
+  const [scopeAsk, setScopeAsk] = useState(null)
+  const editInitialForm = useRef(null)
+  const askScope = (opts) => new Promise((resolve) => setScopeAsk({ ...opts, resolve }))
   const [settingsError, setSettingsError] = useState('')
   const [renameError, setRenameError] = useState('')
   // O erro de admin/tirar fica por baixo dessa pessoa: numa lista comprida,
@@ -1732,9 +1743,7 @@ export default function GerirClube() {
           ? { launch_at: new Date(newDate.getTime() - editingGame.recurrence.mix_offset_seconds * 1000).toISOString() }
           : {}
 
-      const { data, error } = await supabase
-        .from('games')
-        .update({
+      const payload = {
           ...gameFields,
           date: newDate.toISOString(),
           num_courts: numCourts,
@@ -1759,16 +1768,109 @@ export default function GerirClube() {
           ...((imageUrl || editingGame.image_url) ? { image_url: imageUrl || null } : {}),
           ...pendingLaunchUpdate,
           ...singleLaunchUpdate,
-        })
+      }
+
+      // Uma data de uma série com regras mudadas: só este mix, ou este e os
+      // seguintes? (SPEC 2026-10-13-serie-so-este-ou-seguintes, Francisco
+      // 13 out.) O dia e a hora mudam sempre só este mix; o que só existe na
+      // série muda sempre a série. Do «Editar as regras» da página da série
+      // não se pergunta: aí é sempre a série.
+      const inSeries = hadActiveRecurrence && recurrence.enabled
+      let scope = null
+      let changes = []
+      let following = []
+      if (inSeries) {
+        const specialBefore = special === undefined ? undefined
+          : await getEventSpecialPrice('mix', editingGame.id).catch(() => undefined)
+        // O preço especial chega ao formulário depois de ele abrir: compara-se
+        // com o gravado. O resto, com o formulário como abriu.
+        const { special: _s0, ...formBefore } = editInitialForm.current || {}
+        const { special: _s1, ...formNow } = gameForm
+        changes = mixChanges(
+          { ...formBefore, ...(specialBefore !== undefined ? { special: specialBefore } : {}) },
+          { ...formNow, ...(special !== undefined && specialBefore !== undefined ? { special } : {}) },
+        )
+        if (changes.length) {
+          const { data: next } = await supabase
+            .from('games')
+            .select('id, date, participants(status, partner_id, partner_guest_id)')
+            .eq('recurrence_id', editingGame.recurrence.id)
+            .gt('date', editingGame.date)
+            .in('status', SERIES_FOLLOWING_STATUSES)
+            .order('date', { ascending: true })
+          following = (next || []).map((g) => ({
+            id: g.id,
+            when: g.date,
+            people: (g.participants || []).filter((pt) => ['confirmed', 'waitlisted'].includes(pt.status))
+              .reduce((n, pt) => n + 1 + (pt.partner_id || pt.partner_guest_id ? 1 : 0), 0),
+          }))
+          if (location.state?.seriesRules) scope = 'following'
+          else {
+            // O aviso aos inscritos só se promete quando a função do Dev 3
+            // já corre (migration_mix_aviso_regras_mudaram.sql).
+            const { error: probe } = await supabase.rpc('notify_mix_changed', { p_game_ids: [], p_changes: [] })
+            const notifies = !probe || !/PGRST202|does not exist|Could not find/i.test(`${probe.code} ${probe.message}`)
+            // «terça, 20 out» e «27 out», como na proposta.
+            const shortDay = (d) => `${new Date(d).getDate()} ${formatDateLib(d, i18n.language, { month: 'short' }).replace(/\./g, '').toLocaleLowerCase(i18n.language)}`
+            const day = (d) => `${weekdayLong(new Date(d), i18n.language)}, ${shortDay(d)}`
+            const repeats = recurrence.frequency === 'weekly'
+              ? t(isMasculineWeekday(newDate) ? 'series.every_weekday_m' : 'series.every_weekday_f', { day: weekdayLong(newDate, i18n.language) })
+              : t(`series.every_${recurrence.frequency || 'weekly'}`)
+            const rec = editingGame.recurrence
+            const launchNow = deriveLaunchFields(editingGame.date, rec.mix_offset_seconds)
+            const seriesOnlyChanged = recurrence.frequency !== rec.frequency || recurrence.endsType !== rec.ends_type
+              || String(recurrence.launchDaysBefore) !== String(launchNow.daysBefore) || recurrence.launchTime !== launchNow.launchTime
+            const timeChanged = new Date(editingGame.date).getTime() !== newDate.getTime()
+            scope = await askScope({
+              title: gameForm.title || editingGame.title,
+              repeats,
+              dayLabel: day(newDate),
+              changes: changes.map((c) => changeLabel(t, c, i18n.language)),
+              notes: [timeChanged ? t('seriescope.time_only_this') : null, seriesOnlyChanged ? t('seriescope.series_only') : null].filter(Boolean),
+              following: following.map((f) => ({ date: shortDay(f.when), people: f.people })),
+              notifies,
+              whatText: changesText(t, changes.filter((c) => !['image_url', 'whatsapp_post_times'].includes(c.field)), i18n.language),
+            })
+            if (!scope) return
+          }
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('games')
+        .update(payload)
         .eq('id', editingGame.id)
         .select()
         .single()
 
       if (error) throw error
 
-      if (hadActiveRecurrence && recurrence.enabled) {
-        // Origin Mix, recurrence still on: keep the shared rule/snapshot in sync.
-        const result = await updateRecurrence(editingGame.recurrence.id, data, recurrence)
+      if (inSeries && scope === 'following' && following.length) {
+        // Os seguintes num só UPDATE (Dev 3, 14 out): ou mudam todos ou
+        // nenhum. Só as regras que mudaram; o dia e a hora de cada um ficam.
+        const cols = {}
+        for (const c of changes) {
+          if (c.field === 'format') Object.assign(cols, { format: payload.format, seed_reverse: payload.seed_reverse, rotate_partners: payload.rotate_partners, respect_sides: payload.respect_sides })
+          else if (c.field === 'num_courts') Object.assign(cols, { num_courts: payload.num_courts, max_players: payload.max_players })
+          else if (!['special', 'whatsapp_post_times'].includes(c.field) && c.field in payload) cols[c.field] = payload[c.field]
+        }
+        Object.keys(cols).forEach((k) => cols[k] === undefined && delete cols[k])
+        if (Object.keys(cols).length) {
+          const { error: followError } = await supabase.from('games').update(cols).in('id', following.map((f) => f.id))
+          if (followError) {
+            console.error('Error updating the following mixes:', followError)
+            setGameError(t('seriescope.following_failed'))
+            loadGames()
+            return
+          }
+        }
+      }
+
+      if (inSeries) {
+        // Só este mix: a regra da série (Repete?, Abrem, Acaba) muda, mas os
+        // seguintes ficam como estavam — o retrato da série é o de antes.
+        const snapshot = scope === 'this' ? { ...editingGame, date: data.date } : data
+        const result = await updateRecurrence(editingGame.recurrence.id, snapshot, recurrence)
         // O mix ficou gravado; o que falhou na recorrência fica escrito no
         // formulário, que não fecha, para o admin ver onde foi.
         if (result.error) {
@@ -1798,10 +1900,43 @@ export default function GerirClube() {
       }
 
       // As horas do WhatsApp: numa série ativa, da série inteira.
-      const hoursWarning = (await saveMixPostTimes(editingGame.id, recurrence.enabled, postTimes))
+      // Com «Só este mix», ficam só neste mix; com «Este e os seguintes»,
+      // também nos seguintes já criados.
+      const toSeries = recurrence.enabled && scope !== 'this'
+      const hoursWarning = (await saveMixPostTimes(editingGame.id, toSeries, postTimes))
         // Também quando o «Repete?» se liga agora: a série acabou de nascer e
         // as datas seguintes herdam o preço especial dela (#586, ponto 1.7).
-        || (await saveMixSpecialPrice(editingGame.id, recurrence.enabled, special, gameForm.price_per_player))
+        || (await saveMixSpecialPrice(editingGame.id, toSeries, special, gameForm.price_per_player))
+      if (scope === 'following') {
+        for (const f of following) {
+          if (changes.some((c) => c.field === 'whatsapp_post_times')) await saveMixPostTimes(f.id, false, postTimes)
+          if (changes.some((c) => c.field === 'special')) await saveMixSpecialPrice(f.id, false, special, gameForm.price_per_player)
+        }
+      }
+      // O aviso no sino aos inscritos dos mixes que mudaram (Dev 3,
+      // notify_mix_changed). Se ainda não correr, guarda-se na mesma.
+      let notified = []
+      if (scope && changes.length) {
+        const ids = scope === 'following' ? [editingGame.id, ...following.map((f) => f.id)] : [editingGame.id]
+        const { data: sent, error: notifyError } = await supabase.rpc('notify_mix_changed', { p_game_ids: ids, p_changes: changes })
+        if (notifyError) console.error('Error notifying the changed mixes:', notifyError)
+        else notified = Array.isArray(sent) ? sent : []
+      }
+      if (scope) {
+        const shortDay = (d) => `${new Date(d).getDate()} ${formatDateLib(d, i18n.language, { month: 'short' }).replace(/\./g, '').toLocaleLowerCase(i18n.language)}`
+        const here = shortDay(data.date)
+        let msg = scope === 'this' ? t('seriescope.saved_this', { day: here }) : t('seriescope.saved_following', { day: here })
+        const others = following.filter((f) => notified.some((n) => n.game_id === f.id && n.notified > 0))
+        if (scope === 'following' && others.length) {
+          const count = others.reduce((n, f) => n + (notified.find((x) => x.game_id === f.id)?.notified || 0), 0)
+          msg += ` ${others.length === 1
+            ? t('seriescope.saved_notified_single', { count, day: shortDay(others[0].when) })
+            : t('seriescope.saved_notified_many', { count })}`
+        }
+        saidaNotice.current = msg
+        // No formulário de sempre (sem a página do mix) a tira não vinha da saída.
+        if (!mixPage) setDoneNotice(msg)
+      }
       if (hoursWarning) saidaNotice.current = hoursWarning
       if (!saidaNotice.current) saidaNotice.current = t('mixwizard.notice_saved')
       setEditingGame(null)
@@ -2353,7 +2488,10 @@ export default function GerirClube() {
     const launchFields = hasActiveRecurrence
       ? deriveLaunchFields(game.date, game.recurrence.mix_offset_seconds)
       : null
-    setGameForm({
+    // O formulário como abriu: «só este ou os seguintes» compara com ele, e
+    // não com a linha da base de dados (os valores por omissão do formulário
+    // pareciam mudanças).
+    const initialForm = {
       title: game.title,
       date: toLocalInput(game.date),
       location: game.location || '',
@@ -2403,7 +2541,9 @@ export default function GerirClube() {
             launchTime: launchFields.launchTime,
           }
         : EMPTY_RECURRENCE,
-    })
+    }
+    editInitialForm.current = initialForm
+    setGameForm(initialForm)
   }
 
   if (orgLoading) {
@@ -2506,6 +2646,12 @@ export default function GerirClube() {
   const doneStrip = (
     <>
       {askSheet}
+      <SeriesScopeSheet
+        open={!!scopeAsk}
+        {...(scopeAsk || {})}
+        onPick={(v) => { scopeAsk?.resolve(v); setScopeAsk(null) }}
+        onClose={() => { scopeAsk?.resolve(null); setScopeAsk(null) }}
+      />
       {doneNotice && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
           <Check size={16} className="shrink-0" />
@@ -2539,7 +2685,9 @@ export default function GerirClube() {
         abreEm={abreEm}
         onBack={() => voltar()}
         onOpen={(g) => navigate(`/jogo/${g.id}`)}
-        onEditRules={(g) => navigate(`/gerir/${org.slug}/editar/mix/${g.id}`, { state: { fromGerir: true } })}
+        // «Editar as regras» da série: ao guardar não se pergunta «só este
+        // ou os seguintes» — aí é sempre a série (SPEC 2026-10-13).
+        onEditRules={(g) => navigate(`/gerir/${org.slug}/editar/mix/${g.id}`, { state: { fromGerir: true, seriesRules: true } })}
         onChanged={loadGames}
         onStopSeries={deactivateRecurrence}
         onDeleted={(notice) => { loadGames(); voltar(notice) }}

@@ -21,6 +21,7 @@ import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
 import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
+import { changesText } from '../lib/mixChanges'
 import AccountDeletionPending from './AccountDeletionPending'
 import AppToast from './AppToast'
 
@@ -458,6 +459,8 @@ export default function Layout({ children }) {
     // e não «Saíste» (UX, 8 out).
     if (notice.kind === 'mix_removed') return t(d.actor_name ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
+    // «O Mix de terça de 27 out mudou: preço 10,00 €, formato Sobe e desce.»
+    if (notice.kind === 'mix_changed') return t('layout.mix_changed', { ...vars, changes: changesText(t, d.changes, i18n.language) })
     // #622 (Dev 3, migration_mix_aviso_terminou.sql): «🏆 <Evento> terminou.
     // Ganharam <vencedores>.» — sem vencedores com nome, só «terminou».
     if (notice.kind === 'mix_finished') {
