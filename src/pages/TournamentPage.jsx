@@ -72,6 +72,8 @@ export default function TournamentPage() {
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [failed, setFailed] = useState(false)
+  // Sobe a cada toque num separador ou na categoria (StickyTabs pullKey).
+  const [pullKey, setPullKey] = useState(0)
   // Torneio de um grupo onde não estou: diz de que grupo é, em vez de «não
   // encontrado» (SPEC 2026-10-01-jogo-de-grupo-fechado, ponto 7).
   const [orgHint, setOrgHint] = useState(null)
@@ -375,6 +377,7 @@ export default function TournamentPage() {
   const heroCode = [categories.find((c) => c.id === activeMy(data)?.category_id)?.code, heroMore > 0 ? `+${heroMore}` : null].filter(Boolean).join(' ') || null
   const heroPartner = myPair ? [myPair.player1_name, myPair.player2_name].filter(Boolean).find((n) => n !== profile?.name) : null
   const heroPair = heroIn && heroCode && heroPartner ? t('tournament.hero_entered_with', { code: heroCode, name: heroPartner }) : null
+  const pendingPairs = Number(tour.pending_count ?? categories.reduce((n, c) => n + (Number(c.pending_count) || 0), 0)) || 0
   const todayIso = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Lisbon' })
   const isToday = !!tour.starts_on && String(tour.starts_on).slice(0, 10) <= todayIso && String(tour.ends_on || tour.starts_on).slice(0, 10) >= todayIso
   const firstDayCats = categories.filter((c) => c.day_date && String(c.day_date).slice(0, 10) === String(tour.starts_on || '').slice(0, 10) && c.start_time)
@@ -444,6 +447,9 @@ export default function TournamentPage() {
           meta: [totalSlots
             ? t('tournament.hero_pairs_of', { n: teamsIn ?? tour.entry_count ?? 0, total: totalSlots })
             : t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }),
+          // As por validar à parte (a conta grande são os lugares): «0/16
+          // DUPLAS · 1 POR VALIDAR» (UX, 14 out).
+          pendingPairs > 0 ? t('tournament.hero_pending', { count: pendingPairs }) : null,
           isToday ? t('ui.today') : null].filter(Boolean).join(' · '),
         }}
       >
@@ -529,13 +535,13 @@ export default function TournamentPage() {
       {/* A categoria e os separadores ficam presos por baixo do título ao
           descer (Francisco, 11 out, para experimentar — StickyBar). */}
       <div id="tournament-tabs" className="scroll-mt-20" />
-      <StickyTabs resetKey={`${category?.id || ''}:${tab}`} shadow={tab !== 'schedule'}>
+      <StickyTabs resetKey={`${category?.id || ''}:${tab}`} pullKey={pullKey} shadow={tab !== 'schedule'}>
       {categories.length > 0 && (
         <CategorySelect
           categories={categories}
           mineId={activeMy(data)?.category_id}
           value={category?.id}
-          onChange={(nextId) => setParam('cat', categories.find((c) => c.id === nextId)?.code || '')}
+          onChange={(nextId) => { setParam('cat', categories.find((c) => c.id === nextId)?.code || ''); setPullKey((k) => k + 1) }}
           label={t('tournament.category_select_label')}
         />
       )}
@@ -545,7 +551,7 @@ export default function TournamentPage() {
       <Tabs
         options={tabs.map((key) => ({ value: key, label: t(`tournament.tab_${key}`) }))}
         value={tab}
-        onChange={(next) => setParam('tab', next)}
+        onChange={(next) => { setParam('tab', next); setPullKey((k) => k + 1) }}
         label={t('tournament.tabs_label')}
       />
       </StickyTabs>

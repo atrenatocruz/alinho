@@ -13,7 +13,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -2725,7 +2725,9 @@ export default function GerirClube() {
       )}
       {/* R9 (13 out): a foto pequena (56 px; sem logótipo, o Alino do clube ou
           do grupo, R0), «GERIR», o nome e as pastilhas «Clube» e «Plano». */}
-      <div className="!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2">
+      {/* R12b (14 out): a barra do «‹» e este bloco leem-se como um topo só —
+          os cantos de baixo e a sombra vão só aqui, no último. */}
+      <div className={`!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2 ${TOP_EDGE}`}>
         <span className={`h-14 w-14 shrink-0 overflow-hidden ${isGroupOrg ? 'rounded-full' : 'rounded-[14px]'}`} aria-hidden="true">
           <img src={org.group_logo_url || (isGroupOrg ? GROUP_HERO : CLUB_HERO)} alt="" loading="lazy"
             className={`h-full w-full object-cover ${org.group_logo_url ? '' : 'object-[70%_30%]'}`} />

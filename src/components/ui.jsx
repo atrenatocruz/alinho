@@ -877,7 +877,10 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
     </div>
     {more && (
       <button type="button" onClick={nudge} aria-label={t('ui.see_more_right')} tabIndex={-1}
-        className="absolute inset-y-0 -right-4 hidden w-[34px] items-center justify-end bg-gradient-to-r from-white/0 via-white to-white pr-2 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
+        // O esbatido acaba na cor de fundo da barra (--bar-bg): branco no topo
+        // da Home, o cinzento da página na StickyTop (R12b).
+        style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0), var(--bar-bg, #fff) 45%)' }}
+        className="absolute inset-y-0 -right-4 hidden w-[34px] items-center justify-end pr-2 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
         ›
       </button>
     )}
@@ -886,7 +889,8 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
 }
 
 /** O bloco que fica preso em cima ao descer: o separador e a barra de
- *  filtros juntos, em branco, com uma linha fina por baixo. Tem de ser filho
+ *  filtros juntos, no cinzento da página (#F1F2EE), sem faixa branca nem
+ *  linha por baixo (R12b, 14 out) — tapa o que passa por baixo. Tem de ser filho
  *  direto do contentor da página (o sticky só prende dentro do pai). Tem
  *  sempre o mesmo tamanho, preso ou solto — não treme ao descer.
  *  `belowBackBar`: nas páginas com o «‹» preso (BackBar, 64 px + a margem do
@@ -894,8 +898,8 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
 const BELOW_BACKBAR = 'calc(4rem + var(--safe-top, env(safe-area-inset-top, 0px)))'
 export function StickyTop({ children, belowBackBar = false, className = '' }) {
   return (
-    <div style={belowBackBar ? { top: BELOW_BACKBAR } : undefined}
-      className={`sticky top-0 z-10 -mx-4 space-y-2 border-b border-line/70 bg-white px-4 pb-1.5 pt-2 ${className}`}>
+    <div style={{ '--bar-bg': 'rgb(var(--ground))', ...(belowBackBar ? { top: BELOW_BACKBAR } : {}) }}
+      className={`sticky top-0 z-10 -mx-4 space-y-2 bg-ground px-4 pb-1.5 pt-2 ${className}`}>
       {children}
     </div>
   )
@@ -1709,6 +1713,8 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
 // Vouchers» do Gerir, 7 out). Sem `onBack` nem `to`, o lugar do «‹» fica vazio.
 // `solid`: fundo branco opaco em vez do vidro — no Gerir via-se o texto a
 // passar por trás da barra presa (UX, 7 out).
+// Com `solid`, os cantos de baixo a 16 px (R12b): parada não se veem (o bloco
+// branco de baixo está por trás), presa sozinha ao descer ficam como o topo.
 export function BackBar({ onBack, to, label, title, onShare, right, solid = false }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
@@ -1726,7 +1732,7 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
   return (
-    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 px-4 ${solid ? 'bg-white' : 'bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 px-4 ${solid ? 'bg-white rounded-b-[16px]' : 'bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
       <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
@@ -1745,9 +1751,12 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
 
 // `sticky={false}`: o título sobe e sai ao descer — nos ecrãs com o
 // StickyTop (separador e filtros presos em cima, R4), quem fica é ele.
+// R12b (14 out): o topo é branco, colado em cima, com os dois cantos de
+// baixo a 16 px e a sombra leve dos cartões — sem a linha fina por baixo.
+export const TOP_EDGE = 'rounded-b-[16px] shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
 export function PageHeader({ title, children, sticky = true }) {
   return (
-    <div className={`${sticky ? 'sticky top-0 z-10 border-b border-line/70' : ''} -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center justify-between gap-2`}>
+    <div className={`${sticky ? 'sticky top-0 z-10' : ''} -mx-4 px-4 -mt-6 pt-4 pb-3 bg-white ${TOP_EDGE} flex items-center justify-between gap-2`}>
       <h2 className="text-3xl text-ink-900 min-w-0 truncate">{title}</h2>
       {children && <div className="flex items-center gap-1 shrink-0">{children}</div>}
     </div>

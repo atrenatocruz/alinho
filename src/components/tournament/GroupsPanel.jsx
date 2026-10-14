@@ -119,7 +119,10 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
         </tbody>
       </table>
 
-      <p className="border-t border-ink-50 px-3 py-1.5 text-xs text-muted">
+      {/* As siglas ficam (as palavras não cabem no telemóvel), com a legenda
+          por baixo da tabela (UX, 14 out). */}
+      <p className="border-t border-ink-50 px-3 pt-1.5 text-[12px] leading-snug text-muted">{t('tournament.draw.legend')}</p>
+      <p className="px-3 py-1.5 text-xs text-muted">
         {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
       {anyTie && <p className="px-3 pb-1.5 text-xs text-muted">{t('tournament.draw.tied_for_now')}</p>}
