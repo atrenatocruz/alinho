@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { errorKind } from '../lib/errors'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
@@ -80,7 +79,7 @@ export default function Profile() {
   // undefined = a carregar · null = a função ainda não existe aqui (fica a
   // lista antiga) · array = as linhas.
   const [playedHistory, setPlayedHistory] = useState(undefined)
-  const [titles, setTitles] = useState(null)
+  const [titles, setTitles] = useState(undefined) // undefined = a carregar
   // Perfil › Jogos «com vida» (#636): pesquisa, tipo e mês; os dados vêm do
   // Dev 3. Sem as funções (PGRST202) fica a lista simples de antes.
   const [playedQuery, setPlayedQuery] = useState('')
@@ -88,7 +87,10 @@ export default function Profile() {
   const [visibleMonth, setVisibleMonth] = useState(null)
   const [jumpTo, setJumpTo] = useState(null)
   const [monthsOpen, setMonthsOpen] = useState(false)
-  const played = usePlayedHistory({ query: playedQuery, kind: playedKind })
+  // «Jogos» só carrega da primeira vez que se abre (fica carregado depois).
+  const [playedOn, setPlayedOn] = useState(false)
+  useEffect(() => { if (tab === 'historico') setPlayedOn(true) }, [tab])
+  const played = usePlayedHistory({ query: playedQuery, kind: playedKind, enabled: playedOn })
   const playedLive = played.state !== 'missing'
   // A moldura do pódio do mês (#626): com ela, sai o aro do nível e a
   // moldura fica à volta da foto; o título vem por baixo do nome.
@@ -140,8 +142,6 @@ export default function Profile() {
       }
       if (!isGuest) {
         loadPlayedHistory()
-        loadMixHistory()
-        loadPrivateMatchHistory()
         loadGlobalPoints()
         loadFollowCounts()
         loadKudos()
@@ -340,16 +340,13 @@ export default function Profile() {
     }
   }
 
+  // Os títulos do cartão vêm sozinhos, logo ao abrir: antes esperavam pelo
+  // histórico inteiro (100 jogos) e mostravam 0 até lá (QA, 14 out). A
+  // lista de «Jogos» é do usePlayedHistory; aqui fica só a lista antiga.
   const loadPlayedHistory = async () => {
-    const [hist, tit] = await Promise.all([
-      supabase.rpc('get_my_played_history', { p_limit: 100 }),
-      supabase.rpc('get_player_titles', { p_user_id: profile.id }),
-    ])
-    if (hist.error) {
-      if (errorKind(hist.error) !== 'not_ready') console.error('Error loading played history:', hist.error)
-      setPlayedHistory(null)
-    } else setPlayedHistory(hist.data?.rows || [])
-    if (!tit.error && tit.data) setTitles(tit.data.total ?? null)
+    setPlayedHistory(null)
+    const tit = await supabase.rpc('get_player_titles', { p_user_id: profile.id })
+    setTitles(!tit.error && tit.data ? (tit.data.total ?? null) : null)
   }
 
   const loadPrivateMatchHistory = async () => {
@@ -365,13 +362,18 @@ export default function Profile() {
     }
   }
 
-  // Efeito próprio: as memberships chegam depois do perfil, e esta lista
-  // depende delas (uma chamada por grupo/clube).
+  // A lista antiga (mixes, amigos e jogos de grupo, uma chamada por
+  // grupo/clube) só serve quando as funções do histórico novo não existem.
+  // Antes corria sempre ao abrir o Perfil: 8 grupos = 8 get_group_matches
+  // (QA/PO, 14 out). Agora só se «Jogos» abrir e o histórico novo faltar.
   const membershipIdsKey = (memberships || []).map((m) => m.organization_id).sort().join(',')
   useEffect(() => {
-    if (profile?.id && !isGuest) loadGroupMatchHistory()
+    if (!profile?.id || isGuest || played.state !== 'missing') return
+    loadMixHistory()
+    loadPrivateMatchHistory()
+    loadGroupMatchHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, isGuest, membershipIdsKey])
+  }, [profile?.id, isGuest, membershipIdsKey, played.state])
 
   const loadGroupMatchHistory = async () => {
     setGroupMatchHistoryLoading(true)
@@ -793,7 +795,7 @@ export default function Profile() {
             <p className="mt-1 text-[11px] text-muted">{t('profile.r7_wins')}</p>
           </div>
           <div className="px-1">
-            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles ?? stats?.mix_wins ?? 0}</p>
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles === undefined ? '–' : (titles ?? stats?.mix_wins ?? 0)}</p>
             <p className="mt-1 text-[11px] text-muted">{t('profile.r7_titles')}</p>
           </div>
         </div>
