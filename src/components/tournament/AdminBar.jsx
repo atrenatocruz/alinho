@@ -59,6 +59,15 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   const [ask, setAsk] = useState(null) // null | 'delete' | 'close'
   // «Mais ⋯» (revisão de 28 set, peça 5): tudo o resto, numa folha.
   const [moreOpen, setMoreOpen] = useState(false)
+  // As categorias à espera de «Passar ao quadro» (CloseCategories, mais
+  // abaixo, diz quais): a caixa leva até ao botão da primeira (UX, 14 out).
+  const [toFill, setToFill] = useState([])
+  useEffect(() => {
+    if (part !== 'box') return undefined
+    const on = (e) => setToFill(Array.isArray(e.detail) ? e.detail : [])
+    window.addEventListener('tournament:to-fill', on)
+    return () => window.removeEventListener('tournament:to-fill', on)
+  }, [part])
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
@@ -157,10 +166,17 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
         error,
       }
       : canDraw ? { label: t('tournament.admin.do_draw'), onClick: draw, disabled: busy, error } : null
-    const nextLink = !nextBtn && live ? {
+    // Com os grupos acabados, o passo é «Passar ao quadro» (uma categoria de
+    // cada vez, e diz qual quando há mais de uma); senão, terminar as
+    // categorias. Os dois botões vivem mais abaixo, perto do quadro.
+    const fill = toFill[0]
+    const nextLink = !nextBtn && live ? (fill ? {
+      label: toFill.length > 1 ? t('organizer.fill_bracket_code', { code: fill.code }) : t('tournament.bracket.fill'),
+      onClick: () => document.getElementById(`tournament-fill-${fill.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    } : {
       label: t('organizer.finish_categories'),
       onClick: () => document.getElementById('tournament-close-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-    } : null
+    }) : null
     return (
       <>
         <OrganizerBox kind="tournament" label={t('organizer.label_tournament', { state: stateText })}

@@ -68,6 +68,17 @@ export function CategorySelect({ categories, value, onChange, label, mineId = nu
     return () => document.removeEventListener('mousedown', close)
   }, [open])
 
+  // «Ainda te podes inscrever noutra categoria ›» (SignupSlot) abre este
+  // seletor, já à vista (UX, 14 out).
+  useEffect(() => {
+    const show = () => {
+      box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setOpen(true)
+    }
+    window.addEventListener('tournament:open-category-select', show)
+    return () => window.removeEventListener('tournament:open-category-select', show)
+  }, [])
+
   const current = categories.find((c) => c.id === value) || categories[0]
   if (!current) return null
 

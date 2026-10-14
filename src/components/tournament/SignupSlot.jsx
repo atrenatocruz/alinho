@@ -387,6 +387,14 @@ export default function SignupSlot({ tournament, categories, category, my: first
               {t('tsignup.withdraw')}
             </button>
           )}
+          {/* Ainda dá para outra categoria (máx. por torneio): diz-se aqui,
+              senão só se chegava lá pelo seletor de baixo (QA/UX, 14 out). */}
+          {anyOpen && left > 0 && (
+            <button type="button" onClick={() => window.dispatchEvent(new Event('tournament:open-category-select'))}
+              className="min-h-[36px] text-left font-display text-[13px] font-bold text-ink-900 underline underline-offset-2">
+              {t('tsignup.another_category')} ›
+            </button>
+          )}
         </div>
       ) : open && user ? (
         // Quem já tem jogos tem o lima no «Os meus jogos»: este passa a

@@ -51,9 +51,13 @@ function useStuck(ref, onMeasure) {
  *  desceu para lá dela (em cima, nada mexe). Vê-se pelo marcador que fica no
  *  sítio da barra: se já passou para cima do topo preso, desceu-se. */
 function useBackToListStart(resetKey, sentinel, topPx, { pullUp = false } = {}) {
-  const first = useRef(true)
+  // A chave da última vez: só se mexe quando ela muda mesmo. Com «primeira
+  // vez» numa ref, o React em desenvolvimento (que corre o efeito duas vezes
+  // ao montar) fazia a página saltar sozinha ao abrir (14 out).
+  const last = useRef(resetKey)
   useLayoutEffect(() => {
-    if (first.current) { first.current = false; return }
+    if (last.current === resetKey) return
+    last.current = resetKey
     if (!sentinel.current) return
     const box = scroller(sentinel.current)
     const offset = sentinel.current.getBoundingClientRect().top - topOf(box) - topPx()
@@ -68,7 +72,7 @@ function useBackToListStart(resetKey, sentinel, topPx, { pullUp = false } = {}) 
 /** A categoria e os separadores. `resetKey` muda ao trocar de categoria ou de
  *  separador; `shadow` sai quando há dias presos por baixo (Horário), para não
  *  ficarem duas sombras. */
-export function StickyTabs({ children, resetKey, shadow = true }) {
+export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true }) {
   const ref = useRef(null)
   const sentinel = useRef(null)
   const measure = useRef((top, h) => {
@@ -76,9 +80,11 @@ export function StickyTabs({ children, resetKey, shadow = true }) {
   }).current
   const stuck = useStuck(ref, measure)
   useEffect(() => () => document.documentElement.style.removeProperty('--t-sticky-bottom'), [])
-  // Tocar num separador ou mudar a categoria puxa a barra para cima (presa
-  // por baixo do topo) e o conteúdo fica logo à vista (Francisco, 14 out).
-  useBackToListStart(resetKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0, { pullUp: true })
+  useBackToListStart(resetKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0)
+  // Tocar num separador ou mudar a categoria (`pullKey` sobe a cada toque)
+  // puxa a barra para cima, presa por baixo do topo, com o conteúdo à vista
+  // (Francisco, 14 out). Só com um toque: ao abrir a página, nada salta.
+  useBackToListStart(pullKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0, { pullUp: true })
   return (
     <>
       <div ref={sentinel} aria-hidden />
