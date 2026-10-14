@@ -22,6 +22,7 @@ import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
+import PlayedHistory, { usePlayedHistory, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
 import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
@@ -80,6 +81,15 @@ export default function Profile() {
   // lista antiga) · array = as linhas.
   const [playedHistory, setPlayedHistory] = useState(undefined)
   const [titles, setTitles] = useState(null)
+  // Perfil › Jogos «com vida» (#636): pesquisa, tipo e mês; os dados vêm do
+  // Dev 3. Sem as funções (PGRST202) fica a lista simples de antes.
+  const [playedQuery, setPlayedQuery] = useState('')
+  const [playedKind, setPlayedKind] = useState(null)
+  const [visibleMonth, setVisibleMonth] = useState(null)
+  const [jumpTo, setJumpTo] = useState(null)
+  const [monthsOpen, setMonthsOpen] = useState(false)
+  const played = usePlayedHistory({ query: playedQuery, kind: playedKind })
+  const playedLive = played.state !== 'missing'
   // A moldura do pódio do mês (#626): com ela, sai o aro do nível e a
   // moldura fica à volta da foto; o título vem por baixo do nome.
   const frameList = useFrameList(isGuest ? null : profile?.id)
@@ -792,7 +802,15 @@ export default function Profile() {
       {/* R7: os separadores logo por baixo do cartão (antes estavam lá em baixo). */}
       <StickyTop>
         <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
+        {tab === 'historico' && playedLive && (
+          <PlayedBar query={playedQuery} setQuery={setPlayedQuery} kind={playedKind} setKind={setPlayedKind}
+            visibleMonth={visibleMonth} onOpenMonths={() => setMonthsOpen(true)} kinds={played.kinds} />
+        )}
       </StickyTop>
+      {monthsOpen && (
+        <MonthsSheet months={played.months} month={visibleMonth} onClose={() => setMonthsOpen(false)}
+          onPick={(m) => { setJumpTo(m); setMonthsOpen(false) }} />
+      )}
 
       {followListTab && (
         <FollowListModal userId={profile.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} manageable />
@@ -886,7 +904,7 @@ export default function Profile() {
             botão preto a toda a largura. Desligado no Gerir → não aparece. */}
         {isPrivateMatchesEnabled && (
           <div className="overflow-hidden rounded-card border border-line bg-white">
-            <img src="/topo/topo-amigos.webp" alt="" className="block h-32 w-full object-cover bg-[#2A2E35]"
+            <img src="/topo/topo-amigos.webp" alt="" className="block h-32 w-full object-cover bg-ink-900"
               onError={(e) => { e.currentTarget.style.display = 'none' }} />
             <div className="p-3.5">
               <p className="font-display text-lg font-extrabold text-ink-900">{t('home.friendly_match')}</p>
@@ -1083,7 +1101,11 @@ export default function Profile() {
           entre amigos fora de clubes e dentro de grupos. Substitui as duas
           listas separadas e é o que fica no lugar da aba "Terminados" que
           saiu da Home. */}
-      {tab === 'historico' && (
+      {tab === 'historico' && playedLive && (
+        <PlayedHistory data={played} query={playedQuery} kind={playedKind}
+          onVisibleMonth={setVisibleMonth} jumpTo={jumpTo} onJumped={() => setJumpTo(null)} />
+      )}
+      {tab === 'historico' && !playedLive && (
         historyLoading ? null : myGames.length === 0 ? (
           <EmptyState
             icon={Trophy}
