@@ -4,6 +4,7 @@
 // Os dados são do Dev 3 (tournament_player_clashes, my_category_clashes,
 // admin_remove_player_from_entry).
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ChevronRight } from 'lucide-react'
 import { Sheet } from '../agenda/AgendaControls'
@@ -80,12 +81,12 @@ export function ClashListSheet({ clashes, onPick, onClose, onSchedule = null }) 
   )
 }
 
-/** Um caso: «Tirar do MX4» (vermelho), «Tirar do M4» (contorno vermelho) e
- *  «Ainda não». `hereId`: a categoria onde se está (é dessa que o vermelho
- *  cheio tira); sem ela, a segunda.
- *  Saiu o «Mudar a hora do MX4» (#586, 12 out): com inscritos, a hora de uma
- *  categoria não se muda em lado nenhum (o Editar tranca-a e a base de dados
- *  também). Até o Dev 3 o permitir, a folha diz o que fazer. */
+/** Um caso: «Tirar do MX4» (vermelho), «Tirar do M4» (contorno vermelho),
+ *  «Mudar a hora do MX4» (contorno) e «Ainda não». `hereId`: a categoria onde
+ *  se está (é dessa que o vermelho cheio tira); sem ela, a segunda.
+ *  O «Mudar a hora» voltou a 13 out: com inscritos, a hora de uma categoria
+ *  muda-se no Editar até ao sorteio dela (Dev 3). Abre o Editar nessa
+ *  categoria, com a hora à frente. */
 export function ClashCaseSheet({ clash, hereId = null, onRemoved, onClose }) {
   const { t, i18n } = useTranslation()
   const [busy, setBusy] = useState(false)
@@ -93,6 +94,13 @@ export function ClashCaseSheet({ clash, hereId = null, onRemoved, onClose }) {
   const a = { id: clash.category_a, code: clash.code_a, entry: clash.entry_id_a }
   const b = { id: clash.category_b, code: clash.code_b, entry: clash.entry_id_b }
   const [first, second] = hereId === a.id ? [a, b] : [b, a]
+  const [params, setParams] = useSearchParams()
+  const changeTime = () => {
+    const next = new URLSearchParams(params)
+    next.set('admin', 'editar'); next.set('cat', first.code)
+    // Como o «Editar» da barra: ao fechar, volta-se para aqui.
+    setParams(next, { state: { adminFromPage: true } })
+  }
   const remove = async (from) => {
     setBusy(true); setError('')
     try {
@@ -109,8 +117,6 @@ export function ClashCaseSheet({ clash, hereId = null, onRemoved, onClose }) {
       <p className="text-sm text-ink-700">
         {t('tclash.case_line', { a: clash.code_a, b: clash.code_b, when: whenText(clash.at_a, i18n.language) })}
       </p>
-      {/* Lê-se antes de escolher (UX, 12 out). */}
-      <p className="mt-2 text-sm text-ink-700">{t('tclash.time_locked_note')}</p>
       {error && <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
       <div className="mt-4 space-y-2">
         <button type="button" disabled={busy} onClick={() => remove(first)} className={`${BTN} bg-danger text-white`}>
@@ -118,6 +124,9 @@ export function ClashCaseSheet({ clash, hereId = null, onRemoved, onClose }) {
         </button>
         <button type="button" disabled={busy} onClick={() => remove(second)} className={`${BTN} border border-danger bg-white text-danger`}>
           {t('tclash.remove_from', { code: second.code })}
+        </button>
+        <button type="button" disabled={busy} onClick={changeTime} className={`${BTN} border border-line bg-white text-ink-900`}>
+          {t('tclash.change_time', { code: first.code })}
         </button>
         <button type="button" onClick={onClose} className={`${BTN} border border-line bg-white text-ink-900`}>
           {t('tclash.not_now')}

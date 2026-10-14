@@ -767,6 +767,21 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
         data: { ...base, category_id: 'cat-m5', category_code: 'M5', category_name: 'Masculinos 5', prize_first: '200 € + troféu', prize_second: '80 €' } },
       { id: 'tp4', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m4', category_code: 'M4', category_name: 'Masculinos 4', prize_first: '150 €', prize_second: null } },
+      // A hora de uma categoria mudou com inscritos (13 out): a mesma hora
+      // noutro dia, e outra hora no mesmo dia.
+      { id: 'tt1', kind: 'tournament_category_time_changed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, category_code: 'M4', old_day: '2026-10-17', old_time: '12:00:00', new_day: '2026-10-17', new_time: '14:00:00' } },
+      { id: 'tt2', kind: 'tournament_category_time_changed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, category_code: 'MX4', old_day: '2026-10-16', old_time: '18:00:00', new_day: '2026-10-17', new_time: '10:00:00' } },
+      // Saiu o sorteio e a categoria terminou (14 out): com hora e campo,
+      // sem hora; campeões, 2.º lugar, e fora do pódio.
+      { id: 'td1', kind: 'tournament_drawn', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'M4', first_match_at: '2026-10-17T09:00:00.000Z', court_name: 'Campo 2' } },
+      { id: 'td2', kind: 'tournament_drawn', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', first_match_at: null, court_name: null } },
+      { id: 'tf1', kind: 'tournament_finished', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'M4', final_position: 1, champion_name: 'Rui Mendes / Tu', entry_name: 'Rui Mendes / Tu' } },
+      { id: 'tf2', kind: 'tournament_finished', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', final_position: 2, champion_name: 'Ana Costa / Pedro Lima', entry_name: 'Tu / Rita Sousa' } },
+      { id: 'tf3', kind: 'tournament_finished', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'M5', final_position: null, champion_name: 'Os Lobos', entry_name: 'Tu / João Reis' } },
+      // Voltou a rascunho com inscritos (13 out): «retirado».
+      { id: 'tu1', kind: 'tournament_unpublished', game_id: null, created_at: new Date().toISOString(), data: { ...base } },
       // Categorias que chocam (9 out): os três avisos novos.
       ...(localStorage.getItem('mockTClash') === 'true' ? [
         { id: 'tc1', kind: 'tournament_removed_clash', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', kept_code: 'M4' } },

@@ -20,6 +20,7 @@ import OpensPicker, { openingDays } from './OpensPicker'
 import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
 import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
+import { maxCategories } from '../../lib/tournamentSignup'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
@@ -174,6 +175,86 @@ function DayCategories({ draft, set, dayLabel }) {
   )
 }
 
+/** Com inscritos: o dia e a hora de cada categoria ainda mudam até ao
+ *  sorteio dela (Dev 3, 13 out; proposta aprovada pelo PO a 12 out, auditoria
+ *  do #586). Depois do sorteio ficam trancados, com a frase — o horário dos
+ *  jogos muda-se no Horário. Quem está inscrito é avisado no sino.
+ *  `focusCode`: vem do «Mudar a hora do M4» das categorias que chocam. */
+const TIME_EDITABLE = ['inscricoes', 'fechada']
+function CategoryTimes({ draft, set, dayLabel, focusCode }) {
+  const { t } = useTranslation()
+  const box = useRef(null)
+  useEffect(() => {
+    if (!focusCode || !box.current) return undefined
+    const input = box.current.querySelector(`[data-code="${CSS.escape(String(focusCode).toUpperCase())}"]`)
+    if (!input) return undefined
+    // Depois de a página ir para o topo (a troca de endereço faz isso).
+    const timer = setTimeout(() => {
+      input.scrollIntoView({ block: 'center' })
+      input.focus({ preventScroll: true })
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [focusCode])
+  if (!draft.categories.length) return null
+  const patch = (code, change) => set({
+    categories: draft.categories.map((c) => (c.code === code ? { ...c, ...change } : c)),
+  })
+  const days = [...draft.days].sort((a, b) => a.date.localeCompare(b.date))
+  return (
+    <div ref={box}>
+      <FieldLabel>{t('tournament.create.category_times')}</FieldLabel>
+      <p className="-mt-1 mb-2 text-xs text-ink-500">{t('tournament.create.category_times_hint')}</p>
+      <div className="space-y-2">
+        {draft.categories.map((c) => {
+          const editable = TIME_EDITABLE.includes(c.status)
+          const day = days.find((d) => d.date === c.day)
+          const outside = editable && categoryOutsideDay(c, draft.days)
+          if (!editable) {
+            return (
+              <div key={c.code} className="card">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                  <span className="min-w-0 flex-1 text-sm text-ink-900">{c.day ? dayLabel(c.day) : '—'}{c.start_time ? `, ${c.start_time}` : ''}</span>
+                  <Lock size={13} className="shrink-0 text-ink-500" />
+                </div>
+                <p className="mt-1 text-xs text-ink-500">{t('tournament.create.category_time_drawn')}</p>
+              </div>
+            )
+          }
+          return (
+            <div key={c.code} className="card">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
+                <input
+                  type="time"
+                  data-code={String(c.code).toUpperCase()}
+                  aria-label={t('tournament.create.start_time')}
+                  aria-invalid={outside || undefined}
+                  className={`input-field !w-[100px] !px-2 shrink-0 ${outside ? '!border !border-danger' : ''}`}
+                  value={c.start_time || ''}
+                  onChange={(e) => patch(c.code, { start_time: e.target.value })}
+                />
+              </div>
+              {/* Com mais de um dia, escolhe-se o dia; com um só, não há escolha. */}
+              {days.length > 1 && (
+                <Chips className="mt-2 !flex-wrap !overflow-visible" label={t('tournament.create.category_day')}
+                  options={days.map((d) => ({ value: d.date, label: dayLabel(d.date) }))}
+                  value={c.day} onChange={(v) => patch(c.code, { day: v })} />
+              )}
+              {outside && day && (
+                <p role="alert" className="mt-1 text-xs font-bold text-danger">
+                  {t('tournament.create.category_time_outside', { from: day.starts_at, to: day.ends_at })}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 /** Uma secção trancada: continua à vista, na mesma ordem de quando se cria,
  *  e diz PORQUÊ. Um campo que desaparece deixa quem monta sem saber se não
  *  existe, se está noutro sítio, ou se está trancado — e isso é pior do que
@@ -195,9 +276,12 @@ function Locked({ title, reason, children }) {
   )
 }
 
-export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error, danger = null, unpublish = null }) {
+export default function CreateTournamentForm({ club, initial = null, locked = false, focusCode = null, onCancel, onCreate, saving, error, danger = null, unpublish = null }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
+  // O máximo de categorias por pessoa que o torneio tinha ao abrir o Editar:
+  // com inscritos, não se desce abaixo dele (#586, 13 out).
+  const initialMax = maxCategories(initial?.tournament)
   const [addingDay, setAddingDay] = useState(false)
   // O aviso do que falta só aparece depois de se tentar avançar — antes
   // disso seria um ecrã a dizer que está errado ainda antes de se escrever.
@@ -229,7 +313,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       // id: só para ler o preço especial; special: o bloco «Preço especial»
       // (design-handoff/2026-10-07-preco-especial). Nenhum dos dois vai no
       // update_tournament — gravam-se à parte, depois (outgoing).
-      id: c.id, special: null, had_special: false,
+      // status: com inscritos, a hora só muda até ao sorteio da categoria.
+      id: c.id, special: null, had_special: false, status: c.status || null,
       code: c.code, name: c.name, gender: c.gender, level: c.level,
       day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
       slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
@@ -294,7 +379,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // O preço especial de uma categoria por acabar (sem valor, ou «Pessoas
   // escolhidas» sem ninguém) não deixa guardar.
   const specialProblem = draft.categories.map((c) => (Number(c.price) > 0 ? specialPriceMissing(t, c.special || null) : null)).find(Boolean) || null
-  const anyProblem = locked ? finalProblem : ([1, 2, 3, 4].map((n) => stepProblem(n, draft, checkOpts)).find(Boolean) || finalProblem)
+  // Com inscritos, a hora de uma categoria ainda muda: não pode cair fora
+  // do horário do dia dela.
+  const timeProblem = draft.categories.some((c) => categoryOutsideDay(c, draft.days)) ? 'category_time' : null
+  const anyProblem = locked ? (finalProblem || timeProblem) : ([1, 2, 3, 4].map((n) => stepProblem(n, draft, checkOpts)).find(Boolean) || finalProblem)
 
   const addDay = (date) => {
     if (!date || draft.days.some((d) => d.date === date)) return
@@ -357,7 +445,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // chama grava-os depois, já com os ids novos.
   const outgoing = (d) => ({
     ...d,
-    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, ...c }) => c),
+    // Com inscritos, o dia vai como day_date: é o nome que o update_tournament
+    // lê para mudar a hora de uma categoria (Dev 3, 13 out). Mandar a mesma
+    // hora não é mudança.
+    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, status: _status, ...c }) => (locked ? { ...c, day_date: c.day || null } : c)),
     special_prices: d.categories.filter((c) => c.special || c.had_special).map((c) => ({ code: c.code, value: Number(c.price) > 0 ? (c.special || null) : null })),
     courts: courtNames(d.courts, d.days, courtBase),
     entries_close_at: localInputToIso(d.entries_close_at),
@@ -494,21 +585,30 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
         saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`)
           : specialLoad === 'failed' ? t('tournament.create.special_load_failed')
           : specialLoad === 'loading' ? t('common.loading') : specialProblem,
-        // «Voltar a rascunho», como no mix (Francisco, 10 out) — mas só sem
-        // inscrições; com elas fica apagado e diz porquê.
-        extra: unpublish && ['inscricoes', 'fechado'].includes(initial?.tournament?.status) ? {
-          label: t('eventactions.to_draft'),
-          // Sem inscrições ninguém sai prejudicado: a pergunta é a preto.
-          danger: false,
-          disabled: !!initial?.has_entries,
-          hint: t('tournament.edit.to_draft_has_entries'),
-          title: t('eventactions.to_draft_title'),
-          message: t('tournament.edit.to_draft_message'),
-          confirmLabel: t('eventactions.to_draft_confirm'), cancelLabel: t('tournament.edit.to_draft_keep'),
-          onConfirm: unpublish,
-          // A base de dados também recusa com inscrições (Dev 3, has_entries).
-          errorOf: (err) => (String(err?.message || '').includes('has_entries') ? t('tournament.edit.to_draft_has_entries') : describeError(t, err)),
-        } : null,
+        // «Voltar a rascunho», como no mix (Francisco, 10 out). Com inscritos
+        // também (PO, 13 out; base de dados do Dev 3): é um cancelar que
+        // guarda o torneio — as inscrições saem e cada pessoa recebe o aviso
+        // «retirado». Só antes do sorteio (inscricoes ou fechado).
+        extra: unpublish && ['inscricoes', 'fechado'].includes(initial?.tournament?.status) ? (() => {
+          const pairs = (initial?.categories || []).reduce((n, c) => n + (Number(c.entry_count) || 0), 0)
+          // Com uma categoria sorteada já não volta (apagava os jogos do
+          // sorteio; Dev 3, 14 out): fica apagado e diz porquê.
+          const drawn = (initial?.categories || []).find((c) => c.status && !['inscricoes', 'fechada'].includes(c.status))
+          return {
+            label: t('eventactions.to_draft'),
+            disabled: !!drawn,
+            hint: drawn ? t('tournament.edit.to_draft_drawn', { code: drawn.code }) : null,
+            // Sem inscritos ninguém sai prejudicado: a pergunta é a preto;
+            // com eles, a vermelho (as confirmações destrutivas, UX).
+            danger: pairs > 0,
+            title: t('eventactions.to_draft_title'),
+            message: pairs > 0 ? `${t('tournament.edit.to_draft_pairs', { count: pairs })} ${t('tournament.edit.to_draft_message')}` : t('tournament.edit.to_draft_message'),
+            confirmLabel: t('eventactions.to_draft_confirm'), cancelLabel: t('tournament.edit.to_draft_keep'),
+            onConfirm: unpublish,
+            errorOf: (err) => (String(err?.message || '').includes('category_already_drawn')
+              ? t('tournament.edit.to_draft_drawn', { code: err?.hint || '' }) : describeError(t, err)),
+          }
+        })() : null,
         // «Cancelar o torneio» / apagar, a mesma pergunta do «Mais ⋯» (1 out).
         danger,
       } : null}
@@ -570,13 +670,16 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               </span>
             </div>
           ))}
-          {/* «Editar tem tudo o que o Criar tem» (auditoria, 27 set): o máximo
-              por pessoa também se vê com inscritos, trancado com as categorias. */}
-          <div className="flex items-center gap-2 border-t border-line pt-2 mt-1">
-            <span className="min-w-0 flex-1 text-sm text-ink-700">{t('tournament.create.max_categories')}</span>
-            <b className="shrink-0 text-sm text-ink-900">{draft.rules.max_categories}</b>
-          </div>
         </Locked>
+      )}
+      {/* Com inscritos, o máximo por pessoa só sobe (Francisco, 13 out; a base
+          de dados do Dev 3 recusa descer com max_categories_only_up). */}
+      {locked && (
+        <Field label={t('tournament.create.max_categories')} hint={t('tournament.create.max_categories_only_up')}>
+          <Chips value={draft.rules.max_categories} onChange={(n) => setRule('max_categories', n)}
+            label={t('tournament.create.max_categories')}
+            options={[1, 2, 3].filter((n) => n >= initialMax).map((n) => ({ value: n, label: String(n) }))} />
+        </Field>
       )}
       {/* Os prémios mudam-se com inscritos (Francisco, 28 set: «Sim, com aviso
           aos inscritos»; AUDITORIA editar-tem-tudo, ponto 2): saem do cadeado
@@ -715,19 +818,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <li key={d.date}>{dayLabel(d.date)} · {t('tournament.create.day_open', { from: d.starts_at, to: d.ends_at, courts: Number(d.courts) || 0 })}</li>
             ))}
           </ul>
-          {/* Uma categoria por linha, com o código na pastilha preta (UX, 12 out). */}
-          {draft.categories.some((c) => c.day) && (
-            <ul className="mt-2 space-y-1">
-              {draft.categories.filter((c) => c.day).map((c) => (
-                <li key={c.code} className="flex items-center gap-2 text-sm text-ink-900">
-                  <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
-                  <span>{dayLabel(c.day).toLowerCase()}{c.start_time ? `, ${c.start_time}` : ''}</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </Locked>
       )}
+      {locked && <CategoryTimes draft={draft} set={set} dayLabel={dayLabel} focusCode={focusCode} />}
       {!locked && step === 2 && (
         <>
           <Field label={t('tournament.create.days')} hint={t('tournament.create.days_hint')}>
@@ -890,9 +983,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                 ['early_notice', t('tournament.create.early_notice'), 5, 120],
                 ['tolerance', t('tournament.create.tolerance'), 0, 30],
               ].map(([key, label, min, max]) => (
-                <label key={key} className="flex items-center justify-between gap-2 rounded-ctrl border border-line px-3 py-2 text-xs text-ink-700">
+                // Na página cinzenta, cartões brancos; o número com contorno
+                // fino (UX, 14 out).
+                <label key={key} className="flex items-center justify-between gap-2 rounded-ctrl border border-line bg-white px-3 py-2 text-xs text-ink-700">
                   <span className="min-w-0">{label}</span>
-                  <input type="number" min={min} max={max} className="input-field !w-[76px] !px-2 text-right" value={draft.rules[key]} onChange={(e) => setRule(key, Number(e.target.value))} />
+                  <input type="number" min={min} max={max} className="input-field !w-[76px] !border !border-line !px-2 text-right" value={draft.rules[key]} onChange={(e) => setRule(key, Number(e.target.value))} />
                 </label>
               ))}
             </div>

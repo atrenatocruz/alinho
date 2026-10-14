@@ -5,8 +5,8 @@ import { SUPPORT_EMAIL, WHATSAPP_NUMBER, mailtoLink, whatsappContactLink } from 
 describe('contactos', () => {
   it('o WhatsApp abre o número do robô com a mensagem já escrita', () => {
     expect(WHATSAPP_NUMBER).toBe('351923538245')
-    expect(whatsappContactLink('Olá! Quero saber mais sobre os planos da Alinho.'))
-      .toBe('https://wa.me/351923538245?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20os%20planos%20da%20Alinho.')
+    expect(whatsappContactLink('Olá! Quero saber mais sobre os planos do alinho.'))
+      .toBe('https://wa.me/351923538245?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20os%20planos%20do%20alinho.')
   })
 
   it('o email abre com o assunto', () => {

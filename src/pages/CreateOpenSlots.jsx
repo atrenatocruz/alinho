@@ -301,14 +301,20 @@ export default function CreateOpenSlots({ edit = null }) {
         <>
           <div>
             <p className={label}>{t('open_slots.price_label')}</p>
-            <input type="number" step="0.01" min="0" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)}
-              className="input-field" placeholder={t('open_slots.price_example')} />
-            {/* O preço novo vale para os horários sem ninguém; nos outros fica
-                o de antes (base de dados do Dev 3, decisão do PO, 28 set). */}
-            {anyLocked && <LockLine>{t('open_slots.locked_price')}</LockLine>}
+            {/* O mesmo «€» do preço especial, dentro do campo (UX, 14 out). */}
+            <div className="relative">
+              <input type="number" step="0.01" min="0" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)}
+                className="input-field pr-10" placeholder={t('open_slots.price_example')} />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted">€</span>
+            </div>
           </div>
           <SpecialPriceField value={special} onChange={setSpecial} normalPrice={price}
             orgId={org?.id} orgName={org?.name} orgKind={org?.kind === 'group' ? 'group' : 'club'} />
+          {/* Os dois preços novos valem para os horários sem ninguém; nos
+              outros fica o de antes (preço: decisão do PO, 28 set; preço
+              especial: Francisco, 13 out; base de dados do Dev 3). Uma frase
+              só, por baixo dos dois. */}
+          {anyLocked && <LockLine>{t('open_slots.locked_prices')}</LockLine>}
           <WhatsappHoursField organizationId={org?.id} kind="open_slot" value={horas} onChange={onHoras} editing={!!edit} />
         </>
       )}
