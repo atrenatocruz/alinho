@@ -13,7 +13,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -54,6 +54,7 @@ import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { weekdayShort, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
+import { Realce } from '../components/SearchField'
 import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
 import { semAcentos } from '../lib/semAcentos'
 import { cancelMixDate } from '../lib/mixCancel'
@@ -331,7 +332,9 @@ export default function GerirClube() {
   const [pastKind, setPastKind] = useState('all')
   // A lupa da barra dos tipos (R4/R9, 13 out): procura pelo nome do evento.
   const [eventQuery, setEventQuery] = useState('')
-  const nomeDoItem = (i) => [i.nome, i.row?.title, i.row?.name, ...(i.jogos || []).map((g) => g.title)].filter(Boolean).join(' ')
+  // O nome do mix está em entry.game (os outros em row): sem ele, «quinta» não
+  // encontrava o «Mix de Quinta-feira» (Bugs, 14 out).
+  const nomeDoItem = (i) => [i.nome, i.entry?.game?.title, i.row?.title, i.row?.name, ...(i.jogos || []).map((g) => g.title)].filter(Boolean).join(' ')
   const bateNome = (i) => !eventQuery.trim() || semAcentos(nomeDoItem(i)).includes(semAcentos(eventQuery.trim()))
   // As aulas já dadas de cada turma: series_id → { count, last }.
   const [turmasDadas, setTurmasDadas] = useState(new Map())
@@ -3773,7 +3776,7 @@ export default function GerirClube() {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-1.5">
-                            <span className={`truncate text-[16px] font-extrabold ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{tipo === 'turma' ? t(etiqueta) : linha}</span>
+                            <span className={`truncate text-[16px] font-extrabold ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{tipo === 'turma' ? t(etiqueta) : <Realce text={String(linha || '')} query={eventQuery} />}</span>
                             {privado && <Lock size={12} className="shrink-0 text-ink-500" aria-label={t('tournament.admin.private')} />}
                           </span>
                           <span className="mt-0.5 block text-sm leading-snug text-muted">
@@ -3814,13 +3817,18 @@ export default function GerirClube() {
                 }
                 return (
                   <>
-                    <SectionLabel count={aSeguir.length}>{t('pastevents.upcoming')}</SectionLabel>
+                    {/* Pesquisa sem resultados: o Alino já diz tudo, o título sai (UX, 14 out). */}
+                    {!(eventQuery.trim() && todos.length === 0) && <SectionLabel count={aSeguir.length}>{t('pastevents.upcoming')}</SectionLabel>}
                     {publishTourError && <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{publishTourError}</p>}
-                    {aSeguir.length === 0 && (
+                    {/* Com pesquisa e nada encontrado, o vazio comum da pesquisa (com o
+                        Alino); sem pesquisa, a frase da lista vazia (Bugs/UX, 14 out). */}
+                    {aSeguir.length === 0 && (eventQuery.trim() ? (
+                      porTerminarLista.length === 0 && <EmptyState title={t('comunidade.nothing_found_title')} subtitle={t('comunidade.try_another_name')} />
+                    ) : (
                       <p className="text-sm text-muted text-center py-6">
                         {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
                       </p>
-                    )}
+                    ))}
                     {aSeguir.map(renderEvento)}
                     {/* «POR TERMINAR · N» à parte (SPEC do R9; QA, 14 out): o
                         dia já acabou e ainda não foi dado como terminado. */}

@@ -397,140 +397,146 @@ export default function TournamentPage() {
 
   return (
     <div className={`space-y-4 ${skeletonShown.current ? 'animate-fill-in' : ''}`}>
-      {/* R3 — o topo novo (design-handoff/2026-10-13-redesign/R3): a capa com
-          o cartaz ou o Alino do torneio, o cartão branco por cima, a hora
-          grande, a faixa de estado e, logo por baixo, os botões da inscrição.
-          Só aspeto: as ações são as de antes. */}
-      <EventHero
-        kind="tournament"
-        imageUrl={tour.poster_url || null}
-        chip={[t('tournament.label'), categories.length ? t('tournament.hero_categories', { count: categories.length }) : null].filter(Boolean).join(' · ')}
-        org={tour.club_name ? { name: tour.club_name, kindLabel: t(tour.club_kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'), logo: tour.club_logo_url } : null}
-        title={tour.name}
-        time={heroTime}
-        timeAside={heroAside}
-        dateLine={longDate(tour.starts_on, i18n.language)}
-        onBack={goBack}
-        onShare={tour.status === 'rascunho' ? null : shareTournament}
-        // R3b (13 out): a caixa de quem organiza logo a seguir à data, antes
-        // da faixa e da inscrição pessoal. Sai a linha «Editar · Mais» de cima.
-        nextStep={isAdmin ? (
+      {/* A folha branca do topo vai até à morada e à «Organização: …» (UX,
+          14 out — como no protótipo): sobre o fundo novo da app, os quadrados
+          e a morada #F4F5F1 ficavam apagados. A categoria e os separadores
+          ficam depois, no cinzento. */}
+      <div className="-mx-4 space-y-4 rounded-b-[16px] bg-white px-4 pb-5">
+        {/* R3 — o topo novo (design-handoff/2026-10-13-redesign/R3): a capa com
+            o cartaz ou o Alino do torneio, o cartão branco por cima, a hora
+            grande, a faixa de estado e, logo por baixo, os botões da inscrição.
+            Só aspeto: as ações são as de antes. */}
+        <EventHero
+          kind="tournament"
+          imageUrl={tour.poster_url || null}
+          chip={[t('tournament.label'), categories.length ? t('tournament.hero_categories', { count: categories.length }) : null].filter(Boolean).join(' · ')}
+          org={tour.club_name ? { name: tour.club_name, kindLabel: t(tour.club_kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'), logo: tour.club_logo_url } : null}
+          title={tour.name}
+          time={heroTime}
+          timeAside={heroAside}
+          dateLine={longDate(tour.starts_on, i18n.language)}
+          onBack={goBack}
+          onShare={tour.status === 'rascunho' ? null : shareTournament}
+          // R3b (13 out): a caixa de quem organiza logo a seguir à data, antes
+          // da faixa e da inscrição pessoal. Sai a linha «Editar · Mais» de cima.
+          nextStep={isAdmin ? (
+            <AdminBar
+              part="box"
+              tournament={tour}
+              categories={categories}
+              onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
+              onEdit={() => openAdmin('editar')}
+              onDraw={() => openAdmin('sorteio')}
+              onSchedule={() => openAdmin('horario')}
+              onScorekeepers={() => openAdmin('marcadores')}
+              onEntries={() => setParam('tab', 'entries')}
+            />
+          ) : null}
+          status={ended || cancelled ? {
+            // Terminado ou cancelado (UX, 13 out): faixa cinzenta com o estado do
+            // torneio, sem «Inscrição feita» nem vagas. Quem jogou vê o seu lugar.
+            text: [t(cancelled ? 'tournament.status_cancelado' : 'tournament.status_terminado'),
+              ended && myPlace ? t(myPlace.n === 1 ? 'tournament.hero_done_champions' : 'tournament.hero_done_place', { n: myPlace.n, code: myPlace.code }) : null,
+            ].filter(Boolean).join(' · '),
+            tone: 'grey',
+            dot: cancelled ? '#DC2626' : null,
+            meta: [ended ? t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }) : null,
+              shortDay(tour.ends_on || tour.starts_on, i18n.language)].filter(Boolean).join(' · '),
+            note: cancelled && hadEntry ? t('tournament.hero_cancelled_entry') : null,
+          } : {
+            text: heroIn
+              ? (heroPair || t('tournament.state_entered'))
+              : t(statusKey(tour.status, drawProgress(categories), tour.entries_deadline), drawProgress(categories)),
+            tone: heroIn ? 'ok' : 'kind',
+            // «18/32 DUPLAS · HOJE» no dia do torneio (protótipo; QA 13 out).
+            meta: [totalSlots
+              ? t('tournament.hero_pairs_of', { n: teamsIn ?? tour.entry_count ?? 0, total: totalSlots })
+              : t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }),
+            // As por validar à parte (a conta grande são os lugares): «0/16
+            // DUPLAS · 1 POR VALIDAR» (UX, 14 out).
+            pendingPairs > 0 ? t('tournament.hero_pending', { count: pendingPairs }) : null,
+            isToday ? t('ui.today') : null].filter(Boolean).join(' · '),
+          }}
+        >
+          {/* Terminado ou cancelado, os botões da inscrição saem (UX, 13 out). */}
+          {UnderHeader && !ended && !cancelled && <Suspense fallback={null}><UnderHeader {...panelProps} withInfo={false} /></Suspense>}
+        </EventHero>
+        {/* O que ficou por gravar ao criar (preço especial, 10 out). */}
+        {location.state?.notice && (
+          <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{location.state.notice}</p>
+        )}
+
+        {/* A faixa do modo público é a ÚNICA coisa que um visitante a sério não
+            vê. Em rascunho diz a verdade em vez de dar a entender que já está
+            no ar. Sai com um toque, e o botão de trás do telemóvel também sai
+            do modo em vez de sair da página. */}
+        {publicView && canManage && (
+          <div className="card">
+            <p className="flex items-start gap-2 text-sm text-ink-700">
+              <Eye size={15} className="mt-0.5 shrink-0" />
+              {tour.status === 'rascunho'
+                ? t('tournament.admin.public_view_draft')
+                : t('tournament.admin.public_view')}
+            </p>
+            <button type="button" onClick={() => navigate(-1)}
+              className="btn-secondary mt-3 w-full">
+              {t('tournament.admin.back_to_admin')}
+            </button>
+          </div>
+        )}
+
+        {isAdmin && adminError && <p className="text-sm text-danger">{adminError}</p>}
+
+        {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
+        {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
+
+        <EventFacts items={heroFacts} />
+
+        {/* Com o sorteio feito, o terminar de cada categoria (o passo seguinte
+            de quem organiza foi para o topo, UX 13 out). */}
+        {isAdmin && (
           <AdminBar
-            part="box"
+            part="live"
             tournament={tour}
             categories={categories}
             onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
-            onEdit={() => openAdmin('editar')}
             onDraw={() => openAdmin('sorteio')}
-            onSchedule={() => openAdmin('horario')}
-            onScorekeepers={() => openAdmin('marcadores')}
-            onEntries={() => setParam('tab', 'entries')}
           />
-        ) : null}
-        status={ended || cancelled ? {
-          // Terminado ou cancelado (UX, 13 out): faixa cinzenta com o estado do
-          // torneio, sem «Inscrição feita» nem vagas. Quem jogou vê o seu lugar.
-          text: [t(cancelled ? 'tournament.status_cancelado' : 'tournament.status_terminado'),
-            ended && myPlace ? t(myPlace.n === 1 ? 'tournament.hero_done_champions' : 'tournament.hero_done_place', { n: myPlace.n, code: myPlace.code }) : null,
-          ].filter(Boolean).join(' · '),
-          tone: 'grey',
-          dot: cancelled ? '#DC2626' : null,
-          meta: [ended ? t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }) : null,
-            shortDay(tour.ends_on || tour.starts_on, i18n.language)].filter(Boolean).join(' · '),
-          note: cancelled && hadEntry ? t('tournament.hero_cancelled_entry') : null,
-        } : {
-          text: heroIn
-            ? (heroPair || t('tournament.state_entered'))
-            : t(statusKey(tour.status, drawProgress(categories), tour.entries_deadline), drawProgress(categories)),
-          tone: heroIn ? 'ok' : 'kind',
-          // «18/32 DUPLAS · HOJE» no dia do torneio (protótipo; QA 13 out).
-          meta: [totalSlots
-            ? t('tournament.hero_pairs_of', { n: teamsIn ?? tour.entry_count ?? 0, total: totalSlots })
-            : t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }),
-          // As por validar à parte (a conta grande são os lugares): «0/16
-          // DUPLAS · 1 POR VALIDAR» (UX, 14 out).
-          pendingPairs > 0 ? t('tournament.hero_pending', { count: pendingPairs }) : null,
-          isToday ? t('ui.today') : null].filter(Boolean).join(' · '),
-        }}
-      >
-        {/* Terminado ou cancelado, os botões da inscrição saem (UX, 13 out). */}
-        {UnderHeader && !ended && !cancelled && <Suspense fallback={null}><UnderHeader {...panelProps} withInfo={false} /></Suspense>}
-      </EventHero>
-      {/* O que ficou por gravar ao criar (preço especial, 10 out). */}
-      {location.state?.notice && (
-        <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{location.state.notice}</p>
-      )}
+        )}
 
-      {/* A faixa do modo público é a ÚNICA coisa que um visitante a sério não
-          vê. Em rascunho diz a verdade em vez de dar a entender que já está
-          no ar. Sai com um toque, e o botão de trás do telemóvel também sai
-          do modo em vez de sair da página. */}
-      {publicView && canManage && (
-        <div className="card">
-          <p className="flex items-start gap-2 text-sm text-ink-700">
-            <Eye size={15} className="mt-0.5 shrink-0" />
-            {tour.status === 'rascunho'
-              ? t('tournament.admin.public_view_draft')
-              : t('tournament.admin.public_view')}
-          </p>
-          <button type="button" onClick={() => navigate(-1)}
-            className="btn-secondary mt-3 w-full">
-            {t('tournament.admin.back_to_admin')}
-          </button>
-        </div>
-      )}
+        {/* Campeões da categoria, quando termina (peça 2, 28 set). */}
+        <ChampionsBlock tournament={tour} category={category} isAdmin={isAdmin} />
 
-      {isAdmin && adminError && <p className="text-sm text-danger">{adminError}</p>}
-
-      {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
-      {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
-
-      <EventFacts items={heroFacts} />
-
-      {/* Com o sorteio feito, o terminar de cada categoria (o passo seguinte
-          de quem organiza foi para o topo, UX 13 out). */}
-      {isAdmin && (
-        <AdminBar
-          part="live"
-          tournament={tour}
-          categories={categories}
-          onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
-          onDraw={() => openAdmin('sorteio')}
-        />
-      )}
-
-      {/* Campeões da categoria, quando termina (peça 2, 28 set). */}
-      <ChampionsBlock tournament={tour} category={category} isAdmin={isAdmin} />
-
-      {/* «O teu próximo jogo»: um cartão com o jogo à vista, no lugar do lima
-          que só mudava o separador lá em baixo (Francisco, 1 out). Sem mais
-          jogos, sai. */}
-      {hasGames && !publicView && tour.status !== 'cancelado' && (
-        <NextGameCard game={myGame} onOpenList={() => {
-          setParam('tab', 'my_games')
-          // Desce até lá: sem isto não se via nada a mudar (Francisco, 1 out).
-          // A lista carrega aos bocados (o painel é preguiçoso e lê o quadro):
-          // uma descida suave ficava a meio (~117 px, QA 2 out). Desce de uma
-          // vez e repete até a posição assentar.
-          let tries = 0
-          let last = null
-          const settle = () => {
-            const el = document.getElementById('tournament-tabs')
-            if (el) {
-              el.scrollIntoView({ block: 'start' })
-              const top = Math.round(el.getBoundingClientRect().top)
-              if (top === last) return
-              last = top
+        {/* «O teu próximo jogo»: um cartão com o jogo à vista, no lugar do lima
+            que só mudava o separador lá em baixo (Francisco, 1 out). Sem mais
+            jogos, sai. */}
+        {hasGames && !publicView && tour.status !== 'cancelado' && (
+          <NextGameCard game={myGame} onOpenList={() => {
+            setParam('tab', 'my_games')
+            // Desce até lá: sem isto não se via nada a mudar (Francisco, 1 out).
+            // A lista carrega aos bocados (o painel é preguiçoso e lê o quadro):
+            // uma descida suave ficava a meio (~117 px, QA 2 out). Desce de uma
+            // vez e repete até a posição assentar.
+            let tries = 0
+            let last = null
+            const settle = () => {
+              const el = document.getElementById('tournament-tabs')
+              if (el) {
+                el.scrollIntoView({ block: 'start' })
+                const top = Math.round(el.getBoundingClientRect().top)
+                if (top === last) return
+                last = top
+              }
+              if (++tries < 20) setTimeout(settle, 150)
             }
-            if (++tries < 20) setTimeout(settle, 150)
-          }
-          setTimeout(settle, 50)
-        }} />
-      )}
+            setTimeout(settle, 50)
+          }} />
+        )}
 
-      {/* O cartaz do torneio (categorias, pagamento, mapa, quem organiza),
-          depois dos quadrados de dados (R3, 13 out). */}
-      <PublicInfo tournament={tour} categories={categories} entriesOpen={categories.some((c) => entriesOpen(tour, c))} />
+        {/* O cartaz do torneio (categorias, pagamento, mapa, quem organiza),
+            depois dos quadrados de dados (R3, 13 out). */}
+        <PublicInfo plain tournament={tour} categories={categories} entriesOpen={categories.some((c) => entriesOpen(tour, c))} />
+      </div>
 
       {/* A categoria e os separadores ficam presos por baixo do título ao
           descer (Francisco, 11 out, para experimentar — StickyBar). */}

@@ -348,7 +348,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
           dupla em destaque, e «Mudar o nome» até as inscrições fecharem
           (nome-da-dupla, 27 set). */}
       {my ? (
-        <div id="minha-inscricao" className="card scroll-mt-40 space-y-2">
+        // Dentro da folha branca do topo: caixa #F4F5F1, sem contorno nem
+        // sombra, como os quadrados (UX, 14 out).
+        <div id="minha-inscricao" className="scroll-mt-40 space-y-2 rounded-[16px] bg-[#F4F5F1] p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="flex min-w-0 items-center gap-2">
               {myCategory?.code && <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{myCategory.code}</span>}
@@ -383,7 +385,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
             </div>
           )}
           {open && (
-            <button onClick={() => setAskLeave(true)} disabled={busy} className="press min-h-[44px] w-full text-sm font-extrabold text-ink-900">
+            <button onClick={() => setAskLeave(true)} disabled={busy}
+              className="press flex min-h-[44px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white text-sm font-extrabold text-ink-900">
               {t('tsignup.withdraw')}
             </button>
           )}
