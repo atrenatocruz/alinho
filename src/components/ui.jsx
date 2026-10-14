@@ -1723,8 +1723,10 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
 // Vouchers» do Gerir, 7 out). Sem `onBack` nem `to`, o lugar do «‹» fica vazio.
 // `solid`: fundo branco opaco em vez do vidro — no Gerir via-se o texto a
 // passar por trás da barra presa (UX, 7 out).
-// Com `solid`, os cantos de baixo a 16 px (R12b): parada não se veem (o bloco
-// branco de baixo está por trás), presa sozinha ao descer ficam como o topo.
+// Com `solid` (R12b): sem margem por baixo, colada ao bloco branco que vem a
+// seguir, e os cantos de baixo a 16 px só quando esse bloco já saiu do ecrã
+// (presa sozinha ao descer) — parada, os cantos e a sombra são do último
+// bloco (QA, 14 out: via-se uma falha cinzenta entre a barra e o nome).
 export function BackBar({ onBack, to, label, title, onShare, right, solid = false }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
@@ -1742,7 +1744,7 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
   return (
-    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 px-4 ${solid ? 'bg-white rounded-b-[16px]' : 'bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 px-4 ${solid ? `mb-0 bg-white ${showTitle ? 'rounded-b-[16px]' : ''}` : 'mb-1 bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
       <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>

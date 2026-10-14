@@ -25,7 +25,7 @@ const eachOf = (cents, locale) => pricePerPlayer((cents || 0) / 100, locale)
 // `entriesOpen`: as vagas só se mostram com as inscrições abertas; o resto
 // (categorias, dias e horas, preço, texto da organização) vê-se sempre —
 // em rascunho, na pré-visualização, e nos dias do torneio (QA, 26 set).
-export default function PublicInfo({ tournament, categories = [], entriesOpen = true }) {
+export default function PublicInfo({ tournament, categories = [], entriesOpen = true, plain = false }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
 
@@ -37,7 +37,10 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
   }
 
   return (
-    <div className="card space-y-3">
+    // `plain` (dentro da folha branca do topo, UX 14 out): sem a moldura do
+    // cartão — uma secção da folha, com uma linha fina por cima. Dentro de um
+    // branco, as caixas são #F4F5F1 e nunca cartões brancos.
+    <div className={plain ? 'space-y-3 border-t border-[#EEF0EC] pt-5' : 'card space-y-3'}>
       <div className="flex items-center justify-between gap-2">
         <MonoLabel>{t('tpublic.title')}</MonoLabel>
         <button onClick={share} className="press flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900">
