@@ -10,7 +10,7 @@ import { LevelPill, bandLabel } from '../components/lessons/LessonBits'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { followPlayer, removeFollow } from '../lib/follows'
-import { Avatar, ConfirmSheet, EmptyState, GroupLevelBadge, orgAvatarShape, PageHeader, StickyTop, FilterBar } from '../components/ui'
+import { Avatar, ConfirmSheet, EmptyState, GroupLevelBadge, PageHeader, StickyTop, FilterBar } from '../components/ui'
 import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
@@ -55,6 +55,9 @@ import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
    dos filtros da Home. */
 // Os pontos de cor nas pastilhas (UX, 13 out): clubes a preto, grupos no
 // cinzento-escuro dos amigos e professores no verde das aulas.
+// A letra do nível médio (level_letter) → os géneros que o peopleRatingBand espera.
+const LETTER_GENDERS = { M: ['masculino'], F: ['feminino'], MX: ['masculino', 'feminino'] }
+
 const TABS = [
   { key: 'all', labelKey: 'comunidade.filter_all' },
   { key: 'clubs', labelKey: 'comunidade.filter_clubs', dot: '#040404' },
@@ -244,8 +247,8 @@ export default function Comunidade() {
     const joinsDirectly = org.open_join && !org.parent_organization_id
     const group = org.kind === 'group'
     const sub = [
-      t(group ? 'clubprofile.kind_group' : 'clubprofile.kind_club'),
-      group && org.parent_name ? null : org.location,
+      group && org.parent_name ? t('comunidade.group_of', { club: org.parent_name }) : t(group ? 'clubprofile.kind_group' : 'clubprofile.kind_club'),
+      group && org.parent_name ? null : org.city,
       org.member_count != null ? t('comunidade.member_count', { count: org.member_count }) : null,
     ].filter(Boolean).join(' · ')
     return (
@@ -258,25 +261,27 @@ export default function Comunidade() {
           )}
         </KindHero>
         <div className="px-4 pb-4">
-          <span className={`relative -mt-9 inline-block bg-white p-[3px] ${group ? "rounded-full" : "rounded-[15px]"}`}>
-            <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={orgAvatarShape(org.kind)} colorClass="bg-ink-900 text-lime-400" />
+          <span className={`relative -mt-9 inline-block bg-white p-[3px] ${group ? 'rounded-full' : 'rounded-[28%]'}`}>
+            <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={group ? 'round' : 'square'} colorClass="bg-ink-900 text-lime-400" />
           </span>
           <h3 className="mt-1 font-display text-xl font-extrabold leading-tight text-ink-900 break-words">{org.name}</h3>
           <p className="mt-0.5 text-sm text-muted">
             {sub}
-            {group && org.parent_name && <> · {t('comunidade.group_of', { club: org.parent_name })}</>}
-            {org.avg_rating != null && (
-              <span className="whitespace-nowrap"> · {t('comunidade.avg_level_inline')} <GroupLevelBadge rating={org.avg_rating} /></span>
+            {/* A letra (M, F ou MX) vem já feita da base (level_letter, Dev 3,
+                para 23): mandar os géneros dos membros dizia o de cada pessoa
+                num grupo pequeno. Sem letra, o nível não aparece. */}
+            {org.avg_rating != null && LETTER_GENDERS[org.level_letter] && (
+              <span className="whitespace-nowrap"> · {t('comunidade.avg_level_inline')} <GroupLevelBadge rating={org.avg_rating} genders={LETTER_GENDERS[org.level_letter]} /></span>
             )}
           </p>
           <div className="mt-3.5">
             {status === 'member' ? (
-              <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-[#F1F8D6] text-base font-extrabold text-[#3F5200]">
-                <Check size={17} /> {t('clubprofile.is_member')}
+              <span className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F8DC] py-3 font-display text-[14px] font-extrabold leading-none text-[#3F6212]">
+                <Check size={15} /> {t('clubprofile.is_member')}
               </span>
             ) : status === 'pending' ? (
-              <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-50 text-base font-extrabold text-muted">
-                <Clock size={16} /> {t('comunidade.request_sent')}
+              <span className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F5F1] py-3 font-display text-[14px] font-extrabold leading-none text-ink-500">
+                <Clock size={15} /> {t('comunidade.request_sent')}
               </span>
             ) : (
               <button
@@ -396,7 +401,7 @@ export default function Comunidade() {
           troca a barra pelo campo de pesquisa; com a pesquisa a funcionar, o
           filtro deixa de mandar e mostram-se os resultados de tudo. «✕»
           limpa e volta às pastilhas. */}
-      <StickyTop>
+      <StickyTop className="!mt-0">
         <FilterBar
           search={{ value: query, onChange: setQuery, placeholder: t('comunidade.search_placeholder_orgs') }}
           options={TABS.map((f) => ({ value: f.key, label: t(f.labelKey), dot: f.dot }))}
@@ -421,13 +426,15 @@ export default function Comunidade() {
         <>
           {showMineRow && (
             <section>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.mine_heading')} · {myOrgs.length}</p>
-              <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+              <p className="mb-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[.1em] text-[#4F535A]">{t('comunidade.mine_heading')} · {myOrgs.length}</p>
+              {/* 6 px em cima e 4 px em baixo: o anel lima está por fora do
+                  círculo e a fila que desliza cortava-o (Francisco, 13 out). */}
+              <div className="no-scrollbar -mx-4 flex gap-3.5 overflow-x-auto px-4 pb-1 pt-1.5">
                 {myOrgs.map((org) => (
                   <Link key={org.id} to={`/clube/${org.slug}`} className="w-[84px] shrink-0 flex flex-col items-center gap-1.5 text-center">
-                    <span className="rounded-full p-[3px] ring-[3px] ring-lime-400">
-                      <Avatar name={org.name} url={org.group_logo_url} size="w-[62px] h-[62px] text-lg" colorClass="bg-ink-900 text-lime-400" />
-                    </span>
+                    {/* A mesma imagem do cartão, com o anel lima (protótipo, UX 13 out). */}
+                    <img src={org.group_logo_url || (org.kind === 'group' ? GROUP_HERO : CLUB_HERO)} alt="" loading="lazy"
+                      className="h-[62px] w-[62px] rounded-full object-cover shadow-[0_0_0_2px_#fff,0_0_0_4px_#C8DC00]" />
                     <span className="text-[13px] font-extrabold text-ink-900 leading-tight line-clamp-2 break-words">{org.name}</span>
                   </Link>
                 ))}
@@ -437,7 +444,7 @@ export default function Comunidade() {
 
           {showOrgs && shownOrgs.length > 0 && (
             <section>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
+              <p className="mb-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[.1em] text-[#4F535A]">
                 {searching
                   ? t('comunidade.results_count', { count: shownOrgs.length + (showTeachers ? approvedTeachers.length : 0) })
                   : t({ clubs: 'comunidade.filter_clubs', groups: 'comunidade.filter_groups' }[tab] || 'comunidade.tab_orgs')}
@@ -448,7 +455,7 @@ export default function Comunidade() {
 
           {showTeachers && approvedTeachers.length > 0 && (
             <section>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.tab_teachers')} · {approvedTeachers.length}</p>
+              <p className="mb-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[.1em] text-[#4F535A]">{t('comunidade.tab_teachers')} · {approvedTeachers.length}</p>
               <div className="space-y-3">{approvedTeachers.map(renderTeacher)}</div>
             </section>
           )}

@@ -7,8 +7,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus, Share2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, Phone, Plus, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
+import Alino from '../Alino'
+import LocationOpenWith from '../LocationOpenWith'
+import { formatLabelKey } from '../../lib/mixLogic'
+import { formatCurrency } from '../../lib/formatDate'
 import { CLUB_HERO, GROUP_HERO } from '../../lib/kindColors'
 import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
@@ -23,15 +27,16 @@ const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
   ? value : `https://instagram.com/${value.trim().replace(/^@/, '')}`)
 
-/** Símbolo do dono: quadrado = clube, redondo = grupo (regra de 18 set). */
+/** Símbolo do dono: quadrado (cantos de 28%) = clube, redondo = grupo
+ *  (regra de 18 set; confirmada pela UX a 13 out). */
 function Symbol({ club, size = 'w-14 h-14 text-lg' }) {
-  const group = club.kind === 'group'
+  const shape = club.kind === 'group' ? 'rounded-full' : 'rounded-[28%]'
   if (club.group_logo_url) {
-    return <img src={club.group_logo_url} alt="" className={`${size} shrink-0 object-cover ${group ? 'rounded-full' : 'rounded-[12px]'}`} />
+    return <img src={club.group_logo_url} alt="" className={`${size} shrink-0 object-cover ${shape}`} />
   }
   const initials = (club.name || '?').split(/\s+/).filter(Boolean).slice(0, 1).map((w) => w[0]).join('').toUpperCase()
   return (
-    <span className={`${size} flex shrink-0 items-center justify-center font-extrabold ${group ? 'rounded-full bg-ink-700 text-white' : 'rounded-[12px] bg-ink-900 text-lime-400'}`}>
+    <span className={`${size} flex shrink-0 items-center justify-center bg-ink-900 font-extrabold text-lime-400 ${shape}`}>
       {initials}
     </span>
   )
@@ -55,11 +60,11 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
   const [asking, setAsking] = useState(false)
   const [askingCancel, setAskingCancel] = useState(false)
   const member = club.my_status === 'member'
-  // A terra pode ser uma morada inteira (A2N, 26 set): essa parte pode partir
-  // a linha; «Clube» e «N membros» nunca partem.
+  // «Clube · <cidade> · N membros» (R5). Os dados só têm a morada inteira,
+  // que fica em «Sobre»: sem cidade, «Clube · N membros» (UX, 13 out).
   const sub = [
     { text: t(club.kind === 'group' ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), long: false },
-    club.kind !== 'group' && club.location ? { text: club.location, long: true } : null,
+    club.kind !== 'group' && club.city ? { text: club.city, long: true } : null,
     club.member_count != null ? { text: t('clubprofile.member_count', { count: club.member_count }), long: false } : null,
   ].filter(Boolean)
   const round = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm disabled:opacity-50'
@@ -86,10 +91,10 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
         </div>
       </KindHero>
 
-      <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-4">
+      <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-0">
         <div className="flex items-end gap-3.5">
           {/* O logótipo grande, a passar por cima do topo. */}
-          <span className="-mt-7 rounded-[16px] bg-white p-1 shadow-card">
+          <span className={`-mt-7 bg-white p-[3px] ${club.kind === 'group' ? 'rounded-full' : 'rounded-[28%]'}`}>
             <Symbol club={club} size="w-[58px] h-[58px] text-xl" />
           </span>
           <div className="min-w-0 flex-1 pt-3">
@@ -105,13 +110,13 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
         <div className="mt-4">
           {member ? (
             <button type="button" onClick={() => setAsking(true)} disabled={acting}
-              className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-[#F1F8D6] text-base font-extrabold text-[#3F5200] disabled:opacity-40">
-              <Check size={17} /> {t('clubprofile.is_member')}
+              className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F8DC] py-3 font-display text-[14px] font-extrabold leading-none text-[#3F6212] disabled:opacity-40">
+              <Check size={15} /> {t('clubprofile.is_member')}
             </button>
           ) : club.my_status === 'pending' ? (
             <div>
-              <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-50 text-base font-extrabold text-muted">
-                <Clock size={16} /> {t('clubprofile.request_sent')}
+              <span className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F5F1] py-3 font-display text-[14px] font-extrabold leading-none text-ink-500">
+                <Clock size={15} /> {t('clubprofile.request_sent')}
               </span>
               <p className="mt-1.5 text-center text-[13px] text-muted">{t(kk('clubprofile.request_waiting'))}</p>
               {onCancelRequest && (
@@ -219,7 +224,7 @@ function EventRow({ event, member }) {
     const b = x.ends_on && String(x.ends_on).slice(0, 10) !== String(x.starts_on || '').slice(0, 10) ? shortDay(x.ends_on, i18n.language) : null
     time = b ? `${a.split(' ')[0]}–${b}` : a || '—'
     timeAside = daysAside(x.starts_on, x.ends_on, i18n.language, t)
-    chips = x.location || null
+    chips = null
     if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   } else {
     const g = event.game
@@ -229,7 +234,13 @@ function EventRow({ event, member }) {
     if (!event.locked && g.max_players) {
       count = { n: g.confirmed_count || 0, of: g.max_players, unit: t(event.kind === 'open' ? 'homecard.unit_players' : 'homecard.unit_signed') }
     }
-    chips = g.location || null
+    // A linha cinzenta do R1: formato · campos · preço (CONFORMIDADE-R5-R8,
+    // n.º 3). Só com os dados na lista do clube (pedido ao Dev 3).
+    chips = [
+      g.format ? t(formatLabelKey(g)) : null,
+      g.num_courts ? t('gamedetails.court_count', { count: g.num_courts }) : null,
+      g.price_per_player > 0 ? formatCurrency(g.price_per_player, i18n.language) : null,
+    ].filter(Boolean).join(' · ') || null
     const free = g.max_players ? g.max_players - (g.confirmed_count || 0) : null
     if (event.myState === 'in') stateRow = <CardState tone="ok">{t('home.next_in')}</CardState>
     else if (event.myState === 'waitlist') stateRow = <CardState tone="warn">{t('agenda.state_line_waitlist')}</CardState>
@@ -257,7 +268,8 @@ function EventRow({ event, member }) {
       )}
     </HomeCard>
   )
-  return to ? card : <div className="opacity-60" aria-disabled="true">{card}</div>
+  if (to) return card
+  return event.locked ? <div className="opacity-60" aria-disabled="true">{card}</div> : card
 }
 
 // O cabeçalho do dia como o da Home (dayParts, AgendaControls): «Hoje» e
@@ -292,7 +304,7 @@ function EventDays({ events, member }) {
         return (
           <section key={k || i} className="space-y-2.5">
             {dp && (
-              <div className={`flex items-baseline gap-2 px-0.5 ${i === 0 ? '' : 'border-t border-line pt-3.5'}`}>
+              <div className={`flex items-baseline gap-2 px-0.5 ${i === 0 ? '' : 'pt-1'}`}>
                 <b className="font-display text-[22px] font-black leading-none tracking-[-.02em] text-ink-900">{dp.big}</b>
                 <span className="font-display text-[14px] font-semibold leading-none text-[#5B6068]">{dp.small}</span>
                 <em className="ml-auto font-mono text-[10.5px] not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: list.length })}</em>
@@ -321,17 +333,10 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t(canSeePast ? 'clubprofile.events' : 'clubprofile.upcoming')}</h3>
-        {tab === 'upcoming' && events.length > SHOW && !all && (
-          <button type="button" onClick={() => setAll(true)} className="inline-flex min-h-[44px] items-center gap-0.5 text-sm font-extrabold text-ink-900">
-            {t('clubprofile.see_all')} <ChevronRight size={15} />
-          </button>
-        )}
-      </div>
-
+      {/* Sem rótulo por cima: o separador vem logo a seguir ao botão (R5,
+          protótipo; UX 13 out). */}
       {canSeePast && (
-        <Tabs className="mb-3" label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
+        <Tabs className="mb-4" label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
           { value: 'upcoming', label: t('clubprofile.upcoming') },
           { value: 'played', label: t('agenda.show_played') },
         ]} />
@@ -345,22 +350,27 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
       )}
 
       {events.length === 0 ? (
-        isAdmin ? (
-          <div className="rounded-card border-2 border-dashed border-line p-3.5">
-            <p className="text-sm font-extrabold text-ink-900">{t('clubprofile.nothing_yet_admin')}</p>
-            <p className="text-[13px] text-muted">{t(kk('clubprofile.nothing_yet_admin_hint'))}</p>
-            <Link to={gerirHref} className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-ink-900">
+        // O Alino «a pensar», «Ainda sem jogos marcados» (R5, regra de 12 out:
+        // o Alino em todos os vazios). Quem organiza tem o caminho para marcar.
+        <div className="px-2.5 py-6 text-center">
+          <Alino pose="a-pensar" size={120} className="mx-auto" />
+          <b className="mt-2 block font-display text-[19px] font-black leading-tight text-ink-900">{t('clubprofile.empty_title')}</b>
+          <p className="mt-1.5 text-[13.5px] leading-normal text-ink-500">{t(kk('clubprofile.empty_hint'))}</p>
+          {isAdmin && (
+            <Link to={gerirHref} className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-ink-900">
               <Plus size={15} /> {t('clubprofile.schedule_mix')} <ChevronRight size={15} />
             </Link>
-          </div>
-        ) : (
-          <div className="rounded-card border border-line bg-canvas px-3.5 py-3">
-            <p className="text-sm font-extrabold text-ink-900">{t('clubprofile.nothing_yet')}</p>
-            <p className="text-[13px] text-muted">{t(kk('clubprofile.nothing_yet_hint'))}</p>
-          </div>
-        )
+          )}
+        </div>
       ) : (
-        <EventDays events={shown} member={member} />
+        <>
+          <EventDays events={shown} member={member} />
+          {events.length > SHOW && !all && (
+            <button type="button" onClick={() => setAll(true)} className="mt-1 inline-flex min-h-[44px] items-center gap-0.5 text-sm font-extrabold text-ink-900">
+              {t('clubprofile.see_all')} <ChevronRight size={15} />
+            </button>
+          )}
+        </>
       )}
       </>}
     </section>
@@ -442,81 +452,95 @@ function ClubPlayed({ club }) {
    a largura — nunca cortado (provado a 320 px no desenho). Quem organiza à
    vista. Professores (só clube) com o seguir de pessoas que já existe —
    nada de preços nem horários: as aulas estão escondidas até 11 out. */
+// Os blocos de baixo (protótipo .blk e .pl): o cartão cinzento-claro e a
+// linha branca de cada pessoa.
+export const BLOCK = 'rounded-[16px] bg-[#F4F5F1] p-3'
+export const ROW = 'mt-2 flex items-center gap-3 rounded-[12px] bg-white px-2.5 py-2'
+export const BLOCK_TITLE = 'font-display text-[15px] font-bold leading-tight text-ink-900'
+
 export function ClubPeople({ club, members, teachers, follows, followActing, onFollowTeacher, onUnfollowTeacher }) {
   const { t } = useTranslation()
   const admins = members.filter((m) => m.is_admin)
-  const faces = members.slice(0, 3)
+  const faces = members.slice(0, 6)
   const count = club.member_count ?? members.length
   const extra = Math.max(count - faces.length, 0)
 
   if (!count && !teachers.length) return null
+  // R5 (protótipo, UX 13 out): cada bloco num cartão cinzento-claro com o
+  // título dentro — «Pessoas» com «6 MEMBROS» em mono à direita, as caras e
+  // «Ver todos os membros ›»; «Quem organiza» com cada pessoa numa linha
+  // branca. O «Falar» do protótipo precisa do contacto de quem organiza, que
+  // vem com os dados de 23 (DADOS-PARA-23): até lá a linha abre o perfil.
   return (
-    <section className="space-y-2.5">
-      <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.people')}</h3>
-
+    <section className="space-y-2">
       {count > 0 && (
-        <div className="card overflow-hidden p-0">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex shrink-0 -space-x-2">
-              {faces.map((m) => <Avatar key={m.id} name={m.name} url={m.avatar_url} size="w-9 h-9 text-xs ring-2 ring-surface" />)}
-              {extra > 0 && (
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-700 text-[11px] font-extrabold text-white ring-2 ring-surface">+{extra}</span>
-              )}
-            </div>
-            <p className="font-extrabold text-ink-900">{t('clubprofile.member_count', { count })}</p>
+        <div className={BLOCK}>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.people')}</h3>
+            <span className="font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-ink-500">{t('clubprofile.member_count', { count })}</span>
           </div>
-          <Link to={`/clube/${club.slug}/membros`}
-            className="flex min-h-[48px] items-center justify-between border-t border-line px-4 text-sm font-extrabold text-ink-900 hover:bg-ink-50">
-            {t('clubprofile.see_all_members')} <ChevronRight size={16} />
+          <div className="mt-2.5 flex">
+            {faces.map((m, i) => (
+              <span key={m.id} className="-mr-2 rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
+                <Avatar name={m.name} url={m.avatar_url} size="w-8 h-8 text-[11px]" />
+              </span>
+            ))}
+            {extra > 0 && (
+              <span className="-mr-2 grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-[#F1F2EE] font-display text-[10.5px] font-bold text-[#4F535A]">+{extra}</span>
+            )}
+          </div>
+          <Link to={`/clube/${club.slug}/membros`} className="block pb-0.5 pt-3 font-display text-[13px] font-bold text-ink-900">
+            {t('clubprofile.see_all_members')} ›
           </Link>
         </div>
       )}
 
       {admins.length > 0 && (
-        <div className="card space-y-2.5">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.organizers')}</p>
+        <div className={BLOCK}>
+          <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.organizers')}</h3>
           {admins.map((m) => (
-            <Link key={m.id} to={`/jogador/${m.id}`} className="flex items-center gap-3">
-              <Avatar name={m.name} url={m.avatar_url} size="w-10 h-10 text-sm" />
-              <span className="min-w-0">
-                <span className="block truncate font-extrabold text-ink-900">{m.name}</span>
-                <span className="block text-[13px] text-muted">{t('clubprofile.organizes_mixes')}</span>
+            <Link key={m.id} to={`/jogador/${m.id}`} className={ROW}>
+              <Avatar name={m.name} url={m.avatar_url} size="w-9 h-9 text-xs" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-[14px] font-bold text-ink-900">{m.name}</span>
+                <span className="block text-[12px] text-ink-500">{t('clubprofile.organizes_mixes')}</span>
               </span>
+              <ChevronRight size={16} className="shrink-0 text-ink-500" />
             </Link>
           ))}
         </div>
       )}
 
       {club.kind !== 'group' && teachers.length > 0 && (
-        <div className="card space-y-2.5">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.tab_teachers')}</p>
+        <div className={BLOCK}>
+          <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.tab_teachers')}</h3>
           {teachers.map((x) => {
             const follow = x.user_id ? follows[x.user_id] : null
             return (
-              <div key={x.teacher_profile_id || x.user_id} className="flex items-center gap-3">
+              <div key={x.teacher_profile_id || x.user_id} className={ROW}>
                 <Link to={`/professor/${x.teacher_profile_id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  <Avatar name={x.name} url={x.avatar_url} size="w-10 h-10 text-sm" />
+                  <Avatar name={x.name} url={x.avatar_url} size="w-9 h-9 text-xs" />
                   <span className="min-w-0">
-                    <span className="block truncate font-extrabold text-ink-900">{x.name}</span>
-                    <span className="block truncate text-[13px] text-muted">
+                    <span className="block truncate font-display text-[14px] font-bold text-ink-900">{x.name}</span>
+                    <span className="block truncate text-[12px] text-ink-500">
                       {[t('comunidade.teacher_label'), club.kind !== 'group' ? club.location : null].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                 </Link>
                 {x.user_id && (follow?.status === 'accepted' ? (
                   <button type="button" disabled={followActing === x.user_id} onClick={() => onUnfollowTeacher(x)}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-line bg-canvas px-3.5 text-sm font-extrabold text-ink-900">
-                    <Check size={14} /> {t('playerdetails.following_button')}
+                    className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-[12px] border border-[#D5D8DE] bg-white px-2.5 font-display text-[12.5px] font-bold text-ink-900">
+                    <Check size={13} /> {t('playerdetails.following_button')}
                   </button>
                 ) : follow?.status === 'pending' ? (
                   <button type="button" disabled={followActing === x.user_id} onClick={() => onUnfollowTeacher(x, false)}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-line bg-canvas px-3.5 text-sm font-extrabold text-muted">
-                    <Clock size={14} /> {t('playerdetails.requested_button')}
+                    className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-[12px] border border-[#D5D8DE] bg-white px-2.5 font-display text-[12.5px] font-bold text-ink-900 !text-ink-500">
+                    <Clock size={13} /> {t('playerdetails.requested_button')}
                   </button>
                 ) : (
                   <button type="button" disabled={followActing === x.user_id} onClick={() => onFollowTeacher(x)}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border-2 border-ink-900 bg-canvas px-3.5 text-sm font-extrabold text-ink-900">
-                    <Plus size={14} /> {t('playerdetails.follow_button')}
+                    className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-[12px] border border-[#D5D8DE] bg-white px-2.5 font-display text-[12.5px] font-bold text-ink-900">
+                    {t('playerdetails.follow_button')}
                   </button>
                 ))}
               </div>
@@ -561,23 +585,23 @@ export function ClubAbout({ club, isAdmin, gerirHref }) {
   }
 
   return (
+    // R5 (protótipo): «Sobre o clube» / «Sobre o grupo» no cartão
+    // cinzento-claro, com a morada na peça comum («Abrir com…», Dev 2).
     <section>
-      <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.about')}</h3>
-      <div className="card space-y-3">
-        {club.description && <p className="whitespace-pre-line text-ink-900">{club.description}</p>}
-        {hasLocation && (
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(club.location)}`} target="_blank" rel="noopener noreferrer"
-            className="flex min-h-[44px] items-center justify-between gap-2 border-t border-line pt-2 text-ink-900">
-            <span className="flex min-w-0 items-center gap-1.5"><MapPin size={15} className="shrink-0" /> <span className="truncate">{club.location}</span></span>
-            <span className="inline-flex shrink-0 items-center text-sm font-extrabold">{t('clubprofile.open_map')} <ChevronRight size={15} /></span>
-          </a>
-        )}
+      <div className={`${BLOCK} space-y-3`}>
+        <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t(kk('clubprofile.about_title'))}</h3>
+        {club.description && <p className="whitespace-pre-line text-[13px] leading-normal text-ink-700">{club.description}</p>}
+        {hasLocation && <LocationOpenWith location={club.location} surface="white" />}
+        {/* Cada contacto numa linha branca, empilhadas (UX, 13 out — nunca
+            lado a lado): o ícone, o nome e «›». */}
         {contacts.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+          <div className="space-y-2">
             {contacts.map((c) => (
               <a key={c.href} href={c.href} target={c.external ? '_blank' : undefined} rel={c.external ? 'noopener noreferrer' : undefined}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-line bg-canvas px-4 text-sm font-extrabold text-ink-900">
-                <c.icon size={15} /> {c.label}
+                className="press flex min-h-[48px] items-center gap-3 rounded-[12px] bg-white px-3 py-2.5 font-display text-[14px] font-bold text-ink-900">
+                <c.icon size={17} className="shrink-0 text-ink-700" />
+                <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                <ChevronRight size={16} className="shrink-0 text-ink-500" />
               </a>
             ))}
           </div>
