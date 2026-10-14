@@ -64,7 +64,8 @@ export default function LiveBoard({ row, card, onOpen }) {
         </span>
         <span className="min-w-0 truncate font-display text-[12.5px] font-bold leading-[1.2] opacity-95">
           {/* Nos amigos, «Entre amigos · <sítio>», como no protótipo (QA, 13 out). */}
-          {[row.kind === 'friends' ? t('agenda.kind_friends') : card.title, row.org_name].filter(Boolean).join(' · ')}
+          {/* O sítio vem no `location` quando a base o mandar (Dev 3); até lá, o clube. */}
+          {[row.kind === 'friends' ? t('homecard.friends_short') : card.title, row.kind === 'friends' ? (row.location || row.org_name) : row.org_name].filter(Boolean).join(' · ')}
         </span>
       </div>
       <div className="px-3.5 pb-3.5 pt-3">
