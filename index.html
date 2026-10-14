@@ -161,21 +161,21 @@
            lenta mas a funcionar), espera até aos 30 s; senão, aparece já.
          Texto e aspeto: design-handoff/2026-10-14-app-nao-abre (UX). Só
          estilos simples, aqui dentro; o Alino em PNG (os browsers antigos não
-         abrem WebP). «Tentar outra vez» limpa a cache offline e recarrega.
+         abrem WebP). «Tentar outra vez» pede de novo os ficheiros da app sem
+         cache (um 404 ficava guardado 4 h), limpa a cache offline e recarrega.
          Tira o splash (#boot) para a mensagem se ver; se a app acabar por
          montar, o React substitui tudo. -->
     <script>
       (function () {
         var shown = false, loaded = false, started = Date.now();
-        var en = /^en/i.test(navigator.language || '');
-        var T = en ? {
-          netTitle: 'We couldn’t open alinho', netText: 'Your connection may be weak. Try again in a moment.', retry: 'Try again',
-          oldTitle: 'This browser is too old for alinho', oldText: 'Update your phone, or open this address in Safari or Chrome:',
-          oldNote: 'Opened it from the Google app? Copy the address and open it in Safari or Chrome.'
-        } : {
+        // Sempre em português, com uma linha pequena em inglês por baixo, como
+        // no <noscript> (PO, 14 out): a língua do browser engana.
+        var T = {
           netTitle: 'Não foi possível abrir o alinho', netText: 'A ligação pode estar fraca. Tenta outra vez daqui a pouco.', retry: 'Tentar outra vez',
+          netEn: 'We couldn’t open alinho. Your connection may be weak: tap the button to try again.',
           oldTitle: 'Este browser é antigo demais para o alinho', oldText: 'Atualiza o telemóvel, ou abre este endereço no Safari ou no Chrome:',
-          oldNote: 'Abriste a partir da app do Google? Copia o endereço e abre-o no Safari ou no Chrome.'
+          oldNote: 'Abriste a partir da app do Google? Copia o endereço e abre-o no Safari ou no Chrome.',
+          oldEn: 'This browser is too old for alinho. Update your phone, or open alinho.pt in Safari or Chrome.'
         };
         var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
         function isMain(src) { return /\/assets\/index-[^\/]*\.js|\/src\/main\.jsx/.test(src || ''); }
@@ -196,12 +196,24 @@
               ? '<span style="display:inline-block;margin-top:6px;padding:10px 16px;border-radius:12px;background:#fff;font:600 17px/1 ui-monospace,Menlo,Consolas,monospace;color:#040404;letter-spacing:.02em;-webkit-user-select:all;user-select:all">alinho.pt</span>' +
                 '<small style="display:block;font-size:13px;line-height:1.4;color:#6B7079;margin-top:14px">' + T.oldNote + '</small>'
               : '<button type="button" id="boot-retry" style="display:block;width:100%;max-width:300px;box-sizing:border-box;margin-top:14px;padding:15px;border:0;border-radius:14px;background:#040404;color:#fff;font:800 15px ' + FONT + '">' + T.retry + '</button>') +
+            '<small lang="en" style="display:block;max-width:300px;font-size:13px;line-height:1.4;color:#6B7079;margin-top:14px">' + (old ? T.oldEn : T.netEn) + '</small>' +
             '</div>';
           var btn = document.getElementById('boot-retry');
           if (btn) btn.onclick = function () {
+            btn.disabled = true;
             var done = function () { location.reload(); };
             try {
               var jobs = [];
+              // Os ficheiros da app (o principal, os pré-carregados e o CSS),
+              // pedidos de novo à rede: o que o browser tinha guardado (um
+              // 404 de há bocado) é substituído pela resposta nova.
+              if (window.fetch) {
+                var els = document.querySelectorAll('script[src],link[rel=stylesheet][href],link[rel=modulepreload][href]');
+                for (var i = 0; i < els.length; i++) {
+                  var u = els[i].src || els[i].href;
+                  if (u && u.indexOf(location.origin + '/assets/') === 0) jobs.push(fetch(u, { cache: 'reload' }).then(null, function () {}));
+                }
+              }
               if (window.caches && caches.keys) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
               if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
               if (window.Promise && jobs.length) Promise.all(jobs).then(done, done); else done();
