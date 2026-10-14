@@ -2767,7 +2767,9 @@ export default function GameDetails() {
     if (isDraftMix(game)) return t('mixdraft.draft')
     if (game?.status === 'pending') return t('organizer.state_pending')
     if (game?.status === 'open') return t('organizer.state_open')
-    if (game?.status === 'closed') return mixPaused ? t('eventactions.state_stopped') : t('organizer.state_closed')
+    // Com as duplas feitas e o mix por começar, «duplas feitas»: «parado»
+    // soava a avaria (QA, 14 out).
+    if (game?.status === 'closed') return mixPaused ? t('organizer.state_formed') : t('organizer.state_closed')
     if (game?.status === 'in_progress') return isMixLive(game, { scored: matches.some((m) => m.score_a != null) }) ? t('ui.status_live') : t('organizer.state_formed')
     if (game?.status === 'finished') return t('agenda.state_finished')
     if (game?.status === 'cancelled') return t('homecard.cancelled')
