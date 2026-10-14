@@ -5,7 +5,7 @@
 // entre membros · sobre. O clube só ACRESCENTA professores, grupos, local e
 // contactos — não é outra página.
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, Phone, Plus, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
@@ -18,7 +18,8 @@ import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
 import { KIND_STYLE, CardClub } from '../agenda/EventCard'
-import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, kindColorsOf } from '../agenda/HomeCard'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from '../agenda/HomeCard'
+import FaceCircles from '../event/FaceCircles'
 import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
 import { daysAside, shortDay } from '../event/heroDates'
@@ -215,9 +216,10 @@ export function buildClubEvents(club, tournaments = []) {
 // tipo e corpo branco), e o tipo no lugar do clube («Mix · recorrente»).
 function EventRow({ event, member }) {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const kindLabel = t(KIND_STYLE[event.kind]?.labelKey || 'agenda.kind_mix')
   const recurring = event.recurring ? t('ui.recurring') : null
-  let time, timeAside = null, count = null, chips = null, stateRow = null
+  let time, timeAside = null, count = null, chips = null, stateRow = null, free = null
   if (event.tournament) {
     const x = event.tournament
     const a = shortDay(x.starts_on, i18n.language)
@@ -241,7 +243,7 @@ function EventRow({ event, member }) {
       g.num_courts ? t('gamedetails.court_count', { count: g.num_courts }) : null,
       g.price_per_player > 0 ? formatCurrency(g.price_per_player, i18n.language) : null,
     ].filter(Boolean).join(' · ') || null
-    const free = g.max_players ? g.max_players - (g.confirmed_count || 0) : null
+    free = g.max_players ? Math.max(0, g.max_players - (g.confirmed_count || 0)) : null
     if (event.myState === 'in') stateRow = <CardState tone="ok">{t('home.next_in')}</CardState>
     else if (event.myState === 'waitlist') stateRow = <CardState tone="warn">{t('agenda.state_line_waitlist')}</CardState>
     else if (!event.locked && free === 0) stateRow = <CardState tone="warn">{t('homecard.full')}</CardState>
@@ -261,10 +263,21 @@ function EventRow({ event, member }) {
       <CardTitle>{event.title}</CardTitle>
       {chips && <CardChips>{chips}</CardChips>}
       {stateRow}
-      {event.myState === 'in' && to && (
+      {event.myState === 'in' && to ? (
         <CardFoot>
           <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
         </CardFoot>
+      ) : count && (
+        // Os círculos e o «Entrar», como na Home (R1; UX, 14 out). A lista do
+        // clube só traz quantos estão, por isso o cinzento cheio com o número
+        // e os tracejados dos lugares que faltam — nunca caras inventadas.
+        // «Entrar» leva à página do mix, onde se entra.
+        <div className="mt-3 flex items-center gap-2.5">
+          <FaceCircles count={count.n} free={free || 0} size="sm" />
+          {to && free > 0 && !event.myState && (
+            <div className="relative ml-auto"><CardButton onClick={() => navigate(to)}>{t('home.join_short')}</CardButton></div>
+          )}
+        </div>
       )}
     </HomeCard>
   )
@@ -479,7 +492,8 @@ export function ClubPeople({ club, members, teachers, follows, followActing, onF
             <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.people')}</h3>
             <span className="font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-ink-500">{t('clubprofile.member_count', { count })}</span>
           </div>
-          <div className="mt-2.5 flex">
+          {/* Sem caras, sem a linha: um «+340» sozinho parecia um erro (UX, 14 out). */}
+          {faces.length > 0 && <div className="mt-2.5 flex">
             {faces.map((m, i) => (
               <span key={m.id} className="-mr-2 rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
                 <Avatar name={m.name} url={m.avatar_url} size="w-8 h-8 text-[11px]" />
@@ -488,7 +502,7 @@ export function ClubPeople({ club, members, teachers, follows, followActing, onF
             {extra > 0 && (
               <span className="-mr-2 grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-[#F1F2EE] font-display text-[10.5px] font-bold text-[#4F535A]">+{extra}</span>
             )}
-          </div>
+          </div>}
           <Link to={`/clube/${club.slug}/membros`} className="block pb-0.5 pt-3 font-display text-[13px] font-bold text-ink-900">
             {t('clubprofile.see_all_members')} ›
           </Link>
