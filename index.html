@@ -134,6 +134,100 @@
         <p style="font-size:14px;line-height:1.5;margin:0;color:#6B7280;">Para grupos e clubes de padel: mixes com inscrição pelo WhatsApp («In»), rankings por nível, jogos entre amigos e torneios. <a href="/login?mode=signup" style="color:#040404;font-weight:800;">Criar conta</a> · <a href="/instrucoes" style="color:#040404;font-weight:800;">Como funciona</a></p>
       </main>
     </div>
+    <!-- Sem JavaScript (regras do computador da empresa ou uma extensão): o
+         vigia acima não corre, e ficava só o texto para o Google. Aqui, por
+         cima dele, o caso 3 do ecrã «app não abre» (UX, 14 out): sem botão
+         (recarregar não resolve); pt e uma linha em inglês, porque sem
+         JavaScript não se sabe a língua. O <style> esconde o splash. -->
+    <noscript>
+      <style>#boot{display:none!important}</style>
+      <div role="alert" style="position:fixed;top:0;right:0;bottom:0;left:0;z-index:10000;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;background:#F1F2EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+        <img src="/alino/alino-a-pensar.png" alt="" width="80" height="161" style="display:block;width:80px;height:161px;margin:0 auto 18px">
+        <h1 style="font-size:22px;line-height:1.2;font-weight:800;color:#040404;margin:0 0 8px">Este browser não deixa o alinho&nbsp;abrir</h1>
+        <p style="font-size:15px;line-height:1.45;color:#4F535A;margin:0 0 10px">Pode ser uma regra do computador da empresa. Abre este endereço no telemóvel ou noutro browser:</p>
+        <span style="display:inline-block;margin-top:6px;padding:10px 16px;border-radius:12px;background:#fff;font:600 17px/1 ui-monospace,Menlo,Consolas,monospace;color:#040404;letter-spacing:.02em;-webkit-user-select:all;user-select:all">alinho.pt</span>
+        <small style="display:block;font-size:13px;line-height:1.4;color:#6B7079;margin-top:14px">Para quem trata dos computadores: o alinho precisa do JavaScript ligado.</small>
+        <small style="display:block;font-size:13px;line-height:1.4;color:#6B7079;margin-top:10px">This browser is blocking alinho (JavaScript is off). Open alinho.pt on your phone or in another browser.</small>
+      </div>
+    </noscript>
+    <!-- Vigia do arranque (PO, 14 out — um jogador ficava parado no texto de
+         cima, que é para o Google, como se fosse a app). Script simples, que
+         até um browser antigo lê. O main.jsx avisa quando a app montou
+         (window.__alinhoUp). Se não montar:
+         - o ficheiro principal falha a carregar (404, sem rede) → já;
+         - o browser não o percebe (iOS antigo: erro de sintaxe) → já, «antigo»;
+         - o ficheiro carregou mas a app não montou → 2 s depois;
+         - nada disto aos 10 s: se o ficheiro ainda está a descarregar (rede
+           lenta mas a funcionar), espera até aos 30 s; senão, aparece já.
+         Texto e aspeto: design-handoff/2026-10-14-app-nao-abre (UX). Só
+         estilos simples, aqui dentro; o Alino em PNG (os browsers antigos não
+         abrem WebP). «Tentar outra vez» limpa a cache offline e recarrega.
+         Tira o splash (#boot) para a mensagem se ver; se a app acabar por
+         montar, o React substitui tudo. -->
+    <script>
+      (function () {
+        var shown = false, loaded = false, started = Date.now();
+        var en = /^en/i.test(navigator.language || '');
+        var T = en ? {
+          netTitle: 'We couldn’t open alinho', netText: 'Your connection may be weak. Try again in a moment.', retry: 'Try again',
+          oldTitle: 'This browser is too old for alinho', oldText: 'Update your phone, or open this address in Safari or Chrome:',
+          oldNote: 'Opened it from the Google app? Copy the address and open it in Safari or Chrome.'
+        } : {
+          netTitle: 'Não foi possível abrir o alinho', netText: 'A ligação pode estar fraca. Tenta outra vez daqui a pouco.', retry: 'Tentar outra vez',
+          oldTitle: 'Este browser é antigo demais para o alinho', oldText: 'Atualiza o telemóvel, ou abre este endereço no Safari ou no Chrome:',
+          oldNote: 'Abriste a partir da app do Google? Copia o endereço e abre-o no Safari ou no Chrome.'
+        };
+        var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+        function isMain(src) { return /\/assets\/index-[^\/]*\.js|\/src\/main\.jsx/.test(src || ''); }
+        function show(kind) {
+          if (shown || window.__alinhoUp) return;
+          shown = true;
+          var old = kind === 'old';
+          var boot = document.getElementById('boot');
+          if (boot && boot.parentNode) boot.parentNode.removeChild(boot);
+          var root = document.getElementById('root');
+          if (!root) return;
+          root.innerHTML =
+            '<div role="alert" style="position:fixed;top:0;right:0;bottom:0;left:0;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;background:#F1F2EE;font-family:' + FONT + '">' +
+            '<img src="/alino/alino-' + (old ? 'a-pensar' : 'triste') + '.png" alt="" width="80" height="161" onerror="this.style.opacity=0" style="display:block;width:80px;height:161px;margin:0 auto 18px">' +
+            '<h1 style="font-size:22px;line-height:1.2;font-weight:800;color:#040404;margin:0 0 8px">' + (old ? T.oldTitle : T.netTitle) + '</h1>' +
+            '<p style="font-size:15px;line-height:1.45;color:#4F535A;margin:0 0 10px">' + (old ? T.oldText : T.netText) + '</p>' +
+            (old
+              ? '<span style="display:inline-block;margin-top:6px;padding:10px 16px;border-radius:12px;background:#fff;font:600 17px/1 ui-monospace,Menlo,Consolas,monospace;color:#040404;letter-spacing:.02em;-webkit-user-select:all;user-select:all">alinho.pt</span>' +
+                '<small style="display:block;font-size:13px;line-height:1.4;color:#6B7079;margin-top:14px">' + T.oldNote + '</small>'
+              : '<button type="button" id="boot-retry" style="display:block;width:100%;max-width:300px;box-sizing:border-box;margin-top:14px;padding:15px;border:0;border-radius:14px;background:#040404;color:#fff;font:800 15px ' + FONT + '">' + T.retry + '</button>') +
+            '</div>';
+          var btn = document.getElementById('boot-retry');
+          if (btn) btn.onclick = function () {
+            var done = function () { location.reload(); };
+            try {
+              var jobs = [];
+              if (window.caches && caches.keys) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+              if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+              if (window.Promise && jobs.length) Promise.all(jobs).then(done, done); else done();
+            } catch (e) { done(); }
+          };
+        }
+        window.__alinhoBootFailed = show;
+        // O ficheiro principal: falhou (404, sem rede) ou carregou.
+        document.addEventListener('error', function (e) { var s = e.target; if (s && s.tagName === 'SCRIPT' && isMain(s.src)) show('net'); }, true);
+        document.addEventListener('load', function (e) {
+          var s = e.target;
+          if (s && s.tagName === 'SCRIPT' && isMain(s.src)) { loaded = true; setTimeout(function () { show('net'); }, 2000); }
+        }, true);
+        // Um browser que não percebe o código (erro de sintaxe ao ler).
+        window.addEventListener('error', function (e) {
+          if (!window.__alinhoUp && e && /SyntaxError/i.test(String(e.message || (e.error && e.error.name) || ''))) show('old');
+        });
+        // Nem sequer conhece <script type="module">: nunca vai arrancar.
+        if (!('noModule' in document.createElement('script'))) show('old');
+        setTimeout(function check() {
+          if (window.__alinhoUp || shown) return;
+          if (!loaded && Date.now() - started < 30000) { setTimeout(check, 2000); return; }
+          show('net');
+        }, 10000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

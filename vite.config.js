@@ -70,11 +70,14 @@ export default defineConfig(({ mode }) => {
         // precisos vários refreshes até «limpar» (Francisco, 26 set).
         globPatterns: ['**/*.{js,css,ico,png,svg}'],
         navigateFallback: null,
-        // Só se a rede falhar é que se usa a última página guardada.
+        // Só se a rede falhar é que se usa a última página guardada — sem
+        // tempo limite (14 out): com 4 s, numa rede lenta vinha a página
+        // antiga, que pedia o ficheiro principal antigo (já 404) e a app não
+        // arrancava (um jogador ficou parado no texto para o Google).
         runtimeCaching: [{
           urlPattern: ({ request }) => request.mode === 'navigate',
           handler: 'NetworkFirst',
-          options: { cacheName: 'paginas', networkTimeoutSeconds: 4 },
+          options: { cacheName: 'paginas' },
         }],
         // A versão nova NÃO ativa sozinha (29 set): ativá-la logo apagava os
         // ficheiros da versão aberta, e ao mudar de ecrã a página pedia um

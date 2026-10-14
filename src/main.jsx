@@ -39,5 +39,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <UpdatePill />
   </React.StrictMode>,
 )
+// A app montou: o vigia do index.html já não mostra «Não foi possível abrir
+// o alinho» (14 out).
+window.__alinhoUp = true
 
 
