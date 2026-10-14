@@ -1729,6 +1729,7 @@
   "gerir.name_placeholder_club": "ex: Padel Clube Lisboa",
   "gerir.name_placeholder_group": "ex: Torneio de Verão",
   "gerir.admin_label": "Admin",
+  "gerir.admin_default_hint": "Ficas tu como admin. Para criar para outra pessoa, procura-a aqui.",
   "gerir.search_admin_placeholder": "Procurar jogador para ser admin...",
   "gerir.creating": "A criar…",
   "gerir.create_club_button": "Criar clube",

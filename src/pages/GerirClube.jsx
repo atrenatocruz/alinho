@@ -450,6 +450,16 @@ export default function GerirClube() {
      contrario, do mais recente para tras. Os paineis continuam donos de
      criar e gerir -- aqui so se juntam as listas. */
   const diaLocal = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` }
+  const itemPorTerminar = (item) => {
+    if (item.terminado || !['mix', 'torneio'].includes(item.tipo)) return false
+    const row = item.tipo === 'mix' ? item.entry?.game : item.row
+    if (!row) return false
+    if (item.tipo === 'mix' && (isDraftMix(row) || isMixLive(row))) return false
+    if (item.tipo === 'torneio' && ['rascunho', 'a_decorrer'].includes(row.status)) return false
+    const ultimoDia = item.tipo === 'torneio' ? (row.ends_on || row.starts_on) : (row.date ? String(row.date).slice(0, 10) : null)
+    return !!ultimoDia && new Date(`${String(ultimoDia).slice(0, 10)}T23:59`) < new Date()
+  }
+
   const eventosPorData = () => {
     const itens = []
     for (const entry of groupGamesBySeries(games)) {
@@ -2797,7 +2807,7 @@ export default function GerirClube() {
               options={[
                 { value: 'all', label: t('gerirclube.kind_all') },
                 { value: 'mix', label: t('gerirclube.kind_mixes'), dot: KIND_COLORS.mix.strong },
-                ...(isGroupOrg ? [] : [{ value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong }]),
+                { value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong },
                 { value: 'torneio', label: t('gerirclube.kind_tournaments'), dot: KIND_COLORS.tournament.strong },
                 ...(isGroupOrg ? [] : [{ value: 'turma', label: t('gerirclube.kind_series'), dot: KIND_COLORS.lesson.strong }]),
               ]}
@@ -3587,14 +3597,11 @@ export default function GerirClube() {
 
               <div className="space-y-3">
                 {/* «A SEGUIR · N», à vista (sai o «Ver o que vem aí»). */}
-                <SectionLabel count={eventosPorData().length}>{t('pastevents.upcoming')}</SectionLabel>
-                {publishTourError && <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{publishTourError}</p>}
-                {eventosPorData().length === 0 && (
-                  <p className="text-sm text-muted text-center py-6">
-                    {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
-                  </p>
-                )}
-                {eventosPorData().map(item => {
+                {(() => {
+                const todos = eventosPorData()
+                const aSeguir = todos.filter((i) => !itemPorTerminar(i))
+                const porTerminarLista = todos.filter(itemPorTerminar)
+                const renderEvento = (item) => {
                   if (item.tipo === 'aberto' && item.jogos) {
                     return (
                       <OpenDayCard key={item.chave} titulo={quandoCurto(item.quando, false)} jogos={item.jogos}
@@ -3650,7 +3657,7 @@ export default function GerirClube() {
                     // recorrente»).
                     const hora = item.quando && tipo !== 'torneio' ? formatTimeLib(new Date(item.quando), i18n.language, { hour: '2-digit', minute: '2-digit' }) : null
                     const inscritos = tipo === 'torneio' || !max ? null : `${confirmados}/${max} ${t('homecard.unit_signed')}`
-                    detalhe = [hora, tipo === 'mix' ? abreEm(row) : null, aDecorrer, inscritos, duplas, prazo, nivel,
+                    detalhe = [hora, tipo === 'mix' ? abreEm(row) : null, inscritos, duplas, prazo, nivel,
                       row.recurrence_id ? t('gerirclube.every_week') : null].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
                     // Ações do evento (assunto 2): o mix que se repete aparece
@@ -3689,12 +3696,9 @@ export default function GerirClube() {
                     // «Por terminar» (UX, 9 out): o dia já acabou e ainda não foi
                     // dado como terminado. Fica no topo de «A seguir» (a data é a
                     // mais antiga), abre e mantém o «Editar».
-                    const ultimoDia = tipo === 'torneio' ? (row.ends_on || row.starts_on) : (row.date ? String(row.date).slice(0, 10) : null)
-                    porTerminar = (tipo === 'torneio' || (tipo === 'mix' && !isDraftMix(row))) && !item.terminado
-                      && !!ultimoDia && new Date(`${ultimoDia.slice(0, 10)}T23:59`) < new Date()
+                    porTerminar = itemPorTerminar(item)
                     // Um estado por cartão (UX, 9 out): com «Por terminar», a
                     // linha deixa de dizer «A decorrer».
-                    if (porTerminar && aDecorrer) detalhe = detalhe.replace(` · ${aDecorrer}`, '')
                     if (tipo === 'mix') {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
@@ -3738,7 +3742,7 @@ export default function GerirClube() {
                   const corForte = KIND_COLORS[kindKey]?.strong || '#374151'
                   const rascunho = (tipo === 'mix' && isDraftMix(row)) || (tipo === 'torneio' && row.status === 'rascunho')
                   const dia = item.quando ? new Date(item.quando) : null
-                  const pastilha = porTerminar ? { texto: t('pastevents.unfinished'), tom: 'falta' }
+                  const pastilha = porTerminar ? null
                     : rascunho ? { texto: t('mixdraft.draft'), tom: 'rascunho' }
                       : marca ? { texto: marca, tom: 'escuro' }
                         : estado
@@ -3755,7 +3759,7 @@ export default function GerirClube() {
                     }`}>
                       <button type="button" onClick={abrir || undefined} disabled={!abrir} className="flex w-full min-w-0 items-center gap-3 p-3.5 text-left disabled:cursor-default">
                         <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[14px] text-white"
-                          style={{ background: cinzento ? '#9CA3AF' : corForte }}>
+                          style={{ background: cinzento || porTerminar ? '#9CA3AF' : corForte }}>
                           {tipo === 'turma' ? (
                             <b className="font-mono text-sm font-extrabold uppercase">{String(linha || '').slice(0, 3)}</b>
                           ) : (
@@ -3805,7 +3809,28 @@ export default function GerirClube() {
                       )}
                     </div>
                   )
-                })}
+                }
+                return (
+                  <>
+                    <SectionLabel count={aSeguir.length}>{t('pastevents.upcoming')}</SectionLabel>
+                    {publishTourError && <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{publishTourError}</p>}
+                    {aSeguir.length === 0 && (
+                      <p className="text-sm text-muted text-center py-6">
+                        {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
+                      </p>
+                    )}
+                    {aSeguir.map(renderEvento)}
+                    {/* «POR TERMINAR · N» à parte (SPEC do R9; QA, 14 out): o
+                        dia já acabou e ainda não foi dado como terminado. */}
+                    {porTerminarLista.length > 0 && (
+                      <>
+                        <div className="pt-2"><SectionLabel count={porTerminarLista.length}>{t('pastevents.unfinished')}</SectionLabel></div>
+                        {porTerminarLista.map(renderEvento)}
+                      </>
+                    )}
+                  </>
+                )
+                })()}
               </div>
 
               {/* «JÁ PASSARAM · N»: os 3 mais recentes e o resto numa página
@@ -3947,7 +3972,11 @@ export default function GerirClube() {
                 <div>
                   <h3 className="text-sm font-extrabold text-ink-900 mb-2">{t('gerirclube.invite_player_heading')}</h3>
                   <div className="mb-3">
-                    <Segmented
+                    {/* Escolha num formulário = pastilhas soltas, a escolhida a
+                        preto e a outra de contorno branca (regra de 24 set; UX,
+                        14 out). */}
+                    <Chips
+                      label={t('gerirclube.invite_player_heading')}
                       options={[
                         { value: 'member', label: t('gerirclube.invite_as_member') },
                         { value: 'admin', label: t('gerirclube.invite_as_admin') },
@@ -3980,10 +4009,10 @@ export default function GerirClube() {
                 </div>
               </div>
 
-              <div id="gerir-membros" className="card bg-blue-50 scroll-mt-4">
-                <p className="text-gray-700">
-                  <strong>{t('gerirclube.total_members_label')}</strong> {members.length}
-                </p>
+              {/* «MEMBROS · N» em mono, como os outros títulos de lista (UX,
+                  14 out): saiu a caixa azul-clara, que não é cor da app. */}
+              <div id="gerir-membros" className="scroll-mt-4 pt-1">
+                <SectionLabel count={members.length}>{t('clubprofile.members_title')}</SectionLabel>
               </div>
 
               {members.map(member => (

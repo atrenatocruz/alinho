@@ -1725,6 +1725,7 @@
   "gerir.name_placeholder_club": "e.g. Padel Club Lisbon",
   "gerir.name_placeholder_group": "e.g. Summer Tournament",
   "gerir.admin_label": "Admin",
+  "gerir.admin_default_hint": "You'll be the admin. To create it for someone else, search for them here.",
   "gerir.search_admin_placeholder": "Search for a player to be admin...",
   "gerir.creating": "Creating…",
   "gerir.create_club_button": "Create club",
