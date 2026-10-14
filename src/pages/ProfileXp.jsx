@@ -52,7 +52,8 @@ export default function ProfileXp() {
 
   return (
     <div className="space-y-5 pb-6">
-      <div className="flex items-center gap-3 pt-1">
+      {/* A barra fica sempre presa em cima (Francisco, 14 out: as barras nunca desaparecem). */}
+      <div className="sticky top-0 z-10 -mx-4 -mt-6 flex items-center gap-3 bg-canvas px-4 pb-3" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 16px)' }}>
         <button type="button" onClick={() => navigate('/perfil')} aria-label={t('gamedetails.back')}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
           <ChevronLeft size={22} />
