@@ -38,7 +38,9 @@ export function Realce({ text, query }) {
   return (
     <>
       {text.slice(0, i)}
-      <mark className="rounded-sm bg-lime-100 px-0.5 text-ink-900">{text.slice(i, i + q.length)}</mark>
+      {/* Colado ao resto da palavra: sem margem dos lados, senão lia-se
+          «Ren ato» (QA, 14 out). */}
+      <mark className="rounded-[2px] bg-lime-100 text-ink-900">{text.slice(i, i + q.length)}</mark>
       {text.slice(i + q.length)}
     </>
   )

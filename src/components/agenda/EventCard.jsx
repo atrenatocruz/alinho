@@ -366,7 +366,8 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
         </span>
       )}
       {stateRow}
-      <CardFoot people={players} slots={capacity}>{button}</CardFoot>
+      {/* Nos mixes não há tracejados, seja qual for o tamanho (R1; QA, 14 out). */}
+      <CardFoot people={players} slots={event.kind === 'mix' ? 0 : capacity}>{button}</CardFoot>
     </HomeCard>
   )
 }

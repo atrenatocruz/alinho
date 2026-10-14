@@ -73,7 +73,7 @@ function StatusBand({ kind, status }) {
 export default function EventHero({
   kind, imageUrl = null, chip = null, org = null, title, time = null, timeAside = null, dateLine = null,
   onAddToCalendar = null, onBack = null, onShare = null, status = null, children = null,
-  manage = null, nextStep = null,
+  manage = null, nextStep = null, roundBottom = false,
 }) {
   const { t } = useTranslation()
   return (
@@ -95,8 +95,10 @@ export default function EventHero({
         )}
       </KindHero>
 
-      {/* O cartão branco sobe uns 20 px por cima da capa. */}
-      <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-4 pt-4">
+      {/* O cartão branco sobe uns 20 px por cima da capa. `roundBottom`: quando
+          a folha acaba aqui, os cantos de baixo a 16 px, como os topos do R12b
+          (UX, 14 out). O torneio fecha a sua folha mais abaixo. */}
+      <div className={`relative -mt-5 rounded-t-[22px] bg-white px-4 pb-4 pt-4 ${roundBottom ? 'rounded-b-[16px]' : ''}`}>
         {manage && <div className="mb-2 empty:hidden">{manage}</div>}
         {org && (
           <button type="button" onClick={org.onOpen || undefined} disabled={!org.onOpen}

@@ -278,6 +278,9 @@ export default function FriendSession() {
   // Enviado, o «Editar» fica à vista, apagado e com a razão por baixo — antes
   // sumia sem dizer porquê (#586, 13 out).
   // Quem aceitou e não criou: a linha verde (SPEC amigos-convidado, ponto 2).
+  // Quem organiza, com pessoas por responder, pode formar as equipas já:
+  // o botão vive por baixo de «Quem joga» e a caixa de cima aponta para ele.
+  const formNowStep = !!match && games.length === 0 && iOrganize && canForm && pending > 0
   const organizerLine = iOrganize && !iAmCreator && (
     <p className="mt-3 rounded-card bg-lime-100 px-3.5 py-2.5 text-sm text-[#3F6212]">{t('friends.organizer_line')}</p>
   )
@@ -372,7 +375,6 @@ export default function FriendSession() {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
 
-  const label = 'block text-sm font-medium text-gray-700 mb-2'
   const person = (p, onClick) => (
     <button key={p.id} type="button" onClick={onClick}
       className={`press flex min-h-[48px] w-full items-center gap-3 rounded-ctrl border px-3 py-2 text-left ${
@@ -407,6 +409,7 @@ export default function FriendSession() {
         else if (me) { text = t('home.next_in'); tone = 'ok' }
         return (
           <EventHero
+            roundBottom
             kind={kind}
             // «Entre amigos · <sítio>», como no protótipo (UX, 13 out).
             chip={[t(inClub ? 'agenda.kind_open' : 'homecard.friends_short'), match.location ? String(match.location).split(',')[0].trim() : null].filter(Boolean).join(' · ')}
@@ -423,7 +426,8 @@ export default function FriendSession() {
             // «Editar e mais opções» (a folha comum).
             nextStep={iOrganize && (!finished || iSent) ? (
               <OrganizerBox kind={inClub ? 'open' : 'friends'} onMore={() => setActionsOpen(true)}
-                label={t('organizer.label_friends', { state: orgStateText })} />
+                label={t('organizer.label_friends', { state: orgStateText })}
+                nextLink={formNowStep ? { label: t('friends.form_teams'), onClick: () => document.getElementById('friends-next-step')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) } : null} />
             ) : null}
             status={{
               faces: accepted.map((i) => ({ id: i.invitee_id, name: i.name, avatar_url: i.avatar_url })),
@@ -433,60 +437,62 @@ export default function FriendSession() {
               tone,
               meta: t('homecard.hero_meta_accepted', { n: accepted.length, total: slots }),
             }}
-          />
+          >
+          {/* A folha branca continua com a linha do sítio e as respostas ao
+              convite dentro (protótipo; UX e Francisco, 14 out). */}
+          {actions}
+          {games.length > 0 ? (
+            // «6 pessoas · 1 campo · a rodar · 20 min por ronda» (SPEC amigos-a-
+            // jogar: o tipo é de cada ronda, já não vai aqui).
+            <p className="mt-1 text-sm text-muted">
+              {[t('friends.people_count', { count: players.length }),
+                t('friends.courts_count', { count: Math.max(1, ...games.map((g) => g.court_number || 1)) }),
+                match.pairing_mode === 'rotating' ? t('friends.pairs_rotating_short') : null,
+                match.game_minutes && !finished && useClock ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
+              ].filter(Boolean).join(' · ')}
+              {finished && <span className="text-ink-900"> · <Check size={13} className="inline align-[-2px]" /> {t('friends.finished_tag')}</span>}
+            </p>
+          ) : (match.location || players.length > 0) && (
+            <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
+              {match.location && <MapPin size={14} />}
+              {[match.location, match.court, t('friends.people_count', { count: players.length })].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {organizerLine}
+
+          {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}
+          {resultToAnswer && (
+            <div className="space-y-2.5 pt-1">
+              {/* O que se está a confirmar, como no sino (UX, 13 out). Sem artigo
+                  antes do nome («Rita F. enviou…»), a regra do Francisco (QA). */}
+              <p className="text-sm text-ink-900">
+                <Trans i18nKey="friends.page_result_line"
+                  values={{ name: shortName(match.sent_by?.name || resultToAnswer.data?.sender_name || ''), how: resultHow(t, resultToAnswer.data || {}) }}
+                  components={{ b: <b className="font-extrabold" /> }} />
+              </p>
+              <FriendResultButtons matchId={match.id} senderName={match.sent_by?.name} onDone={() => { setResultToAnswer(null); load() }} />
+            </div>
+          )}
+          {!finished && (me?.status === 'pending' || invitedHere) && (
+            <div className="space-y-2.5 pt-1">
+              <p className="rounded-card bg-[#F4F5F1] p-3.5 text-sm text-ink-900">
+                <b>{t('friends.invited_you', { name: creator?.name || '' })}</b> {t('friends.invited_you_rest', {
+                  details: [dayText(match.scheduled_date, i18n.language), match.scheduled_time ? match.scheduled_time.slice(0, 5) : null, match.location].filter(Boolean).join(', ') })}
+              </p>
+              <PrimaryButton onClick={() => respond('yes')} disabled={busy} className="w-full">{t('friends.answer_yes')}</PrimaryButton>
+              {[['anon', 'friends.answer_anon', 'friends.answer_anon_hint'], ['no', 'friends.answer_no', 'friends.answer_no_hint']].map(([k, title, hint]) => (
+                <button key={k} type="button" onClick={() => respond(k)} disabled={busy}
+                  className="press w-full rounded-ctrl border border-line bg-white p-3.5 text-left disabled:opacity-40">
+                  <span className="block text-sm font-extrabold text-ink-900">{t(title)}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{t(hint, { name: creator?.name || '' })}</span>
+                </button>
+              ))}
+              {games.length > 0 && <p className="text-xs text-muted">{t('friends.invite_card_note')}</p>}
+            </div>
+          )}
+          </EventHero>
         )
       })()}
-      {actions}
-      {games.length > 0 ? (
-        // «6 pessoas · 1 campo · a rodar · 20 min por ronda» (SPEC amigos-a-
-        // jogar: o tipo é de cada ronda, já não vai aqui).
-        <p className="mt-1 text-sm text-muted">
-          {[t('friends.people_count', { count: players.length }),
-            t('friends.courts_count', { count: Math.max(1, ...games.map((g) => g.court_number || 1)) }),
-            match.pairing_mode === 'rotating' ? t('friends.pairs_rotating_short') : null,
-            match.game_minutes && !finished && useClock ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
-          ].filter(Boolean).join(' · ')}
-          {finished && <span className="text-ink-900"> · <Check size={13} className="inline align-[-2px]" /> {t('friends.finished_tag')}</span>}
-        </p>
-      ) : (match.location || players.length > 0) && (
-        <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
-          {match.location && <MapPin size={14} />}
-          {[match.location, match.court, t('friends.people_count', { count: players.length })].filter(Boolean).join(' · ')}
-        </p>
-      )}
-      {organizerLine}
-
-      {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}
-      {resultToAnswer && (
-        <div className="mt-6 space-y-2.5">
-          {/* O que se está a confirmar, como no sino (UX, 13 out). Sem artigo
-              antes do nome («Rita F. enviou…»), a regra do Francisco (QA). */}
-          <p className="text-sm text-ink-900">
-            <Trans i18nKey="friends.page_result_line"
-              values={{ name: shortName(match.sent_by?.name || resultToAnswer.data?.sender_name || ''), how: resultHow(t, resultToAnswer.data || {}) }}
-              components={{ b: <b className="font-extrabold" /> }} />
-          </p>
-          <FriendResultButtons matchId={match.id} senderName={match.sent_by?.name} onDone={() => { setResultToAnswer(null); load() }} />
-        </div>
-      )}
-      {!finished && (me?.status === 'pending' || invitedHere) && (
-        <div className="mt-6 space-y-2.5">
-          <p className="rounded-card border border-line bg-white p-3.5 text-sm text-ink-900">
-            <b>{t('friends.invited_you', { name: creator?.name || '' })}</b> {t('friends.invited_you_rest', {
-              details: [dayText(match.scheduled_date, i18n.language), match.scheduled_time ? match.scheduled_time.slice(0, 5) : null, match.location].filter(Boolean).join(', ') })}
-          </p>
-          <PrimaryButton onClick={() => respond('yes')} disabled={busy} className="w-full">{t('friends.answer_yes')}</PrimaryButton>
-          {[['anon', 'friends.answer_anon', 'friends.answer_anon_hint'], ['no', 'friends.answer_no', 'friends.answer_no_hint']].map(([k, title, hint]) => (
-            <button key={k} type="button" onClick={() => respond(k)} disabled={busy}
-              className="press w-full rounded-ctrl border border-line bg-white p-3.5 text-left disabled:opacity-40">
-              <span className="block text-sm font-extrabold text-ink-900">{t(title)}</span>
-              <span className="mt-0.5 block text-xs text-muted">{t(hint, { name: creator?.name || '' })}</span>
-            </button>
-          ))}
-          {games.length > 0 && <p className="text-xs text-muted">{t('friends.invite_card_note')}</p>}
-        </div>
-      )}
-
       {/* Alguém saiu («Não vou»): quem organiza convida outra pessoa ou mantém o
           lugar como «Jogador sem nome» (quem recusa, 27 set). */}
       {iOrganize && invitees.some((i) => i.status === 'declined' && i.left_name) && (() => {
@@ -560,13 +566,14 @@ export default function FriendSession() {
           {/* Antes de começar, «Quem joga» fica por baixo da moldura (SPEC
               amigos-convidado, ponto 3). */}
           {(games.length === 0 || beforeStart(match.scheduled_date, match.scheduled_time)) && (
-          <div>
-            <p className={label}>{t('friends.who_plays', { count: invitees.filter((i) => i.status !== 'declined').length })}</p>
-            <div className="space-y-2">
+          // Um cartão branco, como os «Inscritos» do mix: as pessoas em linhas
+          // com uma linha fina, «+ Juntar pessoa» e a nota lá dentro (UX, 14 out).
+          <div className="card">
+            <h3 className="mb-1 text-lg text-ink-900">{t('friends.who_plays', { count: invitees.filter((i) => i.status !== 'declined').length })}</h3>
+            <div className="divide-y divide-line">
               {/* Quem disse «Não vou» sai de «Quem joga». */}
               {invitees.filter((i) => i.status !== 'declined').map((i) => (
-                <div key={i.invitee_id} className={`flex min-h-[48px] items-center gap-3 rounded-ctrl border px-3 py-2 ${
-                  i.user_id === profile?.id ? 'border-[#BBF7D0] bg-[#DCFCE7]' : 'border-line bg-white'} ${i.status === 'declined' ? 'opacity-60' : ''}`}>
+                <div key={i.invitee_id} className="flex min-h-[52px] items-center gap-3 py-2">
                   <Avatar name={i.name} url={i.avatar_url} size="w-8 h-8 text-[11px]" />
                   <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${i.user_id === profile?.id ? 'text-[#14532D]' : i.is_anonymous ? 'italic text-muted' : 'text-ink-900'}`}>
                     {i.user_id === profile?.id ? t('friends.me_row', { name: i.name }) : i.is_anonymous ? t('friends.anon_name') : i.name}
@@ -594,19 +601,23 @@ export default function FriendSession() {
                 <Plus size={16} /> {t('friends.add_person_button')}
               </button>
             )}
+            {/* Quem organiza, com pessoas por responder: não fica à espera. */}
+            {formNowStep && (
+              <p className="mt-3 rounded-card bg-[#F4F5F1] p-3.5 text-sm text-ink-700">
+                <b className="text-ink-900">{t('friends.no_need_to_wait_bold')}</b> {t('friends.no_need_to_wait_rest')}
+              </p>
+            )}
             {addingPerson && (
               <AddPersonSheet matchId={match.id} inGame={new Set(invitees.map((i) => i.user_id).filter(Boolean))}
                 onClose={() => setAddingPerson(false)} onSaved={() => { setAddingPerson(false); load() }} />
             )}
           </div>
           )}
-          {/* Quem organiza, com pessoas por responder: não fica à espera. */}
-          {games.length === 0 && iOrganize && canForm && pending > 0 && (
-            <div className="space-y-3">
-              <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
-                <b className="text-ink-900">{t('friends.no_need_to_wait_bold')}</b> {t('friends.no_need_to_wait_rest')}
-              </p>
-              <PrimaryButton onClick={() => setFormNow(true)} className="w-full">{t('friends.form_teams')}</PrimaryButton>
+          {/* «Formar as equipas» é um passo de quem organiza: a preto (R3b).
+              A caixa de cima diz «Próximo passo: Formar as equipas ↓». */}
+          {formNowStep && (
+            <div id="friends-next-step" className="space-y-2 scroll-mt-24">
+              <PrimaryButton variant="ink" onClick={() => setFormNow(true)} className="w-full">{t('friends.form_teams')}</PrimaryButton>
               <ShareMissingButton match={match} creatorName={creator?.name} />
             </div>
           )}

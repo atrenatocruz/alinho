@@ -456,7 +456,7 @@ export function Footer() {
           <Link to="/privacidade" className={link}>{t('landing.privacy_link')}</Link>
           <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
         </div>
-        <p className="text-white/50 text-xs">&copy; {year} alinho</p>
+        <p className="text-white/50 text-xs">&copy; {year} alinho.pt</p>
       </div>
     </footer>
   )
