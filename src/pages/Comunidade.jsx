@@ -16,6 +16,7 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
 import KindHero from '../components/KindHero'
 import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
+import { Realce } from '../components/SearchField'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
    Encontrar clubes, grupos e professores — e só isso. Desenho:
@@ -264,7 +265,8 @@ export default function Comunidade() {
           <span className={`relative -mt-9 inline-block bg-white p-[3px] ${group ? 'rounded-full' : 'rounded-[28%]'}`}>
             <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={group ? 'round' : 'square'} colorClass="bg-ink-900 text-lime-400" />
           </span>
-          <h3 className="mt-1 font-display text-xl font-extrabold leading-tight text-ink-900 break-words">{org.name}</h3>
+          {/* A parte encontrada a lima-claro (pesquisa, 14 out). */}
+          <h3 className="mt-1 font-display text-xl font-extrabold leading-tight text-ink-900 break-words"><Realce text={org.name || ''} query={trimmed} /></h3>
           <p className="mt-0.5 text-sm text-muted">
             {sub}
             {/* A letra (M, F ou MX) vem já feita da base (level_letter, Dev 3,
@@ -336,7 +338,7 @@ export default function Comunidade() {
           >
             <Avatar name={teacher.user?.name} url={teacher.user?.avatar_url} size="w-12 h-12 text-base" />
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-lg font-extrabold text-ink-900">{teacher.user?.name}</h3>
+              <h3 className="truncate text-lg font-extrabold text-ink-900"><Realce text={teacher.user?.name || ''} query={trimmed} /></h3>
               <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
                 <span className="truncate">{[teacherClubName(teacher) || t('comunidade.teacher_no_club_short'), teacher.zone].filter(Boolean).join(' · ')}</span>
                 {level && <LevelPill label={level} />}

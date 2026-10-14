@@ -777,7 +777,7 @@ export function Chips({ options, value, onChange, label, className = '' }) {
      <StickyTop>                       ← preso em cima ao descer, num bloco branco
        <Tabs … />                      ← o separador (pílula cinzenta), se houver
        <FilterBar
-         search={{ value, onChange, placeholder }}   ← 🔍 troca a barra pelo campo, «✕» volta
+         search={{ value, onChange, placeholder, open?, onOpenChange? }}   ← 🔍 troca a barra pelo campo, «✕» volta
          lead={<FilterPill chevron onClick={…}>Out 2026</FilterPill>}
          options={[{ value: 'mix', label: 'Mixes', dot: KIND_COLORS.mix.strong, count: 2 }, …]}
          value={kind} onChange={setKind} label="Tipo" />
@@ -813,7 +813,12 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
   const { t } = useTranslation()
   const ref = useDragScroll()
   const inputRef = useRef(null)
-  const [searching, setSearching] = useState(!!search?.value)
+  // Aberta/fechada: por dentro, ou de fora com search.open e
+  // search.onOpenChange (a Home troca a lista do dia pelos resultados).
+  const [openInside, setOpenInside] = useState(!!search?.value)
+  const controlled = typeof search?.open === 'boolean'
+  const searching = controlled ? search.open : openInside
+  const setSearching = (v) => { if (controlled) search.onOpenChange?.(v); else setOpenInside(v) }
   useEffect(() => { if (searching) inputRef.current?.focus() }, [searching])
   // A pastilha escolhida fica sempre à vista: a barra desliza até ela.
   useEffect(() => {
@@ -846,15 +851,20 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
     <div ref={ref} role={searching ? undefined : 'group'} aria-label={searching ? undefined : label}
       className={`no-scrollbar -mx-4 flex cursor-grab items-center gap-1.5 overflow-x-auto px-4 py-1 active:cursor-grabbing ${className}`}>
       {searching ? (
-        <div className="flex min-h-[36px] w-full items-center gap-2 rounded-full border border-ink-900 bg-white pl-3 pr-1">
+        // A caixa da pesquisa, igual em todas as páginas (SPEC 2026-10-14-
+        // pesquisa-regra-unica): redonda, 36 px, branca com contorno preto de
+        // 1,5 px, a lupa cinzenta, o texto a 500 e o «✕» num círculo
+        // cinzento de 26 px que apaga e fecha. O texto fica a 16 px (e não 14):
+        // abaixo de 16 o iPhone aproxima a página ao tocar no campo.
+        <div className="flex min-h-[36px] w-full items-center gap-2 rounded-full border-[1.5px] border-ink-900 bg-white pl-3 pr-[5px]">
           <Search size={16} className="shrink-0 text-muted" />
           <input ref={inputRef} type="search" value={search?.value || ''} onChange={(e) => search?.onChange?.(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') close() }}
             placeholder={search?.placeholder} aria-label={search?.placeholder || t('agenda.search_open')}
-            className="min-w-0 flex-1 bg-transparent text-base outline-none" />
+            className="min-w-0 flex-1 bg-transparent text-[16px] font-medium leading-none text-ink-900 outline-none placeholder:font-medium placeholder:text-muted [&::-webkit-search-cancel-button]:hidden" />
           <button type="button" onClick={close} aria-label={t('ui.close')}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-900 hover:bg-surface">
-            <X size={16} />
+            className="relative flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#E7E9ED] text-ink-900 before:absolute before:-inset-2 before:content-['']">
+            <X size={14} strokeWidth={2.5} />
           </button>
         </div>
       ) : (

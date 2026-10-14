@@ -17,6 +17,7 @@ import MonthRanking from '../components/rankings/MonthRanking'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 import RankPodium from '../components/rankings/RankPodium'
 import { useFrames } from '../lib/frames'
+import { Realce } from '../components/SearchField'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -341,7 +342,8 @@ export default function Rankings() {
           <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" frame={frames[row.user_id]} />
           <div className="flex-1 min-w-0">
             <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
-              <span className="truncate min-w-0">{row.name}</span>
+              {/* A parte encontrada a lima-claro (pesquisa, 14 out). */}
+              <span className="truncate min-w-0"><Realce text={row.name || ''} query={trimmed} /></span>
               {isMe && <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-lime-600">{t('rankings.you_badge')}</span>}
             </p>
             <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
