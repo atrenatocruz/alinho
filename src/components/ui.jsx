@@ -16,7 +16,7 @@ import { describeError } from '../lib/errors'
 import Alino from './Alino'
 import { frameInsideBox, frameSrc } from '../lib/frames'
 import { useDragScroll } from '../lib/useDragScroll'
-import GlassBar, { GLASS_ROUND, SAFE_TOP, scrollParentOf } from './GlassBar'
+import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -1734,40 +1734,37 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
 // Sem `solid` (Francisco, 14 out — design-handoff/2026-10-14-capa-barra-
 // presa, pontos 5 e 6): a barra de vidro, como no topo da app do Claude
 // (GlassBar). De ponta a ponta da janela e a desvanecer em baixo; parada no
-// topo não tem fundo, só os botões; o vidro aparece ao descer. O nome ao
-// centro só quando o título grande da página (o primeiro h1/h2 a seguir à
-// barra) já saiu por cima — nunca os dois ao mesmo tempo.
+// topo não tem fundo, só os botões. Quando o topo do título grande da página
+// (o primeiro h1/h2 a seguir à barra) chega ao fundo dos botões, o vidro e o
+// nome entram juntos e o título grande sai, numa troca cruzada de 150 ms — o
+// mesmo das páginas com capa (UX, 15 out). Nunca os dois, nunca o grande
+// cortado a meio do vidro.
 function GlassBackBar({ onBack, to, label, title, onShare, right }) {
   const { t } = useTranslation()
   const spaceRef = useRef(null)
-  const [scrolled, setScrolled] = useState(false)
-  const [showTitle, setShowTitle] = useState(false)
-  useEffect(() => {
+  const rowRef = useRef(null)
+  const headRef = useRef(null)
+  const [isHeading, setIsHeading] = useState(false)
+  useLayoutEffect(() => {
     const space = spaceRef.current
-    if (!space) return undefined
-    const area = scrollParentOf(space)
-    const read = () => setScrolled((area ? area.scrollTop : window.scrollY) > 2)
-    read()
-    const target = area || window
-    target.addEventListener('scroll', read, { passive: true })
-    return () => target.removeEventListener('scroll', read)
-  }, [])
-  useEffect(() => {
-    const space = spaceRef.current
-    if (!space || typeof IntersectionObserver === 'undefined') { setShowTitle(true); return undefined }
-    // O título grande: o primeiro h1/h2 depois da barra; sem ele, o que vem
-    // logo a seguir (o cartão do topo).
-    const after = [...(space.parentElement?.querySelectorAll('h1, h2') || [])]
+    // O título grande; sem ele, o que vem logo a seguir (o cartão do topo),
+    // que não se esconde.
+    const after = [...(space?.parentElement?.querySelectorAll('h1, h2') || [])]
       .find((h) => space.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING)
-    const watched = after || space.nextElementSibling
-    if (!watched) { setShowTitle(true); return undefined }
-    const io = new IntersectionObserver(
-      ([entry]) => setShowTitle(!entry.isIntersecting && entry.boundingClientRect.top < space.offsetHeight),
-      { rootMargin: `-${space.offsetHeight}px 0px 0px 0px`, threshold: 0 },
-    )
-    io.observe(watched)
-    return () => io.disconnect()
+    headRef.current = after || space?.nextElementSibling || null
+    setIsHeading(!!after)
   }, [title])
+  const under = useUnderBar(headRef, rowRef, [title, isHeading], { lastLine: isHeading })
+  const moved = useUnderBar(spaceRef, rowRef, [], { edge: 'bottom' })
+  // O vidro entra com a primeira linha do título; o nome sobe com a última.
+  const firstUnder = useUnderBar(headRef, rowRef, [title, isHeading])
+  useEffect(() => {
+    const head = headRef.current
+    if (!head || !isHeading) return undefined
+    head.style.transition = 'opacity 150ms'
+    head.style.opacity = under ? '0' : ''
+    return () => { head.style.opacity = ''; head.style.transition = '' }
+  }, [under, isHeading])
   const back = to
     ? <Link to={to} aria-label={label || t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></Link>
     : onBack
@@ -1777,7 +1774,7 @@ function GlassBackBar({ onBack, to, label, title, onShare, right }) {
     <>
       {/* O lugar da barra na página (a barra em si vai para o <body>). */}
       <div ref={spaceRef} aria-hidden="true" className="-mx-4 -mt-6 mb-1 h-16 box-content" style={{ paddingTop: SAFE_TOP }} />
-      <GlassBar anchorRef={spaceRef} filled={scrolled} showTitle={showTitle} title={title} left={back}
+      <GlassBar anchorRef={spaceRef} rowRef={rowRef} filled={under || firstUnder} strip={moved} showTitle={under} title={title} left={back}
         wide={!!right}
         right={right || (onShare ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button> : null)} />
     </>

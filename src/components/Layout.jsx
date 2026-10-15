@@ -839,7 +839,11 @@ export default function Layout({ children }) {
           Perfil) shows notifications/logout in its own sticky title
           (PageHeader in components/ui.jsx), read via HeaderActionsContext. */}
       <AppToast />
-      <main ref={mainRef} className="flex-1 overflow-y-auto">
+      {/* scrollbar-gutter dos dois lados: no computador a barra de deslizar
+          ocupava só a direita e a coluna ficava descentrada na janela (10 px
+          de um lado, 54 do outro — Francisco, 15 out). No telemóvel a barra
+          não ocupa espaço e nada muda. */}
+      <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
         {/* O espaço reservado no fim tem de crescer com a barra (Trello #407).
             A nav acrescenta env(safe-area-inset-bottom) ao seu próprio fundo —
             no iPhone com barra de gestos são ~34px — e o pb-28 fixo (7rem)

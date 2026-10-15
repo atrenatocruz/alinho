@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, Phone, Plus, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
-import GlassBar, { GLASS_ROUND, GlassPinned, usePassedTop } from '../GlassBar'
+import GlassBar, { GLASS_ROUND, GlassPinned, useUnderBar } from '../GlassBar'
 import Alino from '../Alino'
 import LocationOpenWith from '../LocationOpenWith'
 import { formatLabelKey } from '../../lib/mixLogic'
@@ -69,48 +69,37 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
     club.kind !== 'group' && club.city ? { text: club.city, long: true } : null,
     club.member_count != null ? { text: t('clubprofile.member_count', { count: club.member_count }), long: false } : null,
   ].filter(Boolean)
-  const round = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm disabled:opacity-50'
-  // Ao descer, a barra de vidro presa com o «‹», o ♡ e o partilhar (GlassBar;
-  // Francisco, 14 out). O nome só aparece quando o grande já saiu por cima.
+  // O «‹», o ♡ e o partilhar sempre no mesmo sítio, presos em cima em
+  // círculos de vidro, também por cima da foto (GlassBar; Francisco, 15 out:
+  // nada muda de sítio). O vidro e o nome entram juntos quando o nome grande
+  // chega aos botões, numa troca cruzada com ele (UX).
   const coverRef = useRef(null)
   const nameRef = useRef(null)
-  const coverGone = usePassedTop(coverRef, 64)
-  const nameGone = usePassedTop(nameRef, 64)
-  const tab = coverGone ? 0 : -1
+  const rowRef = useRef(null)
+  const under = useUnderBar(nameRef, rowRef, [], { lastLine: true })
+  // O vidro entra com a primeira linha do nome; o nome sobe para a barra com
+  // a última (UX, 15 out).
+  const firstUnder = useUnderBar(nameRef, rowRef)
+  const coverGone = useUnderBar(coverRef, rowRef, [], { edge: 'bottom' })
 
   return (
     // Sai das margens da página, como o topo dos eventos (R3).
     <div className="-mx-4 -mt-6">
-      <GlassBar anchorRef={coverRef} show={coverGone} showTitle={nameGone} title={club.name} wide={member && !!onShare}
-        left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} tabIndex={tab} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
+      <GlassBar anchorRef={coverRef} rowRef={rowRef} filled={under || firstUnder} strip={coverGone} showTitle={under} title={club.name} wide={member && !!onShare}
+        left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
         right={<>
           {member && (
-            <button type="button" onClick={onToggleFavorite} disabled={favoriting} tabIndex={tab}
+            <button type="button" onClick={onToggleFavorite} disabled={favoriting}
               aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
+              title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
               aria-pressed={isFavorite} className={`${GLASS_ROUND} disabled:opacity-50`}>
               <Heart size={19} className={isFavorite ? 'fill-lime-400 text-lime-600' : ''} />
             </button>
           )}
-          {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} tabIndex={tab} className={GLASS_ROUND}><Share2 size={18} /></button>}
+          {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button>}
         </>} />
       <div ref={coverRef}>
       <KindHero kind="club" src={club.kind === 'group' ? GROUP_HERO : CLUB_HERO} className="relative h-40">
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 12px)' }}>
-          {onBack
-            ? <button type="button" onClick={onBack} aria-label={t('common.back')} className={round}><ChevronLeft size={22} /></button>
-            : <span aria-hidden />}
-          <div className="flex items-center gap-2">
-            {member && (
-              <button type="button" onClick={onToggleFavorite} disabled={favoriting}
-                aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
-                title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
-                aria-pressed={isFavorite} className={round}>
-                <Heart size={19} className={isFavorite ? 'fill-lime-400 text-lime-400' : ''} />
-              </button>
-            )}
-            {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>}
-          </div>
-        </div>
       </KindHero>
       </div>
 
@@ -121,7 +110,7 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
             <Symbol club={club} size="w-[58px] h-[58px] text-xl" />
           </span>
           <div className="min-w-0 flex-1 pt-3">
-            <h1 ref={nameRef} className="font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h1>
+            <h1 ref={nameRef} className={`font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere] transition-opacity duration-fast ${under ? 'opacity-0' : 'opacity-100'}`}>{club.name}</h1>
           </div>
         </div>
         <p className="mt-1 text-sm text-muted">
