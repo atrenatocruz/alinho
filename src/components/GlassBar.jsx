@@ -75,12 +75,14 @@ function useScrollArea(anchorRef) {
   useEffect(() => {
     const area = scrollParentOf(anchorRef.current)
     // O vidro ocupa a área toda (de ponta a ponta da janela); os botões e o
-    // nome alinham-se com a coluna da app (o primeiro filho do <main>), que é
-    // onde estão a capa e os cartões — assim nada depende da barra de deslizar.
+    // nome alinham-se com o próprio `anchorRef` (a capa, ou o lugar da barra
+    // nas páginas sem capa), 16 px para dentro. Assim seguem a largura de cada
+    // página — a dos jogos entre amigos é mais estreita (QA, 15 out) — e nada
+    // depende da barra de deslizar.
     const measure = () => {
       if (!area) { setBox({ left: 0, width: document.documentElement.clientWidth, colLeft: 0, colWidth: document.documentElement.clientWidth }); return }
       const r = area.getBoundingClientRect()
-      const col = (area.firstElementChild || area).getBoundingClientRect()
+      const col = (anchorRef.current || area.firstElementChild || area).getBoundingClientRect()
       const next = { left: r.left, width: r.width, colLeft: col.left - r.left, colWidth: col.width }
       setBox((b) => (b && b.left === next.left && b.width === next.width && b.colLeft === next.colLeft && b.colWidth === next.colWidth ? b : next))
     }
@@ -91,6 +93,7 @@ function useScrollArea(anchorRef) {
     // A barra de deslizar aparece quando o conteúdo cresce, sem mudar o
     // tamanho da área por fora: vigia-se também o conteúdo.
     if (ro && area.firstElementChild) ro.observe(area.firstElementChild)
+    if (ro && anchorRef.current) ro.observe(anchorRef.current)
     // E ao deslizar, por garantia (medir é barato e só muda se mudou).
     area?.addEventListener('scroll', measure, { passive: true })
     return () => { window.removeEventListener('resize', measure); area?.removeEventListener('scroll', measure); ro?.disconnect() }
