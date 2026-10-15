@@ -4,11 +4,12 @@
 // grupo: cabeçalho · o que vem aí · pessoas · (grupos do clube) · jogos
 // entre membros · sobre. O clube só ACRESCENTA professores, grupos, local e
 // contactos — não é outra página.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, Phone, Plus, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
+import GlassBar, { GLASS_ROUND, GlassPinned, usePassedTop } from '../GlassBar'
 import Alino from '../Alino'
 import LocationOpenWith from '../LocationOpenWith'
 import { formatLabelKey } from '../../lib/mixLogic'
@@ -69,10 +70,30 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
     club.member_count != null ? { text: t('clubprofile.member_count', { count: club.member_count }), long: false } : null,
   ].filter(Boolean)
   const round = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm disabled:opacity-50'
+  // Ao descer, a barra de vidro presa com o «‹», o ♡ e o partilhar (GlassBar;
+  // Francisco, 14 out). O nome só aparece quando o grande já saiu por cima.
+  const coverRef = useRef(null)
+  const nameRef = useRef(null)
+  const coverGone = usePassedTop(coverRef, 64)
+  const nameGone = usePassedTop(nameRef, 64)
+  const tab = coverGone ? 0 : -1
 
   return (
     // Sai das margens da página, como o topo dos eventos (R3).
     <div className="-mx-4 -mt-6">
+      <GlassBar anchorRef={coverRef} show={coverGone} showTitle={nameGone} title={club.name} wide={member && !!onShare}
+        left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} tabIndex={tab} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
+        right={<>
+          {member && (
+            <button type="button" onClick={onToggleFavorite} disabled={favoriting} tabIndex={tab}
+              aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
+              aria-pressed={isFavorite} className={`${GLASS_ROUND} disabled:opacity-50`}>
+              <Heart size={19} className={isFavorite ? 'fill-lime-400 text-lime-600' : ''} />
+            </button>
+          )}
+          {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} tabIndex={tab} className={GLASS_ROUND}><Share2 size={18} /></button>}
+        </>} />
+      <div ref={coverRef}>
       <KindHero kind="club" src={club.kind === 'group' ? GROUP_HERO : CLUB_HERO} className="relative h-40">
         <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 12px)' }}>
           {onBack
@@ -91,6 +112,7 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
           </div>
         </div>
       </KindHero>
+      </div>
 
       <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-0">
         <div className="flex items-end gap-3.5">
@@ -99,7 +121,7 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
             <Symbol club={club} size="w-[58px] h-[58px] text-xl" />
           </span>
           <div className="min-w-0 flex-1 pt-3">
-            <h1 className="font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h1>
+            <h1 ref={nameRef} className="font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h1>
           </div>
         </div>
         <p className="mt-1 text-sm text-muted">
@@ -347,11 +369,14 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
     <section>
       {/* Sem rótulo por cima: o separador vem logo a seguir ao botão (R5,
           protótipo; UX 13 out). */}
+      {/* Preso por baixo da barra de vidro ao descer (Francisco, 14 out). */}
       {canSeePast && (
-        <Tabs className="mb-4" label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
-          { value: 'upcoming', label: t('clubprofile.upcoming') },
-          { value: 'played', label: t('agenda.show_played') },
-        ]} />
+        <GlassPinned className="mb-1">
+          <Tabs label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
+            { value: 'upcoming', label: t('clubprofile.upcoming') },
+            { value: 'played', label: t('agenda.show_played') },
+          ]} />
+        </GlassPinned>
       )}
 
       {tab === 'played' ? <ClubPlayed club={club} /> : <>

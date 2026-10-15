@@ -6,6 +6,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { parseLevel } from '../lib/mixLevels'
 import EventHero from '../components/event/EventHero'
+import { GlassPinned } from '../components/GlassBar'
 import EventFacts from '../components/event/EventFacts'
 import OrganizerBox from '../components/event/OrganizerBox'
 import { isMixLive } from '../lib/mixLive'
@@ -3449,7 +3450,7 @@ export default function GameDetails() {
       {/* Tocar num separador sobe a página até ele ficar em cima, com o
           conteúdo logo à vista, como no torneio (Francisco, 14 out). */}
       {game.status === 'finished' && rounds.length > 0 && (
-        <div ref={finishedTabsRef} className="scroll-mt-3">
+        <GlassPinned pinRef={finishedTabsRef}>
         <Tabs
           value={finishedTab}
           onChange={(v) => {
@@ -3462,7 +3463,7 @@ export default function GameDetails() {
             { value: 'rondas', label: t('gamedetails.tab_rondas') },
           ].filter((tab) => !(showIndividualStandings && tab.value === 'duplas'))}
         />
-        </div>
+        </GlassPinned>
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}

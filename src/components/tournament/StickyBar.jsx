@@ -6,6 +6,7 @@
 // tudo como hoje. Mudar de categoria, de separador ou de dia na barra presa
 // leva ao início dessa lista, logo abaixo da barra — não ao topo da página.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useGlassBehind } from '../GlassBar'
 
 const SAFE_TOP = 'var(--safe-top, env(safe-area-inset-top, 0px))'
 const BAR_TOP = `calc(4rem + ${SAFE_TOP})`
@@ -80,8 +81,12 @@ function useBackToListStart(resetKey, sentinel, topPx, { pullUp = false } = {}) 
 // do fundo tapa essa margem enquanto está presa (Francisco, iPhone, 14 out:
 // ficava um espaço em cima com o conteúdo a passar por trás). Aí sem sombra:
 // no cinzento da página, como os outros separadores (R12b; UX, 14 out).
-export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true, belowBackBar = true }) {
+// `glass`: na página do torneio, presa por baixo da barra de vidro da capa
+// (GlassBar; Francisco, 14 out), «dentro do mesmo vidro»: sem fundo cinzento
+// nem sombra, o vidro a continuar por trás.
+export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true, belowBackBar = true, glass = false }) {
   const ref = useRef(null)
+  const [, glassBg] = useGlassBehind(ref)
   const sentinel = useRef(null)
   const measure = useRef((top, h) => {
     document.documentElement.style.setProperty('--t-sticky-bottom', `${top + h}px`)
@@ -98,9 +103,10 @@ export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true, bel
       <div ref={sentinel} aria-hidden />
       {/* A mesma altura presa ou solta: o espaço que sai do meio (16 → 8 px)
           passa para baixo — senão a página saltava ao prender. */}
-      <div ref={ref} style={{ top: belowBackBar ? BAR_TOP : SAFE_TOP }}
-        className={`sticky z-[9] -mx-4 bg-ground px-4 ${stuck ? `space-y-2 pb-4 pt-2 ${shadow && belowBackBar ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
-        {stuck && !belowBackBar && (
+      <div ref={ref} style={{ top: belowBackBar || glass ? BAR_TOP : SAFE_TOP }}
+        className={`sticky z-[9] -mx-4 px-4 ${glass ? 'isolate' : 'bg-ground'} ${stuck ? `space-y-2 pb-4 pt-2 ${shadow && belowBackBar && !glass ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
+        {glass && stuck && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 -z-10" style={glassBg} />}
+        {stuck && !belowBackBar && !glass && (
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-full bg-ground" style={{ height: SAFE_TOP }} />
         )}
         {children}

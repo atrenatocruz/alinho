@@ -16,6 +16,7 @@ import { describeError } from '../lib/errors'
 import Alino from './Alino'
 import { frameInsideBox, frameSrc } from '../lib/frames'
 import { useDragScroll } from '../lib/useDragScroll'
+import GlassBar, { GLASS_ROUND, SAFE_TOP, scrollParentOf } from './GlassBar'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -1730,6 +1731,59 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
 // seguir, e os cantos de baixo a 16 px só quando esse bloco já saiu do ecrã
 // (presa sozinha ao descer) — parada, os cantos e a sombra são do último
 // bloco (QA, 14 out: via-se uma falha cinzenta entre a barra e o nome).
+// Sem `solid` (Francisco, 14 out — design-handoff/2026-10-14-capa-barra-
+// presa, pontos 5 e 6): a barra de vidro, como no topo da app do Claude
+// (GlassBar). De ponta a ponta da janela e a desvanecer em baixo; parada no
+// topo não tem fundo, só os botões; o vidro aparece ao descer. O nome ao
+// centro só quando o título grande da página (o primeiro h1/h2 a seguir à
+// barra) já saiu por cima — nunca os dois ao mesmo tempo.
+function GlassBackBar({ onBack, to, label, title, onShare, right }) {
+  const { t } = useTranslation()
+  const spaceRef = useRef(null)
+  const [scrolled, setScrolled] = useState(false)
+  const [showTitle, setShowTitle] = useState(false)
+  useEffect(() => {
+    const space = spaceRef.current
+    if (!space) return undefined
+    const area = scrollParentOf(space)
+    const read = () => setScrolled((area ? area.scrollTop : window.scrollY) > 2)
+    read()
+    const target = area || window
+    target.addEventListener('scroll', read, { passive: true })
+    return () => target.removeEventListener('scroll', read)
+  }, [])
+  useEffect(() => {
+    const space = spaceRef.current
+    if (!space || typeof IntersectionObserver === 'undefined') { setShowTitle(true); return undefined }
+    // O título grande: o primeiro h1/h2 depois da barra; sem ele, o que vem
+    // logo a seguir (o cartão do topo).
+    const after = [...(space.parentElement?.querySelectorAll('h1, h2') || [])]
+      .find((h) => space.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const watched = after || space.nextElementSibling
+    if (!watched) { setShowTitle(true); return undefined }
+    const io = new IntersectionObserver(
+      ([entry]) => setShowTitle(!entry.isIntersecting && entry.boundingClientRect.top < space.offsetHeight),
+      { rootMargin: `-${space.offsetHeight}px 0px 0px 0px`, threshold: 0 },
+    )
+    io.observe(watched)
+    return () => io.disconnect()
+  }, [title])
+  const back = to
+    ? <Link to={to} aria-label={label || t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></Link>
+    : onBack
+    ? <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button>
+    : null
+  return (
+    <>
+      {/* O lugar da barra na página (a barra em si vai para o <body>). */}
+      <div ref={spaceRef} aria-hidden="true" className="-mx-4 -mt-6 mb-1 h-16 box-content" style={{ paddingTop: SAFE_TOP }} />
+      <GlassBar anchorRef={spaceRef} filled={scrolled} showTitle={showTitle} title={title} left={back}
+        wide={!!right}
+        right={right || (onShare ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button> : null)} />
+    </>
+  )
+}
+
 export function BackBar({ onBack, to, label, title, onShare, right, solid = false }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
@@ -1746,8 +1800,9 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
     return () => io.disconnect()
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
+  if (!solid) return <GlassBackBar onBack={onBack} to={to} label={label} title={title} onShare={onShare} right={right} />
   return (
-    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 px-4 ${solid ? `mb-0 bg-white ${showTitle ? 'rounded-b-[16px]' : ''}` : 'mb-1 bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 px-4 mb-0 bg-white ${showTitle ? 'rounded-b-[16px]' : ''}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
       <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
