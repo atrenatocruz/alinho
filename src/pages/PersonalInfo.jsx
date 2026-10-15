@@ -259,7 +259,7 @@ export default function PersonalInfo() {
                     onClick={() => setIsPrivate((v) => !v)}
                     className={`shrink-0 w-11 h-6 rounded-full transition-colors duration-fast relative ${isPrivate ? 'bg-lime-400' : 'bg-ink-200'}`}
                   >
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-fast ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    <span className={`absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-fast ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </button>
                 </label>
               </div>
