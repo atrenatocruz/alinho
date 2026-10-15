@@ -66,9 +66,13 @@ export function scrollParentOf(el) {
  *  de largura — a barra de deslizar do computador só aparece quando a página
  *  cresce, e a coluna anda ~8 px; medida uma vez só, o «‹» ficava para dentro
  *  e o partilhar para fora (Francisco, 15 out). */
+// useEffect e não useLayoutEffect: a GlassBar vem antes da capa na página, e
+// no useLayoutEffect dela o ref da capa ainda não está ligado — a área saía
+// nula e a barra ficava à largura da janela (só no build: em local o
+// StrictMode corre os efeitos duas vezes e escondia isto — QA, 15 out).
 function useScrollArea(anchorRef) {
   const [box, setBox] = useState(null)
-  useLayoutEffect(() => {
+  useEffect(() => {
     const area = scrollParentOf(anchorRef.current)
     // O vidro ocupa a área toda (de ponta a ponta da janela); os botões e o
     // nome alinham-se com a coluna da app (o primeiro filho do <main>), que é

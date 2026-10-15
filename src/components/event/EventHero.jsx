@@ -81,8 +81,9 @@ export default function EventHero({
     // No computador, quando a folha acaba aqui (roundBottom), fica da largura
     // dos cartões de baixo — saía 16 px para cada lado (Francisco, 14 out).
     <div className={`-mx-4 -mt-6 ${roundBottom ? 'sm:mx-0 sm:overflow-hidden sm:rounded-b-[16px]' : ''}`}>
-      {/* No computador, com a folha à largura dos cartões (roundBottom), os
-          círculos alinham com os cartões, 16 px para dentro da folha (UX). */}
+      {/* No computador, com a folha à largura da coluna (roundBottom), o que
+          está dentro da folha (o «Entrar», a caixa de quem organiza) começa 16 px
+          para dentro: os círculos alinham com isso, não com a folha (UX). */}
       <GlassBar anchorRef={coverRef} rowRef={rowRef} filled={under || firstUnder} strip={coverGone} showTitle={under}
         inner={roundBottom ? 'px-4 sm:px-8' : 'px-4'}
         title={barTitle || title} dot={(KIND_COLORS[kind] || KIND_COLORS.mix).strong}
