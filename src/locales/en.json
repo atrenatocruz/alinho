@@ -1406,6 +1406,7 @@
   "gamedetails.undo_duplas_title": "Undo the pairs?",
   "gamedetails.undo_duplas_text": "The pairs are removed and everyone goes back to the sign-up list. You can make the pairs again afterwards.",
   "gamedetails.undo_duplas_text_games": "The pairs and the Round 1 games are removed, and everyone goes back to the sign-up list. You can make the pairs again afterwards.",
+  "gamedetails.undo_duplas_no_autostart": "The mix won't start by itself anymore: you start it with «Start the mix».",
   "gamedetails.undo_duplas_confirm": "Undo the pairs",
   "gamedetails.undo_duplas_error": "Couldn't undo the pairs. Try again.",
   "gamedetails.error_stop_mix": "Couldn't stop the mix.",

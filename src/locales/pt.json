@@ -1410,6 +1410,7 @@
   "gamedetails.undo_duplas_title": "Desfazer as duplas?",
   "gamedetails.undo_duplas_text": "As duplas saem e todos voltam aos inscritos. Depois podes fazer as duplas outra vez.",
   "gamedetails.undo_duplas_text_games": "As duplas e os jogos da Ronda 1 saem, e todos voltam aos inscritos. Depois podes fazer as duplas outra vez.",
+  "gamedetails.undo_duplas_no_autostart": "O mix já não começa sozinho: começas tu, com «Começar o Mix».",
   "gamedetails.undo_duplas_confirm": "Desfazer as duplas",
   "gamedetails.undo_duplas_error": "Não foi possível desfazer as duplas. Tenta outra vez.",
   "gamedetails.error_stop_mix": "Não foi possível parar o mix.",

@@ -1822,6 +1822,54 @@ export default function GameDetails() {
     await handleStartMix({ start: false })
   }
 
+  // «Desfazer as duplas» (Francisco, 15 out: «Sinto mesmo falta duma forma
+  // para desfazer as equipas e voltar ao estado anterior»): as duplas da app
+  // saem e o mix volta aos inscritos, com «Fazer duplas». Quem se inscreveu
+  // em dupla continua junto (isso vive nos inscritos). Com a Ronda 1 já nos
+  // campos, os jogos saem primeiro (apontam para as duplas) — por isso a
+  // pergunta fica a vermelho. O estado do mix não muda: fazer as duplas
+  // também não o mudou.
+  const handleUndoDuplas = async () => {
+    const withGames = matches.length > 0
+    const ok = await askConfirm({
+      title: t('gamedetails.undo_duplas_title'),
+      // Começado sozinho: quem desfaz fica a saber que deixa de começar sozinho (UX, 15 out).
+      message: [t(withGames ? 'gamedetails.undo_duplas_text_games' : 'gamedetails.undo_duplas_text'),
+        game.status === 'in_progress' && game.auto_start_hours_before != null ? t('gamedetails.undo_duplas_no_autostart') : null].filter(Boolean).join(' '),
+      confirmLabel: t('gamedetails.undo_duplas_confirm'),
+      cancelLabel: t('gamedetails.ask_not_yet'),
+      danger: withGames,
+    })
+    if (!ok) return
+    setBusy(true)
+    setMixError('')
+    try {
+      if (withGames) {
+        const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
+        if (matchesError) throw matchesError
+      }
+      const { error } = await supabase.from('teams').delete().eq('game_id', id)
+      if (error) throw error
+      // Começado sozinho (o arranque automático, 15 out: o «+ 1 Mix de
+      // Quinta»), sem jogos marcados: volta às inscrições — «open» com lugar,
+      // «closed» cheio — e perde o arranque automático, só este mix, senão o
+      // robô formava as duplas outra vez logo a seguir. A série fica igual.
+      if (game.status === 'in_progress') {
+        const { error: statusError } = await supabase.from('games')
+          .update({ status: peopleCount < capacity ? 'open' : 'closed', auto_start_hours_before: null })
+          .eq('id', id)
+        if (statusError) throw statusError
+      }
+      setEditingPairs(false)
+      await loadGameDetails()
+    } catch (error) {
+      console.error('Error undoing duplas:', error)
+      setMixError(describeError(t, error, 'gamedetails.undo_duplas_error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const orderedTeamIds = (list = teams) =>
     [...list].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map(team => team.id)
 
@@ -2665,6 +2713,12 @@ export default function GameDetails() {
   const canStart = isAdmin && !mixStarted && showClosed && !mixPaused && !mixCancelled
   const canStartGames = isAdmin && mixPaused && !mixCancelled
   const canRedoDuplas = canStartGames && matches.length === 0
+  // «Desfazer as duplas» (15 out): com as duplas feitas e o mix por começar,
+  // e também com o mix começado (sozinho, pelo arranque automático) enquanto
+  // não houver jogos a decorrer — sem jogos, ou só a Ronda 1 nos campos, por
+  // começar e sem resultados.
+  const canUndoDuplas = isAdmin && !mixCancelled && teams.length > 0
+    && (canStartGames || (game?.status === 'in_progress' && (matches.length === 0 || round1Pending)))
   // O × nas duplas (ponto 8): também com as duplas sorteadas e o mix por
   // começar — tira a pessoa e as duplas refazem-se com a mesma regra.
   const duplaRemovable = lastMinuteEditable || (canRedoDuplas && !editingPairs)
@@ -3732,6 +3786,15 @@ export default function GameDetails() {
           </div>
           {editingPairs ? renderPairsEditor() : renderDuplasList()}
           <p className="mt-2 text-xs text-muted">{t('eventactions.drawn_everyone_sees')}</p>
+          {/* Voltar aos inscritos, sem duplas (Francisco, 15 out). A cor
+              segue a da pergunta (UX): preto sem jogos; vermelho com a
+              Ronda 1 nos campos, porque os jogos saem. */}
+          {canUndoDuplas && !editingPairs && (
+            <button type="button" onClick={handleUndoDuplas} disabled={busy}
+              className={`mt-3 min-h-[44px] text-sm font-extrabold underline underline-offset-2 disabled:opacity-40 ${matches.length > 0 ? 'text-danger' : 'text-ink-900'}`}>
+              {t('gamedetails.undo_duplas')}
+            </button>
+          )}
         </div>
       )}
       {mixPaused && stepSlot === 'duplas' && renderStepButton()}
@@ -3812,6 +3875,14 @@ export default function GameDetails() {
                   renderDuplasList()
                 )}
               </>
+            )}
+            {/* Começado sozinho, sem jogos a decorrer: voltar aos inscritos
+                (15 out). À vista também com o cartão dobrado. */}
+            {canUndoDuplas && !editingPairs && (
+              <button type="button" onClick={handleUndoDuplas} disabled={busy}
+                className={`mt-3 min-h-[44px] text-sm font-extrabold underline underline-offset-2 disabled:opacity-40 ${matches.length > 0 ? 'text-danger' : 'text-ink-900'}`}>
+                {t('gamedetails.undo_duplas')}
+              </button>
             )}
           </div>
           )}
@@ -5233,6 +5304,8 @@ export default function GameDetails() {
               ? `/gerir/${orgSlug}/editar/em-aberto/${game.open_batch_id}`
               : `/gerir/${orgSlug}/editar/mix/${game.id}`) },
           isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
+          // Com as duplas formadas e o mix por começar: voltar aos inscritos.
+          canUndoDuplas && { key: 'undo_duplas', label: t('gamedetails.undo_duplas'), hint: t('gamedetails.undo_duplas_hint'), onClick: handleUndoDuplas, danger: matches.length > 0 },
           // «Voltar a rascunho» (unpublish_mix, Dev 3) — regra nova do
           // Francisco (6 out): sempre, até o mix terminar, também com
           // inscritos e depois de o robô o anunciar. Quem está inscrito sai e
