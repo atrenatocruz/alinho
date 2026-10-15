@@ -63,7 +63,9 @@ export default function EventHero({
   const { t } = useTranslation()
   return (
     // Sai das margens da página (o <main> tem px-4 e pt-6), como a capa do protótipo.
-    <div className="-mx-4 -mt-6">
+    // No computador, quando a folha acaba aqui (roundBottom), fica da largura
+    // dos cartões de baixo — saía 16 px para cada lado (Francisco, 14 out).
+    <div className={`-mx-4 -mt-6 ${roundBottom ? 'sm:mx-0 sm:overflow-hidden sm:rounded-b-[16px]' : ''}`}>
       <KindHero kind={kind} src={imageUrl} className="relative h-[210px]" imgClassName={imageUrl ? "" : "object-[center_22%]"}>
         <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 12px)' }}>
           {onBack
