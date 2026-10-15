@@ -15,12 +15,17 @@
 //     clube; `nextStep` (o passo seguinte, preto) logo depois da hora e da
 //     data, antes da faixa de estado.
 // Só aspeto: as ações e os estados são os de cada página.
+// Ao descer, quando a capa sai do ecrã, aparece a barra de vidro presa com o
+// «‹», o partilhar e o nome (GlassBar; Francisco, 14 out). O nome só aparece
+// quando o título grande já saiu por cima.
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
 import { KIND_COLORS } from '../../lib/kindColors'
 import { Avatar } from '../ui'
 import FaceCircles from './FaceCircles'
+import GlassBar, { GLASS_ROUND, usePassedTop } from '../GlassBar'
 
 const ROUND = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm'
 
@@ -58,14 +63,23 @@ function StatusBand({ kind, status }) {
 export default function EventHero({
   kind, imageUrl = null, chip = null, org = null, title, time = null, timeAside = null, dateLine = null,
   onAddToCalendar = null, onBack = null, onShare = null, status = null, children = null,
-  manage = null, nextStep = null, roundBottom = false,
+  manage = null, nextStep = null, roundBottom = false, barTitle = null,
 }) {
   const { t } = useTranslation()
+  const coverRef = useRef(null)
+  const titleRef = useRef(null)
+  const coverGone = usePassedTop(coverRef, 64)
+  const titleGone = usePassedTop(titleRef, 64)
   return (
     // Sai das margens da página (o <main> tem px-4 e pt-6), como a capa do protótipo.
     // No computador, quando a folha acaba aqui (roundBottom), fica da largura
     // dos cartões de baixo — saía 16 px para cada lado (Francisco, 14 out).
     <div className={`-mx-4 -mt-6 ${roundBottom ? 'sm:mx-0 sm:overflow-hidden sm:rounded-b-[16px]' : ''}`}>
+      <GlassBar anchorRef={coverRef} show={coverGone} showTitle={titleGone}
+        title={barTitle || title} dot={(KIND_COLORS[kind] || KIND_COLORS.mix).strong}
+        left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} tabIndex={coverGone ? 0 : -1} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
+        right={onShare ? <button type="button" onClick={onShare} aria-label={t('ui.share')} tabIndex={coverGone ? 0 : -1} className={GLASS_ROUND}><Share2 size={18} /></button> : null} />
+      <div ref={coverRef}>
       <KindHero kind={kind} src={imageUrl} className="relative h-[210px]" imgClassName={imageUrl ? "" : "object-[center_22%]"}>
         <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 12px)' }}>
           {onBack
@@ -81,6 +95,7 @@ export default function EventHero({
           </span>
         )}
       </KindHero>
+      </div>
 
       {/* O cartão branco sobe uns 20 px por cima da capa. `roundBottom`: quando
           a folha acaba aqui, os cantos de baixo a 16 px, como os topos do R12b
@@ -96,7 +111,7 @@ export default function EventHero({
           </button>
         )}
         {/* O título pode ir a duas linhas (amigos: «Ana M. + Pedro L. vs Tiago L. + Tu»). */}
-        <h1 className="mt-1.5 font-display text-[26px] font-extrabold leading-tight text-ink-900 line-clamp-2 break-words">{title}</h1>
+        <h1 ref={titleRef} className="mt-1.5 font-display text-[26px] font-extrabold leading-tight text-ink-900 line-clamp-2 break-words">{title}</h1>
         {time && (
           <p className="mt-1 flex items-baseline gap-2.5">
             <span className="font-display text-[56px] font-extrabold leading-none tracking-tight text-ink-900 tabular-nums">{time}</span>

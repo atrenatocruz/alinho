@@ -548,7 +548,7 @@ export default function TournamentPage() {
       {/* A categoria e os separadores ficam presos por baixo do título ao
           descer (Francisco, 11 out, para experimentar — StickyBar). */}
       <div id="tournament-tabs" className="scroll-mt-20" />
-      <StickyTabs resetKey={`${category?.id || ''}:${tab}`} pullKey={pullKey} shadow={tab !== 'schedule'} belowBackBar={false}>
+      <StickyTabs resetKey={`${category?.id || ''}:${tab}`} pullKey={pullKey} shadow={tab !== 'schedule'} belowBackBar={false} glass>
       {categories.length > 0 && (
         <CategorySelect
           categories={categories}
