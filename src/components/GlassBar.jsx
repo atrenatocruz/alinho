@@ -30,12 +30,17 @@ export const GLASS_BELOW_STYLE = {
   maskImage: 'linear-gradient(to bottom, #000 75%, transparent)',
 }
 
+// O vidro cobre a margem do telemóvel (hora e bateria) e a linha dos botões
+// inteira; só desvanece nos FADE px de baixo — com a margem do iPhone, um
+// desvanecer em percentagem começava a meio dos botões e via-se o conteúdo
+// nítido ao lado do nome (UX, 15 out).
+const FADE = 24
 const GLASS_BG = {
-  background: 'linear-gradient(to bottom, rgba(241,242,238,0.92) 0%, rgba(241,242,238,0.75) 55%, rgba(241,242,238,0) 100%)',
+  background: `linear-gradient(to bottom, rgba(241,242,238,0.92) 0%, rgba(241,242,238,0.75) calc(100% - ${FADE}px), rgba(241,242,238,0) 100%)`,
   WebkitBackdropFilter: 'blur(10px)',
   backdropFilter: 'blur(10px)',
-  WebkitMaskImage: 'linear-gradient(to bottom, #000 60%, transparent)',
-  maskImage: 'linear-gradient(to bottom, #000 60%, transparent)',
+  WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${FADE}px), transparent)`,
+  maskImage: `linear-gradient(to bottom, #000 calc(100% - ${FADE}px), transparent)`,
 }
 
 /** O contentor que desliza (o <main> da app; sem ele, a janela). */
@@ -90,10 +95,12 @@ export default function GlassBar({ anchorRef, show = true, filled = true, showTi
   if (!box || typeof document === 'undefined') return null
   return createPortal(
     <div aria-hidden={!show || undefined}
-      className={`fixed top-0 z-30 transition-opacity duration-fast ${show ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-      style={{ left: box.left, width: box.width }}>
+      className={`fixed z-30 transition-opacity duration-fast ${show ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+      // No site de testes, logo por baixo da faixa laranja (--tb-h, index.css);
+      // no alinho.pt não há faixa e fica colada em cima (UX, 15 out).
+      style={{ top: 'var(--tb-h, 0px)', left: box.left, width: box.width }}>
       <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-fast ${filled ? 'opacity-100' : 'opacity-0'}`}
-        style={{ ...GLASS_BG, height: `calc(${GLASS_BAR_H} + 18px)` }} />
+        style={{ ...GLASS_BG, height: `calc(${GLASS_BAR_H} + ${FADE}px)` }} />
       <div className="relative mx-auto max-w-2xl px-4" style={{ paddingTop: SAFE_TOP }}>
         <div className={`grid h-16 items-center gap-3 ${wide ? 'grid-cols-[minmax(92px,auto)_minmax(0,1fr)_minmax(92px,auto)]' : 'grid-cols-[42px_minmax(0,1fr)_42px]'}`}>
           {left || <span aria-hidden />}
