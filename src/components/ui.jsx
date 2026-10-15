@@ -1883,11 +1883,15 @@ export function EmptyState({ title, subtitle, action, pose = 'a-pensar' }) {
     )
   }
   return (
+    // O título e a frase como no protótipo (.empty) e no vazio do clube: letra
+    // da marca a 19 px, peso 900; a frase a 13,5 px em cinzento (UX, 15 out —
+    // o Francisco viu «Grupos ainda não sorteados» fino ao lado do clube). Linhas
+    // equilibradas (balance): nunca uma palavra sozinha na última.
     <div className="card text-center py-10 px-6 animate-fade-up">
-      <Alino pose={pose} size={120} className="mb-4" />
-      <h3 className="text-lg text-ink-900 mb-1">{title}</h3>
-      {subtitle && <p className="text-muted text-sm mb-6">{subtitle}</p>}
-      {action}
+      <Alino pose={pose} size={120} className="mx-auto" />
+      <h3 className="mt-2 font-display text-[19px] font-black leading-tight text-ink-900 [text-wrap:balance]">{title}</h3>
+      {subtitle && <p className="mt-1.5 text-[13.5px] leading-normal text-ink-500 [text-wrap:balance]">{subtitle}</p>}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   )
 }

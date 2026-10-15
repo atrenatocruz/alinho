@@ -2746,7 +2746,7 @@
   "createprivatematch.create_button": "Criar jogo",
   "joinprivatematch.slot_team_a": "na dupla de quem criou o jogo",
   "joinprivatematch.slot_team_b": "na dupla adversária",
-  "joinprivatematch.invalid_link": "Link de convite inválido.",
+  "joinprivatematch.invalid_link": "Link de convite inválido",
   "joinprivatematch.invalid_link_hint": "Pede um link novo a quem te convidou.",
   "joinprivatematch.joined_title": "Entraste no jogo!",
   "joinprivatematch.view_game": "Ver jogo",

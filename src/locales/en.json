@@ -2742,7 +2742,7 @@
   "createprivatematch.create_button": "Create game",
   "joinprivatematch.slot_team_a": "on the creator's team",
   "joinprivatematch.slot_team_b": "on the opposing team",
-  "joinprivatematch.invalid_link": "Invalid invite link.",
+  "joinprivatematch.invalid_link": "Invalid invite link",
   "joinprivatematch.invalid_link_hint": "Ask whoever invited you for a new link.",
   "joinprivatematch.joined_title": "You joined the game!",
   "joinprivatematch.view_game": "View game",
