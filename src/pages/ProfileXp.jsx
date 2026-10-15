@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
+import { BackBar } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { XP_TIERS, tierFromXp, preTierProgress } from '../lib/xp'
@@ -52,14 +53,10 @@ export default function ProfileXp() {
 
   return (
     <div className="space-y-5 pb-6">
-      {/* A barra fica sempre presa em cima (Francisco, 14 out: as barras nunca desaparecem). */}
-      <div className="sticky top-0 z-10 -mx-4 -mt-6 flex items-center gap-3 bg-canvas px-4 pb-3" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 16px)' }}>
-        <button type="button" onClick={() => navigate('/perfil')} aria-label={t('gamedetails.back')}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <ChevronLeft size={22} />
-        </button>
-        <h1 className="min-w-0 truncate text-[28px] font-extrabold leading-tight text-ink-900">{t('xp_page.title')}</h1>
-      </div>
+      {/* A barra comum das páginas sem capa (BackBar, vidro do Bugs): presa ao
+          descer, com o nome ao centro depois de o título sair (15 out). */}
+      <BackBar onBack={() => navigate('/perfil')} title={t('xp_page.title')} />
+      <h1 className="text-[28px] font-extrabold leading-tight text-ink-900">{t('xp_page.title')}</h1>
 
       {/* O cartão preto: o nível, o XP e a barra até ao seguinte. */}
       <div className="rounded-[22px] bg-ink-900 px-5 pt-6 pb-5 text-center text-white">
