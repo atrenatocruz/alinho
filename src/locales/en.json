@@ -6217,5 +6217,17 @@
   "playerstats.no_opponents": "No opponents on record yet",
   "playerstats.no_opponents_body": "Mix and friendly games count here.",
   "playerstats.partners_title": "With whom",
-  "playerstats.friends_event": "Friendly game"
+  "playerstats.friends_event": "Friendly game",
+  "install.title": "Add alinho to your home screen",
+  "install.body": "Open it like any other app, full screen and always one tap away. It only takes three taps.",
+  "install.body_native": "Open it like any other app, full screen and always one tap away.",
+  "install.ios_step1": "Tap the Share button in Safari",
+  "install.ios_step2": "Scroll down and tap Add to Home Screen",
+  "install.ios_step3": "Tap Add and open alinho from your home screen",
+  "install.android_step1": "Tap the browser menu ⋮ in the top corner",
+  "install.android_step2": "Tap Add to Home screen (or Install app)",
+  "install.android_step3": "Confirm and open alinho from your home screen",
+  "install.add_now": "Add to home screen",
+  "install.done": "I’ve added it",
+  "install.not_now": "Not now"
 }

@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import './lib/i18n'
+// Apanha o beforeinstallprompt do Android antes de a app montar.
+import './lib/installPrompt'
 import { installDevMockNetwork } from './lib/devMockNetwork'
 import { reloadOnceForChunk } from './lib/chunkReload'
 import { Workbox } from 'workbox-window'
