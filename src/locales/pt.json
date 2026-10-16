@@ -6197,6 +6197,8 @@
   "league.venue_optional": "Onde (opcional)",
   "league.publish": "Publicar",
   "playerstats.title": "Estatísticas",
+  "playerstats.chart_aria": "Evolução dos pontos, um ponto por evento",
+  "playerstats.chart_hint": "Toca ou arrasta no gráfico para ver cada evento.",
   "playerstats.card_hint": "Como o teu ranking tem mexido",
   "playerstats.card_hint_other": "Evolução, adversários e parceiros",
   "playerstats.private": "Esta pessoa escolheu não mostrar os resultados.",

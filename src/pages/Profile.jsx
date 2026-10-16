@@ -21,7 +21,7 @@ import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
-import PlayedHistory, { usePlayedHistory, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
+import PlayedHistory, { usePlayedHistory, useAllPlayed, playedTotals, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
 import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
@@ -92,6 +92,9 @@ export default function Profile() {
   useEffect(() => { if (tab === 'historico') setPlayedOn(true) }, [tab])
   const played = usePlayedHistory({ query: playedQuery, kind: playedKind, enabled: playedOn })
   const playedLive = played.state !== 'missing'
+  // Todo o histórico (sem filtros): os totais do cartão (Jogos · % Vitórias).
+  const allPlayed = useAllPlayed(!isGuest && !!profile?.id)
+  const totals = playedTotals(allPlayed)
   // A moldura do pódio do mês (#626): com ela, sai o aro do nível e a
   // moldura fica à volta da foto; o título vem por baixo do nome.
   const frameList = useFrameList(isGuest ? null : profile?.id)
@@ -136,10 +139,8 @@ export default function Profile() {
       // aterra num clube diferente do que estava "lembrado" na sessão
       // anterior). O histórico é pessoal, não do clube atual — mostra-se
       // sempre inteiro, tal como os jogos entre amigos já fazem.
-      if (!isGuest && currentOrganizationId) {
-        loadStats()
-      }
       if (!isGuest) {
+        loadStats()
         loadPlayedHistory()
         loadGlobalPoints()
         loadFollowCounts()
@@ -575,9 +576,12 @@ export default function Profile() {
   const myGames = Array.isArray(playedHistory) ? playedHistory.map(playedRow).sort((a, b) => b.date - a.date) : myGamesOld
   const historyLoading = playedHistory === undefined || (playedHistory === null && (mixHistoryLoading || privateMatchHistoryLoading || groupMatchHistoryLoading))
 
-  const gamesPlayed = (stats?.game_wins || 0) + (stats?.game_losses || 0)
+  // Totais de todos os tipos de jogo (histórico); sem as funções novas,
+  // volta ao player_stats (só mixes).
+  const gameWins = totals ? totals.wins : (stats?.game_wins || 0)
+  const gamesPlayed = totals ? totals.games : (stats?.game_wins || 0) + (stats?.game_losses || 0)
   const winRate = gamesPlayed > 0
-    ? ((stats.game_wins / gamesPlayed) * 100).toFixed(0)
+    ? Math.round((gameWins / gamesPlayed) * 100)
     : 0
 
 
