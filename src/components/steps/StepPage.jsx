@@ -109,16 +109,6 @@ export default function StepPage({
   const [asking, setAsking] = useState(false)
   const [askingDanger, setAskingDanger] = useState(false)
   const [askingExtra, setAskingExtra] = useState(false)
-  // Editar: barra de cima com fundo branco sólido e a linha fina quando o
-  // título já passou por baixo dela (designer, 30 set).
-  const titleRef = useRef(null)
-  const [scrolled, setScrolled] = useState(false)
-  useEffect(() => {
-    if (!edit || !titleRef.current || typeof IntersectionObserver === 'undefined') return undefined
-    const io = new IntersectionObserver(([e]) => setScrolled(!e.isIntersecting), { rootMargin: '-64px 0px 0px 0px' })
-    io.observe(titleRef.current)
-    return () => io.disconnect()
-  }, [!!edit]) // eslint-disable-line react-hooks/exhaustive-deps
   // Sem a barra de baixo enquanto se cria ou edita por passos (30 set).
   useEffect(() => {
     document.body.dataset.steps = '1'
@@ -136,22 +126,13 @@ export default function StepPage({
     <div className="mx-auto max-w-lg pb-28">
       {/* «Cancelar / Voltar» sempre visível ao deslizar (27 set). No editar,
           «Cancelar» em todos os passos e o nome do passo no meio (30 set). */}
+      {/* Editar usa a mesma barra de vidro dos outros ecrãs (Renato, 16 out:
+          a faixa branca própria não batia com o resto). */}
       {edit
-        ? (
-          <div className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white px-4 ${scrolled ? 'border-b border-line' : ''}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
-            <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
-              <button type="button" onClick={cancelEdit} aria-label={t('common.back')}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-card">
-                <ChevronLeft size={22} />
-              </button>
-              <p className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${scrolled ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
-              <span aria-hidden />
-            </div>
-          </div>
-        )
+        ? <BackBar onBack={cancelEdit} label={t('common.back')} title={title} />
         : <BackBar onBack={onBack} label={step === 1 ? t('steps.cancel') : t('common.back')} title={title} />}
 
-      <h2 ref={titleRef} className="mt-2 text-3xl text-ink-900">{title}</h2>
+      <h2 className="mt-2 text-3xl text-ink-900">{title}</h2>
       {/* «No <grupo>» por baixo de «Novo jogo entre amigos» (27 set). */}
       {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
       {top && <div className="mt-6">{top}</div>}
