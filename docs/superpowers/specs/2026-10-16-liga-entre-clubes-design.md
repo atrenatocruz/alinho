@@ -235,3 +235,21 @@ A classificação por clube soma pontos por posição final de cada dupla. Nada 
 2. Pontos por omissão (3/1/0, −1 por falta)?
 3. A partir de que jornada o plantel fecha?
 4. Um clube pode ter duas equipas na mesma categoria (A e B)? Proposta: não na Fase 1.
+
+## Estado (16 out 2026, fim da implementação da Fase 1)
+
+- Fase 1 implementada no branch `feature/liga-entre-clubes` (worktree `padeleirosrobot-liga`), sem push. Plano: `docs/superpowers/plans/2026-10-16-liga-entre-clubes-fase1.md`.
+- **Migrações `migration_liga_1` a `6` — correr por esta ordem na alinho-dev; em produção só quando a Fase 1 for para `main`.** Testadas numa base local descartável com um esqueleto do esquema; nenhuma correu ainda num projeto Supabase.
+  - Antes da 5: ver o check atual de `xp_events.kind` na dev e em produção (a 5 reescreve-o com a lista mix/friendly/kudos + `league_match`, `league_win`).
+  - Antes da 6: `pg_cron` ativo (Database → Extensions) — o lembrete de prazo é um trabalho diário.
+  - Os testes `supabase/tests/liga_*.sql` têm marcadores `<…>` para preencher com ids da dev.
+- Desvios ao desenho acima, decididos durante o plano e a implementação:
+  - a tabela calcula-se em JS só a partir dos encontros oficiais devolvidos pelo servidor (não há `league_standings` em SQL);
+  - o calendário calcula-se em JS e o servidor valida-o (sem tabela temporária);
+  - nível por `level` + `rating_tolerance` (em vez de `min_rating`/`max_rating`);
+  - XP com coluna `source_league_match_id` (sem generalizar `xp_events`), e soma também em `profiles.xp`; o XP nunca se retira numa correção;
+  - um organizador que fala por um dos clubes não decide esse encontro (`conflict_of_interest`) — uma liga comunitária em que o clube dono joga precisa de um co-organizador neutro para as disputas desse clube;
+  - retirar o pedido fecha o plantel do clube e avisa quem organiza;
+  - todas as funções com `SET search_path = public, pg_temp`;
+  - a nota da decisão e a lista de organizadores só aparecem a quem está dentro / organiza.
+- As perguntas ao Francisco continuam abertas; a implementação usa os valores por omissão acima (todos configuráveis por categoria).
