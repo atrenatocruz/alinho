@@ -86,7 +86,7 @@ BEGIN
       'home_team_id', v_e.home_team_id, 'away_team_id', v_e.away_team_id,
       'walkover_team_id', CASE WHEN v_e.status = 'oficial' THEN v_e.walkover_team_id END,
       'proposed_by_team_id', v_e.proposed_by_team_id, 'submitted_by_team_id', v_e.submitted_by_team_id,
-      'submitted_at', v_e.submitted_at, 'resolution_note', v_e.resolution_note,
+      'submitted_at', v_e.submitted_at, 'resolution_note', CASE WHEN v_inside THEN v_e.resolution_note END,
       'contest_reason', CASE WHEN v_inside THEN v_e.contest_reason END),
     'league', jsonb_build_object('slug', v_l.slug, 'name', v_l.name, 'kind', v_l.kind),
     'category', to_jsonb(v_c) - 'league_id' - 'created_at',
@@ -132,6 +132,7 @@ BEGIN
   SELECT * INTO v_l FROM leagues WHERE id = v_t.league_id;
   v_edit := represents_league_team(v_t.id);
   IF v_t.status <> 'aprovada' AND NOT (v_edit OR can_manage_league(v_l.id)) THEN RETURN NULL; END IF;
+  IF v_l.status = 'rascunho' AND NOT can_manage_league(v_l.id) THEN RETURN NULL; END IF;
   SELECT * INTO v_c FROM league_categories WHERE id = v_t.category_id;
   RETURN jsonb_build_object(
     'team', jsonb_build_object('id', v_t.id, 'status', v_t.status,
@@ -243,10 +244,12 @@ END;
 $$;
 
 -- (A Supabase concede EXECUTE a anon e authenticated por defeito: por isso o REVOKE abaixo tira também esses, e só depois se concede o que se quer.)
--- cron.schedule substitui o trabalho se já existir: pode correr outra vez.
-SELECT cron.schedule('league-deadline-reminders', '0 8 * * *', $$SELECT public.league_deadline_reminders()$$);
 
 REVOKE ALL ON FUNCTION get_league_page(TEXT), get_league_encounter(UUID), get_league_team(UUID),
   league_roster_candidates(UUID), my_league_agenda(), league_deadline_reminders() FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_league_page(TEXT), get_league_encounter(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_league_team(UUID), league_roster_candidates(UUID), my_league_agenda() TO authenticated;
+
+-- Precisa do pg_cron ativo no projeto Supabase (Database → Extensions) para o job de lembretes.
+-- cron.schedule substitui o trabalho se já existir: pode correr outra vez.
+SELECT cron.schedule('league-deadline-reminders', '0 8 * * *', $$SELECT public.league_deadline_reminders()$$);
