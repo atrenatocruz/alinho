@@ -25,6 +25,7 @@ import { formatDate } from '../lib/formatDate'
 import { changesText } from '../lib/mixChanges'
 import AccountDeletionPending from './AccountDeletionPending'
 import AppToast from './AppToast'
+import InstallPrompt from './InstallPrompt'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 
@@ -852,6 +853,7 @@ export default function Layout({ children }) {
           Perfil) shows notifications/logout in its own sticky title
           (PageHeader in components/ui.jsx), read via HeaderActionsContext. */}
       <AppToast />
+      <InstallPrompt />
       {/* scrollbar-gutter dos dois lados: no computador a barra de deslizar
           ocupava só a direita e a coluna ficava descentrada na janela (10 px
           de um lado, 54 do outro — Francisco, 15 out). No telemóvel a barra

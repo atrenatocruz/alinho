@@ -6232,5 +6232,17 @@
   "playerstats.no_opponents": "Ainda sem adversários registados",
   "playerstats.no_opponents_body": "Os jogos de mix e entre amigos contam para aqui.",
   "playerstats.partners_title": "Com quem",
-  "playerstats.friends_event": "Jogo entre amigos"
+  "playerstats.friends_event": "Jogo entre amigos",
+  "install.title": "Adiciona o alinho ao ecrã principal",
+  "install.body": "Abre-o como qualquer outra app, em ecrã inteiro e sempre à distância de um toque. São só três toques.",
+  "install.body_native": "Abre-o como qualquer outra app, em ecrã inteiro e sempre à distância de um toque.",
+  "install.ios_step1": "Toca no botão Partilhar no Safari",
+  "install.ios_step2": "Desce e toca em Adicionar ao ecrã principal",
+  "install.ios_step3": "Toca em Adicionar e abre o alinho a partir do ecrã principal",
+  "install.android_step1": "Toca no menu ⋮ do browser, no canto de cima",
+  "install.android_step2": "Toca em Adicionar ao ecrã principal (ou Instalar app)",
+  "install.android_step3": "Confirma e abre o alinho a partir do ecrã principal",
+  "install.add_now": "Adicionar ao ecrã principal",
+  "install.done": "Já adicionei",
+  "install.not_now": "Agora não"
 }
