@@ -25,10 +25,15 @@ const shortDay = (d, lang) => `${formatDate(d, lang, { weekday: 'short' }).repla
 /** «16 out 2026» (UX, 16 out: não «16/10/2026»). */
 const longDay = (d, lang) => `${d.getDate()} ${formatDate(d, lang, { month: 'short' }).replace(/\./g, '')} ${d.getFullYear()}`
 
-/** achievement: { key, rarity, pct?, at? (quando foi ganha) } */
-export default function AchievementShareFlow({ achievement: given, onClose }) {
+/** achievement: { key, rarity, pct?, at? (quando foi ganha) }. fresh: vem da
+    festa de uma conquista nova («CONQUISTA NOVA»; nos outros sítios só
+    «CONQUISTA», UX 16 out). owner: { id, name, avatar_url } quando é a
+    conquista de outra pessoa — a imagem e o texto são dela; o QR leva a
+    referência de quem partilha. */
+export default function AchievementShareFlow({ achievement: given, fresh = false, owner = null, onClose }) {
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
+  const who = owner || profile
   const lang = i18n.language
   const [format, setFormat] = useState('stories')
   const [qr, setQr] = useState(null)
@@ -41,14 +46,14 @@ export default function AchievementShareFlow({ achievement: given, onClose }) {
   // buscar às conquistas da pessoa (as mesmas do perfil).
   const [extra, setExtra] = useState(null)
   useEffect(() => {
-    if (given.pct != null || !profile?.id) return undefined
+    if (given.pct != null || !who?.id) return undefined
     let alive = true
-    supabase.rpc('get_player_achievements', { p_user_id: profile.id }).then(({ data }) => {
+    supabase.rpc('get_player_achievements', { p_user_id: who.id }).then(({ data }) => {
       const row = (data || []).find((r) => r.achievement_key === given.key)
       if (alive && row) setExtra({ pct: row.rarity_pct, at: row.awarded_at })
     })
     return () => { alive = false }
-  }, [given.key, given.pct, profile?.id])
+  }, [given.key, given.pct, who?.id])
   const achievement = { ...given, pct: given.pct ?? extra?.pct ?? null, at: given.at ?? extra?.at ?? null }
   const rarity = RARITY_META[achievement.rarity] ? achievement.rarity : 'comum'
   const name = t(`achievements.${achievement.key}_name`)
@@ -57,7 +62,8 @@ export default function AchievementShareFlow({ achievement: given, onClose }) {
   const pctLine = pct == null ? null : t(Number(achievement.pct) < 50 ? 'achshare.pct_only' : 'achshare.pct', { pct })
   const at = achievement.at ? new Date(achievement.at) : new Date()
   const suggested = [
-    t('achshare.caption_lead', { name }),
+    // De outra pessoa: sem artigo («Bruno ganhou…»), que não se sabe se é «o» ou «a» (UX).
+    owner ? t('achshare.caption_lead_other', { who: String(owner.name || '').trim().split(/\s+/)[0], name }) : t('achshare.caption_lead', { name }),
     pct != null ? t(Number(achievement.pct) < 50 ? 'achshare.caption_pct_only' : 'achshare.caption_pct', { pct }) : null,
     'alinho.pt @alinhopt #alinhopadel',
   ].filter(Boolean).join(' ')
@@ -74,23 +80,23 @@ export default function AchievementShareFlow({ achievement: given, onClose }) {
   // A foto da pessoa, já redonda (o WebKit estraga o redondo por CSS).
   useEffect(() => {
     let alive = true
-    bakeCircle(profile?.avatar_url, 28).then((v) => { if (alive) setPhoto(v) })
+    bakeCircle(who?.avatar_url, 28).then((v) => { if (alive) setPhoto(v) })
     return () => { alive = false }
-  }, [profile?.avatar_url])
+  }, [who?.avatar_url])
 
   const data = {
     name,
     desc: t(`achievements.${achievement.key}_desc`),
     medal: medalUrl(achievement.key),
     // A raridade concorda com «conquista»: «LENDÁRIA», «ÉPICA» (UX, 16 out).
-    kicker: `${t('achshare.kicker')} · ${t(`achshare.rarity_${rarity}`)}`,
+    kicker: `${t(fresh ? 'achshare.kicker' : 'achshare.kicker_plain')} · ${t(RARITY_META[rarity].labelKey)}`,
     date: shortDay(at, lang),
     pctLine,
-    person: profile ? {
-      name: profile.name || '',
+    person: who ? {
+      name: who.name || '',
       photo,
       // A primeira letra de cada palavra: «Admin (Dev)» → «AD», nunca «A(».
-      initials: (profile.name || '?').split(/\s+/).map((w) => w.match(/\p{L}/u)?.[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?',
+      initials: (who.name || '?').split(/\s+/).map((w) => w.match(/\p{L}/u)?.[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?',
       sub: t('achshare.since', { date: longDay(at, lang) }),
     } : null,
   }

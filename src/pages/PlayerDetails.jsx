@@ -500,7 +500,8 @@ export default function PlayerDetails() {
                 )
               ) : (
                 <Suspense fallback={<div className="h-40" />}>
-                  <AchievementCollection catalog={trophyCatalog} mine={playerTrophies} />
+                  <AchievementCollection catalog={trophyCatalog} mine={playerTrophies}
+                    owner={player ? { id, name: player.name, avatar_url: player.avatar_url } : null} />
                 </Suspense>
               )}
               {/* A folha da conquista é a do Dev 2 (AchievementViewer, com o dono). */}

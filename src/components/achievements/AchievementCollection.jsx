@@ -20,7 +20,9 @@ const RECENT = 6
 
 const rarityOf = (r) => (RARITY_META[r] ? r : 'comum')
 
-export default function AchievementCollection({ catalog, mine }) {
+// owner: { id, name, avatar_url } quando a coleção é de outra pessoa (o perfil
+// dela): a folha diz «O Rui ganhou…» e a partilha leva-a a ela.
+export default function AchievementCollection({ catalog, mine, owner = null }) {
   const { t } = useTranslation()
   const [filled, setFilled] = useState(false)
   const [open, setOpen] = useState(null) // { items, start, locked }
@@ -136,7 +138,7 @@ export default function AchievementCollection({ catalog, mine }) {
       ))}
 
       {open && (
-        <AchievementViewer items={open.items} start={open.start} locked={open.locked} onClose={() => setOpen(null)} />
+        <AchievementViewer items={open.items} start={open.start} locked={open.locked} owner={owner} onClose={() => setOpen(null)} />
       )}
     </div>
   )

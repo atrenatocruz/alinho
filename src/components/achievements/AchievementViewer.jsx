@@ -18,7 +18,11 @@ const AchievementShareFlow = lazy(() => import('./AchievementShareFlow'))
    items: [{ key, rarity, pct?, at? }] (as ganhas, pela ordem a percorrer), start:
    o índice a abrir. locked: abre uma só, por ganhar. celebrate: a festa de
    uma conquista nova («Partilhar» por cima e «Boa!» em contorno); sem ela,
-   numa ganha, «↗ Partilhar a conquista» e «Fechar» (UX, 16 out). */
+   numa ganha, «↗ Partilhar a conquista» e «Fechar» (UX, 16 out). owner:
+   { id, name, avatar_url } quando as conquistas são de outra pessoa (o
+   perfil dela): «O Bruno ganhou…» e a imagem com ela (Francisco, 16 out). */
+
+const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || ''
 
 const CONFETTI_COLORS = {
   raro: ['#6CB8FF', '#C5DD01', '#fff'],
@@ -59,7 +63,7 @@ function runConfetti(canvas, rarity) {
   return () => { cancelAnimationFrame(raf); ctx.clearRect(0, 0, W, H) }
 }
 
-export default function AchievementViewer({ items, start = 0, locked = false, celebrate = false, onClose }) {
+export default function AchievementViewer({ items, start = 0, locked = false, celebrate = false, owner = null, onClose }) {
   const { t, i18n } = useTranslation()
   const [i, setI] = useState(start)
   const canvasRef = useRef(null)
@@ -156,7 +160,9 @@ export default function AchievementViewer({ items, start = 0, locked = false, ce
 
       <div key={`m${i}`} className="achv-meta">
         <p className="text-xs text-white/60">
-          {locked ? t('achievements.fx_locked_note') : t('achievements.fx_earned_note')}
+          {locked ? (owner ? t('achievements.fx_locked_note_other', { name: firstName(owner.name) }) : t('achievements.fx_locked_note'))
+            : owner ? t('achievements.fx_earned_note_other', { name: firstName(owner.name) })
+            : t('achievements.fx_earned_note')}
         </p>
         {/* Ganha: «Partilhar» a lima por cima e, por baixo, «Boa!» (na festa)
             ou «Fechar», em contorno claro — um só botão lima (SPEC de partilhar
@@ -179,7 +185,7 @@ export default function AchievementViewer({ items, start = 0, locked = false, ce
       <canvas ref={canvasRef} className="achv-confetti" aria-hidden="true" />
       {sharing && (
         <Suspense fallback={null}>
-          <AchievementShareFlow achievement={sharing} onClose={() => setSharing(null)} />
+          <AchievementShareFlow achievement={sharing} fresh={celebrate} owner={owner} onClose={() => setSharing(null)} />
         </Suspense>
       )}
     </div>,
