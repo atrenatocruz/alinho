@@ -6263,12 +6263,6 @@
   "cover.saving": "Saving…",
   "cover.reset": "Back to the alinho cover",
   "cover.error_save": "Couldn’t save the cover. Try again.",
-  "cover.preset_club": "Club",
-  "cover.preset_group": "Group",
-  "cover.preset_mix": "Mix",
-  "cover.preset_tournament": "Tournament",
-  "cover.preset_league": "League",
-  "cover.preset_open": "Open",
   "cover.see_as_player": "See it as players do",
   "cover.section_about_club": "About the club",
   "cover.section_about_group": "About the group",
@@ -6289,5 +6283,11 @@
   "personal.section_court": "On court",
   "personal.section_account": "Account",
   "personal.section_who_sees": "Who sees what",
-  "personal.name_required": "Your name can’t be empty."
+  "personal.name_required": "Your name can’t be empty.",
+  "cover.preset_night": "Game night",
+  "cover.preset_net": "Net",
+  "cover.preset_glass": "Glass",
+  "cover.preset_sunset": "Sunset",
+  "cover.preset_ball": "Ball",
+  "cover.preset_court": "Court"
 }

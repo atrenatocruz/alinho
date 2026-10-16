@@ -9,14 +9,16 @@ import { CLUB_HERO, GROUP_HERO } from './kindColors'
 
 const BUCKET = 'club-logos'
 
-/** As capas do alinho para escolher (ficheiros da própria app). */
+/** As capas do alinho para escolher (Renato, 16 out): seis desenhos do mundo
+ *  do padel, sem ligação a um tipo de clube ou de evento — geradas por
+ *  scripts/gerar-capas.cjs. Sem escolha, fica a imagem do Alino do tipo. */
 export const COVER_PRESETS = [
-  { key: 'clube', url: CLUB_HERO, labelKey: 'cover.preset_club' },
-  { key: 'grupo', url: GROUP_HERO, labelKey: 'cover.preset_group' },
-  { key: 'mix', url: '/topo/topo-mix.webp', labelKey: 'cover.preset_mix' },
-  { key: 'torneio', url: '/topo/topo-torneio.webp', labelKey: 'cover.preset_tournament' },
-  { key: 'liga', url: '/topo/topo-liga.webp', labelKey: 'cover.preset_league' },
-  { key: 'aberto', url: '/topo/topo-aberto.webp', labelKey: 'cover.preset_open' },
+  { key: 'noite', url: '/topo/capa-noite.webp', labelKey: 'cover.preset_night' },
+  { key: 'rede', url: '/topo/capa-rede.webp', labelKey: 'cover.preset_net' },
+  { key: 'vidro', url: '/topo/capa-vidro.webp', labelKey: 'cover.preset_glass' },
+  { key: 'poente', url: '/topo/capa-poente.webp', labelKey: 'cover.preset_sunset' },
+  { key: 'bola', url: '/topo/capa-bola.webp', labelKey: 'cover.preset_ball' },
+  { key: 'campo', url: '/topo/capa-campo.webp', labelKey: 'cover.preset_court' },
 ]
 
 /** A capa a mostrar: a escolhida, ou a do Alino do tipo. */
