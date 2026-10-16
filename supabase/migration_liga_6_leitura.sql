@@ -65,7 +65,7 @@ CREATE OR REPLACE FUNCTION get_league_encounter(p_encounter_id UUID)
 RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_e league_encounters; v_l leagues; v_c league_categories; v_r league_rounds;
-  v_manage BOOLEAN; v_side TEXT; v_inside BOOLEAN; v_my_team UUID;
+  v_manage BOOLEAN; v_side TEXT; v_inside BOOLEAN; v_my_team UUID; v_in BOOLEAN;
 BEGIN
   SELECT * INTO v_e FROM league_encounters WHERE id = p_encounter_id;
   IF v_e.id IS NULL THEN RETURN NULL; END IF;
@@ -76,6 +76,7 @@ BEGIN
   SELECT * INTO v_r FROM league_rounds WHERE id = v_e.round_id;
   v_side := CASE WHEN auth.uid() IS NULL THEN NULL ELSE league_side(v_e) END;
   v_inside := v_manage OR v_side IS NOT NULL;
+  v_in := COALESCE(v_side IN ('home', 'away'), false);
   v_my_team := CASE v_side WHEN 'home' THEN v_e.home_team_id WHEN 'away' THEN v_e.away_team_id END;
 
   RETURN jsonb_build_object(
@@ -112,13 +113,13 @@ BEGIN
       END,
     'viewer', jsonb_build_object(
       'side', v_side, 'can_manage', v_manage,
-      'can_submit', v_side IN ('home', 'away') AND (v_e.status IN ('por_marcar', 'proposto', 'marcado')
+      'can_submit', v_in AND (v_e.status IN ('por_marcar', 'proposto', 'marcado')
                     OR (v_e.status = 'submetido' AND v_e.submitted_by_team_id = v_my_team))
                     AND (v_e.scheduled_at IS NULL OR v_e.scheduled_at <= NOW()),
-      'can_answer', v_side IN ('home', 'away') AND v_e.status = 'submetido'
+      'can_answer', v_in AND v_e.status = 'submetido'
                     AND v_e.submitted_by_team_id <> v_my_team AND v_e.submitted_by IS DISTINCT FROM auth.uid(),
-      'can_propose', v_side IN ('home', 'away') AND v_e.status IN ('por_marcar', 'proposto', 'marcado'),
-      'can_accept', v_side IN ('home', 'away') AND v_e.status = 'proposto' AND v_e.proposed_by_team_id <> v_my_team));
+      'can_propose', v_in AND v_e.status IN ('por_marcar', 'proposto', 'marcado'),
+      'can_accept', v_in AND v_e.status = 'proposto' AND v_e.proposed_by_team_id <> v_my_team));
 END;
 $$;
 
@@ -241,11 +242,11 @@ BEGIN
 END;
 $$;
 
+-- (A Supabase concede EXECUTE a anon e authenticated por defeito: por isso o REVOKE abaixo tira também esses, e só depois se concede o que se quer.)
 -- cron.schedule substitui o trabalho se já existir: pode correr outra vez.
 SELECT cron.schedule('league-deadline-reminders', '0 8 * * *', $$SELECT public.league_deadline_reminders()$$);
 
 REVOKE ALL ON FUNCTION get_league_page(TEXT), get_league_encounter(UUID), get_league_team(UUID),
-  league_roster_candidates(UUID), my_league_agenda(), league_deadline_reminders() FROM public;
+  league_roster_candidates(UUID), my_league_agenda(), league_deadline_reminders() FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_league_page(TEXT), get_league_encounter(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_league_team(UUID), league_roster_candidates(UUID), my_league_agenda() TO authenticated;
-REVOKE ALL ON FUNCTION league_deadline_reminders() FROM anon, authenticated;
