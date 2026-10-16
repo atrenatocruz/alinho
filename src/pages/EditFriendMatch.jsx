@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
-import { EmptyState } from '../components/ui'
+import { EmptyState, LoadErrorState } from '../components/ui'
 import CreateFriendMatch from './CreateFriendMatch'
 
 export default function EditFriendMatch() {
@@ -22,11 +22,13 @@ export default function EditFriendMatch() {
       .catch((err) => { console.error('Error loading friend match to edit:', err); setError(describeError(t, err)) })
   }, [id, t])
 
-  if (error) return <EmptyState title={error} />
+  if (error) return <LoadErrorState title={error} />
   if (!data) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
-  const mine = (data.invitees || []).some((i) => i.is_creator && i.user_id === profile?.id)
+  // Quem criou, ou quem disse «Vou» com o nome (SPEC 2026-10-07-amigos-convidado).
+  const mine = (data.invitees || []).some((i) => i.user_id && i.user_id === profile?.id
+    && (i.is_creator || (i.status === 'accepted' && !i.is_anonymous)))
   if (!mine) return <EmptyState title={t('friends.edit_error_not_allowed')} />
   // Jogo de grupo (#586): juntar pessoas procura só nos membros do grupo,
   // como no criar. O grupo vem na get_friend_match (Dev 3); sem ele, como antes.

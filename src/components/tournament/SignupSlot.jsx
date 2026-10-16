@@ -13,11 +13,14 @@ import TeamNameSheet from './TeamNameSheet'
 import { supabase } from '../../lib/supabase'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, tournamentInviteLink, canScoreTournament,
+  entriesOpen, categoriesLeft, maxCategories, tournamentInviteLink, canScoreTournament,
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
-import { signupErrorMessage } from '../../lib/tournamentError'
+import { errorCode, signupErrorMessage } from '../../lib/tournamentError'
 import { categoryGenderQuestion } from './genderCheck'
+import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
+import { setMyTshirtSize } from '../../lib/tournamentApi'
+import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -35,8 +38,10 @@ const STATE_KEY = {
   selecionada: 'tsignup.state_in',
   suplente: 'tsignup.state_waitlist',
 }
+// Os que não cabem no canto sem tapar o nome da categoria.
+const LONG_STATES = ['por_validar', 'convite', 'sem_parceiro']
 
-export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false, hasGames = false }) {
+export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false, hasGames = false, withInfo = true }) {
   const { t, i18n } = useTranslation()
   const { user, profile, updateProfile } = useAuth()
   const [genderSheet, setGenderSheet] = useState(false)
@@ -89,6 +94,16 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // não posso, mostra-se a que tenho (Trello #451).
   const my = myEntries.find((e) => e.category_id === category?.id)
   const myCategory = categories.find((c) => c.id === my?.category_id)
+  // Categorias que chocam (9 out): duas das minhas começam quase à mesma
+  // hora, e ainda não houve sorteio. Some quando deixa de haver choque.
+  const myCats = myEntries.filter((e) => e.state !== 'desistiu').map((e) => categories.find((c) => c.id === e.category_id)).filter(Boolean)
+  const clashPair = (() => {
+    for (const [i, a] of myCats.entries()) {
+      const b = myCats.slice(i + 1).find((x) => categoriesClash(a, x))
+      if (b && a.status !== 'sorteada' && b.status !== 'sorteada') return [a, b]
+    }
+    return null
+  })()
   // O nome da dupla e os dois nomes vêm da lista pública de inscritos: a
   // página só traz o estado da minha inscrição.
   const [myRow, setMyRow] = useState(null)
@@ -136,7 +151,11 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // `player1_gender_required` ficava-se por `_gender_required` — chave que
   // não existe — e quem se inscrevia sem género lia «Não foi possível. Tenta
   // outra vez.» em vez de «falta escolher o género» (Trello #476).
-  const say = (err) => setError(signupErrorMessage(t, err))
+  // O número vai na frase do máximo («Já estás no máximo de 2 categorias
+  // deste torneio», PO 12 out); as outras frases ignoram-no.
+  // e o nome de quem convido vai na do parceiro no máximo (Dev 3, 12 out).
+  const errorText = (err, name = '') => signupErrorMessage(t, err, undefined, { count: maxCategories(tournament), name })
+  const say = (err) => setError(errorText(err))
 
   const doSignUp = async (choice) => {
     setBusy(true); setError('')
@@ -145,14 +164,18 @@ export default function SignupSlot({ tournament, categories, category, my: first
       setSheet(false)
       if (result?.invite_token) setFresh({ name: choice.guestName, email: choice.guestEmail, token: result.invite_token, waitlist: result.status === 'suplente' })
       window.dispatchEvent(new CustomEvent('tournament:reload'))
-    } catch (err) { console.error('Error signing up for tournament:', err); say(err) }
+    } catch (err) { console.error('Error signing up for tournament:', err); setError(errorText(err, choice.partnerName || '')) }
     finally { setBusy(false) }
   }
 
   // Sem género no perfil pergunta-se ali mesmo, com «Agora não»: o sexo
   // nunca bloqueia (Francisco, 26 set; antes era obrigatório, #433).
-  const startSignUp = () => {
+  // «Ainda não tenho parceiro» (R3, 13 out) abre a mesma folha já em
+  // «Procuro parceiro»: é a escolha que já lá estava, um toque mais perto.
+  const [sheetMode, setSheetMode] = useState('partner')
+  const startSignUp = (mode = 'partner') => {
     setError('')
+    setSheetMode(mode === 'alone' ? 'alone' : 'partner')
     if (!profile?.gender) setGenderSheet(true)
     else setSheet(true)
   }
@@ -171,13 +194,45 @@ export default function SignupSlot({ tournament, categories, category, my: first
     else doSignUp(choice)
   }
 
+  // A t-shirt de quem aceita (SPEC t-shirts, ponto 3): «Aceitar» só fica
+  // ativo depois de escolher, «Não quero» incluído.
+  const shirts = tshirtOn(shirtRulesOf(tournament))
+  const [inviteShirt, setInviteShirt] = useState({})
+  // «👕 A tua t-shirt: L · Mudar» (SPEC t-shirts, ponto 6).
+  // A segunda linha é a do convidado sem conta que eu inscrevi (UX, 8 out):
+  // a folha promete «Podes mudar os dois». shirtSheet: 'mine' | 'guest'.
+  const [shirtSheet, setShirtSheet] = useState(null)
+  const [shirtError, setShirtError] = useState('')
+  const changeShirt = async (size) => {
+    setBusy(true); setShirtError('')
+    try {
+      await setMyTshirtSize(my.entry_id, size, { forGuest: shirtSheet === 'guest' })
+      setShirtSheet(null)
+      window.dispatchEvent(new CustomEvent('tournament:reload'))
+    } catch (err) { console.error('Error changing t-shirt:', err); setShirtError(signupErrorMessage(t, err)) }
+    finally { setBusy(false) }
+  }
+  const deadlineDay = tournament.entries_deadline
+    ? new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ')
+    : ''
+  // O erro de responder a um convite fica no próprio cartão, junto ao botão:
+  // em baixo, depois da inscrição, ficava fora do ecrã e o «Aceitar» parecia
+  // não fazer nada (QA, 12 out: max_categories_reached no iPhone).
+  const [inviteError, setInviteError] = useState(null) // { entryId, text }
   const answer = async (entryId, accept) => {
     setBusy(true)
+    setInviteError(null)
     try {
-      await respondToInvite(entryId, accept)
+      // Já com t-shirt neste torneio (uma por pessoa, 11 out): não se pergunta;
+      // a base de dados dá-lhe a que já tem.
+      const inv = invites.find((x) => x.entry_id === entryId)
+      await respondToInvite(entryId, accept, shirts && !inv?.my_tshirt ? { tshirtSize: inviteShirt[entryId] } : {})
       reloadInvites()
       window.dispatchEvent(new CustomEvent('tournament:reload'))
-    } catch (err) { console.error('Error answering tournament invite:', err); say(err) }
+    } catch (err) {
+      console.error('Error answering tournament invite:', err)
+      setInviteError({ entryId, text: errorText(err), code: errorCode(err) })
+    }
     finally { setBusy(false) }
   }
 
@@ -194,8 +249,14 @@ export default function SignupSlot({ tournament, categories, category, my: first
 
   return (
     <div className="space-y-2.5">
+      {clashPair && !publicView && (
+        <ClashNotice action={{ label: t('tclash.see_my_entries'), onClick: () => document.getElementById('minha-inscricao')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }}>
+          <b>{t('tclash.page_title', { a: clashPair[0].code, b: clashPair[1].code, when: categoryWhen(clashPair[0], i18n.language) })}</b> {t('tclash.page_body')}
+        </ClashNotice>
+      )}
       {canScore && !publicView && (
-        <div className="card flex items-center justify-between gap-3">
+        // Dentro da folha branca do topo: caixa #F4F5F1, sem sombra (UX, 14 out).
+        <div className="flex items-center justify-between gap-3 rounded-[16px] bg-[#F4F5F1] p-4">
           <p className="min-w-0 text-sm font-semibold text-ink-900">{t('tournament.score.link_title')}</p>
           <Link to={`/torneio/${tournament.slug || tournament.id}/marcar`}
             className="btn-secondary shrink-0 !px-4 inline-flex items-center">
@@ -212,29 +273,99 @@ export default function SignupSlot({ tournament, categories, category, my: first
             {[inv.category_code, inv.respond_by ? t('tsignup.invite_deadline', { date: new Date(inv.respond_by).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' }) }) : null]
               .filter(Boolean).join(' · ')}
           </p>
-          <div className="flex gap-2">
-            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy} className="flex-1">
+          {shirts && inv.my_tshirt ? (
+            <p className="text-sm text-ink-900">👕 {t('tshirt.my_line')} <b>{inv.my_tshirt === NO_TSHIRT ? t('tshirt.no_thanks') : inv.my_tshirt}</b> · {t('tshirt.already_chosen')}</p>
+          ) : shirts && (
+            <div>
+              <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</p>
+              <TshirtPicker rules={shirtRulesOf(tournament)} value={inviteShirt[inv.entry_id] || null}
+                onChange={(v) => setInviteShirt((m) => ({ ...m, [inv.entry_id]: v }))} label={t('tshirt.mine_label', { price: '' })} />
+            </div>
+          )}
+          {inviteError?.entryId === inv.entry_id && (
+            <div role="alert" className="space-y-1">
+              <p className="text-sm font-extrabold text-danger">{inviteError.text}</p>
+              {/* No máximo, diz a saída: sair de uma (o «Desistir» está na
+                  minha inscrição, mais abaixo) para aceitar esta (UX/PO, 12 out). */}
+              {inviteError.code === 'max_categories_reached' && my && (
+                <p className="text-sm text-ink-900">
+                  {t('tsignup.invite_max_way_out')}{' '}
+                  <button type="button" onClick={() => document.getElementById('minha-inscricao')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                    className="min-h-[44px] font-extrabold underline underline-offset-2">{t('tclash.see_my_entries')}</button>
+                </p>
+              )}
+            </div>
+          )}
+          {/* Empilhados, a ação em cima (regra de 6 out): nunca lado a lado. */}
+          <div className="space-y-2">
+            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy || (shirts && !inv.my_tshirt && !inviteShirt[inv.entry_id])} className="w-full">
               {t('tsignup.invite_accept')}
             </PrimaryButton>
-            <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="flex-1">
+            <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="w-full">
               {t('tsignup.invite_decline')}
             </PrimaryButton>
           </div>
         </div>
       ))}
 
+      {/* A minha t-shirt, por cima da inscrição (SPEC t-shirts, ponto 6), e
+          a do convidado sem conta que eu inscrevi. */}
+      {shirts && my && (
+        <div className="card space-y-2">
+          {[
+            { key: 'mine', label: t('tshirt.my_line'), size: my.tshirt },
+            ...(my.guest_name ? [{ key: 'guest', label: t('tshirt.guest_line', { name: String(my.guest_name).split(/\s+/)[0] }), size: my.guest_tshirt }] : []),
+          ].map((row) => (
+            <div key={row.key} className="flex items-start gap-3">
+              <span aria-hidden="true" className="text-lg leading-6">👕</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-ink-900">
+                  {row.label} <b>{row.size === NO_TSHIRT ? t('tshirt.no_thanks') : row.size || t('tshirt.not_chosen')}</b>
+                </p>
+                <p className="text-xs text-muted">{open ? t('tshirt.change_until_short', { date: deadlineDay }) : t('tshirt.closed_line', { date: deadlineDay })}</p>
+              </div>
+              {open && (
+                <button type="button" onClick={() => setShirtSheet(row.key)} className="-my-2 inline-flex min-h-[44px] shrink-0 items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                  {t('tshirt.change')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {shirtSheet && my && (
+        <Sheet title={shirtSheet === 'guest'
+          ? t('tshirt.guest_label', { name: String(my.guest_name || '').split(/\s+/)[0], price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })
+          : t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })} onClose={() => setShirtSheet(null)}>
+          <div className="space-y-3">
+            <TshirtPicker rules={shirtRulesOf(tournament)} value={(shirtSheet === 'guest' ? my.guest_tshirt : my.tshirt) || null} onChange={changeShirt} disabled={busy} label={t('tshirt.mine_label', { price: '' })} />
+            <p className="text-xs text-muted">{t('tshirt.change_until', { date: deadlineDay })}</p>
+            {shirtError && <p className="text-sm font-extrabold text-danger">{shirtError}</p>}
+          </div>
+        </Sheet>
+      )}
+
       {/* A minha inscrição, ou o convite para me inscrever. O nome da
           dupla em destaque, e «Mudar o nome» até as inscrições fecharem
           (nome-da-dupla, 27 set). */}
       {my ? (
-        <div className="card space-y-2">
+        // Dentro da folha branca do topo: caixa #F4F5F1, sem contorno nem
+        // sombra, como os quadrados (UX, 14 out).
+        <div id="minha-inscricao" className="scroll-mt-40 space-y-2 rounded-[16px] bg-[#F4F5F1] p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="flex min-w-0 items-center gap-2">
               {myCategory?.code && <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{myCategory.code}</span>}
               <b className="truncate text-sm font-extrabold text-ink-900">{myCategory?.name}</b>
             </p>
-            <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-ok-700">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</span>
+            {/* No canto só estados curtos (regra dos cartões, 10 out): os
+                compridos passam a uma linha por baixo, e o nome da categoria
+                nunca fica tapado (UX, 11 out; QA, 13 out). */}
+            {!LONG_STATES.includes(my.state) && (
+              <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-ok-700">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</span>
+            )}
           </div>
+          {my.state === 'por_validar' && <p className="text-xs font-extrabold text-ink-900">⏳ {t('tsignup.state_to_validate_line')}</p>}
+          {['convite', 'sem_parceiro'].includes(my.state) && <p className="text-xs font-extrabold text-ink-900">⏳ {t(STATE_KEY[my.state])}</p>}
           {my.state === 'suplente' && <p className="text-sm text-muted">{t('tsignup.state_waitlist_hint')}</p>}
           {myRow && (
             <div>
@@ -255,17 +386,35 @@ export default function SignupSlot({ tournament, categories, category, my: first
             </div>
           )}
           {open && (
-            <button onClick={() => setAskLeave(true)} disabled={busy} className="press min-h-[44px] w-full text-sm font-extrabold text-ink-900">
+            <button onClick={() => setAskLeave(true)} disabled={busy}
+              className="press flex min-h-[44px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white text-sm font-extrabold text-ink-900">
               {t('tsignup.withdraw')}
+            </button>
+          )}
+          {/* Ainda dá para outra categoria (máx. por torneio): diz-se aqui,
+              senão só se chegava lá pelo seletor de baixo (QA/UX, 14 out). */}
+          {anyOpen && left > 0 && (
+            <button type="button" onClick={() => window.dispatchEvent(new Event('tournament:open-category-select'))}
+              className="min-h-[36px] text-left font-display text-[13px] font-bold text-ink-900 underline underline-offset-2">
+              {t('tsignup.another_category')} ›
             </button>
           )}
         </div>
       ) : open && user ? (
         // Quem já tem jogos tem o lima no «Os meus jogos»: este passa a
         // contorno, por baixo (um lima por ecrã, UX 1 out).
-        <PrimaryButton variant={hasGames ? 'ghost' : 'lime'} onClick={startSignUp} disabled={left === 0} className="w-full">
-          {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
-        </PrimaryButton>
+        // Com um convite por responder, o lima é o «Aceitar» (UX/PO, 12 out).
+        <div className="space-y-2.5">
+          <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={() => startSignUp()} disabled={left === 0} className="w-full">
+            {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
+          </PrimaryButton>
+          {/* O segundo botão, em contorno, por baixo (R3): nunca lado a lado. */}
+          {left > 0 && (
+            <PrimaryButton variant="ghost" onClick={() => startSignUp('alone')} className="w-full !border-ink-900 !bg-white">
+              {t('tsignup.no_partner_yet')}
+            </PrimaryButton>
+          )}
+        </div>
       ) : open && !user ? (
         // Sem conta vê-se tudo menos inscrever (SPEC §4.10).
         <PrimaryButton onClick={() => { window.location.href = signUpHref() }} className="w-full">
@@ -291,7 +440,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
           organiza — SEMPRE, também em rascunho (pré-visualização) e depois
           do fecho, que é quando se joga (QA, 26 set). Só as vagas e o botão
           de inscrever dependem das inscrições abertas. */}
-      <PublicInfo tournament={tournament} categories={categories} entriesOpen={anyOpen} />
+      {/* No topo novo (R3, 13 out) a página põe o cartaz mais abaixo, depois
+          dos quadrados de dados: withInfo={false}. */}
+      {withInfo && <PublicInfo tournament={tournament} categories={categories} entriesOpen={anyOpen} />}
 
       {genderSheet && (
         <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>
@@ -323,7 +474,10 @@ export default function SignupSlot({ tournament, categories, category, my: first
           categories={categories}
           category={category}
           categoriesLeft={left}
+          initialMode={sheetMode}
           takenIds={myEntries.map((e) => e.category_id)}
+          // A t-shirt que já tenho neste torneio (uma por pessoa, 11 out).
+          myExistingShirt={myEntries.find((e) => e.state !== 'desistiu' && e.tshirt)?.tshirt || null}
           busy={busy}
           error={error}
           onConfirm={trySignUp}
@@ -380,7 +534,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         confirmLabel={t('tsignup.withdraw_yes')}
         onConfirm={leave}
         onClose={() => setAskLeave(false)}
-        errorOf={(err) => signupErrorMessage(t, err)}
+        errorOf={errorText}
       />
     </div>
   )

@@ -24,6 +24,7 @@ import { Toggle, euros } from '../components/lessons/LessonBits'
 import StepPage from '../components/steps/StepPage'
 import WhatsappHoursField from '../components/WhatsappHoursField'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
+import TimeInput from '../components/TimeInput'
 
 const pad = (n) => String(n).padStart(2, '0')
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -169,7 +170,7 @@ export default function CreateSeries() {
       }
       const notice = t('lessons.series_saved')
       try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
-      navigate(`/gerir/${slug}`, { state: { notice } })
+      navigate(`/gerir/${slug}`, { replace: true, state: { notice } })
     } catch (err) {
       console.error('Error saving lesson series:', err)
       // Os códigos do update_lesson_series (Dev 3) têm frase própria.
@@ -201,7 +202,7 @@ export default function CreateSeries() {
       // histórico).
       const notice = forOther ? t('lessons.series_created_pending', { name: teacher.name }) : t('lessons.series_created')
       try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
-      navigate(`/gerir/${slug}`, { state: { notice } })
+      navigate(`/gerir/${slug}`, { replace: true, state: { notice } })
     } catch (err) {
       console.error('Error creating lesson series:', err)
       setError(describeError(t, err, 'lessons.error_create_series'))
@@ -302,7 +303,7 @@ export default function CreateSeries() {
           </div>
           <div>
             <p className={label}>{t('lessons.f_start')}</p>
-            <input type="time" step={1800} value={f.start_time} aria-label={t('lessons.f_start')}
+            <TimeInput step={1800} value={f.start_time} aria-label={t('lessons.f_start')}
               onChange={(e) => set({ start_time: e.target.value, peak_choice: null })} className="input-field w-full" />
           </div>
           <div>

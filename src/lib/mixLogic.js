@@ -370,7 +370,18 @@ export function nextSobeDesce(roundMatches, numCourts) {
     partnerPairs: Set de "idA|idB" de todas as duplas já formadas no mix.
     rankOf(player): posição atual no mix (0 = primeiro).
     Devolve [{ court_number, duplaA: [p, p], duplaB: [p, p] }]. */
-export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { partnerPairs = new Set(), rankOf = () => 0, random = Math.random } = {}) {
+// Pares quebrados (Francisco, 12 out; design-handoff/2026-10-12-pares-
+// quebrados/REGRAS.md): nas rondas seguintes, entre as maneiras de juntar os
+// quatro de um campo sem repetir parceiro neste mix, prefere-se a que não
+// junta quem foi dupla num dos últimos 4 mixes em que estiveram os dois
+// (`historyPairs`, a regra de 12 out) e, com «Respeitar os lados» ligado
+// (`respectSides`), a que junta esquerda com direita. Quem diz «os dois», não
+// tem lado ou joga sem conta serve para qualquer lado. Nunca bloqueia: sem
+// maneira limpa, junta na mesma e marca o campo (`forcedHistory`).
+const sideOfPlayer = (u) => (u?.preferred_side === 'left' || u?.preferred_side === 'right') ? u.preferred_side : 'both'
+const sidesClash = (x, y) => { const a = sideOfPlayer(x); const b = sideOfPlayer(y); return a !== 'both' && a === b }
+
+export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { partnerPairs = new Set(), rankOf = () => 0, random = Math.random, historyPairs = new Set(), respectSides = false } = {}) {
   const pairKey = (a, b) => [a?.id, b?.id].sort().join('|')
   const byCourt = {}
   for (const m of roundMatches) {
@@ -393,15 +404,23 @@ export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { part
         [[a, d], [b, c]],
       ]
       const repeats = (opt) => opt.filter(([x, y]) => partnerPairs.has(pairKey(x, y))).length
+      const history = (opt) => opt.filter(([x, y]) => historyPairs.has(pairKey(x, y))).length
+      const clashes = (opt) => (respectSides ? opt.filter(([x, y]) => sidesClash(x, y)).length : 0)
       const fresh = options.filter((opt) => repeats(opt) === 0)
       let chosen
       if (fresh.length > 0) {
-        chosen = fresh[Math.floor(random() * fresh.length)]
+        // Primeiro a regra dos 4 mixes, depois os lados (prioridade do PO).
+        const best = Math.min(...fresh.map((o) => history(o) * 10 + clashes(o)))
+        const pick = fresh.filter((o) => history(o) * 10 + clashes(o) === best)
+        chosen = pick[Math.floor(random() * pick.length)]
       } else {
         const byPosition = [...players].sort((x, y) => rankOf(x) - rankOf(y))
-        chosen = [[byPosition[0], byPosition[1]], [byPosition[2], byPosition[3]]]
+        const positional = [[byPosition[0], byPosition[1]], [byPosition[2], byPosition[3]]]
+        // Com «Respeitar os lados», também aqui «sempre que dá» (QA, 13 out):
+        // a de menos choques de lado; empatadas, fica a da posição.
+        chosen = [positional, ...options].reduce((best, o) => (clashes(o) < clashes(best) ? o : best))
       }
-      return { court_number: Number(court), duplaA: chosen[0], duplaB: chosen[1] }
+      return { court_number: Number(court), duplaA: chosen[0], duplaB: chosen[1], forcedHistory: history(chosen) > 0 }
     })
     .sort((x, y) => x.court_number - y.court_number)
 }
@@ -605,11 +624,20 @@ export function standings(teams, matches) {
 /** «Carlos N.» para o «marcado por»: o primeiro nome e a inicial do último.
     O que está entre parênteses e o que não tem letras não conta — com
     «Francisco (QA)» saía «Francisco (.» (Francisco, 2 out). */
+// Nome com número no fim (12 out, regra combinada com o Dev 3 — a mesma do
+// live_short_name): os números do fim ficam, e a inicial vem da última
+// palavra com letras. «Teste Xico 1» → «Teste X. 1» (antes «Teste»: a t1 e a
+// t2 ficavam iguais). Sem nenhuma palavra com letras, fica o nome inteiro.
 export function shortPersonName(name) {
-  const parts = String(name || '').replace(/\([^)]*\)?/g, ' ').trim().split(/\s+/).filter((p) => /\p{L}/u.test(p))
-  if (parts.length === 0) return ''
+  const raw = String(name || '').trim()
+  if (!raw) return ''
+  const tokens = raw.replace(/\([^)]*\)?/g, ' ').trim().split(/\s+/).filter(Boolean)
+  const tail = []
+  while (tokens.length && !/\p{L}/u.test(tokens[tokens.length - 1])) tail.unshift(tokens.pop())
+  const parts = tokens.filter((p) => /\p{L}/u.test(p))
+  if (parts.length === 0) return raw
   const last = parts[parts.length - 1].match(/\p{L}/u)[0]
-  return parts.length > 1 ? `${parts[0]} ${last.toUpperCase()}.` : parts[0]
+  return [parts[0], parts.length > 1 ? `${last.toUpperCase()}.` : null, ...tail].filter(Boolean).join(' ')
 }
 
 export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null && m.score_b != null))
@@ -782,13 +810,19 @@ export const placementOfCourt = (court) => 2 * court - 1
 
     Returns: numRounds entries, each an array of numCourts
     { court_number, duplaA: {player1, player2, seed}, duplaB: {...} }. */
-export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}, { mode = 'por_nivel', random = Math.random } = {}) {
+// A regra de 12 out em todas as rondas do Americano (Francisco, «quero o
+// mesmo em todos os modos»): ao formar as duplas de cada ronda, evita quem
+// foi dupla num dos últimos 4 mixes em que estiveram os dois
+// (`historyPairs`), depois de não repetir parceiro neste mix. Sem outra
+// forma, junta na mesma e devolve o par em `rounds.forcedHistory`.
+export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}, { mode = 'por_nivel', random = Math.random, historyPairs = new Set() } = {}) {
   const pairKey = (a, b) => [a.id, b.id].sort().join('|')
   const pointsOf = (p) => pointsById[p?.id] ?? 0
 
   const partnerHistory = new Set()
   const opponentHistory = new Set()
   const rounds = []
+  const forcedHistory = []
 
   for (let r = 0; r < numRounds; r++) {
     // ── Form this round's duplas ──────────────────────────────────────
@@ -804,9 +838,14 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
     const duplas = []
     while (pool.length >= 2) {
       const a = pool.shift()
-      let idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)))
+      // Primeiro sem repetir neste mix nem dos últimos 4 mixes; depois só sem
+      // repetir neste mix; depois só sem os últimos 4; por fim o mais próximo.
+      let idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)) && !historyPairs.has(pairKey(a, cand)))
+      if (idx === -1) idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)))
+      if (idx === -1) idx = pool.findIndex((cand) => !historyPairs.has(pairKey(a, cand)))
       if (idx === -1) idx = 0 // everyone left is a repeat partner — accept the closest rather than leave a gap
       const b = pool.splice(idx, 1)[0]
+      if (historyPairs.has(pairKey(a, b))) forcedHistory.push([a, b])
       partnerHistory.add(pairKey(a, b))
       duplas.push({ player1: a, player2: b, seed: pointsOf(a) + pointsOf(b) })
     }
@@ -837,14 +876,17 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
     rounds.push(courtDuplas.slice(0, numCourts).map((cm, idx) => ({ court_number: idx + 1, ...cm })))
   }
 
+  rounds.forcedHistory = forcedHistory
   return rounds
 }
 
 /** Americano's individual ranking: each player's points are the sum of
     the score their side got in every match they took part in (across
     whichever different teams row they were on each round) — not the
-    team's win/loss. wins is a secondary sort key (breaks a points tie),
-    never the primary one — see the design spec's "Ranking" decision.
+    team's win/loss. A points tie breaks on the points DIFFERENCE (scored
+    minus conceded) — Francisco, 8 out (design-handoff/2026-10-08-americano-
+    voucher): the same rule the voucher and «ganhou o mix» use, so the screen
+    never shows a different 1st place. wins is kept for display.
     `teams` must have embedded player1/player2 profile objects (same
     shape GameDetails.jsx's `teams` state already carries). */
 export function americanoStandings(matches, teams) {
@@ -852,7 +894,7 @@ export function americanoStandings(matches, teams) {
   const table = {}
   const rowFor = (player) => {
     if (!player) return null
-    if (!table[player.id]) table[player.id] = { player, points: 0, wins: 0, played: 0 }
+    if (!table[player.id]) table[player.id] = { player, points: 0, diff: 0, wins: 0, played: 0 }
     return table[player.id]
   }
 
@@ -866,6 +908,7 @@ export function americanoStandings(matches, teams) {
       if (!row) continue
       row.played += 1
       row.points += m.score_a ?? 0
+      row.diff += (m.score_a ?? 0) - (m.score_b ?? 0)
       if (m.winner_team_id === teamA.id) row.wins += 1
     }
     for (const player of [teamB.player1, teamB.player2]) {
@@ -873,11 +916,12 @@ export function americanoStandings(matches, teams) {
       if (!row) continue
       row.played += 1
       row.points += m.score_b ?? 0
+      row.diff += (m.score_b ?? 0) - (m.score_a ?? 0)
       if (m.winner_team_id === teamB.id) row.wins += 1
     }
   }
 
-  return Object.values(table).sort((x, y) => y.points - x.points || y.wins - x.wins)
+  return Object.values(table).sort((x, y) => y.points - x.points || y.diff - x.diff)
 }
 
 export const PHASE_LABEL_KEY = {

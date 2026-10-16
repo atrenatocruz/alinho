@@ -1,21 +1,25 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { WifiOff, Compass } from 'lucide-react'
+import { Compass } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton, EmptyState } from './components/ui'
+import Alino from './components/Alino'
 import Layout, { Wordmark } from './components/Layout'
 import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Plans from './pages/Plans'
 import Home from './pages/Home'
+import { SkeletonGate, GenericPageSkeleton } from './components/Skeleton'
 import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
 import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
+import ProfileXp from './pages/ProfileXp'
+import PlayerStats from './pages/PlayerStats'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -74,9 +78,17 @@ const EditOpenSlots = lazyPage(() => import('./pages/EditOpenSlots'))
 const CreateSeries = lazyPage(() => import('./pages/CreateSeries'))
 const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
+const LeaguePage = lazyPage(() => import('./pages/LeaguePage'))
+const LeagueEncounterPage = lazyPage(() => import('./pages/LeagueEncounterPage'))
+const LeagueTeamPage = lazyPage(() => import('./pages/LeagueTeamPage'))
+const CreateLeaguePage = lazyPage(() => import('./pages/CreateLeaguePage'))
+const LeagueManagePage = lazyPage(() => import('./pages/LeagueManagePage'))
+const LeagueResultPage = lazyPage(() => import('./pages/LeagueResultPage'))
 const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
+const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
+const Novidades = lazyPage(() => import('./pages/Novidades'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
 const MixOffline = lazyPage(() => import('./pages/MixOffline'))
@@ -87,9 +99,12 @@ const ConsentGate = lazyPage(() => import('./pages/ConsentGate'))
 // Same spinner used for every other in-app loading state (Home, Rankings,
 // etc.) — a lazy chunk on a fast connection resolves before this is even
 // visible; on a slow one it matches what players already see elsewhere.
+// Enquanto chega o código de uma página carregada à parte: sem círculo a
+// rodar (regra dos esqueletos, Francisco 12 out) — o fundo e, se demorar mais
+// de 0,2 s, uma página genérica a cinzento; aos 8 s, o erro de sempre.
 const RouteFallback = () => (
-  <div className="flex items-center justify-center py-16">
-    <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+  <div className="mx-auto max-w-lg px-4">
+    <SkeletonGate><GenericPageSkeleton /></SkeletonGate>
   </div>
 )
 
@@ -140,7 +155,8 @@ const LoadErrorScreen = ({ onRetry }) => {
     <div onClick={handleTap} className="min-h-screen flex items-center justify-center px-6 bg-canvas">
       <div className="text-center max-w-xs">
         <Wordmark variant="light" className="h-8 mx-auto mb-8" />
-        <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
+        {/* Sem rede: o Alino «ups» (mascote, 12 out). */}
+        <Alino pose="triste" size={120} className="mb-4" />
         <h1 className="text-lg text-ink-900 mb-1">{t('app.load_error_title')}</h1>
         <p className="text-muted text-sm mb-6">{t('app.load_error_body')}</p>
         <PrimaryButton onClick={onRetry} className="w-full">{t('app.load_error_retry')}</PrimaryButton>
@@ -241,10 +257,9 @@ const Guard = ({ require, showSplash, children }) => {
   // Consent gate (Trello #154): brand-new accounts (email/password or
   // Google) must accept the Privacy Policy/Terms once before reaching the
   // app — checked BEFORE rating-onboarding so no profile data (like a
-  // self-selected rating) gets written before consent is on file. Existing
-  // pilot accounts are grandfathered — the migration backfills
-  // consent_accepted_at = NOW() for every profile that existed before this
-  // shipped, so only genuinely new signups see this screen.
+  // self-selected rating) gets written before consent is on file. Desde o
+  // #360 (10 out) também as contas que já existiam passam por aqui uma vez:
+  // a migração do Dev 3 deixa de as dar como aceites.
   if (user && profile && profile.consent_accepted_at === null) {
     return <ConsentGate />
   }
@@ -343,6 +358,17 @@ function AfterLogin() {
 const PUBLIC_HEAD = {
   '/': { title: 'alinho — mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
   '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
+  // Páginas do site (#619, 10 out): título e descrição próprios, no mesmo estilo.
+  '/como-funciona': {
+    title: 'Como funciona o alinho.pt — mixes, nível, torneios e WhatsApp',
+    canonical: 'https://www.alinho.pt/como-funciona',
+    description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
+  },
+  '/novidades': {
+    title: 'Novidades do alinho.pt — o que mudou em cada versão',
+    canonical: 'https://www.alinho.pt/novidades',
+    description: 'As mudanças de cada versão do alinho.pt, a mais recente em cima.',
+  },
 }
 function useRouteHead() {
   const location = useLocation()
@@ -359,6 +385,13 @@ function useRouteHead() {
       document.title = head.title
     } else if (link) {
       link.remove()
+    }
+    // A descrição só muda nas páginas que a trazem; ao sair, volta a do
+    // index.html (a do Ruben, SEO de 29 set).
+    const meta = document.querySelector('meta[name="description"]')
+    if (meta) {
+      if (meta.dataset.base == null) meta.dataset.base = meta.getAttribute('content') || ''
+      meta.setAttribute('content', head?.description || meta.dataset.base)
     }
   }, [location.pathname])
 }
@@ -395,6 +428,9 @@ function AppRoutes() {
         <Route path="/termos" element={<TermsOfService />} />
         {/* Página pública dos planos (Trello #327). */}
         <Route path="/planos" element={<Plans />} />
+        {/* Páginas do site (#619): «Como funciona» e «Novidades». */}
+        <Route path="/como-funciona" element={<HowItWorks />} />
+        <Route path="/novidades" element={<Novidades />} />
         <Route path="/mix-offline" element={<MixOffline />} />
         <Route
           path="/"
@@ -510,6 +546,13 @@ function AppRoutes() {
           }
         />
         {/* Torneios (Trello #361 a #366) — abre sem conta */}
+        {/* Liga entre Clubes (Fase 1): pública, como o torneio. */}
+        <Route path="/liga/:slug" element={<Guard require="public" showSplash={showSplash}><LeaguePage /></Guard>} />
+        <Route path="/liga/:slug/encontro/:id" element={<Guard require="public" showSplash={showSplash}><LeagueEncounterPage /></Guard>} />
+        <Route path="/gerir/:slug/criar/liga" element={<Guard require="protected" showSplash={showSplash}><CreateLeaguePage /></Guard>} />
+        <Route path="/liga/:slug/gerir" element={<Guard require="protected" showSplash={showSplash}><LeagueManagePage /></Guard>} />
+        <Route path="/liga/:slug/equipa/:teamId" element={<Guard require="protected" showSplash={showSplash}><LeagueTeamPage /></Guard>} />
+        <Route path="/liga/:slug/encontro/:id/resultado" element={<Guard require="protected" showSplash={showSplash}><LeagueResultPage /></Guard>} />
         <Route
           path="/torneio/:id"
           element={
@@ -565,6 +608,33 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <Profile />
+            </Guard>
+          }
+        />
+        {/* R15 · A página do XP de atividade (UX, 14 out). */}
+        <Route
+          path="/perfil/xp"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <ProfileXp />
+            </Guard>
+          }
+        />
+        {/* Estatísticas da evolução do ranking (Francisco, 16 out) — a
+            mesma página serve o próprio perfil e o de terceiros. */}
+        <Route
+          path="/perfil/estatisticas"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <PlayerStats />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogador/:id/estatisticas"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <PlayerStats />
             </Guard>
           }
         />
@@ -728,6 +798,8 @@ function AppRoutes() {
         <Route path="/gerir/:slug/editar/mix/:editId" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
         {/* A página de um mix que se repete (ações do evento, 26 set). */}
         <Route path="/gerir/:slug/serie/:serieId" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
+        {/* «Já passaram»: tudo o que já passou, por mês (Gerir, 9 out). */}
+        <Route path="/gerir/:slug/ja-passaram" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
         {/* Tudo o que não é uma página da app. Tem de ficar em último. */}
         <Route path="*" element={<NotFound showSplash={showSplash} />} />
       </Routes>

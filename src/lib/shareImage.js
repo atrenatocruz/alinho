@@ -64,10 +64,31 @@ export function shareFilename(...parts) {
 
 /** Partilhar o link de uma página (o botão redondo do BackBar): a folha de
  *  partilha do telemóvel; sem ela, o WhatsApp com o nome e o link. */
+/** Partilhar só um link (partilhar-link, 12 out): a partilha do telemóvel
+ *  com a frase (que já leva o link); sem ela, copia o link e devolve
+ *  'copied' para quem chama mostrar «✓ Link copiado». */
+export async function shareLinkOrCopy({ title = '', text, url }) {
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    try { await navigator.share({ title, text }) } catch { /* fechou a folha */ }
+    return 'shared'
+  }
+  try {
+    await navigator.clipboard.writeText(url)
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = url
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    ta.remove()
+  }
+  return 'copied'
+}
+
 export function sharePageLink({ title = '', text = '', url }) {
   if (typeof navigator !== 'undefined' && navigator.share) {
     navigator.share({ title, text: text || title, url }).catch(() => {})
     return
   }
-  window.open(`https://wa.me/?text=${encodeURIComponent([text || title, url].filter(Boolean).join(' '))}`, '_blank')
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent([text || title, url].filter(Boolean).join(' '))}`, '_blank')
 }

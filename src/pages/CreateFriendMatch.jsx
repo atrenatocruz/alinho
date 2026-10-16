@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Users, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createFriendMatch, updateFriendMatch, addFriendMatchInvitees, removeFriendMatchInvitee, cancelFriendMatch } from '../lib/privateMatches'
-import { FORMAT_DB, formatKey } from '../components/friends/friendScoring'
+import { FORMAT_DB, formatKey, formatToSave } from '../components/friends/friendScoring'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
 import { PrimaryButton, DateTimeField, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { describeError } from '../lib/errors'
-import StepPage from '../components/steps/StepPage'
+import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
 
 /* `group` ({ id, slug, name }): o jogo de grupo — o mesmo desenho, com a
@@ -31,17 +31,21 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const { t } = useTranslation()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const routeLocation = useLocation()
 
   // Quatro passos, como todos os eventos (#342, versão final de 26 set):
   // Pessoas · Quando · Onde joga · Regras. Primeiro as pessoas, sem duplas —
   // podem ser mais de 4; as equipas fazem-se depois de todos aceitarem, na
   // página do jogo (base de dados do Dev 3: create_friend_match).
   const [step, setStep] = useState(1)
-  const original = (edit?.invitees || []).filter((i) => !i.is_creator && i.status !== 'declined')
-  const [people, setPeople] = useState(() => original.map(personFrom)) // sem o criador
+  // Sem mim (vou na linha «· tu»). Quem aceitou também edita (SPEC 2026-10-
+  // 07-amigos-convidado): aí quem criou aparece na lista, e não sai.
+  const original = (edit?.invitees || []).filter((i) => i.status !== 'declined' && !(i.user_id && i.user_id === profile?.id))
+  const [people, setPeople] = useState(() => original.map(personFrom))
   // No editar: quem já tem resultados não sai; com resultados, a forma de
   // contar não muda (a base de dados tranca com format_locked).
-  const lockedKeys = edit ? new Set(original.filter((i) => i.has_results).map((i) => i.invitee_id)) : null
+  const lockedKeys = edit ? new Set(original.filter((i) => i.has_results && !i.is_creator).map((i) => i.invitee_id)) : null
+  const creatorKey = original.find((i) => i.is_creator)?.invitee_id || null
   const scoringLocked = !!edit?.games?.some((g) => g.score_a != null && g.score_b != null)
 
   // «Conta para o ranking?» e «Equipas» também no editar (27 set: «o editar
@@ -84,6 +88,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   // Estável entre desenhos: a pesquisa do InviteesStep volta a correr quando
   // a função muda.
   const searchMembers = useCallback(async (q) => members.filter((m) => contemTexto(m.name, q)), [members])
+  // As sugestões num jogo de grupo: só quem é do grupo.
+  const memberIds = useMemo(() => (group ? new Set(members.map((m) => m.id)) : null), [group, members])
 
   const hasGuest = people.some((p) => p.guest)
   const missing = Math.max(0, MIN_PEOPLE - (people.length + 1))
@@ -115,7 +121,9 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
       })
-      navigate(`/jogos-privados/sessao/${id}`)
+      // replace: o criar sai do histórico — o «voltar» do jogo não pode
+      // reabrir o «Novo jogo» no passo 1 (Francisco, 12 out).
+      navigate(`/jogos-privados/sessao/${id}`, { replace: true })
     } catch (err) {
       console.error('Error creating friend match:', err)
       // As funções do Dev 3 recusam com a frase já escrita (P0001).
@@ -135,6 +143,24 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     if (!scheduledDate) { setError(t('createprivatematch.error_date_required')); setStep(2); return }
     setSaving(true)
     try {
+      await updateFriendMatch(m.id, {
+        scheduledDate,
+        scheduledTime: scheduledTime || null,
+        location: location.trim() || null,
+        locationLatitude: locationCoords.latitude,
+        locationLongitude: locationCoords.longitude,
+        court: court.trim() || null,
+        gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
+        // A forma de contar só vai mudada se a pessoa a mudou (#586, 12 out).
+        ...formatToSave(format, m.scoring_format, m.num_sets),
+        // Só vão quando mudam (a função recusa com o cadeado).
+        rankedIntent: rankedIntent !== (m.ranked_intent !== false) ? rankedIntent : undefined,
+        teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
+        showLive,
+      })
+      // As pessoas gravam-se DEPOIS do resto (#586, 13 out): é o resto que
+      // pode ser recusado (format_locked, ranked_locked, teams_locked…), e
+      // antes as pessoas já ficavam mudadas quando ele falhava.
       const keep = new Set(people.map((p) => p.inviteeId).filter(Boolean))
       for (const i of original.filter((x) => !keep.has(x.invitee_id))) {
         // eslint-disable-next-line no-await-in-loop
@@ -146,21 +172,10 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })))
       }
-      await updateFriendMatch(m.id, {
-        scheduledDate,
-        scheduledTime: scheduledTime || null,
-        location: location.trim() || null,
-        locationLatitude: locationCoords.latitude,
-        locationLongitude: locationCoords.longitude,
-        court: court.trim() || null,
-        gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
-        ...FORMAT_DB[format],
-        // Só vão quando mudam (a função recusa com o cadeado).
-        rankedIntent: rankedIntent !== (m.ranked_intent !== false) ? rankedIntent : undefined,
-        teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
-        showLive,
-      })
-      navigate(`/jogos-privados/sessao/${m.id}`)
+      // Vindo do jogo, volta para ele (sem o repetir no histórico); de outro
+      // lado (a lista), o editar troca de lugar com o jogo.
+      if (routeLocation.state?.fromSession) navigate(-1)
+      else navigate(`/jogos-privados/sessao/${m.id}`, { replace: true })
     } catch (err) {
       console.error('Error editing friend match:', err)
       const code = EDIT_ERRORS.find((k) => String(err?.message || '').includes(k))
@@ -189,7 +204,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       </div>
       {teamsLocked ? (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
-          <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.teams_locked_hint')}
+          <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.teams_locked_hint')}
         </p>
       ) : <p className="mt-2 text-xs text-muted">{t('friends.teams_app_hint')}</p>}
     </div>
@@ -213,7 +228,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           criar conta pelo convite passa a contar (QA/PO, 27 set). */}
       {rankedLocked ? (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
-          <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.ranked_locked_hint')}
+          <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.ranked_locked_hint')}
         </p>
       ) : edit ? <p className="mt-2 text-xs text-muted">{t('friends.ranked_edit_hint')}</p>
         : rankedIntent && hasGuest && <p className="mt-2 text-xs text-muted">{t('friends.ranked_hint_guests')}</p>}
@@ -253,6 +268,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
       onNext={() => { setError(''); setStep(step + 1) }}
       nextDisabled={(step === 1 && missing > 0) || (step === 2 && !scheduledDate)}
+      nextMissingField={step === 2 && !scheduledDate ? 'step-friends-date' : null}
       nextHint={step === 1 ? t('friends.missing_people', { count: missing }) : t('createprivatematch.date_missing')}
       error={error}
       edit={edit ? {
@@ -280,10 +296,10 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     >
       {step === 1 && (
         <InviteesStep
-          {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder') } : {})}
+          {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder'), suggestOrgId: group.id, suggestOnlyIds: memberIds } : {})}
           me={profile}
           people={people}
-          {...(edit ? { lockedKeys, collapsedSearch: true } : {})}
+          {...(edit ? { lockedKeys, creatorKey, collapsedSearch: true } : {})}
           onAdd={(p) => setPeople((list) => (list.some((x) => x.key === p.key) ? list : [...list, p]))}
           onRemove={(key) => setPeople((list) => list.filter((x) => x.key !== key))}
         />
@@ -292,7 +308,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       {step === 2 && (
         <div>
           <p className={label}>{t('steps.datetime_label')}</p>
-          <DateTimeField value={when} onChange={setWhen} />
+          <div id="step-friends-date"><DateTimeField value={when} onChange={setWhen} /><StepMissingNote field="step-friends-date" /></div>
           <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
         </div>
       )}
@@ -343,7 +359,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
             {format !== 'points' && <p className="mt-2 text-xs text-muted">{t(`friends.format_${format}_hint`)}</p>}
             {scoringLocked && (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
-                <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.format_locked_hint')}
+                <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.format_locked_hint')}
               </p>
             )}
           </div>

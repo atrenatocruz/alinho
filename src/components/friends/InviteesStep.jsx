@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Search, X, UserPlus, Lock } from 'lucide-react'
 import { Avatar } from '../ui'
 import { searchPlayers } from '../../lib/privateMatches'
+import PeopleSuggestions from '../people/PeopleSuggestions'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 
 export const MIN_PEOPLE = 4
@@ -18,7 +19,11 @@ export const MIN_PEOPLE = 4
 // No editar (27 set): `lockedKeys` = quem já tem resultados (🔒 em vez do ✕,
 // com a frase por baixo) e `collapsedSearch` = a pesquisa só abre com
 // «＋ Juntar pessoa», como no desenho.
-export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, collapsedSearch = false }) {
+// `creatorKey`: quem criou, quando quem edita é quem aceitou (SPEC 2026-10-07-
+// amigos-convidado) — fica com «Criou o jogo» e não sai.
+// Sugestões antes de escrever (Francisco, 12 out): `suggestOrgId` /
+// `suggestOnlyIds` limitam-nas ao grupo num jogo de grupo.
+export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, creatorKey = null, collapsedSearch = false, suggestOrgId = null, suggestOnlyIds = null }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(!collapsedSearch)
@@ -64,6 +69,10 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder || t('partner.search_placeholder')}
             className="input-field pl-10" />
         </div>
+        {query.trim().length < 2 && (
+          <PeopleSuggestions exclude={[...inList]} orgId={suggestOrgId} onlyIds={suggestOnlyIds}
+            onPick={(r) => onAdd({ key: r.id, user_id: r.id, name: r.name, avatar_url: r.avatar_url })} />
+        )}
         {results.length > 0 && (
           <div className="mt-2 overflow-hidden rounded-ctrl border border-line bg-white shadow-card">
             {results.slice(0, 6).map((r) => (
@@ -103,7 +112,9 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
               {p.guest && (
                 <span className="shrink-0 rounded-full border border-line bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{t('friends.guest_tag')}</span>
               )}
-              {lockedKeys?.has(p.key) ? (
+              {creatorKey && p.key === creatorKey ? (
+                <span className="shrink-0 rounded-full bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{t('friends.creator_tag')}</span>
+              ) : lockedKeys?.has(p.key) ? (
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center text-warning" aria-label={t('friends.locked_person')}>
                   <Lock size={16} />
                 </span>
@@ -124,7 +135,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
         )}
         {lockedKeys?.size > 0 && (
           <p className="mt-2 flex items-start gap-1.5 rounded-ctrl border border-dashed border-line px-3 py-2 text-xs text-muted">
-            <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.locked_hint')}
+            <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.locked_hint')}
           </p>
         )}
         {count > MIN_PEOPLE && <p className="mt-2 text-xs text-muted">{t('friends.rotating_line', { count })}</p>}

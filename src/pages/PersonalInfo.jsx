@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { maxSignupBirthday } from '../lib/age'
-import { PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
+import { BackBar, PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
@@ -121,34 +120,18 @@ export default function PersonalInfo() {
 
   return (
     <div className="space-y-4 pb-6">
-      <div className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center gap-2 border-b border-line/70">
-        <button
-          type="button"
-          onClick={() => (editing ? (setEditing(false), resetForm()) : navigate('/perfil'))}
-          aria-label={t('gamedetails.back')}
-          className="w-11 h-11 -ml-2 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50"
-        >
-          <ArrowLeft size={22} />
-        </button>
-        <h2 className="text-3xl text-ink-900 min-w-0 truncate">{t('profile.personal_info_heading')}</h2>
-      </div>
+      {/* O topo das páginas sem capa: a barra de vidro com o «‹» e o título
+          grande por baixo (Renato/Francisco, 16 out — a faixa branca antiga
+          deixava um espaço vazio em cima). */}
+      <BackBar onBack={() => (editing ? (setEditing(false), resetForm()) : navigate('/perfil'))}
+        label={t('gamedetails.back')} title={t('profile.personal_info_heading')} />
+      <h1 className="text-[28px] font-extrabold leading-tight text-ink-900">{t('profile.personal_info_heading')}</h1>
 
       {saved && (
         <p className="text-sm font-extrabold text-ink-900">{t('profile.updated_success')}</p>
       )}
 
       <div className="card">
-        {!editing && (
-          <div className="flex justify-end -mt-1 mb-3">
-            <button
-              onClick={() => setEditing(true)}
-              className="text-ink-700 font-extrabold text-sm min-h-[44px] px-2"
-            >
-              {t('profile.edit_button')}
-            </button>
-          </div>
-        )}
-
         {editing ? (
           <form onSubmit={handleSave} className="space-y-4 animate-fade-up">
             <div>
@@ -259,7 +242,7 @@ export default function PersonalInfo() {
                     onClick={() => setIsPrivate((v) => !v)}
                     className={`shrink-0 w-11 h-6 rounded-full transition-colors duration-fast relative ${isPrivate ? 'bg-lime-400' : 'bg-ink-200'}`}
                   >
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-fast ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    <span className={`absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-fast ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </button>
                 </label>
               </div>
@@ -318,7 +301,17 @@ export default function PersonalInfo() {
         ) : (
           <div className="space-y-4">
             <div>
-              <p className={fieldLabel}>{t('profile.name_label')}</p>
+              {/* «Editar» na linha do «NOME», à direita, sublinhado como os
+                  outros links de ação: o cartão já não começa com uma linha
+                  vazia (Renato/Francisco, 16 out). Toque de 44 px sem mexer
+                  na altura da linha. */}
+              <div className="flex items-baseline justify-between gap-3">
+                <p className={fieldLabel}>{t('profile.name_label')}</p>
+                <button type="button" onClick={() => setEditing(true)}
+                  className="-my-3 -mr-2 inline-flex min-h-[44px] items-center px-2 text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                  {t('profile.edit_button')}
+                </button>
+              </div>
               <p className={fieldValue}>{profile?.name}</p>
             </div>
 

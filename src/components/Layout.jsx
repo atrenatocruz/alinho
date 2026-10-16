@@ -1,11 +1,11 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, ClipboardList, LogOut, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
+import { Link, useLocation, useNavigationType } from 'react-router-dom'
+import { Home, Users, Trophy, ClipboardList, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
-import { PrimaryButton, Avatar, AchievementCard } from './ui'
+import { PrimaryButton, Avatar } from './ui'
 import { supabase } from '../lib/supabase'
 import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
@@ -15,12 +15,17 @@ import { describeError } from '../lib/errors'
 import ConfirmPhoneCard from './ConfirmPhoneCard'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
+import { useNoOverlayOpen } from '../lib/useNoOverlayOpen'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
+import LeagueNoticeRow, { LEAGUE_NOTICE_KINDS } from './league/LeagueNoticeRow'
 import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
+import { changesText } from '../lib/mixChanges'
 import AccountDeletionPending from './AccountDeletionPending'
+import AppToast from './AppToast'
+import InstallPrompt from './InstallPrompt'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 
@@ -29,38 +34,24 @@ import AccountDeletionPending from './AccountDeletionPending'
 // ainda houver novidades por marcar como vistas).
 const CELEBRATIONS_CHECKED_KEY = 'celebrationsChecked'
 
-/* Modal de celebração: troféus novos e kudos recebidos desde a última
-   visita (RPC get_unseen_celebrations; "visto" via mark_celebrations_seen).
+// As conquistas novas abrem logo no cartão animado (design-handoff/2026-10-12-
+// conquistas-animadas); só se carrega quando há uma para mostrar.
+const AchievementViewer = lazy(() => import('./achievements/AchievementViewer'))
+
+/* Modal de celebração: kudos recebidos desde a última visita (RPC
+   get_unseen_celebrations; "visto" via mark_celebrations_seen). As
+   conquistas novas já não vêm aqui: abrem antes, no cartão animado
+   (AchievementViewer); esta folha fica só com os kudos, se os houver.
    Fail-soft — qualquer erro e simplesmente não aparece. */
 function CelebrationModal({ items, onClose }) {
   const { t } = useTranslation()
-  const trophies = items.filter((i) => i.kind === 'trophy')
   const kudos = items.filter((i) => i.kind === 'kudos')
-  const shownTrophies = trophies.slice(0, 6)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={onClose}>
       <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-extrabold text-ink-900 text-center mb-1">🎉 {t('layout.celebrations_title')}</h2>
         <p className="text-sm text-muted text-center mb-4">{t('layout.celebrations_subtitle')}</p>
-
-        {trophies.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
-              {t('layout.celebrations_trophies', { count: trophies.length })}
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {shownTrophies.map((tr) => (
-                <AchievementCard key={tr.trophy_key} achievementKey={tr.trophy_key} rarity={tr.rarity} earned />
-              ))}
-            </div>
-            {trophies.length > shownTrophies.length && (
-              <p className="mt-2 text-[11px] text-muted text-center">
-                {t('layout.celebrations_more_trophies', { count: trophies.length - shownTrophies.length })}
-              </p>
-            )}
-          </div>
-        )}
 
         {kudos.length > 0 && (
           <div className="mb-4 space-y-2">
@@ -157,8 +148,7 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 
 export default function Layout({ children }) {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled, isLessonsEnabled } = useAuth()
+  const { profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled, isLessonsEnabled } = useAuth()
   const { t, i18n } = useTranslation()
 
   // Conta com pedido de apagar (Trello #306): em vez da app, o ecrã de
@@ -197,6 +187,27 @@ export default function Layout({ children }) {
       if (data?.length) setCelebrations(data)
     })
   }, [profile?.id])
+
+  // Primeiro as conquistas novas, no cartão animado; ao fechar, os kudos
+  // (se os houver) na folha de sempre. O cartão nunca abre por cima de outra
+  // folha (ex.: a pergunta de fim do mix): espera que não haja nenhuma, e
+  // depois de aberto fica aberto.
+  const newTrophies = celebrations
+    .filter((c) => c.kind === 'trophy')
+    .map((c) => ({ key: c.trophy_key, rarity: c.rarity }))
+  const [trophiesDone, setTrophiesDone] = useState(false)
+  const [trophiesShown, setTrophiesShown] = useState(false)
+  const trophiesPending = newTrophies.length > 0 && !trophiesDone && !needsPhonePrompt
+  const noOverlay = useNoOverlayOpen(trophiesPending && !trophiesShown)
+  useEffect(() => {
+    if (trophiesPending && noOverlay && !trophiesShown) setTrophiesShown(true)
+  }, [trophiesPending, noOverlay, trophiesShown])
+  const kudosPending = celebrations.some((c) => c.kind === 'kudos')
+  const closeTrophies = () => {
+    setTrophiesDone(true)
+    setTrophiesShown(false)
+    if (!kudosPending) closeCelebrations()
+  }
 
   const closeCelebrations = () => {
     setCelebrations([])
@@ -357,6 +368,7 @@ export default function Layout({ children }) {
   const [tournamentNotices, setTournamentNotices] = useState([])
   // Convites para jogos entre amigos (#342): ficam até se responder.
   const [friendNotices, setFriendNotices] = useState([])
+  const [leagueNotices, setLeagueNotices] = useState([])
   // Quem criou conta por causa de um convite por email fica logo com o
   // jogo: junta-se uma vez por sessão do browser (Dev 3, #342).
   useEffect(() => {
@@ -372,6 +384,7 @@ export default function Layout({ children }) {
       setLessonNotices([])
       setTournamentNotices([])
       setFriendNotices([])
+      setLeagueNotices([])
       return
     }
     let cancelled = false
@@ -382,6 +395,7 @@ export default function Layout({ children }) {
         setLessonNotices(isLessonsEnabled ? data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)) : [])
         setTournamentNotices(data.filter((n) => TOURNAMENT_NOTICE_KINDS.includes(n.kind)))
         setFriendNotices(data.filter((n) => FRIEND_NOTICE_KINDS.includes(n.kind)))
+        setLeagueNotices(data.filter((n) => LEAGUE_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {
@@ -416,6 +430,12 @@ export default function Layout({ children }) {
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
+  const openLeagueNotice = (notice) => {
+    setShowNotifications(false)
+    setLeagueNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
   const openTournamentNotice = (notice) => {
     setShowNotifications(false)
     setTournamentNotices((list) => list.filter((n) => n.id !== notice.id))
@@ -426,9 +446,11 @@ export default function Layout({ children }) {
   // o «<Nome> não vai», «cancelou» e «apagou» são só para saber: tocar-lhes
   // tira-os, como os outros avisos. Antes ficavam lá para sempre (Francisco,
   // 28 set).
-  const openFriendNotice = (notice) => {
+  // `keep`: só abre o jogo, sem tirar o aviso (o resultado enviado tem
+  // «Está certo / Não está certo», que é o que o tira).
+  const openFriendNotice = (notice, { keep = false } = {}) => {
     setShowNotifications(false)
-    if (notice.kind === 'friend_match_invite') return
+    if (notice.kind === 'friend_match_invite' || keep) return
     setFriendNotices((list) => list.filter((n) => n.id !== notice.id))
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
@@ -444,8 +466,22 @@ export default function Layout({ children }) {
     if (notice.kind === 'mix_join_request') return t('layout.mix_join_request', vars)
     if (notice.kind === 'mix_request_accepted') return t(d.status === 'waitlisted' ? 'layout.mix_request_accepted_waitlist' : 'layout.mix_request_accepted', vars)
     if (notice.kind === 'mix_request_declined') return t('layout.mix_request_declined', vars)
-    if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
+    // Tirado por quem organiza (o aviso guarda o nome dele): diz-se quem tirou,
+    // e não «Saíste» (UX, 8 out).
+    if (notice.kind === 'mix_removed') return t(d.actor_name ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
+    // «O Mix de terça de 27 out mudou: preço 10,00 €, formato Sobe e desce.»
+    if (notice.kind === 'mix_changed') return t('layout.mix_changed', { ...vars, changes: changesText(t, d.changes, i18n.language) })
+    // #622 (Dev 3, migration_mix_aviso_terminou.sql): «🏆 <Evento> terminou.
+    // Ganharam <vencedores>.» — sem vencedores com nome, só «terminou».
+    if (notice.kind === 'mix_finished') {
+      // Um nome só (americano): «Ganhou»; dupla ou empate: «Ganharam». Sem
+      // o ponto a mais quando o nome já acaba em «.» («X..», QA 11 out).
+      const winners = String(d.winners || '').replace(/\.+$/, '')
+      if (!winners) return t('layout.mix_finished_plain', vars)
+      const many = /\s\/\s|\se\s|\sand\s|,/.test(winners)
+      return t(many ? 'layout.mix_finished' : 'layout.mix_finished_one', { ...vars, winners })
+    }
     if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind)) {
       return t(`layout.${notice.kind}`, vars)
     }
@@ -460,7 +496,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length + leagueNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -543,11 +579,6 @@ export default function Layout({ children }) {
     }
   }, [locationKey, navigationType])
 
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
-
   // Guests only see Jogos + Perfil
   // `icon` is omitted for Perfil — the render loop always shows the real
   // Avatar there instead of an icon (see isPerfil below).
@@ -570,7 +601,8 @@ export default function Layout({ children }) {
     navItems.push({ path: '/gerir', icon: ClipboardList, label: t('layout.nav_manage') })
   }
 
-  // Notificações + logout — só o que sobra do antigo header escuro (o
+  // Notificações — só o que sobra do antigo header escuro (o «Sair» passou
+  // para o fim do Perfil a 13 out; o
   // logótipo, o nível e a ajuda saíram de vez). Definidos aqui porque é onde
   // vive toda a lógica (pedidos, convites…), mas mostrados dentro do título
   // fixo de cada página principal via HeaderActionsContext — já não há uma
@@ -608,14 +640,49 @@ export default function Layout({ children }) {
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                  {/* Os convites para jogos entre amigos por responder ficam
+                      sempre em cima (convite-amigos-na-home, 12 out). */}
+                  {friendNotices.filter((n) => n.kind === 'friend_match_invite').map((notice) => (
+                    <FriendInviteRow key={notice.id} notice={notice} onOpen={openFriendNotice} />
+                  ))}
+                  {/* Os convites do modelo antigo seguem a mesma regra (UX, 12 out). */}
+                  {privateMatchTodos.filter((x) => x.kind === 'respond').map(({ kind, match }) => (
+                    <Link
+                      key={`${kind}-${match.id}`}
+                      to={match.session_id ? `/jogos-privados/sessao/${match.session_id}` : '/jogos-privados'}
+                      onClick={() => setShowNotifications(false)}
+                      className="flex items-center gap-3 bg-lime-400/15 px-4 py-3 transition-colors duration-fast hover:bg-lime-400/25"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-lime-400/20 text-ink-900 flex items-center justify-center shrink-0">
+                        <Swords size={16} />
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        {kind === 'respond' ? (
+                          <>
+                            <span className="font-extrabold">{match.team_a_player1_name || t('layout.someone')}</span>{' '}
+                            {t('layout.private_match_invited')}
+                          </>
+                        ) : (
+                          <>
+                            {t('layout.private_match_confirm_score')}{' '}
+                            <span className="font-extrabold tabular-nums">{match.score_a}-{match.score_b}</span>
+                          </>
+                        )}
+                      </p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
+                  ))}
                   {lessonNotices.map((notice) => (
                     <LessonNoticeRow key={notice.id} notice={notice} onOpen={openLessonNotice} />
                   ))}
                   {tournamentNotices.map((notice) => (
                     <TournamentNoticeRow key={notice.id} notice={notice} onOpen={openTournamentNotice} />
                   ))}
-                  {friendNotices.map((notice) => (
+                  {friendNotices.filter((n) => n.kind !== 'friend_match_invite').map((notice) => (
                     <FriendInviteRow key={notice.id} notice={notice} onOpen={openFriendNotice} />
+                  ))}
+                  {leagueNotices.map((notice) => (
+                    <LeagueNoticeRow key={notice.id} notice={notice} onOpen={openLeagueNotice} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link
@@ -624,7 +691,7 @@ export default function Layout({ children }) {
                       onClick={() => setShowNotifications(false)}
                       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                     >
-                      <div className="w-9 h-9 rounded-full bg-[#E9E7FB] text-[#4338A8] flex items-center justify-center shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-kind-tournament-light text-kind-tournament-dark flex items-center justify-center shrink-0">
                         <Trophy size={16} />
                       </div>
                       <p className="flex-1 min-w-0 text-sm text-ink-900">
@@ -648,7 +715,7 @@ export default function Layout({ children }) {
                       <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
                     </Link>
                   ))}
-                  {privateMatchTodos.map(({ kind, match }) => (
+                  {privateMatchTodos.filter((x) => x.kind !== 'respond').map(({ kind, match }) => (
                     <Link
                       key={`${kind}-${match.id}`}
                       to={match.session_id ? `/jogos-privados/sessao/${match.session_id}` : '/jogos-privados'}
@@ -756,13 +823,6 @@ export default function Layout({ children }) {
           document.body
         )}
       </div>
-      <button
-        onClick={handleSignOut}
-        title={t('layout.sign_out')}
-        className="w-10 h-10 flex items-center justify-center rounded-full text-ink-700 hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
-      >
-        <LogOut size={20} />
-      </button>
     </>
   )
 
@@ -784,14 +844,21 @@ export default function Layout({ children }) {
     // there's no document-level momentum scroll left to detach it from.
     // --app-h: no site de testes a faixa «Ambiente de testes» fica por cima e
     // o ecrã da app encolhe à medida (index.css, #585).
-    <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: 'var(--app-h, 100dvh)' }}>
+    // Fundo cinzento-claro das páginas da app, com os cartões em branco (R12, 13 out).
+    <div className="relative flex flex-col h-screen bg-ground overflow-hidden" style={{ height: 'var(--app-h, 100dvh)' }}>
       {/* Main — the only scrolling region in the shell (see the app-shell
           comment above the root div). pb-28 keeps the last bit of content
           from hiding behind the nav overlay below. No dark header above it
           any more — each main page (Home, Comunidade, Rankings, Gerir,
           Perfil) shows notifications/logout in its own sticky title
           (PageHeader in components/ui.jsx), read via HeaderActionsContext. */}
-      <main ref={mainRef} className="flex-1 overflow-y-auto">
+      <AppToast />
+      <InstallPrompt />
+      {/* scrollbar-gutter dos dois lados: no computador a barra de deslizar
+          ocupava só a direita e a coluna ficava descentrada na janela (10 px
+          de um lado, 54 do outro — Francisco, 15 out). No telemóvel a barra
+          não ocupa espaço e nada muda. */}
+      <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
         {/* O espaço reservado no fim tem de crescer com a barra (Trello #407).
             A nav acrescenta env(safe-area-inset-bottom) ao seu próprio fundo —
             no iPhone com barra de gestos são ~34px — e o pb-28 fixo (7rem)
@@ -818,9 +885,11 @@ export default function Layout({ children }) {
         className="app-nav absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
+        {/* A ilha ocupa a largura do ecrã (até ~480 px num ecrã largo), e os
+            cinco botões repartem o espaço por igual (Francisco, 13 out —
+            design-handoff/2026-10-13-menu-largura-toda). */}
         <div
-          className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
-                        max-w-full overflow-x-auto no-scrollbar
+          className="pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10"
@@ -844,11 +913,11 @@ export default function Layout({ children }) {
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={label}
-                className={`relative flex flex-col items-center justify-center h-11 rounded-full shrink-0
-                            transition-all duration-base ${
+                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center h-11 rounded-full
+                            transition-colors duration-base ${
                   isActive
-                    ? 'bg-white/15 text-lime-400 w-[92px]'
-                    : 'text-ink-200 hover:text-white w-11'
+                    ? 'bg-white/15 text-lime-400'
+                    : 'text-ink-200 hover:text-white'
                 }`}
               >
                 {isGerir && joinRequestsTotal > 0 && (
@@ -911,7 +980,12 @@ export default function Layout({ children }) {
 
       {/* Celebrações depois do phone-prompt na ordem de render — só uma
           aparece de cada vez na prática (o phone-prompt é dispensável). */}
-      {celebrations.length > 0 && !needsPhonePrompt && (
+      {trophiesShown && !trophiesDone && (
+        <Suspense fallback={null}>
+          <AchievementViewer items={newTrophies} onClose={closeTrophies} />
+        </Suspense>
+      )}
+      {kudosPending && !needsPhonePrompt && (newTrophies.length === 0 || trophiesDone) && (
         <CelebrationModal items={celebrations} onClose={closeCelebrations} />
       )}
     </div>

@@ -196,6 +196,27 @@ describe('generateAmericanoSchedule', () => {
     }
   })
 
+  it('regra dos 4 mixes (12 out): em todas as rondas evita quem já foi dupla, havendo outra forma', () => {
+    const k = (a, b) => [a, b].sort().join('|')
+    // Os 1+2, 1+3 e 5+6 jogaram juntos há pouco.
+    const historyPairs = new Set([k(1, 2), k(1, 3), k(5, 6)])
+    const schedule = generateAmericanoSchedule(eightPlayers, 2, 4, {}, { historyPairs })
+    for (const round of schedule) {
+      for (const m of round) {
+        for (const d of [m.duplaA, m.duplaB]) expect(historyPairs.has(k(d.player1.id, d.player2.id))).toBe(false)
+      }
+    }
+    expect(schedule.forcedHistory).toEqual([])
+  })
+
+  it('regra dos 4 mixes: com 4 pessoas que já foram todas dupla, junta na mesma e diz quais', () => {
+    const k = (a, b) => [a, b].sort().join('|')
+    const all = new Set([k(1, 2), k(1, 3), k(1, 4), k(2, 3), k(2, 4), k(3, 4)])
+    const schedule = generateAmericanoSchedule(fourPlayers, 1, 1, {}, { historyPairs: all })
+    expect(schedule).toHaveLength(1)
+    expect(schedule.forcedHistory.length).toBe(2)
+  })
+
   it('assigns court numbers 1..numCourts within each round', () => {
     const schedule = generateAmericanoSchedule(eightPlayers, 2, 1, {})
     expect(schedule[0].map(m => m.court_number).sort()).toEqual([1, 2])
@@ -280,6 +301,27 @@ describe('americanoStandings', () => {
     expect(byId.p4.points).toBe(30) // 10 (round 1, with p3) + 20 (round 2, with p2)
     expect(byId.p4.wins).toBe(1)
     expect(result.map((r) => r.player.id)).toEqual(['p2', 'p1', 'p4', 'p3'])
+  })
+
+  it('breaks a points tie on the points difference, not on wins (Francisco, 8 out)', () => {
+    const teams = [teamAB, teamCD, teamAC, teamBD]
+    const matches = [
+      // p1: 21 (diff +11); p2: 21 (+11); p3: 10 (-11); p4: 10 (-11)
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: 21, score_b: 10, winner_team_id: 't-ab' },
+      // p1: +15 (diff -4) → 36, +7; p3: +15 → 25; p2: +19 (diff +4) → 40; p4: +19 → 29
+      { team_a_id: 't-ac', team_b_id: 't-bd', score_a: 15, score_b: 19, winner_team_id: 't-bd' },
+    ]
+    const result = americanoStandings(matches, teams)
+    const byId = Object.fromEntries(result.map((r) => [r.player.id, r]))
+    expect(byId.p1.diff).toBe(7)
+    expect(byId.p2.diff).toBe(15)
+    const tie2 = americanoStandings([
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: 12, score_b: 10, winner_team_id: 't-ab' },
+      { team_a_id: 't-ac', team_b_id: 't-bd', score_a: 10, score_b: 12, winner_team_id: 't-bd' },
+    ], teams)
+    // p1: 22 (diff 0, 1 win); p2: 24 (+4); p3: 20 (-4); p4: 22 (diff 0, 1 win) — p1 and p4 fully tied
+    expect(tie2[0].player.id).toBe('p2')
+    expect(tie2.slice(1, 3).map((r) => r.points)).toEqual([22, 22])
   })
 
   it('ignores matches with no winner_team_id yet', () => {
@@ -522,6 +564,71 @@ describe('nextSobeDesceRotating', () => {
         }
       }
     }
+  })
+
+  // Pares quebrados (12 out): no campo 1 da ronda 2 ficam a, b, e, f; sem
+  // repetir parceiro deste mix há duas formas: a+e/b+f ou a+f/b+e.
+  const pairsOf = (court) => [court.duplaA, court.duplaB].map(([x, y]) => key(x.id, y.id)).sort()
+
+  it('regra dos 4 mixes (12 out): evita quem já foi dupla, havendo outra forma', () => {
+    for (const r of [0.05, 0.5, 0.95]) {
+      const [c1] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: () => r, historyPairs: new Set([key('a', 'e')]) })
+      expect(pairsOf(c1)).toEqual([key('a', 'f'), key('b', 'e')].sort())
+      expect(c1.forcedHistory).toBe(false)
+    }
+  })
+
+  it('regra dos 4 mixes: sem outra forma, junta na mesma e marca o campo', () => {
+    const [c1] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: () => 0.1,
+      historyPairs: new Set([key('a', 'e'), key('a', 'f')]) })
+    expect(c1.forcedHistory).toBe(true)
+  })
+
+  it('respeitar os lados (12 out): junta esquerda com direita, sempre que dá', () => {
+    const side = (id, s) => ({ id, name: id, preferred_side: s })
+    const sided = {
+      t1: { id: 't1', player1: side('a', 'left'), player2: side('b', 'right') },
+      t2: { id: 't2', player1: side('c', 'left'), player2: side('d', 'right') },
+      t3: { id: 't3', player1: side('e', 'left'), player2: side('f', 'right') },
+      t4: { id: 't4', player1: side('g', 'both'), player2: side('h', null) },
+    }
+    for (const r of [0.05, 0.5, 0.95]) {
+      const [c1, c2] = nextSobeDesceRotating(round1, sided, 2, { partnerPairs: playedPairs, random: () => r, respectSides: true })
+      // a e e são da esquerda: nunca juntos.
+      expect(pairsOf(c1)).toEqual([key('a', 'f'), key('b', 'e')].sort())
+      // Campo 2: c (esq.), d (dir.), g («os dois»), h (sem lado) — qualquer forma serve.
+      expect(pairsOf(c2).length).toBe(2)
+    }
+    // Sem o interruptor, os lados não contam: as duas formas aparecem.
+    const vistas = new Set()
+    for (const r of [0.05, 0.3, 0.55, 0.8, 0.95]) {
+      vistas.add(pairsOf(nextSobeDesceRotating(round1, sided, 2, { partnerPairs: playedPairs, random: () => r })[0]).join(','))
+    }
+    expect(vistas.size).toBe(2)
+  })
+
+  it('a regra dos 4 mixes vem antes dos lados', () => {
+    const side = (id, s) => ({ id, name: id, preferred_side: s })
+    const sided = { ...teams, t1: { id: 't1', player1: side('a', 'left'), player2: side('b', 'right') },
+      t3: { id: 't3', player1: side('e', 'left'), player2: side('f', 'right') } }
+    // a+f e b+e foram dupla há pouco: fica a+e/b+f, mesmo com os lados a chocar.
+    const [c1] = nextSobeDesceRotating(round1, sided, 2, { partnerPairs: playedPairs, random: () => 0.5, respectSides: true,
+      historyPairs: new Set([key('a', 'f'), key('b', 'e')]) })
+    expect(pairsOf(c1)).toEqual([key('a', 'e'), key('b', 'f')].sort())
+  })
+
+  it('sem forma nova, os lados contam na mesma; empatadas, a da posição (QA, 13 out)', () => {
+    const side = (id, s) => ({ id, name: id, preferred_side: s })
+    const sided = { ...teams, t1: { id: 't1', player1: side('a', 'left'), player2: side('b', 'left') },
+      t3: { id: 't3', player1: side('e', 'right'), player2: side('f', 'right') } }
+    const all = new Set(['a', 'b', 'e', 'f'].flatMap((x, i, l) => l.slice(i + 1).map((y) => key(x, y))))
+    const rank = { a: 0, b: 1, e: 2, f: 3 }
+    const opts = { partnerPairs: all, rankOf: (p) => rank[p.id] ?? 9, random: () => 0.5 }
+    // Pela posição seria a+b / e+f — os dois pares chocam de lado.
+    expect(pairsOf(nextSobeDesceRotating(round1, sided, 2, opts)[0])).toEqual([key('a', 'b'), key('e', 'f')].sort())
+    const c1 = pairsOf(nextSobeDesceRotating(round1, sided, 2, { ...opts, respectSides: true })[0])
+    expect(c1).not.toContain(key('a', 'b'))
+    expect(c1).not.toContain(key('e', 'f'))
   })
 
   it('escolhe ao sorte entre as formas sem repetição', () => {

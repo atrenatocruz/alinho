@@ -114,7 +114,11 @@ const TOURNAMENT = () => {
     // mockTournamentScoring = 'melhor_2_sets' | 'melhor_3_sets' para ver o
     // ecrã do marcador a pedir os sets um a um.
     // mockTTieBreak = 'super_tiebreak': o 8-8 decide-se no super tie-break a 10.
-    rules: { scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockTTieBreak') || 'tiebreak' },
+    // mockTShirt = 'sale' | 'gift': t-shirts do torneio (SPEC t-shirts, 8 out).
+    rules: {
+      scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockTTieBreak') || 'tiebreak',
+      ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
+    },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
     // localhost não há Storage: carregar um cartaz a sério precisa de
     // sessão verdadeira.
@@ -330,14 +334,22 @@ export const TOURNAMENT_RPC_MOCKS = {
       // localStorage.mockTMyGamesReal = 'true' (+ mockTDraw): sou a dupla e1
       // do M4 e «Os meus jogos» lê as vistas, como em produção (Trello #508).
       ...(myGamesReal()
-        ? { my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
-            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }],
+        // mockTMyState = 'por_validar' …: o estado da minha inscrição.
+        ? { my: { category_id: 'cat-m4', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1' },
+            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1', tshirt: localStorage.getItem('mockTShirt') ? 'L' : null, ...(localStorage.getItem('mockTShirtGuest') ? { guest_name: 'João Ferreira', guest_tshirt: 'M' } : {}) }],
             my_matches: [] }
         // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
         // inscrito — sem «Os meus jogos» (separadores, 28 set).
         : localStorage.getItem('mockTNotEntered') === 'true' ? { my: null, my_entries: [], my_matches: [] }
         : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
             my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),
+      // localStorage.mockTClashMine = 'true': estou no M4 e no MX4, que
+      // começam os dois sábado às 12:00 (categorias que chocam, 9 out).
+      ...(localStorage.getItem('mockTClashMine') === 'true' ? {
+        my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
+        my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }, { category_id: 'cat-mx4', status: 'validada', state: 'validada', entry_id: 'm5-3' }],
+        my_matches: [],
+      } : {}),
     }
   },
 }
@@ -701,7 +713,30 @@ export const TOURNAMENT_GROUPS_DONE_TABLE_MOCKS = {
 // localStorage.mockTPromoted = 'true': dois avisos no sino — um já dentro,
 // outro à espera que o parceiro aceite.
 const promotedRead = new Set()
+// localStorage.mockTShirt = 'sale' | 'gift' — as t-shirts (SPEC t-shirts, 8
+// out): tamanhos na lista de quem organiza, a contagem e a lista por pessoa.
+const shirtOn = () => !!localStorage.getItem('mockTShirt')
+const SHIRT_SIZES = ['L', 'M', 'S', null, 'XL', 'none', 'M', 'L', 'XS', 'M', 'L', 'XXL', null, 'S', 'M', 'L']
+// Uma linha por pessoa, com as categorias juntas (uma t-shirt por pessoa,
+// 11 out; Dev 3: category_codes[], entry_ids[], slots[]).
+const SHIRT_PEOPLE = () => [
+  ['Ana Moreira', ['F4', 'MX4'], 'S'], ['Carla Nunes', ['F3'], 'M'], ['Inês Rocha', ['MX4'], 'none'], ['João Ferreira', ['M4'], 'M'],
+  ['Marta Costa', ['M4', 'MX4'], 'S'], ['Nuno Alves', ['M5'], null], ['Pedro Lima', ['M5'], 'XL'], ['Rui Oliveira Gomes', ['M3', 'M4', 'M5'], 'L'], ['Tiago Ferreira', ['M4'], 'M'],
+].map(([name, category_codes, size], i) => ({ user_id: `u-sp-${i}`, name, category_codes, entry_ids: category_codes.map((c, k) => `sp-${i}-${k}`), slots: category_codes.map(() => 1), size }))
 export const TOURNAMENT_PROMOTED_RPC_MOCKS = {
+  list_tournament_entries: (params, before) => (shirtOn() && before
+    ? (before(params) || []).map((e, i) => ({ ...e, player1_tshirt: SHIRT_SIZES[(2 * i) % SHIRT_SIZES.length], player2_tshirt: SHIRT_SIZES[(2 * i + 1) % SHIRT_SIZES.length] }))
+    : undefined),
+  tournament_tshirt_counts: () => (shirtOn() ? [{ sizes: [{ size: 'XS', count: 1 }, { size: 'S', count: 4 }, { size: 'M', count: 9 }, { size: 'L', count: 11 }, { size: 'XL', count: 5 }, { size: 'XXL', count: 1 }], requested: 31, declined: 6, pending: 3 }] : undefined),
+  tournament_tshirt_people: () => (shirtOn() ? SHIRT_PEOPLE() : undefined),
+  admin_set_tournament_tshirt: () => (shirtOn() ? null : undefined),
+  // mockTShirtMine = 'L': já tenho t-shirt neste torneio (o convite não pergunta).
+  list_my_tournament_invites: (params, before) => (shirtOn() && localStorage.getItem('mockTShirtMine') && before
+    ? (before(params) || []).map((i) => ({ ...i, my_tshirt: localStorage.getItem('mockTShirtMine') })) : undefined),
+  // O parceiro escolhido já tem t-shirt (mockTShirtPartner = 'M' | 'chosen').
+  tournament_player_tshirt: () => (shirtOn() && localStorage.getItem('mockTShirtPartner')
+    ? { chosen: true, size: localStorage.getItem('mockTShirtPartner') === 'chosen' ? null : localStorage.getItem('mockTShirtPartner') } : shirtOn() ? { chosen: false, size: null } : undefined),
+  set_my_tournament_tshirt: () => (shirtOn() ? null : undefined),
   mark_notifications_read: (params) => {
     if (localStorage.getItem('mockTPromoted') !== 'true') return undefined
     for (const id of params?.p_ids || []) promotedRead.add(id)
@@ -725,10 +760,34 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
       // As inscrições fecharam sozinhas no fim do prazo (6 out).
       { id: 'tp6', kind: 'tournament_entries_closed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, entry_count: 84 } },
+      // Com duplas por validar (pending_count, Dev 3, 11 out).
+      { id: 'tp7', kind: 'tournament_entries_closed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, entry_count: 80, pending_count: 4 } },
       { id: 'tp3', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m5', category_code: 'M5', category_name: 'Masculinos 5', prize_first: '200 € + troféu', prize_second: '80 €' } },
       { id: 'tp4', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m4', category_code: 'M4', category_name: 'Masculinos 4', prize_first: '150 €', prize_second: null } },
+      // A hora de uma categoria mudou com inscritos (13 out): a mesma hora
+      // noutro dia, e outra hora no mesmo dia.
+      { id: 'tt1', kind: 'tournament_category_time_changed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, category_code: 'M4', old_day: '2026-10-17', old_time: '12:00:00', new_day: '2026-10-17', new_time: '14:00:00' } },
+      { id: 'tt2', kind: 'tournament_category_time_changed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, category_code: 'MX4', old_day: '2026-10-16', old_time: '18:00:00', new_day: '2026-10-17', new_time: '10:00:00' } },
+      // Saiu o sorteio e a categoria terminou (14 out): com hora e campo,
+      // sem hora; campeões, 2.º lugar, e fora do pódio.
+      { id: 'td1', kind: 'tournament_drawn', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'M4', first_match_at: '2026-10-17T09:00:00.000Z', court_name: 'Campo 2' } },
+      { id: 'td2', kind: 'tournament_drawn', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', first_match_at: null, court_name: null } },
+      { id: 'tf1', kind: 'tournament_finished', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'M4', final_position: 1, champion_name: 'Rui Mendes / Tu', entry_name: 'Rui Mendes / Tu' } },
+      { id: 'tf2', kind: 'tournament_finished', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', final_position: 2, champion_name: 'Ana Costa / Pedro Lima', entry_name: 'Tu / Rita Sousa' } },
+      { id: 'tf3', kind: 'tournament_finished', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'M5', final_position: null, champion_name: 'Os Lobos', entry_name: 'Tu / João Reis' } },
+      // Voltou a rascunho com inscritos (13 out): «retirado».
+      { id: 'tu1', kind: 'tournament_unpublished', game_id: null, created_at: new Date().toISOString(), data: { ...base } },
+      // Categorias que chocam (9 out): os três avisos novos.
+      ...(localStorage.getItem('mockTClash') === 'true' ? [
+        { id: 'tc1', kind: 'tournament_removed_clash', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', kept_code: 'M4' } },
+        { id: 'tc2', kind: 'tournament_partner_removed', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', removed_name: 'Rui Mendes' } },
+        { id: 'tc3', kind: 'tournament_clash', game_id: null, created_at: new Date().toISOString(), data: { ...base, code_a: 'M4', code_b: 'MX4', at_a: '2026-10-10T13:00:00.000Z', at_b: '2026-10-10T13:30:00.000Z' } },
+      ] : []),
       ...((before && before(url)) || []),
     ].filter((n) => !promotedRead.has(n.id))
   },

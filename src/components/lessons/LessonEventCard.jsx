@@ -2,13 +2,15 @@
 // prints 03 (1.º), 04 e 07 (3.º) de design-handoff/2026-09-18-aulas-com-
 // treinadores. Mesmas regras de cor dos outros cartões: o tipo (turquesa)
 // pinta o cartão; o estado é uma pastilha; contorno verde só quando inscrito.
+// R1 (13 out): a moldura comum dos cartões da Home (faixa verde das aulas do
+// R0, a hora e os lugares); o corpo é o de sempre.
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Clock, GraduationCap, Repeat } from 'lucide-react'
-import { OrgHeader, Owner, StateTag } from '../agenda/EventCard'
+import { Owner, CardClub } from '../agenda/EventCard'
+import HomeCard, { BandPill, CardTitle, kindColorsOf } from '../agenda/HomeCard'
 import { ConfirmSheet } from '../ui'
-import { LevelPill, TEAL, TealTag, bandLabel, euros, hhmm, lessonTypeLabel } from './LessonBits'
+import { LevelPill, TEAL, bandLabel, euros, hhmm, lessonTypeLabel } from './LessonBits'
 
 // «qua 30/9 · 11:00–12:00» — a mesma forma do pedir aula.
 const whenLine = (t, iso, minutes) => {
@@ -49,23 +51,17 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
     : l.form === 'trial' ? t('lessons.form_trial')
       : l.form === 'free_invite' ? t('lessons.form_free_invite')
         : lessonTypeLabel(t, l.lesson_type)
+  const label = [typeLabel, isSeries && !cancelled ? t(`lessons.wd_plural_${((event.startsAt.getDay() + 6) % 7) + 1}`) : null].filter(Boolean).join(' · ')
 
   let state = null
-  if (cancelled) state = <span className="rounded-full bg-[#FBE3E3] px-2 py-1 text-[11px] font-extrabold text-danger">{t('lessons.state_cancelled')}</span>
-  else if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
-  else if (l.status === 'deciding') state = <StateTag tone="invited">{t('lessons.state_deciding')}</StateTag>
-  else if (event.myState === 'in') state = <StateTag tone="in" icon={CheckCircle2}>{t('lessons.state_enrolled')}</StateTag>
-  else if (event.myState === 'not_going') state = <StateTag tone="grey">{t('lessons.state_not_going')}</StateTag>
-  else if (needsYou) state = <span className="rounded-full border border-[#FCD34D] bg-[#FEF3C7] px-2 py-1 text-[11px] font-extrabold text-[#78350F]">{t('lessons.needs_you')}</span>
-  else if (event.myState === 'requested') state = <StateTag tone="grey" icon={Clock}>{t('lessons.state_requested')}</StateTag>
-  else if (event.myState === 'invited') state = <StateTag tone="invited">{t('lessons.state_invited')}</StateTag>
-
-  const frame = past || event.finished
-    ? 'bg-surface border border-line'
-    : event.myState === 'in' ? 'border-2 border-ok'
-      : event.myState === 'requested' ? 'border-[1.5px] border-dashed border-ink-500'
-        : 'border'
-  const frameStyle = past || event.finished ? undefined : { background: TEAL.bg, borderColor: event.myState === 'in' || event.myState === 'requested' ? undefined : TEAL.border }
+  if (cancelled) state = <span className="whitespace-nowrap rounded-full bg-[#FBE3E3] px-[9px] py-1 font-display text-[11px] font-bold normal-case leading-none tracking-normal text-danger">{t('lessons.state_cancelled')}</span>
+  else if (past || event.finished) state = <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>
+  else if (l.status === 'deciding') state = <BandPill tone="dark">{t('lessons.state_deciding')}</BandPill>
+  else if (event.myState === 'in') state = <BandPill>✓ {t('lessons.state_enrolled')}</BandPill>
+  else if (event.myState === 'not_going') state = <BandPill tone="dark">{t('lessons.state_not_going')}</BandPill>
+  else if (needsYou) state = <span className="whitespace-nowrap rounded-full bg-[#FEF3C7] px-[9px] py-1 font-display text-[11px] font-bold normal-case leading-none tracking-normal text-[#78350F]">{t('lessons.needs_you')}</span>
+  else if (event.myState === 'requested') state = <BandPill tone="dark">{t('lessons.state_requested')}</BandPill>
+  else if (event.myState === 'invited') state = <BandPill tone="dark">{t('lessons.state_invited')}</BandPill>
 
   const title = cancelled
     ? t(`lessons.no_lesson_wd_${((event.startsAt.getDay() + 6) % 7) + 1}`)
@@ -86,22 +82,13 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-card p-3.5 press ${frame}`} style={frameStyle}>
-      <Link to={isRequest ? `/professor/${base.teacher_profile_id}/pedir` : `/aula/${l.lesson_id}`} className="absolute inset-0" aria-label={title} />
-      {/* O estado ao canto, com quem organiza (Francisco, 30 set: «em todos»). */}
-      <OrgHeader event={event} past={past} right={state} />
-      <div className="flex items-start justify-between gap-2">
-        <span className="flex flex-wrap gap-1">
-          <TealTag icon={GraduationCap}>{typeLabel}</TealTag>
-          {isSeries && !cancelled && <TealTag icon={Repeat}>{t(`lessons.wd_plural_${((event.startsAt.getDay() + 6) % 7) + 1}`)}</TealTag>}
-        </span>
-        {!event.orgName && state}
-      </div>
-
-      <p className={`font-display text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
-        {hhmm(l.starts_at)}<span className="text-sm font-bold text-ink-500">–{hhmm(l.ends_at)}</span>
-      </p>
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{title}</h3>
+    <HomeCard colors={kindColorsOf('lesson')} label={label} pill={state} time={hhmm(l.starts_at)}
+      timeAside={t('homecard.until', { time: hhmm(l.ends_at) })}
+      count={!cancelled && l.capacity ? { n: l.taken, of: l.capacity, unit: t('homecard.unit_pupils') } : null}
+      mine={event.myState === 'in'} past={past || event.finished}
+      to={isRequest ? `/professor/${base.teacher_profile_id}/pedir` : `/aula/${l.lesson_id}`} ariaLabel={title}>
+      {event.orgName && <CardClub event={event} past={past} />}
+      <CardTitle past={past}>{title}</CardTitle>
 
       {cancelled ? (
         <p className="text-[13px] text-ink-700 mt-1">{t('lessons.cancel_line', { name: l.teacher_name, reason: t(`lessons.reason_${l.cancel_reason || 'other'}`).toLowerCase() })}{l.cancel_note ? ` ${l.cancel_note}` : ''}</p>
@@ -136,17 +123,20 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
           {l.avg_rating != null && event.myState !== 'not_going' && <LevelPill label={bandLabel(l.avg_rating, l.avg_gender)} />}
           {/* «Cancelar pedido» (desenho de 18 set), com a pergunta da janela de baixo. */}
           {/* «Mudar» (AUDITORIA, ponto 7): os passos do «Marcar aula», já preenchidos. */}
+          {/* «Mudar» e «Cancelar pedido» nunca lado a lado (regra de 6 out; PO,
+              12 out): «Mudar» a toda a largura, «Cancelar pedido» numa linha
+              de texto por baixo. */}
           {onCancelRequest && !needsYou && (
-            <button type="button" onClick={() => navigate(`/professor/${base.teacher_profile_id}/pedir?mudar=${base.request_id}`)}
-              className="relative ml-auto rounded-full border border-ink-900 bg-white px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50">
-              {t('lessons.change_request')}
-            </button>
-          )}
-          {onCancelRequest && !needsYou && (
-            <button type="button" disabled={busy} onClick={() => setAsking(true)}
-              className="relative rounded-full border border-ink-900 bg-white px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50 disabled:opacity-40">
-              {t('lessons.cancel_request')}
-            </button>
+            <div className="relative w-full">
+              <button type="button" onClick={() => navigate(`/professor/${base.teacher_profile_id}/pedir?mudar=${base.request_id}`)}
+                className="w-full min-h-[44px] rounded-ctrl border-[1.5px] border-ink-900 bg-white px-4 text-sm font-extrabold text-ink-900 hover:bg-ink-50">
+                {t('lessons.change_request')}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setAsking(true)}
+                className="mt-1 w-full min-h-[40px] text-sm font-extrabold text-ink-700 hover:text-ink-900 disabled:opacity-40">
+                {t('lessons.cancel_request')}
+              </button>
+            </div>
           )}
           {onAttendance && !past && (event.myState === 'in' || event.myState === 'not_going') && (
             <button type="button" disabled={busy} onClick={() => onAttendance(event.myState === 'not_going')}
@@ -168,6 +158,6 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
           onClose={() => setAsking(false)}
         />
       )}
-    </div>
+    </HomeCard>
   )
 }

@@ -26,6 +26,9 @@ import { isThirdPlace } from './matchPath'
 import MatchCard from './MatchCard'
 import MatchSheet from './MatchSheet'
 import { footOf } from './BracketTree'
+import { StickyDays } from './StickyBar'
+import { listTournamentClashes } from '../../lib/tournamentApi'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 /** «Sáb 10 out» — o dia no filtro. */
 function dayChip(date, locale) {
@@ -61,7 +64,7 @@ function useNow() {
   return now
 }
 
-export default function CalendarPanel({ category, myEntries }) {
+export default function CalendarPanel({ category, myEntries, tournament, isAdmin = false , emptyPose }) {
   const { t, i18n } = useTranslation()
   const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
   const now = useNow()
@@ -71,9 +74,26 @@ export default function CalendarPanel({ category, myEntries }) {
   const present = TREE_ROUNDS.filter((r) => matches.some((m) => !m.group_id && m.round === r))
   const myIds = (myEntries || []).filter((e) => e.category_id === category?.id).map((e) => e.entry_id).filter(Boolean)
   const days = useMemo(() => byDayAndTime(matches), [matches])
+  // Categorias que chocam, depois do sorteio (9 out): quem organiza vê a
+  // amarelo os dois jogos de quem tem jogos quase à mesma hora.
+  const [clashes, setClashes] = useState([])
+  useEffect(() => {
+    if (!isAdmin || !tournament?.id) return undefined
+    let cancelled = false
+    listTournamentClashes(tournament.id)
+      .then((r) => { if (!cancelled) setClashes((r || []).filter((c) => c.kind === 'match_overlap')) })
+      .catch(() => { if (!cancelled) setClashes([]) })
+    return () => { cancelled = true }
+  }, [isAdmin, tournament?.id])
+  const warnOf = (m) => {
+    const at = m.scheduled_at ? new Date(m.scheduled_at).getTime() : null
+    const hit = clashes.find((c) => [[c.entry_id_a, c.at_a], [c.entry_id_b, c.at_b]].some(([e, t2]) =>
+      (m.entry_a_id === e || m.entry_b_id === e) && at != null && new Date(t2).getTime() === at))
+    return hit ? hit.name : null
+  }
 
   if (loading) {
-    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+    return <PanelSkeleton rows={2} />
   }
 
   // Pela ordem das fases (grupos, quartos, meias, 3.º lugar, final) e, dentro
@@ -86,6 +106,7 @@ export default function CalendarPanel({ category, myEntries }) {
     return (
       <EmptyState
         icon={CalendarDays}
+        pose={emptyPose}
         title={t('tournament.draw.calendar_empty_title')}
         subtitle={t('tournament.draw.calendar_empty_subtitle')}
       />
@@ -120,7 +141,7 @@ export default function CalendarPanel({ category, myEntries }) {
       .filter(Boolean).join(' · ')
     return (
       <MatchCard key={m.id} match={m} entries={entries} labels={labelsOf(m)} myIds={myIds}
-        head={head} foot={footOf(m, t)} final={m.round === 'F' && !m.group_id} onOpen={() => setOpenId(m.id)} />
+        head={head} foot={footOf(m, t)} final={m.round === 'F' && !m.group_id} onOpen={() => setOpenId(m.id)} warn={warnOf(m)} />
     )
   }
   const opened = openId ? matches.find((m) => m.id === openId) : null
@@ -137,16 +158,19 @@ export default function CalendarPanel({ category, myEntries }) {
   return (
     <div>
       {days.length > 1 ? (
-        <Chips
-          className="mb-4"
-          label={t('tournament.schedule.day_filter')}
-          value={openDay}
-          onChange={setPickedDay}
-          options={days.map((d) => ({
-            value: d.date,
-            label: `${dayChip(d.date, i18n.language)} · ${t('tournament.tree.n_games', { count: d.slots.reduce((n, s) => n + s.matches.length, 0) })}`,
-          }))}
-        />
+        // Os dias também ficam presos, por baixo da categoria e dos
+        // separadores (Francisco, 11 out — StickyBar).
+        <StickyDays resetKey={openDay}>
+          <Chips
+            label={t('tournament.schedule.day_filter')}
+            value={openDay}
+            onChange={setPickedDay}
+            options={days.map((d) => ({
+              value: d.date,
+              label: `${dayChip(d.date, i18n.language)} · ${t('tournament.tree.n_games', { count: d.slots.reduce((n, s) => n + s.matches.length, 0) })}`,
+            }))}
+          />
+        </StickyDays>
       ) : day ? (
         <MonoLabel className="mb-3">{dayLabel(day.date, i18n.language)}</MonoLabel>
       ) : null}

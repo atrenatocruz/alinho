@@ -44,8 +44,10 @@ export const isCategoryFull = (category, entries) => slotsLeft(category, entries
    gravam `max_categories`; `max_categories_per_person` é o nome antigo, que
    fica de reserva — a mesma ordem do servidor (Dev 3, 8 out). Antes só se
    lia o antigo, e quem escolhia 1 ou 3 ficava sempre com 2. */
+export const maxCategories = (tournament) =>
+  Number(tournament?.rules?.max_categories ?? tournament?.rules?.max_categories_per_person ?? 2)
 export function categoriesLeft(tournament, myEntries = []) {
-  const max = Number(tournament?.rules?.max_categories ?? tournament?.rules?.max_categories_per_person ?? 2)
+  const max = maxCategories(tournament)
   const mine = myEntries.filter((e) => e.status !== 'desistiu').length
   return Math.max(0, max - mine)
 }
@@ -77,20 +79,26 @@ export const tournamentInviteLink = (token, origin) => `${origin}/convite-tornei
 
 // ── Chamadas ────────────────────────────────────────────────────────────
 
-export async function signUp({ categoryId, partnerId = null, guestName = null, guestEmail = null, teamName = null }) {
+export async function signUp({ categoryId, partnerId = null, guestName = null, guestEmail = null, teamName = null, tshirtSize, partnerTshirtSize }) {
   const { data, error } = await supabase.rpc('tournament_signup', {
     p_category_id: categoryId,
     p_partner_id: partnerId,
     p_guest_name: guestName,
     p_guest_email: guestEmail,
     p_team_name: teamName,
+    // As t-shirts (Dev 3) só vão quando o torneio as tem: sem elas, a chamada
+    // fica igual à de sempre.
+    ...(tshirtSize !== undefined ? { p_player1_tshirt: tshirtSize, p_player2_tshirt: partnerTshirtSize ?? null } : {}),
   })
   if (error) throw error
   return data
 }
 
-export async function respondToInvite(entryId, accept) {
-  const { data, error } = await supabase.rpc('tournament_respond_invite', { p_entry_id: entryId, p_accept: accept })
+export async function respondToInvite(entryId, accept, { tshirtSize } = {}) {
+  const { data, error } = await supabase.rpc('tournament_respond_invite', {
+    p_entry_id: entryId, p_accept: accept,
+    ...(accept && tshirtSize !== undefined ? { p_tshirt: tshirtSize } : {}),
+  })
   if (error) throw error
   return data
 }
@@ -221,4 +229,18 @@ export async function canScoreTournament(tournamentId) {
   const { data, error } = await supabase.rpc('can_score_tournament', { p_tournament_id: tournamentId })
   if (error) throw error
   return !!data
+}
+
+/* As minhas inscrições ativas, a partir da página do torneio. Uma desistida
+   não conta — nem antes de a base de dados deixar de a devolver
+   (migration_tournaments_withdraw_resignup, Trello #451). Sem `my_entries`
+   (migração por correr), vale o `my`.
+   Um convite que me fizeram e que ainda não aceitei também não é inscrição
+   minha (QA, 13 out: com o convite caducado aparecia «À espera do teu
+   parceiro aceitar» e contava para as categorias que chocam). Sem o
+   `registered_by_me` (migração por correr), fica como antes. */
+export function activeEntriesOf(data) {
+  return (data?.my_entries || (data?.my ? [{ ...data.my, status: data.my.state }] : []))
+    .filter((e) => (e.status ?? e.state) !== 'desistiu')
+    .filter((e) => !((e.status ?? e.state) === 'convite' && e.registered_by_me === false))
 }

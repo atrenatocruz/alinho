@@ -10,7 +10,7 @@ import { PrimaryButton, Avatar, DateTimeField, Select, Chips } from '../componen
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
-import StepPage from '../components/steps/StepPage'
+import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 
@@ -134,7 +134,7 @@ export default function CreatePrivateMatchSlots() {
         teamBPlayer2Id: teamBPlayer2?.id,
         teamBPlayer2GuestName: teamBPlayer2Guest.trim() || null,
       })
-      navigate('/jogos-privados')
+      navigate('/jogos-privados', { replace: true })
     } catch (err) {
       console.error('Error creating private match:', err)
       setError(describeError(t, err, 'createprivatematch.error_create'))
@@ -155,6 +155,7 @@ export default function CreatePrivateMatchSlots() {
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
       onNext={() => { setError(''); setStep(step + 1) }}
       nextDisabled={step === 2 && !scheduledDate}
+      nextMissingField={step === 2 && !scheduledDate ? 'step-private-date' : null}
       nextHint={t('createprivatematch.date_missing')}
       error={error}
       footer={step === 4 ? (
@@ -169,7 +170,7 @@ export default function CreatePrivateMatchSlots() {
           <div>
             <p className={label}>{t('createprivatematch.your_dupla')}</p>
             <div className="space-y-2">
-              <div className="flex items-center gap-3 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] p-3">
+              <div className="flex items-center gap-3 rounded-ctrl bg-lime-100 p-3">
                 <Avatar name={profile?.name} url={profile?.avatar_url} size="w-9 h-9 text-sm" />
                 <p className="text-sm font-extrabold text-[#14532D]">{t('createprivatematch.you_suffix', { name: profile?.name })}</p>
               </div>
@@ -215,7 +216,7 @@ export default function CreatePrivateMatchSlots() {
         <>
           <div>
             <p className={label}>{t('steps.datetime_label')}</p>
-            <DateTimeField value={when} onChange={setWhen} />
+            <div id="step-private-date"><DateTimeField value={when} onChange={setWhen} /><StepMissingNote field="step-private-date" /></div>
             <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
           </div>
         </>

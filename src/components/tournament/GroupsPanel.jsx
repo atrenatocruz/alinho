@@ -12,6 +12,7 @@ import RuleHint from '../RuleHint'
 import { Me } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 /** Uma tabela de grupo. As duplas que passam ficam marcadas à esquerda e
  *  com o lugar em destaque — é o que se lê de relance no telemóvel. */
@@ -88,7 +89,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
                 <td className="py-1.5 text-center">
                   <span
                     className={`inline-flex h-5 min-w-[20px] px-0.5 items-center justify-center rounded-full font-mono text-xs font-bold ${
-                      passes ? 'bg-[#E9E7FB] text-[#4338A8]' : 'text-muted'
+                      passes ? 'bg-kind-tournament-light text-kind-tournament-dark' : 'text-muted'
                     }`}
                   >
                     {row.id in firstOf ? `${firstOf[row.id] + 1}=` : i + 1}
@@ -118,7 +119,10 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
         </tbody>
       </table>
 
-      <p className="border-t border-ink-50 px-3 py-1.5 text-xs text-muted">
+      {/* As siglas ficam (as palavras não cabem no telemóvel), com a legenda
+          por baixo da tabela (UX, 14 out). */}
+      <p className="border-t border-ink-50 px-3 pt-1.5 text-[12px] leading-snug text-muted">{t('tournament.draw.legend')}</p>
+      <p className="px-3 py-1.5 text-xs text-muted">
         {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
       {anyTie && <p className="px-3 pb-1.5 text-xs text-muted">{t('tournament.draw.tied_for_now')}</p>}
@@ -132,18 +136,19 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
   )
 }
 
-export default function GroupsPanel({ category, my }) {
+export default function GroupsPanel({ category, my , emptyPose }) {
   const { t } = useTranslation()
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
-    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+    return <PanelSkeleton rows={2} />
   }
 
   if (!groups.length) {
     return (
       <EmptyState
         icon={Users}
+        pose={emptyPose}
         title={t('tournament.draw.groups_empty_title')}
         subtitle={t('tournament.draw.groups_empty_subtitle')}
       />

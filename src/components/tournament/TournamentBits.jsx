@@ -1,12 +1,12 @@
 // Peças pequenas partilhadas pelos ecrãs do torneio (Trello #361 a #366).
 // Cores do desenho aprovado (design-handoff/2026-09-19-torneios, SPEC §9):
-// torneio = lilás — fundo #E9E7FB, contorno #C9C3F3, texto #4338A8. São as
-// mesmas que já estavam reservadas em KIND_STYLE.tournament
-// (src/components/agenda/EventCard.jsx).
+// torneio = roxo — desde o R0 do redesign (13 out) as cores vêm de
+// src/lib/kindColors.js, as mesmas do KIND_STYLE.tournament.
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Trophy } from 'lucide-react'
+import { KIND_COLORS } from '../../lib/kindColors'
 
-export const LILAC = { bg: '#E9E7FB', border: '#C9C3F3', text: '#4338A8' }
+export const LILAC = { bg: KIND_COLORS.tournament.light, border: KIND_COLORS.tournament.line, text: KIND_COLORS.tournament.dark }
 
 /** Etiqueta branca com texto lilás ("Torneio", "M5 · Grupo A · 1/3"). */
 export function TourTag({ icon: Icon = Trophy, children }) {
@@ -67,6 +67,17 @@ export function CategorySelect({ categories, value, onChange, label, mineId = nu
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [open])
+
+  // «Ainda te podes inscrever noutra categoria ›» (SignupSlot) abre este
+  // seletor, já à vista (UX, 14 out).
+  useEffect(() => {
+    const show = () => {
+      box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setOpen(true)
+    }
+    window.addEventListener('tournament:open-category-select', show)
+    return () => window.removeEventListener('tournament:open-category-select', show)
+  }, [])
 
   const current = categories.find((c) => c.id === value) || categories[0]
   if (!current) return null

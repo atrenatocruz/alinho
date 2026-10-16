@@ -13,6 +13,7 @@
 import { supabase } from './supabase'
 import { isMatchDone } from './myTournamentMatches'
 import { normalizeGameOrgHint } from './gameOrgHint'
+import { saveEventSpecialPrice } from './specialPrice'
 
 /** Cabeçalho da página do torneio + categorias, numa só chamada.
  *
@@ -69,11 +70,29 @@ export async function listClubTournaments(organizationId) {
  *  pessoa, como se escolhe quem entra) — guardado em jsonb, para não serem
  *  dez colunas que ninguém consulta. */
 export async function createTournament(organizationId, draft) {
+  const { special_prices: _specials, ...rest } = draft
   const { data, error } = await supabase.rpc('create_tournament', {
-    p_organization_id: organizationId, p_draft: draft,
+    p_organization_id: organizationId, p_draft: rest,
   })
   if (error) throw error
+  // O preço especial de cada categoria grava-se depois de ela existir: quem
+  // cria chama saveCategorySpecialPrices com o que vem em special_prices.
   return data
+}
+
+/** O preço especial de cada categoria (design-handoff/2026-10-07-preco-
+ *  especial; base de dados do Dev 3). specials: [{ code, value }] — value
+ *  null desliga. Liga-se pelo código, porque o update_tournament apaga e
+ *  recria as categorias (os ids mudam e o preço especial vai com elas). */
+export async function saveCategorySpecialPrices(tournamentId, specials) {
+  if (!specials?.length) return
+  const { data, error } = await supabase.rpc('get_tournament_for_edit', { p_tournament_id: tournamentId })
+  if (error) throw error
+  const idOf = new Map((data?.categories || []).map((c) => [c.code, c.id]))
+  for (const { code, value } of specials) {
+    const id = idOf.get(code)
+    if (id) await saveEventSpecialPrice('tournament_category', id, value)
+  }
 }
 
 /** O torneio inteiro para o ecrã de editar: ao contrário do
@@ -107,8 +126,14 @@ export async function getTournamentForEdit(tournamentId) {
  *  organizador, prazo, data do sorteio e se é público) — é o próprio
  *  update_tournament que ignora o resto. */
 export async function updateTournament(tournamentId, draft) {
-  const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: draft })
+  const { special_prices: specials, ...rest } = draft
+  const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: rest })
   if (error) throw error
+  // O torneio já ficou gravado: um erro aqui diz só que o preço especial não.
+  try { await saveCategorySpecialPrices(tournamentId, specials) } catch (err) {
+    console.error('Error saving special prices:', err)
+    const e = new Error('special_prices_failed'); e.code = 'special_prices_failed'; throw e
+  }
 }
 
 /** Abrir/fechar inscrições e voltar atrás (rascunho ↔ inscrições ↔
@@ -430,4 +455,82 @@ export async function getTournamentOrgHint(key) {
   const hint = normalizeGameOrgHint(data)
   // Visível sem endereço não leva a lado nenhum: trata-se como privado.
   return hint && hint.visible && !hint.slug ? { ...hint, visible: false, name: null } : hint
+}
+
+// T-shirts do torneio (SPEC 2026-10-08-torneio-t-shirts; dados do Dev 3).
+// O tamanho é 'XS'…'XXL', 'none' («Não quero») ou null (por escolher).
+
+/** O próprio jogador muda o seu tamanho, até as inscrições fecharem. Com
+ *  `forGuest`, quem inscreveu muda o do parceiro sem conta. */
+export async function setMyTshirtSize(entryId, size, { forGuest = false } = {}) {
+  const { error } = await supabase.rpc('set_my_tournament_tshirt', { p_entry_id: entryId, p_size: size, ...(forGuest ? { p_for_guest: true } : {}) })
+  if (error) throw error
+}
+
+/** Quem organiza muda o tamanho de qualquer jogador, mesmo depois do prazo.
+ *  `slot` 1 ou 2: o jogador da inscrição. */
+export async function adminSetTshirtSize(entryId, slot, size) {
+  const { error } = await supabase.rpc('admin_set_tournament_tshirt', { p_entry_id: entryId, p_slot: slot, p_size: size })
+  if (error) throw error
+}
+
+/** A contagem do torneio todo, só para quem organiza:
+ *  { sizes: [{ size, count }], requested, declined, pending }. Sem a função
+ *  (migração por correr), null — o cartão não aparece. */
+export async function getTshirtCounts(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_tshirt_counts', { p_tournament_id: tournamentId })
+  if (error) { if (error.code === 'PGRST202') return null; throw error }
+  return Array.isArray(data) ? data[0] || null : data || null
+}
+
+/** Uma linha por pessoa: [{ entry_id, slot, name, category_code, size }]. */
+export async function getTshirtPeople(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_tshirt_people', { p_tournament_id: tournamentId })
+  if (error) { if (error.code === 'PGRST202') return []; throw error }
+  return data || []
+}
+
+/** Se uma pessoa já tem t-shirt neste torneio (uma por pessoa, 11 out; Dev
+ *  3): { chosen, size }. O tamanho só vem para o próprio e para quem
+ *  organiza; aos outros, só o «chosen». null sem a função. */
+export async function getPlayerTshirt(tournamentId, userId) {
+  const { data, error } = await supabase.rpc('tournament_player_tshirt', { p_tournament_id: tournamentId, p_user_id: userId })
+  if (error) { if (error.code === 'PGRST202') return null; throw error }
+  const row = Array.isArray(data) ? data[0] : data
+  return row?.chosen ? { chosen: true, size: row.size || null } : null
+}
+
+// ── Categorias que chocam (design-handoff/2026-10-09-torneio-categorias-
+// chocam; base de dados do Dev 3) ───────────────────────────────────────
+// Um choque: { user_id?, name?, category_a, category_b, code_a, code_b,
+// entry_id_a, entry_id_b, kind: 'near_start' | 'match_overlap', at_a, at_b }.
+// 'near_start': duas categorias da mesma pessoa a começar com menos de 1 hora
+// entre elas (antes do sorteio — resolve-se antes de sortear, e o servidor
+// recusa fechar/sortear com 'has_clashes'). 'match_overlap': dois jogos
+// quase à mesma hora (depois do sorteio, quando alguém muda horas à mão).
+// Sem as funções (PGRST202), não há choques — fica como hoje.
+const noClashFunction = (error) => error?.code === 'PGRST202'
+
+/** Os choques de quem está a ver, neste torneio. */
+export async function listMyClashes(tournamentId) {
+  const { data, error } = await supabase.rpc('my_category_clashes', { p_tournament_id: tournamentId })
+  if (error) { if (noClashFunction(error)) return []; throw error }
+  return data || []
+}
+
+/** Os choques de todos os jogadores do torneio (só quem organiza). */
+export async function listTournamentClashes(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_player_clashes', { p_tournament_id: tournamentId })
+  if (error) { if (noClashFunction(error)) return []; throw error }
+  return data || []
+}
+
+/** Tira uma pessoa de uma inscrição (o parceiro fica «sem_parceiro»).
+ *  Erros: not_admin, entry_not_found, not_in_entry, already_drawn. Quem
+ *  sai e o parceiro recebem o aviso (tournament_removed_clash /
+ *  tournament_partner_removed). */
+export async function removePlayerFromEntry(entryId, userId) {
+  const { data, error } = await supabase.rpc('admin_remove_player_from_entry', { p_entry_id: entryId, p_user_id: userId })
+  if (error) throw error
+  return data
 }

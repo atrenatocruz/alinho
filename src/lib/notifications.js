@@ -22,9 +22,14 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_not_finis
   // Ponto 17 (trocar uma pessoa): mix_slot_open (a quem organiza: há uma vaga
   // numa dupla) e mix_swapped_out (a quem foi trocado).
   'mix_slot_open', 'mix_swapped_out',
+  // #622: o mix terminou e quem ganhou (Dev 3, migration_mix_aviso_terminou.sql).
+  'mix_finished',
   // Aprovar quem entra (2 out, Dev 3): o pedido a quem organiza, e a resposta
   // a quem pediu.
-  'mix_join_request', 'mix_request_accepted', 'mix_request_declined']
+  'mix_join_request', 'mix_request_accepted', 'mix_request_declined',
+  // As regras de um mix mudaram (preço, formato…) — quem organiza escolheu
+  // «Só este mix» ou «Este e os seguintes» (Dev 3, notify_mix_changed).
+  'mix_changed']
 
 export async function listMyUnreadNotifications(limit = 20) {
   const { data, error } = await supabase
@@ -38,6 +43,23 @@ export async function listMyUnreadNotifications(limit = 20) {
     throw error
   }
   return data || []
+}
+
+/** O aviso «enviou o resultado» deste jogo entre amigos, ainda por
+    responder (null se já respondi ou se não o recebi). */
+export async function unreadFriendResultNotice(matchId) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, kind, data')
+    .eq('kind', 'friend_match_result_sent')
+    .is('read_at', null)
+    .eq('data->>match_id', matchId)
+    .limit(1)
+  if (error) {
+    if (errorKind(error) === 'not_ready') return null
+    throw error
+  }
+  return (data || []).find((n) => n.kind === 'friend_match_result_sent' && n.data?.match_id === matchId) || null
 }
 
 export async function markNotificationsRead(ids) {

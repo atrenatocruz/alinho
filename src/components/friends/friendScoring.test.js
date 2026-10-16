@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { best3NeedsThird, friendSetProblem, setsState } from './friendScoring'
+import { best3NeedsThird, formatToSave, friendSetProblem, setsState } from './friendScoring'
 
 const sets = (...list) => list.map(([a, b]) => ({ a: String(a), b: String(b) }))
 
@@ -31,5 +31,20 @@ describe('jogos entre amigos: sets por acabar (Francisco, 28 set)', () => {
   it('Melhor de 3: o 3.º set só aparece com 1-1', () => {
     expect(best3NeedsThird(sets([6, 4], [4, 6]))).toBe(true)
     expect(best3NeedsThird(sets([6, 4], [4, 4]))).toBe(false)
+  })
+})
+
+
+describe('formatToSave (#586: editar um jogo antigo com N sets)', () => {
+  it('sem mudar a forma de contar, manda a que o jogo já tinha (5 sets fica 5)', () => {
+    expect(formatToSave('free', 'sets', 5)).toEqual({ scoringFormat: 'sets', numSets: 5 })
+  })
+  it('melhor de 3 e pontos, sem mudar, ficam iguais', () => {
+    expect(formatToSave('best3', 'sets', 3)).toEqual({ scoringFormat: 'sets', numSets: 3 })
+    expect(formatToSave('points', 'pontos_simples', null)).toEqual({ scoringFormat: 'pontos_simples', numSets: null })
+  })
+  it('mudada pela pessoa, manda a nova', () => {
+    expect(formatToSave('best3', 'sets', 5)).toEqual({ scoringFormat: 'sets', numSets: 3 })
+    expect(formatToSave('points', 'sets', 5)).toEqual({ scoringFormat: 'pontos_simples', numSets: null })
   })
 })

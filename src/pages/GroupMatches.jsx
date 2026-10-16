@@ -13,7 +13,7 @@ import {
   submitGroupMatchResult, proposeGroupMatchCorrection, acceptGroupMatchCorrection, deleteGroupMatch,
 } from '../lib/groupMatches'
 import { formatDate as formatDateLib } from '../lib/formatDate'
-import { Avatar, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { Avatar, ConfirmSheet, EmptyState, LoadErrorState, PrimaryButton } from '../components/ui'
 import { describeError } from '../lib/errors'
 
 const SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
@@ -308,7 +308,8 @@ export default function GroupMatches() {
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
       ) : loadError ? (
-        <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{loadError}</p>
+        // Erro a carregar a página toda: o Alino «ups» (mascote, 12 out).
+        <LoadErrorState title={loadError} />
       ) : matches.length === 0 && friendGames.length === 0 ? (
         <EmptyState title={t('groupmatches.empty_title')} subtitle={t('groupmatches.empty_subtitle')} />
       ) : (

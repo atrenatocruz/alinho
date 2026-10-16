@@ -1,8 +1,9 @@
 import { useState, useEffect, useLayoutEffect } from 'react'
-import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
+import { Link, useSearchParams, useNavigationType, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Trophy, Shuffle, ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
+import { MedalGrid, Highlights, SITE_DARK } from '../components/site/MedalShowcase'
 import i18n from '../lib/i18n'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
@@ -84,6 +85,7 @@ export function Nav() {
   const { t } = useTranslation()
   const [scrolled, setScrolled] = useState(false)
   const loginHref = useLoginHref()
+  const { pathname } = useLocation()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -92,19 +94,23 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const link = 'inline-flex items-center min-h-[44px] px-1 text-ink-700 hover:text-ink-900 font-extrabold text-sm transition-colors duration-fast'
+  const link = 'inline-flex items-center min-h-[44px] sm:px-1 whitespace-nowrap text-ink-700 hover:text-ink-900 font-extrabold text-[13px] sm:text-sm transition-colors duration-fast'
   return (
     <header
       className={`fixed top-0 inset-x-0 z-20 transition-colors duration-base ${
         scrolled ? 'bg-[#F7F7F4]/95 backdrop-blur-xl border-b border-line' : 'bg-transparent'
       }`}
     >
-      <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
-        <Link to="/" className="leading-none">
-          <Wordmark variant="light" />
+      <div className="max-w-5xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2">
+        <Link to="/" className="leading-none shrink-0">
+          <Wordmark variant="light" className="!h-[22px] sm:!h-6" />
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-4">
           <LanguageToggle className="text-ink-700 hover:text-ink-900" />
+          {/* «Como funciona» ao lado de «Planos» (#619, 10 out); sublinhado
+              na própria página. */}
+          <Link to="/como-funciona" className={`${link} ${pathname === '/como-funciona' ? 'underline underline-offset-4 text-ink-900' : ''}`}
+            onClick={() => { if (pathname === '/como-funciona') window.scrollTo(0, 0) }}>{t('hiw.nav_link')}</Link>
           <Link to="/planos" className={link} onClick={() => { if (window.location.pathname === '/planos') window.scrollTo(0, 0) }}>{t('landing.pricing_nav_link')}</Link>
           <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
         </div>
@@ -203,26 +209,24 @@ function Point({ bg, eyebrowClass, eyebrow, title, text, back, children }) {
   )
 }
 
-function LevelPoint() {
+// Ranking e conquistas (12 out): o primeiro bloco a seguir ao topo, escuro
+// como os cartões das conquistas na app, para as medalhas brilharem. É o único
+// bloco escuro antes do fim. Sem botões (só há um lima por ecrã).
+function RankingPoint() {
   const { t } = useTranslation()
   return (
-    <Point
-      bg="bg-[#F4F8DC]"
-      eyebrowClass="text-[#5B6B00]"
-      eyebrow={t('landing.level_eyebrow')}
-      title={t('landing.level_title')}
-      text={t('landing.level_text')}
-      back={<span className="font-display text-[170px] font-extrabold text-ink-900/[0.07]">M4</span>}
-    >
-      {/* Só a etiqueta, sem números (SPEC, «Exemplos»). */}
-      <div className="inline-flex items-center gap-3 rounded-card bg-white px-4 py-3 shadow-card">
-        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-lg font-extrabold text-lime-400">M4</span>
-        <span>
-          <b className="block text-sm text-ink-900">{t('landing.level_chip_title')}</b>
-          <span className="block text-xs text-muted">{t('landing.level_chip_text')}</span>
-        </span>
+    <section className={`relative overflow-hidden ${SITE_DARK}`}>
+      <div className="relative max-w-5xl mx-auto px-5 py-14 lg:py-20 lg:flex lg:items-center lg:gap-12">
+        <div className="lg:flex-1">
+          <p className="font-mono text-[12px] font-bold uppercase tracking-widest text-lime-400">{t('landing.rank_eyebrow')}</p>
+          <h2 className="text-3xl lg:text-4xl text-white mt-2 max-w-md">{t('landing.rank_title')}</h2>
+          <p className="text-white/75 mt-3 max-w-md">{t('landing.rank_text')}</p>
+          <MedalGrid className="mt-8 lg:hidden" />
+          <div className="mt-7 max-w-md"><Highlights /></div>
+        </div>
+        <MedalGrid className="hidden lg:block lg:flex-1 max-w-sm" />
       </div>
-    </Point>
+    </section>
   )
 }
 
@@ -230,19 +234,19 @@ function TournamentPoint() {
   const { t } = useTranslation()
   return (
     <Point
-      bg="bg-[#E9E7FB]"
-      eyebrowClass="text-[#4338A8]"
+      bg="bg-kind-tournament-light"
+      eyebrowClass="text-kind-tournament-dark"
       eyebrow={t('landing.tour_eyebrow')}
       title={t('landing.tour_title')}
       text={t('landing.tour_text')}
-      back={<Trophy size={170} strokeWidth={1.2} className="text-[#4338A8]/10" />}
+      back={<Trophy size={170} strokeWidth={1.2} className="text-kind-tournament-dark/10" />}
     >
-      <div className="rounded-card border-2 border-[#C9C3F3] bg-[#E9E7FB] p-4 shadow-card">
+      <div className="rounded-card border-2 border-kind-tournament-line bg-kind-tournament-light p-4 shadow-card">
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#4338A8]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-kind-tournament-dark">
             <Trophy size={13} /> {t('agenda.kind_tournament')}
           </span>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#4338A8]">{t('landing.tour_card_state')}</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-kind-tournament-dark">{t('landing.tour_card_state')}</span>
         </div>
         <p className="mt-2 font-display text-lg font-extrabold text-ink-900">{t('landing.tour_card_title')}</p>
         <p className="text-xs text-muted">{t('landing.tour_card_sub')}</p>
@@ -255,12 +259,12 @@ function MixPoint() {
   const { t } = useTranslation()
   return (
     <Point
-      bg="bg-[#FBE7DE]"
-      eyebrowClass="text-[#9A3A17]"
+      bg="bg-kind-mix-light"
+      eyebrowClass="text-kind-mix-dark"
       eyebrow={t('landing.mix_eyebrow')}
       title={t('landing.mix_title')}
       text={t('landing.mix_text')}
-      back={<Shuffle size={170} strokeWidth={1.2} className="text-[#9A3A17]/10" />}
+      back={<Shuffle size={170} strokeWidth={1.2} className="text-kind-mix-dark/10" />}
     >
       {/* A conversa no grupo — o mecanismo mostrado, não descrito. */}
       <div className="space-y-2" aria-hidden="true">
@@ -443,12 +447,16 @@ export function Footer() {
     <footer className="bg-ink-900 border-t border-white/10 py-6 px-5">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex flex-wrap items-center justify-center gap-x-5">
-          <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
+          {/* Rodapé das páginas públicas (#619, 10 out): Como funciona · Planos
+              · Instruções · Novidades · Privacidade (+ Termos). */}
+          <Link to="/como-funciona" className={link}>{t('hiw.nav_link')}</Link>
+          <Link to="/planos" className={link}>{t('landing.pricing_nav_link')}</Link>
           <Link to="/instrucoes" className={link}>{t('landing.instructions_link')}</Link>
-          <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
+          <Link to="/novidades" className={link}>{t('nov.footer_link')}</Link>
           <Link to="/privacidade" className={link}>{t('landing.privacy_link')}</Link>
+          <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
         </div>
-        <p className="text-white/50 text-xs">&copy; {year} alinho</p>
+        <p className="text-white/50 text-xs">&copy; {year} alinho.pt</p>
       </div>
     </footer>
   )
@@ -460,7 +468,7 @@ export default function Landing() {
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
       <Hero />
-      <LevelPoint />
+      <RankingPoint />
       <TournamentPoint />
       <MixPoint />
       <About />

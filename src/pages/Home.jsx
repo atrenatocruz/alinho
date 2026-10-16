@@ -1,16 +1,18 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, X, Check } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
 import { useAuth } from '../contexts/AuthContext'
-import { ConfirmSheet } from '../components/ui'
+import { ConfirmSheet, EmptyState, PrimaryButton, TOP_EDGE } from '../components/ui'
+import HomeSkeleton from '../components/home/HomeSkeleton'
+import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
-import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel, KIND_FILTER_KEY, SHOW_LABEL_KEY } from '../components/agenda/AgendaControls'
-import HomeSearch from '../components/agenda/HomeSearch'
+import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayParts, dayHeading } from '../components/agenda/AgendaControls'
+import HomeSearch, { rememberSearch } from '../components/agenda/HomeSearch'
 import PlayedList from '../components/agenda/PlayedList'
 import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
@@ -19,10 +21,19 @@ import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
 import { listOpenTournaments } from '../lib/tournamentApi'
 import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
-import ScoreTodayCard, { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
-import FriendInviteCard from '../components/friends/FriendInviteCard'
-import LiveStrip from '../components/live/LiveStrip'
-import { listMyFriendMatchInvites } from '../lib/privateMatches'
+import { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
+import MyNextGames, { CustomizePill } from '../components/home/MyNextGames'
+import LiveNowLine from '../components/home/LiveNowLine'
+import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
+import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
+import FreeSlotsCard from '../components/home/FreeSlotsCard'
+import OpenSlotSheet from '../components/home/OpenSlotSheet'
+import { groupFreeSlots, markFreeSlots } from '../lib/freeSlots'
+import { ratingBand } from '../lib/elo'
+import { formatTime } from '../lib/formatDate'
+import { listMyFriendMatchInvites, getFriendMatch, respondFriendMatchInvite } from '../lib/privateMatches'
+import { loadFriendInviteEvents } from '../lib/friendInvites'
+import FriendInviteEventCard from '../components/friends/FriendInviteEventCard'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
@@ -31,6 +42,8 @@ import { cancelLessonRequest, listMyLessonRequests, listMyLessons, listLessonEve
 import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
 import TournamentEventCard from '../components/agenda/TournamentEventCard'
+import LeagueEventCard from '../components/league/LeagueEventCard'
+import { loadLeagueHome, leagueForYouItems } from '../lib/leagueAgenda'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
@@ -57,7 +70,6 @@ import {
    ════════════════════════════════════════════════════════════════════════ */
 
 const FILTERS_KEY = 'home.agenda.filters'
-const SEARCH_KEY = 'home.agenda.search'
 const VIEW_MODE_KEY = 'home.agenda.view'
 let homeShownBefore = false
 
@@ -72,6 +84,11 @@ const readSession = (key, fallback) => {
 const writeSession = (key, value) => {
   try { sessionStorage.setItem(key, JSON.stringify(value)) } catch { /* modo privado */ }
 }
+
+// O que a Home já mostrou, para ao voltar aparecer logo, sem cinzento (SPEC
+// 2026-10-12-home-esqueleto, ponto 6). Só na memória desta aba; os dados
+// voltam a pedir-se por trás e substituem estes quando chegam.
+let homeCache = null
 
 export default function Home() {
   const { t, i18n } = useTranslation()
@@ -95,11 +112,18 @@ export default function Home() {
   const headerActions = useHeaderActions()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [games, setGames] = useState([])
-  const [groupMatches, setGroupMatches] = useState([]) // [{ match, org }]
-  const [privateMatches, setPrivateMatches] = useState([])
-  const [myMixResults, setMyMixResults] = useState(new Map())
-  const [loading, setLoading] = useState(true)
+  const cached = homeCache && homeCache.userId === user?.id ? homeCache : null
+  const [games, setGames] = useState(() => cached?.games || [])
+  const [groupMatches, setGroupMatches] = useState(() => cached?.groupMatches || []) // [{ match, org }]
+  const [privateMatches, setPrivateMatches] = useState(() => cached?.privateMatches || [])
+  const [myMixResults, setMyMixResults] = useState(() => cached?.myMixResults || new Map())
+  const [loading, setLoading] = useState(() => !cached)
+  // Esqueleto (não o círculo a rodar): só se demorar mais de 0,2 s; ao fim
+  // de 8 s sem dados, o erro de sempre.
+  const showSkeleton = useSkeleton(loading)
+  const loadLate = useLoadTimeout(loading)
+  const skeletonShown = useRef(false)
+  if (showSkeleton) skeletonShown.current = true
   const [friendIds, setFriendIds] = useState(null)
   const [pendingKeys, setPendingKeys] = useState(() => new Set())
   // O erro de uma ação num cartão aparece por baixo desse cartão, não no
@@ -131,15 +155,14 @@ export default function Home() {
   // limpa e volta à Home tal como estava.
   // `all`: «Procurar em tudo» só dentro da pesquisa — os filtros da Home
   // ficam como estavam para quando se fecha (designer, 25 set).
-  const [searchState, setSearchState] = useState(() => readSession(SEARCH_KEY, { open: false, q: '', all: false }))
+  // A pesquisa abre sempre fechada (UX, 10 out): o que se procurou fica só
+  // nas «Pesquisas recentes».
+  const [searchState, setSearchState] = useState({ open: false, q: '', all: false })
   const search = searchState.q || ''
   const searchOpen = !!searchState.open
   const setSearch = (q) => setSearchState((st) => ({ ...st, q }))
   const openSearch = () => setSearchState({ open: true, q: '', all: false })
   const closeSearch = () => setSearchState({ open: false, q: '', all: false })
-  useEffect(() => {
-    try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify(searchState)) } catch { /* sem sessão, sem memória */ }
-  }, [searchState])
   // O dia que está no topo da lista — é o que a data do cabeçalho mostra.
   const [visibleDay, setVisibleDay] = useState(() => toDayKey(new Date()))
   // Dia de torneio: quem marca resultados tem o botão em «Hoje» (#505).
@@ -147,25 +170,67 @@ export default function Home() {
   // Jogos entre amigos com resultados à espera de mim (amigos sem bloquear,
   // 27 set): o convite âmbar em hoje, como no desenho aprovado.
   const [friendInvites, setFriendInvites] = useState([])
-  // «A decorrer agora» (27 set): quantos há, para abrir em Hoje.
-  const [liveCount, setLiveCount] = useState(0)
+  // O topo da Home (SPEC-2, 9 out): o que a pessoa escondeu no «Personalizar».
+  const homeSections = useHomeSections(user?.id)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  // «Abrir um jogo no <clube>» (SPEC-4): { club, slot } | null.
+  const [openSlot, setOpenSlot] = useState(null)
+  const [openBusy, setOpenBusy] = useState(false)
+  const [openError, setOpenError] = useState('')
+  // O nível ao abrir só aparece com o open_slot_join na base de dados
+  // (sem ele, entra-se como antes e o nível ficava por gravar).
+  const [openJoinReady, setOpenJoinReady] = useState(false)
   useEffect(() => {
-    listMyFriendMatchInvites()
-      .then((rows) => setFriendInvites(rows.filter((r) => r.teams_set)))
-      .catch((err) => console.error('Error loading friend invites:', err))
+    let alive = true
+    supabase.rpc('open_slot_join', { p_game_id: null, p_level: null, p_partner_id: null })
+      .then(({ error }) => { if (alive) setOpenJoinReady(!!error && error.code !== 'PGRST202') })
+    return () => { alive = false }
   }, [])
+  // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
+  const topBlockRef = useRef(null)
+  // Os convites da sessão nova de amigos: no «Para ti» os que já têm
+  // equipas, e na Home todos (cartão em «Os teus próximos jogos» e no dia —
+  // convite-amigos-na-home, 12 out).
+  const [friendInviteEvents, setFriendInviteEvents] = useState([])
+  const loadFriendInvites = () => {
+    const orgsById = new Map((memberships || []).map((ms) => [ms.organization_id,
+      { name: ms.organization?.name, kind: ms.organization?.kind, logo: ms.organization?.group_logo_url }]))
+    let rows = []
+    return loadFriendInviteEvents({
+      listInvites: async () => { rows = await listMyFriendMatchInvites(); return rows },
+      getDetail: getFriendMatch,
+      orgsById,
+    })
+      // No «Para ti» só os por responder: um jogo aceite não pede nada.
+      .then((evs) => { setFriendInvites(rows.filter((r) => r.teams_set && r.my_status !== 'accepted')); setFriendInviteEvents(evs) })
+      .catch((err) => console.error('Error loading friend invites:', err))
+  }
+  useEffect(() => {
+    if (!user) return
+    loadFriendInvites()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, (memberships || []).length])
+  const declineFriendInvite = async (event) => {
+    await respondFriendMatchInvite(event.id, false)
+    setFriendInviteEvents((list) => list.filter((e) => e.key !== event.key))
+    setFriendInvites((list) => list.filter((i) => i.match_id !== event.id))
+  }
   const navigationType = useNavigationType()
   const [monthOpen, setMonthOpen] = useState(false)
   // Explorar (Fase 2): eventos de clubes da Comunidade onde ainda não estou.
   const [exploreRows, setExploreRows] = useState([])
   // Aulas com professores (Trello #49): as minhas e as em aberto. Sem a
   // migração das aulas as RPCs não existem e isto fica vazio.
-  const [lessonRows, setLessonRows] = useState([])
+  const [lessonRows, setLessonRows] = useState(() => cached?.lessonRows || [])
   // Pedidos de aula por responder (#392): «Pedido enviado» na Home.
-  const [lessonRequests, setLessonRequests] = useState([])
+  const [lessonRequests, setLessonRequests] = useState(() => cached?.lessonRequests || [])
   // Torneios (Trello #363): o cartão de inscrição antes do sorteio, e os
   // meus jogos depois dele — é na Home que a malta vê a que horas joga.
   const [tournamentEvents, setTournamentEvents] = useState([])
+  // A liga entre clubes: os encontros em que jogo e o «Para ti» dela.
+  const [leagueEvents, setLeagueEvents] = useState([])
+  const [leagueAgenda, setLeagueAgenda] = useState(null)
   const [location, setLocation] = useState(getSavedLocation)
   const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -258,14 +323,19 @@ export default function Home() {
         *,
         organization:organizations (name, kind, group_logo_url),
         participants (
-          id, user_id, partner_id, guest_id, partner_guest_id, status,
+          id, user_id, partner_id, guest_id, partner_guest_id, status, created_at,
           user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
           partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
           guest:game_guests!participants_guest_id_fkey (id, name),
           partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
-        )
+        ),
+        scored:matches (id)
       `)
       .in('organization_id', orgIds)
+      // «A decorrer» só com a ronda começada ou um resultado (mixLive, 12 out):
+      // basta saber se há um jogo com resultado.
+      .not('scored.score_a', 'is', null)
+      .limit(1, { referencedTable: 'scored' })
       .order('date', { ascending: true })
     if (error) throw error
 
@@ -360,6 +430,11 @@ export default function Home() {
       setLoading(false)
     }
   }
+  // O que já se mostrou fica para a próxima vez que se abre a Home.
+  useEffect(() => {
+    if (loading || !user?.id) return
+    homeCache = { userId: user.id, games, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests }
+  }, [loading, user?.id, games, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests])
 
   useEffect(() => {
     if (!user) return
@@ -408,6 +483,22 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, orgIdsKey])
 
+  useEffect(() => {
+    if (!user) {
+      setLeagueEvents([])
+      setLeagueAgenda(null)
+      return
+    }
+    let cancelled = false
+    // Sem as migrações da liga devolve vazio — nunca é motivo para partir.
+    loadLeagueHome().then(({ events: rows, agenda }) => {
+      if (cancelled) return
+      setLeagueEvents(rows)
+      setLeagueAgenda(agenda)
+    })
+    return () => { cancelled = true }
+  }, [user?.id])
+
   const events = useMemo(() => {
     if (!user) return []
     return [
@@ -422,30 +513,28 @@ export default function Home() {
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
       ...tournamentEvents.filter((e) => e.dayKey)
         .map((e) => (e.orgKind ? e : { ...e, orgKind: (memberships || []).find((ms) => ms.organization_id === e.orgId)?.organization?.kind || null })),
-    ]
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user, memberships])
+      ...leagueEvents,
+      ...friendInviteEvents,
+    ].filter((e, _, all) => !(e.source === 'friend_session' && e.id && all.some((x) => x.key === `friend_invite:${e.id}`)))
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, leagueEvents, friendInviteEvents, user, memberships])
 
-  const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
-  const searchEvents = useMemo(
-    () => (searchState.all ? applyFilters(events, DEFAULT_FILTERS, location) : visible),
-    [searchState.all, events, location, visible],
-  )
+  const visible = useMemo(() => applyFilters(markFreeSlots(events), filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
-  const days = useMemo(() => groupByDay(visible, today), [visible, today])
+  // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
+  // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
+  // Horários livres (SPEC-4, 9 out): os jogos em aberto sem ninguém de um
+  // dia juntam-se numa linha só (FreeSlotsCard); com alguém, cartão normal.
+  // Só «Horários livres» escolhido: um cartão por clube (SPEC-4).
+  const onlyFree = filters.kinds.length === 1 && filters.kinds[0] === 'free'
+  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today)
+    .map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey, Date.now(), { perClub: onlyFree }) })), [visible, today, onlyFree])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show
     || filters.orgIds != null
     || EVENT_KINDS.some((k) => !filters.kinds.includes(k))
   const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
-  const searching = search.trim().length > 0
-  // «A procurar só em …»: os filtros ligados, com as palavras dos próprios filtros.
-  const filtersLabel = [
-    filters.show !== DEFAULT_FILTERS.show ? t(SHOW_LABEL_KEY[filters.show]) : null,
-    ...(EVENT_KINDS.some((k) => !filters.kinds.includes(k)) ? filters.kinds.map((k) => t(KIND_FILTER_KEY[k])) : []),
-    ...(filters.orgIds ? orgs.filter((o) => filters.orgIds.includes(o.id)).map((o) => o.name) : []),
-  ].filter(Boolean).join(', ')
   // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
   // ajudam a decidir onde jogar a seguir.
   const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
@@ -591,8 +680,10 @@ export default function Home() {
     if (!header) return
     const line = header.getBoundingClientRect().bottom + 12
     let current = null
+    // O bloco do topo conta como o 1.º dia de hoje em diante: está por cima dele.
+    const firstUpcoming = days.find((d) => d.dayKey >= today)?.dayKey
     for (const { dayKey } of days) {
-      const el = dayRefs.current.get(dayKey)
+      const el = (dayKey === firstUpcoming && topBlockRef.current) || dayRefs.current.get(dayKey)
       if (!el) continue
       if (el.getBoundingClientRect().top <= line) current = dayKey
       else break
@@ -600,13 +691,21 @@ export default function Home() {
     setVisibleDay(current || days[0]?.dayKey || today)
   }
 
+  // Os saltos feitos pela própria Home (abrir em «hoje», a cada bocado de
+  // eventos que chega) não contam como deslizar: não encolhem o topo.
+  const autoScrollAt = useRef(0)
   const scrollToDay = (dayKey) => {
     const main = scroller()
     const header = headerRef.current
     const target = days.find((d) => d.dayKey >= dayKey) || days[days.length - 1]
-    const el = target && dayRefs.current.get(target.dayKey)
+    const firstUpcoming = days.find((d) => d.dayKey >= today)
+    const el = target && (target === firstUpcoming && topBlockRef.current ? topBlockRef.current : dayRefs.current.get(target.dayKey))
     if (!main || !header || !el) return
-    main.scrollTop += el.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 8
+    // O fundo do cabeçalho sem o «encolher» (translateY): senão cada salto
+    // dependia de o topo estar subido ou não, e os dois puxavam um pelo outro.
+    const shift = new DOMMatrixReadOnly(getComputedStyle(header).transform).m42 || 0
+    autoScrollAt.current = Date.now()
+    main.scrollTop += el.getBoundingClientRect().top - (header.getBoundingClientRect().bottom - shift) - 8
     updateVisibleDay()
   }
 
@@ -617,6 +716,58 @@ export default function Home() {
     return () => main.removeEventListener('scroll', updateVisibleDay)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days])
+
+  /* Topo que encolhe (Home do futuro, SPEC-1, ponto 3): a deslizar para
+     baixo, a linha do sítio, do mapa e do sino sobe e fica só a barra; a
+     deslizar para cima, mesmo pouco, volta. Sobe com transform — a altura do
+     cabeçalho não muda, por isso a lista não pula. */
+  const topRowRef = useRef(null)
+  const [collapsed, setCollapsed] = useState(false)
+  // Sem animações no topo até a pessoa mexer na lista: ao abrir, nada desliza.
+  const [moved, setMoved] = useState(false)
+  useEffect(() => {
+    // Ouve no documento, não no <main> do momento: ao abrir, o <main> ainda
+    // pode não ser o definitivo, e o topo ficava sem ouvir nada.
+    let last = scroller()?.scrollTop || 0
+    // Só arrastar com o dedo, a roda do rato ou as teclas contam: um toque
+    // no ecrã enquanto a Home carrega (a abrir a app instalada) não, nem os
+    // saltos da própria Home para «hoje» (bug do iPhone, 11 out: o topo subia
+    // e descia sozinho a cada salto).
+    let touchedAt = 0
+    const touched = () => { touchedAt = Date.now(); setMoved(true) }
+    const onScroll = (e) => {
+      const main = scroller()
+      if (!main || e.target !== main) return
+      const top = main.scrollTop
+      const delta = top - last
+      last = top
+      if (Date.now() - autoScrollAt.current < 250) return
+      if (top < 40) { setCollapsed(false); return }
+      if (Date.now() - touchedAt > 1200) return
+      if (delta > 4) setCollapsed(true)
+      else if (delta < -2) setCollapsed(false)
+    }
+    const inputs = ['wheel', 'touchmove', 'keydown']
+    inputs.forEach((ev) => window.addEventListener(ev, touched, { passive: true }))
+    document.addEventListener('scroll', onScroll, { passive: true, capture: true })
+    return () => {
+      inputs.forEach((ev) => window.removeEventListener(ev, touched))
+      document.removeEventListener('scroll', onScroll, { capture: true })
+    }
+  }, [])
+  // A pesquisa abre com o cabeçalho inteiro à vista (a linha do sítio volta).
+  useEffect(() => { if (searchOpen) setCollapsed(false) }, [searchOpen])
+  const allEvents = useMemo(() => applyFilters(events, DEFAULT_FILTERS, location), [events, location])
+  const topRowH = collapsed ? (topRowRef.current?.offsetHeight || 0) + 6 : 0
+  // A altura que fica à vista, para quem prende coisas por baixo (Dev 2).
+  useEffect(() => {
+    const header = headerRef.current
+    if (!header) return undefined
+    const set = () => document.documentElement.style.setProperty('--home-bar-h', `${Math.max(0, Math.round(header.getBoundingClientRect().bottom))}px`)
+    set()
+    const tm = setTimeout(set, 220)
+    return () => clearTimeout(tm)
+  }, [collapsed])
 
   // Abre no dia do próximo evento, com o passado por cima. Os eventos chegam
   // aos bocados (clubes, grupos, Comunidade), por isso volta a encostar a cada
@@ -647,15 +798,11 @@ export default function Home() {
       updateVisibleDay()
       return
     }
-    // O próximo evento que ainda não acabou, com o filtro que estiver
-    // escolhido (em "Todos", inscrito ou não) — a Home nunca abre em branco.
-    // Dia de torneio em que marco resultados, ou um convite de jogo entre
-    // amigos à espera de mim: abre em Hoje, onde está o botão.
-    const next = scoreToday.length > 0 || friendInvites.length > 0 || liveCount > 0 ? null
-      : days.find((d) => d.dayKey >= today && d.events.some((e) => !e.finished))
-    scrollToDay(next ? next.dayKey : today)
+    // Abre no topo de hoje: os teus próximos jogos, o que está a decorrer e
+    // o que é para ti, e por baixo os dias (Home do futuro, SPEC-2, 9 out).
+    scrollToDay(today)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, days, scoreToday.length, friendInvites.length, liveCount])
+  }, [loading, days])
 
   // Alternar de mapa para lista, ou tocar outra vez no separador "Jogos" da
   // barra de baixo (aviso do Layout — ver home:reset-scroll), volta sempre
@@ -683,16 +830,38 @@ export default function Home() {
     document.body,
   ) : null
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-        {joinStrip}
-      </div>
-    )
-  }
 
   const orgSlugById = new Map(orgs.map((o) => [o.id, o.slug]))
+  // O caminho de cada evento: o mesmo na pesquisa e nos próximos jogos.
+  const eventLink = (e) => (
+    e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
+      : e.kind === 'league' ? `/liga/${e.slug}/encontro/${e.id}`
+      : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
+        : e.source === 'lesson' ? `/aula/${e.id}`
+          : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
+            : e.source === 'friend_session' || e.source === 'friend_invite' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
+            : e.source === 'private_match' ? '/jogos-privados'
+              : null
+  )
+  // O topo da Home (SPEC-2): os teus próximos → a decorrer → para ti → os dias.
+  // O número por confirmar (sem ele, o «In» no WhatsApp entra como convidado
+  // sem conta — migration_mix_guest_sem_conta.sql) é uma linha do «Para ti»
+  // que abre a caixa de sempre numa folha (UX, 10 out).
+  const phoneToConfirm = !!profile && !profile.phone_verified_at && profile.phone_hash !== 'dev-bypass'
+  const forYou = [
+    ...forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language,
+      onConfirmPhone: phoneToConfirm ? () => setPhoneOpen(true) : null }),
+    ...leagueForYouItems(leagueAgenda, t, i18n.language),
+  ]
+  const firstUpcomingDay = days.find((d) => d.dayKey >= today)?.dayKey
+  const topBlock = (
+    <div ref={topBlockRef} className="space-y-4">
+      <MyNextGames events={events} todayKey={today} userId={user?.id} linkFor={eventLink} filters={filters}
+        onCustomize={() => setCustomizeOpen(true)} show={!homeSections.hidden.has('mine')} />
+      <LiveNowLine filters={filters} show={!homeSections.hidden.has('live')} />
+      <ForYouLine items={forYou} show={!homeSections.hidden.has('foryou')} />
+    </div>
+  )
   const hasAnyEvents = events.length > 0
 
   // Quem ainda não está em nenhum clube nem grupo (Francisco, 28 set:
@@ -762,7 +931,59 @@ export default function Home() {
     }
   }
 
+  // Abrir um jogo a partir de um horário livre: é entrar nesse jogo em
+  // aberto, como o «Entrar» de hoje (SPEC-4, ponto 4). O parceiro e o nível
+  // esperam pelos dados do Dev 3.
+  const openFreeSlot = async (slot, { level = null, partnerId = null } = {}) => {
+    setOpenBusy(true)
+    setOpenError('')
+    try {
+      // open_slot_join (migration_open_slot_join.sql): entra e, sendo o 1.º,
+      // deixa o jogo com o nível escolhido (null = «Qualquer»). Sem a função
+      // na base de dados, entra como antes.
+      const { error: rpcError } = await supabase.rpc('open_slot_join', { p_game_id: slot.raw.id, p_level: level, p_partner_id: partnerId })
+      if (rpcError && rpcError.code !== 'PGRST202') throw rpcError
+      if (rpcError) {
+        const { error } = await supabase.from('participants').insert([{
+          game_id: slot.raw.id, user_id: user.id, status: 'confirmed', joined_alone: true,
+        }])
+        if (error) throw error
+      }
+      setOpenSlot(null)
+      setJoinNotice(t('home.free_opened', { time: formatTime(slot.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) }))
+      await loadGames()
+    } catch (error) {
+      console.error('Error opening a game from a free slot:', error)
+      setOpenError(isGameFull(error) ? t('home.free_taken_now') : describeError(t, error, 'home.card_action_error'))
+      if (isGameFull(error)) loadGames()
+    } finally {
+      setOpenBusy(false)
+    }
+  }
+  // O nível do jogo (UX, 11 out): «M3 (o teu)» · «M2» · «M4» · «Qualquer».
+  // Só com género M/F e nível calculado — senão só se abre com «Qualquer».
+  const myBand = ratingBand(profile?.rating, profile?.gender)
+  const levelOptions = myBand?.fullVars?.num && /^[MF]\d$/.test(myBand.label) ? (() => {
+    const n = myBand.fullVars.num
+    const pre = myBand.label[0]
+    return [
+      { value: `${pre}${n}`, label: t('home.open_level_mine', { level: `${pre}${n}` }) },
+      ...(n > 1 ? [{ value: `${pre}${n - 1}`, label: `${pre}${n - 1}` }] : []),
+      ...(n < 6 ? [{ value: `${pre}${n + 1}`, label: `${pre}${n + 1}` }] : []),
+      { value: null, label: t('home.open_any_level') },
+    ]
+  })() : []
+
   const renderEvent = (event) => {
+    if (event.source === 'free') {
+      return (
+        <FreeSlotsCard key={event.key} event={event} isToday={event.dayKey === today}
+          onPick={(club, slot) => (club.outside
+            // De um clube onde não estou: abre a página do clube, onde estão os horários.
+            ? (club.orgSlug ? navigate(`/clube/${club.orgSlug}`) : null)
+            : (setOpenError(''), setOpenSlot({ club, slot })))} />
+      )
+    }
     const past = event.finished || event.dayKey < today
     const distance = eventDistance(event, location)
     if (event.source === 'explore') {
@@ -776,6 +997,9 @@ export default function Home() {
           onJoin={() => handleExploreJoin(event)}
         />
       )
+    }
+    if (event.kind === 'league') {
+      return <LeagueEventCard key={event.key} event={event} past={past} />
     }
     if (event.kind === 'tournament') {
       return <TournamentEventCard key={event.key} event={event} past={past} />
@@ -791,6 +1015,9 @@ export default function Home() {
           onCancelRequest={event.raw.request_id ? () => handleCancelLessonRequest(event) : null}
         />
       )
+    }
+    if (event.source === 'friend_invite') {
+      return <FriendInviteEventCard key={event.key} event={event} onDecline={declineFriendInvite} />
     }
     if (event.source === 'game') {
       const a = past ? null : cardAction(event.raw)
@@ -840,9 +1067,28 @@ export default function Home() {
           desse grupo (Francisco, 19 set — a Home fica só com a agenda). */}
       {/* Cabeçalho fixo: fica em cima enquanto a lista passa por baixo. Sem
           data nem calendário na vista de mapa — não há "dia no topo" lá. */}
-      <div ref={headerRef} className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2.5 bg-canvas space-y-1.5 border-b border-line/70">
-        <div className="flex items-center justify-between gap-2">
-          <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
+      {/* Home do futuro (SPEC-1): a linha do sítio, do mapa e do sino; por
+          baixo, uma barra só. O dia é a pastilha «Hoje ⌄» da barra. */}
+      <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)` }}
+        className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 ${TOP_EDGE} ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
+        {/* R2 (13 out): em cima o dia da semana, a data em grande (abre o
+            calendário) e o sítio; ao descer sai tudo e fica só a barra. */}
+        <div ref={topRowRef} className={`flex items-start justify-between gap-2 ${moved ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
+          <div className="min-w-0">
+            {viewMode === 'list' && (() => {
+              const dh = dayHeading(visibleDay, i18n.language)
+              return (
+                <>
+                  <span className="block font-mono text-[10.5px] font-medium uppercase leading-none tracking-[.12em] text-[#5B6068]">{dh.weekday}</span>
+                  <button type="button" onClick={() => setMonthOpen(true)}
+                    className="mt-1.5 flex items-baseline gap-1 font-display text-[24px] font-black leading-none tracking-[-.02em] text-ink-900">
+                    {dh.date} <ChevronDown size={16} className="shrink-0 self-center text-muted" />
+                  </button>
+                </>
+              )
+            })()}
+            <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
+          </div>
           <div className="flex items-center gap-1 shrink-0">
             {GOOGLE_MAPS_API_KEY && (
               <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
@@ -850,15 +1096,25 @@ export default function Home() {
             {headerActions}
           </div>
         </div>
-        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} onToday={() => scrollToDay(today)} />}
-        <FilterChips filters={filters} orgs={orgs} onOpenFilters={(part) => setFiltersOpen(part)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
+        <HomeBar
+          filters={filters}
+          dayKey={visibleDay}
+          // A pesquisa comum (SPEC 2026-10-14-pesquisa-regra-unica): a caixa
+          // abre no sítio da barra; o «✕» apaga e fecha. Só na lista.
+          search={viewMode === 'list' ? {
+            value: search,
+            onChange: setSearch,
+            placeholder: t('homesearch.placeholder'),
+            open: searchOpen,
+            onOpenChange: (v) => { if (v) openSearch(); else { rememberSearch(search); closeSearch() } },
+          } : null}
+          // A pastilha do dia só com a barra presa (R2): parado, a data está em cima.
+          onOpenDay={viewMode === 'list' && collapsed ? () => setMonthOpen(true) : undefined}
+          onOpenFilters={() => setFiltersOpen(true)}
+          onKinds={(kinds) => setFilters((f) => ({ ...f, kinds }))}
+        />
       </div>
 
-
-      {/* Número associado mas por confirmar: sem confirmação, o «In» no
-          WhatsApp entra como convidado sem conta — o banner só aparece a
-          quem tem mesmo de agir (migration_mix_guest_sem_conta.sql). */}
-      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact dismissible /></div>}
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
@@ -866,25 +1122,37 @@ export default function Home() {
         // «Já jogados» (27 set): a lista do que já se jogou, do mais recente
         // para trás, em vez da agenda por dias.
         <PlayedList orgIds={filters.orgIds} kinds={filters.kinds} />
+      ) : loading ? (
+        // A carregar: o topo e a barra já estão a sério; o conteúdo a cinzento.
+        loadLate ? (
+          <div className="mt-3">
+            <EmptyState title={t('app.load_error_title')} subtitle={t('app.load_error_body')}
+              action={<PrimaryButton onClick={() => { setLoading(true); loadAll() }}>{t('app.load_error_retry')}</PrimaryButton>} />
+          </div>
+        ) : showSkeleton ? <HomeSkeleton /> : null
       ) : (
-        <div className="mt-3 space-y-5">
+        <div className={`mt-3 space-y-5 ${skeletonShown.current ? 'animate-fill-in' : ''}`}>
           {days.map(({ dayKey, events: dayEvents }) => (
+            <Fragment key={dayKey}>
+            {dayKey === firstUpcomingDay && topBlock}
             <section
-              key={dayKey}
               ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}
               className="space-y-2.5"
             >
-              <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
-                {dayLabel(dayKey, t, i18n.language)}
-              </p>
-              {dayKey === today && <LiveStrip onCount={setLiveCount} />}
-              {dayKey === today && friendInvites.map((inv) => <FriendInviteCard key={inv.match_id} invite={inv} />)}
-              {/* Quem só marca: o cartão do torneio com «Marcar resultados».
-                  Quem também joga hoje: vem por baixo dos jogos, como ligação
-                  (28 set). */}
-              {dayKey === today && <ScoreTodayCard rows={scoreToday.filter((x) => !dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
-              {dayKey === today && (scoreToday.length > 0 || friendInvites.length > 0 || liveCount > 0) && dayEvents.length === 0 ? null
-                : dayEvents.length === 0 && emptyByFilters
+              {/* R1 (13 out): «Hoje» em grande, a data a cinzento e, à direita, «5 jogos». */}
+              {(() => {
+                const dp = dayParts(dayKey, t, i18n.language)
+                return (
+                  <div className={`flex items-baseline gap-2 px-0.5 ${dayKey === firstUpcomingDay ? '' : 'border-t border-line pt-3.5'}`}>
+                    <b className="font-display text-[22px] font-black leading-none tracking-[-.02em] text-ink-900">{dp.big}</b>
+                    <span className="font-display text-[14px] font-semibold leading-none text-[#5B6068]">{dp.small}</span>
+                    {dayEvents.length > 0 && <em className="ml-auto font-mono text-[10.5px] font-medium not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: dayEvents.length })}</em>}
+                  </div>
+                )
+              })()}
+              {/* «A decorrer agora», o convite dos amigos e o «Marcar resultados»
+                  passaram para o topo da Home (SPEC-2, 9 out). */}
+              {dayEvents.length === 0 && emptyByFilters
                 ? (
                   <div className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line flex items-center justify-between gap-3">
                     <span>{t('agenda.filters_empty')}</span>
@@ -896,89 +1164,77 @@ export default function Home() {
                 : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t(noClubs && dayKey === today ? 'home.no_clubs_today_empty' : 'agenda.today_empty')}</p>
                 : dayEvents.map(renderEventWithError)}
-              {dayKey === today && <ScoreTodayCard asLink rows={scoreToday.filter((x) => dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
               {/* Os torneios abertos a quem chega (não pedem clube) e o convite. */}
               {dayKey === today && noClubs && openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
               {dayKey === today && noClubsCard}
             </section>
+            </Fragment>
           ))}
+          {/* Sem dias de hoje em diante: o topo vem no fim. */}
+          {!firstUpcomingDay && topBlock}
+          <CustomizePill long onClick={() => setCustomizeOpen(true)} />
           {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
           <div className="h-[40vh]" aria-hidden="true" />
         </div>
       )}
 
-      {/* A pesquisa por cima da Home (Trello #547, 25 set): ecrã inteiro,
-          teclado aberto, «Fechar» limpa e volta à Home tal como estava. */}
+      {/* A pesquisa (Trello #547; SPEC 2026-10-14-pesquisa-regra-unica): a
+          caixa está na barra, lá em cima, e os resultados ficam no lugar da
+          lista do dia, por baixo do cabeçalho; ao fechar, a lista volta. */}
       {/* Portal para o body: dentro do bloco animado da página (transform) o
           `fixed` ficava preso a ele, e ao abrir a Home já com a pesquisa
           aberta o salto para «hoje» levava-a para fora do ecrã. */}
       {searchOpen && createPortal(
-        <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto">
-          <div className="max-w-lg mx-auto px-4 pt-4 pb-10">
-            <div className="flex items-center gap-2">
-              <label className="flex-1 min-w-0 flex items-center gap-2 input-field !border-2 !border-ink-900">
-                <Search size={16} className="text-muted shrink-0" />
-                <input
-                  type="text"
-                  value={search}
-                  autoFocus
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                  placeholder={t('agenda.search_placeholder_short')}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-base"
-                />
-                {search && (
-                  <button type="button" onClick={() => setSearch('')} aria-label={t('agenda.search_clear')} className="text-muted shrink-0">
-                    <X size={16} />
-                  </button>
-                )}
-              </label>
-              <button type="button" onClick={closeSearch} className="shrink-0 px-2 min-h-[44px] text-sm font-extrabold text-ink-900">
-                {t('agenda.search_close')}
-              </button>
-            </div>
-            {searching ? (
-              <HomeSearch
-                events={searchEvents}
-                query={search}
-                todayKey={today}
-                filtersActive={filtersActive && !searchState.all}
-                filtersLabel={filtersLabel}
-                onSearchAll={() => setSearchState((st) => ({ ...st, all: true }))}
-                onClear={() => setSearch('')}
-                results={myMixResults}
-                userId={user.id}
-                linkFor={(e) => (
-                  e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
-                    : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
-                      : e.source === 'lesson' ? `/aula/${e.id}`
-                        : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
-                          : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
-                          : e.source === 'private_match' ? '/jogos-privados'
-                            : null
-                )}
-              />
-            ) : (
-              <div className="mt-4 space-y-3">
-                <p className="text-sm text-muted">{t('agenda.search_help')}</p>
-                {orgs.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {orgs.map((o) => (
-                      <button key={o.id} type="button" onClick={() => setSearch(o.name)}
-                        className="inline-flex items-center px-3 min-h-[40px] rounded-full border border-line bg-canvas text-sm font-extrabold text-ink-900">
-                        {o.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-ground overflow-y-auto" style={{ top: 'var(--home-bar-h, 120px)' }}>
+          <div className="max-w-lg mx-auto px-4 pt-3">
+            <HomeSearch
+              events={allEvents}
+              query={search}
+              todayKey={today}
+              location={location}
+              onQuery={setSearch}
+              // O «Entrar» da pesquisa faz o mesmo que o do cartão (UX, 9 out):
+              // inscreve logo e passa a «✓ Dentro». Sem ação no cartão, nada.
+              actionFor={(e) => {
+                if (e.finished || e.dayKey < today) return null
+                const busy = pendingKeys.has(e.key)
+                if (e.source === 'explore') {
+                  // Como no cartão: «Entrar no clube» ou «Pedir para entrar»; com o pedido feito, nada.
+                  if (e.explore?.requestStatus === 'pending') return null
+                  return e.explore?.openJoin
+                    ? { kind: 'join', label: t('agenda.explore_join_club'), busy, onAction: () => handleExploreJoin(e) }
+                    : { kind: 'request', label: t('agenda.explore_request', { name: e.orgName }), busy, onAction: () => handleExploreJoin(e) }
+                }
+                if (e.source !== 'game') return null
+                const a = cardAction(e.raw)
+                return a && (a.kind === 'join' || a.kind === 'waitlist') ? { kind: a.kind, busy, onAction: () => handleGameAction(e, a.kind) } : null
+              }}
+              errorFor={(e) => (cardError?.key === e.key ? cardError.message : null)}
+              linkFor={eventLink}
+            />
           </div>
         </div>,
         document.body,
       )}
 
       {joinStrip}
+
+      {phoneOpen && phoneToConfirm && (
+        <Sheet title={t('phoneconfirm.title')} onClose={() => setPhoneOpen(false)}>
+          <ConfirmPhoneCard bare />
+        </Sheet>
+      )}
+
+      {openSlot && (
+        <OpenSlotSheet key={openSlot.slot.key} club={openSlot.club} picked={openSlot.slot} busy={openBusy} error={openError}
+          levelOptions={levelOptions}
+          levelReady={openJoinReady} partnerReady={openJoinReady}
+          onOpen={(slot, opts) => openFreeSlot(slot, opts)} onClose={() => setOpenSlot(null)} />
+      )}
+
+      {customizeOpen && (
+        <PersonalizeHomeSheet hidden={homeSections.hidden} onToggle={homeSections.toggle} onClose={() => setCustomizeOpen(false)} />
+      )}
 
       {selectedPin && (
         <Sheet
@@ -1021,11 +1277,9 @@ export default function Home() {
         />
       )}
       {filtersOpen && (
-        <FilterSheet
-          part={filtersOpen}
+        <HomeFiltersSheet
           filters={filters}
           orgs={orgs}
-          countFor={(f) => applyFilters(events, f, location).length}
           onApply={(f) => { setFilters(f); setFiltersOpen(false) }}
           onClose={() => setFiltersOpen(false)}
         />

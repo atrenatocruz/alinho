@@ -8,6 +8,9 @@ export function shortName(name) {
   // «Renato C.», não «Renato D.» (revisão dos torneios, 28 set).
   const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/).filter(Boolean)
   if (parts.length < 2) return parts[0] || ''
+  // Um nome que acaba num número («QA 01», «Jogador 7») fica inteiro: sem
+  // ele, «QA 01» e «QA 02» davam os dois «QA» (QA, 11 out).
+  if (!/\p{L}/u.test(parts[parts.length - 1])) return parts.join(' ')
   const initialOf = (parts[parts.length - 1].match(/\p{L}/u) || [''])[0]
   return initialOf ? `${parts[0]} ${initialOf.toUpperCase()}.` : parts[0]
 }
@@ -116,7 +119,10 @@ export function resultShare({ tournament, category, board, matchId, myEntryId, m
   const theirScore = bigScore(m, meA ? 'b' : 'a')
   const didWin = m.winner_entry_id === myEntryId
   const data = {
-    kicker: [tournament?.name, category?.code, phase].filter(Boolean).join(' · '),
+    // O torneio e a categoria passam para a linha do clube, por baixo do
+    // logótipo (#622, UX 12 out); por cima do título fica só a fase.
+    kicker: phase,
+    orgSub: [tournament?.name, category?.code].filter(Boolean).join(' · '),
     date: shortDate(m.scheduled_at, lang),
     mine: pairShort(mine, hidden),
     teamName: mine?.hides_results ? '' : teamName(mine),
@@ -151,7 +157,8 @@ export function podiumShare({ tournament, results, myName, hidingIds = [], t, la
   const myTeam = teams[place - 1]
   const partner = myTeam ? partnerFirstName({ players: playersOf(myTeam) }, myName) : ''
   const data = {
-    kicker: [tournament?.name, c.code, t('tshare.podium')].filter(Boolean).join(' · '),
+    kicker: t('tshare.podium'),
+    orgSub: [tournament?.name, c.code].filter(Boolean).join(' · '),
     date: shortDate(tournament?.ends_on ? `${tournament.ends_on}T12:00:00Z` : null, lang),
     place, rows, record: recordWords(record, t),
   }
@@ -180,7 +187,9 @@ export function championsShare({ tournament, category, hidingIds = [], t, lang }
     thirds.length ? { place: 3, pair: thirds.map(name).join(' · ') } : null,
   ].filter(Boolean)
   const data = {
-    kicker: [tournament?.name, category.code].filter(Boolean).join(' · '),
+    // O título já diz «Campeões»: por cima não vai nada.
+    kicker: '',
+    orgSub: [tournament?.name, category.code].filter(Boolean).join(' · '),
     date: shortDate(tournament?.ends_on ? `${tournament.ends_on}T12:00:00Z` : null, lang),
     title: t('tshare.champions'),
     rows,

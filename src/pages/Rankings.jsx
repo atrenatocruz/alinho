@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link, useLocation, useNavigationType } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trophy, Award, HelpCircle, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { RatingBadge, EmptyState, Avatar, Select, PageHeader, Tabs } from '../components/ui'
+import { RatingBadge, EmptyState, Avatar, Select, PageHeader, Tabs, StickyTop, FilterBar } from '../components/ui'
 import { formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
@@ -13,6 +13,11 @@ import { getRankingHiddenIds, withoutHidden } from '../lib/rankingVisibility'
 import { errorKind } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
+import MonthRanking from '../components/rankings/MonthRanking'
+import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
+import RankPodium from '../components/rankings/RankPodium'
+import { useFrames } from '../lib/frames'
+import { Realce } from '../components/SearchField'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -44,6 +49,7 @@ export default function Rankings() {
   const { user, currentOrganizationId, memberships, profile } = useAuth()
   const location = useLocation()
   const navigationType = useNavigationType()
+  const navigate = useNavigate()
 
   // Quem chega com state.tab (Perfil → "Ranking global", links antigos)
   // abre no sítio equivalente.
@@ -64,6 +70,14 @@ export default function Rankings() {
   const [scaleChoice, setScaleChoice] = useState(null)
   const scale = scaleChoice ?? defaultScale(profile?.gender)
 
+  // «Do mês» (#626): só aparece quando a função do Dev 3 existe.
+  const [monthReady, setMonthReady] = useState(false)
+  const [monthShare, setMonthShare] = useState(null)
+  useEffect(() => {
+    supabase.rpc('get_month_ranking_months', { p_organization_id: null })
+      .then(({ error }) => setMonthReady(!error || errorKind(error) !== 'not_ready'))
+  }, [])
+
   const scopeOptions = useMemo(() => [
     { value: 'global', label: t('rankings.scope_global') },
     ...memberships
@@ -81,6 +95,7 @@ export default function Rankings() {
   // ── Carregar ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
+    if (mode === 'month') return undefined
     setLoading(true)
 
     const load = async () => {
@@ -151,7 +166,8 @@ export default function Rankings() {
     mixes_played: p.mixes_played,
     // Sem nível = sem rating: vai para o fim, sem posição nem pontos.
     ranked: p.rating != null,
-    sub: `🏆 ${t('rankings.mix_wins_ratio', { wins: p.mix_wins || 0, played: p.mixes_played || 0 })}`,
+    // «N jogos» (R6): os jogos que contaram para o nível.
+    sub: t('month.games', { count: p.rating_games || 0 }),
     value: p.rating != null ? formatRatingMaybeProvisional(p.rating, p.rating_games) : null,
     valueLabel: isProvisional(p.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label'),
     provisional: isProvisional(p.rating_games),
@@ -209,7 +225,7 @@ export default function Rankings() {
   // ── Posições ─────────────────────────────────────────────────────────
   // Com nível primeiro, pela ordem que veio; sem nível no fim, A–Z.
   // Ranking: por escala (lib/rankingScales). Assiduidade: lista única.
-  const byScale = mode === 'ranking'
+  const byScale = mode === 'ranking' || mode === 'month'
 
   // Pesquisa sem acentos: «goncalves» encontra «Gonçalves».
   const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -238,7 +254,18 @@ export default function Rankings() {
   }, [rows, shownScale, byScale])
   const allScales = byScale && shownScale === 'all'
 
-  const visible = trimmed ? positioned.filter(matchesQuery) : positioned
+  // O pódio 1·2·3 também no Ranking e na Assiduidade (Francisco, 12 out):
+  // os três primeiros saem da lista e vão para o cartão. No «Todos» do
+  // Ranking não há lugares (cada um tem o da sua escala), e com pesquisa
+  // fica só a lista.
+  const podiumRows = mode !== 'month' && !trimmed && !allScales
+    ? positioned.filter((r) => r.ranked && r.position && r.position <= 3).sort((a, b) => a.position - b.position)
+    : []
+  const podiumIds = new Set(podiumRows.map((r) => r.user_id))
+  const podiumValue = (row) => ({ text: mode === 'xp' ? `${row.value} ${t('rankings.xp_label')}` : row.value, muted: false })
+  // Molduras do pódio do mês (quem fechou o mês passado no pódio), na lista.
+  const frames = useFrames(rows.map((r) => r.user_id))
+  const visible = (trimmed ? positioned.filter(matchesQuery) : positioned).filter((r) => !podiumIds.has(r.user_id))
   // A tua linha: a tua posição na tua escala, mesmo quando se vê outra.
   const me = byScale
     ? applyScale(rows, 'all').find((r) => r.user_id === user.id)
@@ -273,7 +300,8 @@ export default function Rankings() {
     if (position === 1) return 'bg-lime-400 text-ink-900'
     if (position === 2) return 'bg-ink-900 text-white'
     if (position === 3) return 'bg-ink-700 text-white'
-    return 'bg-ink-50 text-ink-700'
+    // Do 4.º em diante, só o número (R6), como no «Do mês».
+    return 'text-ink-900'
   }
 
   const renderValue = (row, onDark = false) => allScales && !onDark ? (
@@ -311,10 +339,11 @@ export default function Rankings() {
               {row.position ?? '—'}
             </span>
           )}
-          <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" />
+          <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" frame={frames[row.user_id]} />
           <div className="flex-1 min-w-0">
             <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
-              <span className="truncate min-w-0">{row.name}</span>
+              {/* A parte encontrada a lima-claro (pesquisa, 14 out). */}
+              <span className="truncate min-w-0"><Realce text={row.name || ''} query={trimmed} /></span>
               {isMe && <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-lime-600">{t('rankings.you_badge')}</span>}
             </p>
             <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
@@ -348,11 +377,14 @@ export default function Rankings() {
   return (
     <div className="space-y-4">
       <PageHeader
+        sticky={false}
         title={(
           <span className="inline-flex items-center gap-2">
             {t('rankings.title')}
-            <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
-              <HelpCircle size={18} />
+            {/* R6 (13 out): o «?» redondo abre o «Como funciona» do separador. */}
+            <Link to={mode === 'xp' ? '/instrucoes#xp' : '/instrucoes#ranking'} aria-label={t('rankings.help_aria')}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-ink-700 hover:text-ink-900">
+              <HelpCircle size={17} />
             </Link>
           </span>
         )}
@@ -360,82 +392,98 @@ export default function Rankings() {
         {headerActions}
       </PageHeader>
 
-      <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
-        <Search size={16} className="text-muted shrink-0" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-          placeholder={t('rankings.search_placeholder')}
-          className="flex-1 min-w-0 bg-transparent outline-none text-base"
+      {/* R6 + R4: o separador e a barra presos em cima, num bloco branco. A
+          lupa troca a barra pelo campo (no «Do mês» não há pesquisa). */}
+      <StickyTop>
+        <Tabs
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'ranking', label: t('rankings.mode_ranking') },
+            ...(monthReady ? [{ value: 'month', label: t('rankings.tab_month') }] : []),
+            { value: 'xp', label: t('rankings.tab_assiduity') },
+          ]}
         />
-        {query && (
-          <button type="button" onClick={() => setQuery('')} aria-label={t('ui.close')} className="text-muted shrink-0">
-            <X size={16} />
-          </button>
-        )}
-      </div>
+        <FilterBar search={mode !== 'month' ? { value: query, onChange: setQuery, placeholder: t('rankings.search_placeholder') } : null}>
+            {byScale && (
+              <Select
+                variant="chip" className="shrink-0"
+                value={shownScale}
+                onChange={setScaleChoice}
+                options={SCALES.map((s) => ({ value: s, label: t(`rankings.scale_${s}`) }))}
+                placeholder={t('rankings.scale_title')}
+              />
+            )}
+            <Select variant="chip" className="shrink-0" active={scope !== 'global'} value={scope} onChange={setScope} options={scopeOptions} placeholder={t('rankings.scope_title')} />
+            {mode === 'ranking' && scope !== 'global' && months.length > 0 && (
+              <Select
+                variant="chip" className="shrink-0"
+                active={period !== ALWAYS}
+                value={period}
+                onChange={setPeriod}
+                options={monthOptions}
+                placeholder={t('rankings.period_title')}
+              />
+            )}
+        </FilterBar>
+      </StickyTop>
 
-      <Tabs
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: 'ranking', label: t('rankings.mode_ranking') },
-          { value: 'xp', label: t('rankings.tab_assiduity') },
-        ]}
-      />
-
-      <div className="flex gap-1.5 flex-wrap">
-        {byScale && (
-          <Select
-            variant="chip"
-            value={shownScale}
-            onChange={setScaleChoice}
-            options={SCALES.map((s) => ({ value: s, label: t(`rankings.scale_${s}`) }))}
-            placeholder={t('rankings.scale_title')}
-          />
-        )}
-        <Select variant="chip" active={scope !== 'global'} value={scope} onChange={setScope} options={scopeOptions} placeholder={t('rankings.scope_title')} />
-        {mode === 'ranking' && scope !== 'global' && months.length > 0 && (
-          <Select
-            variant="chip"
-            active={period !== ALWAYS}
-            value={period}
-            onChange={setPeriod}
-            options={monthOptions}
-            placeholder={t('rankings.period_title')}
-          />
-        )}
-      </div>
-
-      {loading ? (
+      {mode === 'month' ? (
+        <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare} />
+      ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
-      ) : visible.length === 0 ? (
+      ) : visible.length === 0 && podiumRows.length === 0 ? (
         <EmptyState
           icon={trimmed ? Search : mode === 'xp' ? Award : Trophy}
-          title={trimmed ? t('rankings.no_player_found_title') : t('rankings.empty_global_title')}
+          title={trimmed ? t('rankings.no_player_found_title') : mode === 'xp' ? t('rankings.empty_xp_title') : t('rankings.empty_global_title')}
           subtitle={trimmed ? t('comunidade.try_another_name') : mode === 'xp' ? t('rankings.empty_assiduity_subtitle') : t('rankings.empty_global_subtitle')}
         />
       ) : (
         <>
-          {/* Quantas pessoas há na lista — com pesquisa, quantas a pesquisa encontrou. */}
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
-            {t('rankings.players_found', { count: visible.length })}
-          </p>
+          {/* Um título por separador, sempre no mesmo sítio (R6). Com pesquisa,
+              quantas pessoas a pesquisa encontrou. */}
+          {trimmed ? (
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+              {t('rankings.players_found', { count: visible.length + podiumRows.length })}
+            </p>
+          ) : (
+            <div>
+              <h2 className="font-display text-2xl font-extrabold text-ink-900 leading-tight">
+                {mode === 'xp' ? t('rankings.title_xp') : scope === 'global' ? t('rankings.title_global') : scopeOptions.find((o) => o.value === scope)?.label}
+              </h2>
+              <p className="text-xs text-muted mt-0.5">
+                {mode === 'xp' ? t('rankings.sub_xp')
+                  : t(shownScale === 'feminino' ? 'rankings.sub_count_f' : 'rankings.sub_count', { count: allScales ? positioned.length : rankedCount(rows, shownScale), scale: t(`rankings.scale_${shownScale}`) })}
+              </p>
+            </div>
+          )}
+          {podiumRows.length > 0 && (
+            <RankPodium id="rank-podium" spots={[0, 1, 2].map((i) => podiumRows[i] || null)} value={podiumValue} meId={user.id}
+              onOpen={(id) => navigate(`/jogador/${id}`)}
+              onShare={() => setMonthShare({
+                kind: mode === 'xp' ? 'xp' : 'ranking',
+                title: mode === 'xp' ? t('monthshare.title_xp') : t(`rankings.scale_${shownScale}`),
+                podium: [0, 1, 2].map((i) => podiumRows[i] && { ...podiumRows[i], display: podiumValue(podiumRows[i]).text }),
+              })} />
+          )}
           {allScales && !trimmed && (
             <p className="text-xs text-muted">{t('rankings.all_scales_hint')}</p>
           )}
-          <div className="card p-0 overflow-hidden divide-y divide-line">
+          <div className="rounded-card border border-line bg-white overflow-hidden divide-y divide-line">
             {visible.map(renderRow)}
           </div>
         </>
       )}
 
       {/* A tua linha, sempre à vista por cima da barra de navegação. */}
-      {!loading && me && (
+      {monthShare && (
+        <MonthPodiumShare share={monthShare} onClose={() => setMonthShare(null)}
+          org={scope === 'global' ? null : (memberships.find((m) => m.organization_id === scope)?.organization || null)} />
+      )}
+
+      {mode !== 'month' && !loading && me && (
         <button
           type="button"
           onClick={() => scrollToPlayer(me.user_id)}

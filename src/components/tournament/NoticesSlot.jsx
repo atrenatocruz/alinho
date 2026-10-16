@@ -173,12 +173,12 @@ export default function NoticesSlot({ tournament, publicView = false }) {
         const age = noticeAge(notice.created_at)
         const edited = editedWords(notice.updated_at)
         return (
-          <div key={notice.id} className="rounded-card border-2 border-[#C9C3F3] bg-[#E9E7FB] px-3.5 py-3">
+          <div key={notice.id} className="rounded-card border-2 border-kind-tournament-line bg-kind-tournament-light px-3.5 py-3">
             <div className="flex gap-2.5">
-              <Megaphone size={18} className="mt-0.5 shrink-0 text-[#4338A8]" />
+              <Megaphone size={18} className="mt-0.5 shrink-0 text-kind-tournament-dark" />
               <div className="min-w-0 flex-1">
                 <p className="font-extrabold text-ink-900">{notice.body}</p>
-                <p className="mt-0.5 text-xs text-[#4338A8]">
+                <p className="mt-0.5 text-xs text-kind-tournament-dark">
                   {[
                     notice.author_name || tournament.club_name,
                     age ? t(age.key, age.values) : null,
@@ -191,7 +191,7 @@ export default function NoticesSlot({ tournament, publicView = false }) {
                   <button
                     onClick={() => { setError(''); setComposer(notice) }}
                     aria-label={t('tnotices.edit_title')}
-                    className="press flex h-8 w-8 items-center justify-center rounded-full text-[#4338A8] hover:bg-white/60"
+                    className="press flex h-8 w-8 items-center justify-center rounded-full text-kind-tournament-dark hover:bg-white/60"
                   >
                     <Pencil size={15} />
                   </button>
@@ -199,7 +199,7 @@ export default function NoticesSlot({ tournament, publicView = false }) {
                     onClick={() => remove(notice)}
                     disabled={busy}
                     aria-label={t('tnotices.delete')}
-                    className="press flex h-8 w-8 items-center justify-center rounded-full text-[#4338A8] hover:bg-white/60"
+                    className="press flex h-8 w-8 items-center justify-center rounded-full text-kind-tournament-dark hover:bg-white/60"
                   >
                     <Trash2 size={15} />
                   </button>

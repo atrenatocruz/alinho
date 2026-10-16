@@ -18,13 +18,13 @@ import { tiedMatch } from '../../lib/tournamentScore'
 import { useTranslation } from 'react-i18next'
 import { finishCategory } from '../../lib/tournamentApi'
 import {
-  getCategoryBoard, listCategoriesAdmin, standingsOf,
+  listCategoriesAdmin, standingsOf,
   qualifiedFromGroups, qualifiersPerGroup, fillBracketFromGroups, clearBracketFromGroups,
 } from '../../lib/tournamentDraw'
 import { describeError } from '../../lib/errors'
 import { ConfirmSheet, Select } from '../ui'
 import { MonoLabel } from './TournamentBits'
-import { boardChanged } from './useCategoryBoard'
+import { boardChanged, readCategoryBoard } from './useCategoryBoard'
 
 const DRAWN = ['sorteada', 'a_decorrer']
 const OPEN_MATCH = ['marcado', 'a_decorrer']
@@ -188,8 +188,8 @@ function CategoryRow({ category, board, slug, onClosed }) {
   const toFill = bracket?.kind === 'to_fill'
 
   const right = toFill ? (
-    <button type="button" onClick={() => setAsking('fill')}
-      className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
+    <button type="button" id={`tournament-fill-${category.id}`} onClick={() => setAsking('fill')}
+      className="inline-flex min-h-[48px] scroll-mt-40 items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
       {t('tournament.bracket.fill')}
     </button>
   ) : {
@@ -322,7 +322,8 @@ export default function CloseCategories({ tournament, onChanged, onReady }) {
       const { categories = [] } = await listCategoriesAdmin(tournament.id)
       const sorted = [...categories].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
       // Só se lê o quadro das que podem fechar; as outras não precisam.
-      const boards = await Promise.all(sorted.map((c) => (DRAWN.includes(c.status) ? getCategoryBoard(c.id) : null)))
+      // O quadro partilhado com o resto da página (um pedido por categoria).
+      const boards = await Promise.all(sorted.map((c) => (DRAWN.includes(c.status) ? readCategoryBoard(c.id) : null)))
       setRows(sorted.map((c, i) => ({ category: c, board: boards[i] })))
       setError(null)
     } catch (err) {
@@ -332,6 +333,18 @@ export default function CloseCategories({ tournament, onChanged, onReady }) {
   }, [tournament.id, t])
 
   useEffect(() => { load() }, [load])
+
+  // As categorias com os grupos acabados à espera de «Passar ao quadro», pela
+  // ordem do seletor: a caixa «Organizas este torneio» diz «Próximo passo:
+  // Passar ao quadro (M5) ↓» e desce até ao botão (UX, 14 out).
+  useEffect(() => {
+    if (!rows) return undefined
+    const toFill = rows
+      .filter((r) => r.category.status !== 'terminada' && bracketStatus(r.category, r.board)?.kind === 'to_fill')
+      .map((r) => ({ id: r.category.id, code: r.category.code || r.category.name }))
+    window.dispatchEvent(new CustomEvent('tournament:to-fill', { detail: toFill }))
+    return () => window.dispatchEvent(new CustomEvent('tournament:to-fill', { detail: [] }))
+  }, [rows])
 
   if (error) return <p className="mt-2 text-xs text-danger">{error}</p>
   if (!rows || rows.length === 0) return null

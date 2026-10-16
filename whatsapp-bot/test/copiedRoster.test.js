@@ -34,6 +34,8 @@ test('lê a cópia da lista: nomes sem banda, dupla nem vagas livres', () => {
   assert.deepEqual(parsed.names, ['Bernardo Ramos', 'Afonso Dias', 'Martim Baptista'])
   // O link do cartão diz qual é o mix (ids da base de dados são uuid).
   assert.equal(parseCopiedRoster(copiedList([]).replace('/jogo/m', '/jogo/0b8f3c1e-1111-4222-8333-944455556666')).gameId, '0b8f3c1e-1111-4222-8333-944455556666')
+  // O link curto (9 out): só o começo do id.
+  assert.equal(parseCopiedRoster(copiedList([]).replace('/jogo/m', '/m/0B8F3C1E')).gameId, '0b8f3c1e')
   assert.equal(parsed.title, 'Mix M5 de segunda')
   assert.equal(cleanRosterName('Paulo Henriques (N6) (convidado) (2)'), 'Paulo Henriques')
 })

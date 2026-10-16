@@ -7,6 +7,7 @@ import { Avatar, PrimaryButton } from '../ui'
 import { partnerNameError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { contemTexto } from '../../lib/semAcentos'
 import { isGenderMismatch, isMissingGender } from '../../lib/mixLogic'
+import PeopleSuggestions from '../people/PeopleSuggestions'
 
 /* Entrar num mix de duplas fixas com parceiro (Trello #339; convidados sem
    conta desde migration_mix_guest_sem_conta.sql).
@@ -29,6 +30,8 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
   const [mode, setMode] = useState('member') // 'member' | 'named'
   const [name, setName] = useState('')
   const [touched, setTouched] = useState(false)
+  // Antes de escrever, as «Sugestões» (12 out); sem nenhuma, a lista de sempre.
+  const [suggested, setSuggested] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -54,7 +57,8 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
   // Sem contar acentos: «goncalves» encontra «Gonçalves».
   const q = query.trim()
   const available = useMemo(() => members.filter((m) => !excludeIds.has(m.id)), [members, excludeIds])
-  const shown = (q ? available.filter((m) => contemTexto(m.name, q)) : available).slice(0, 8)
+  const showSuggestions = !q && suggested !== 0
+  const shown = (q ? available.filter((m) => contemTexto(m.name, q)) : showSuggestions ? [] : available).slice(0, 8)
 
   const nameError = partnerNameError(name)
   const ready = mode === 'member' ? !!partnerId : !nameError
@@ -64,7 +68,7 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
     if (!ready || busy) return
     const partner = members.find((m) => m.id === partnerId)
     onConfirm(mode === 'member'
-      ? { kind: 'member', partnerId, mismatchName: isGenderMismatch(game, partner) ? partner.name : null }
+      ? { kind: 'member', partnerId, mismatchName: partner && isGenderMismatch(game, partner) ? partner.name : null }
       : { kind: 'named', name: name.trim() })
   }
 
@@ -84,6 +88,16 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
           </div>
 
           {loadError && <p className="text-sm text-muted">{t('partner.members_error')}</p>}
+
+          {showSuggestions && (
+            <PeopleSuggestions
+              orgId={game.organization_id}
+              exclude={[...excludeIds]}
+              onCount={setSuggested}
+              pickedId={mode === 'member' ? partnerId : null}
+              onPick={(p) => { setMode('member'); setPartnerId(p.id) }}
+            />
+          )}
 
           <div className="space-y-1.5">
             {shown.map((m) => {
@@ -110,7 +124,7 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
                 </button>
               )
             })}
-            {!loadError && shown.length === 0 && (
+            {!loadError && shown.length === 0 && !showSuggestions && (
               <p className="text-sm text-muted px-1">{t('partner.no_members_found')}</p>
             )}
           </div>

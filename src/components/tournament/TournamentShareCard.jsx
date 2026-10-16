@@ -7,11 +7,19 @@
 // logótipo e o QR nunca ficam lá. Com foto, a foto ocupa a metade de cima e
 // o cartão fica compacto em baixo. A foto chega já cortada à medida (canvas):
 // o WebKit estraga fotos cortadas por CSS ao rasterizar (ver ShareCard.jsx).
+//
+// Vencedores em todos os jogos (#622, design-handoff/2026-10-11-vencedores-
+// em-todos-os-jogos, aprovado pelo Francisco a 11 out): o mesmo cartão serve
+// o mix, o americano, o jogo em aberto e os amigos. Por baixo do logótipo,
+// o clube ou grupo onde se jogou (`org`); o miolo é o pódio, o resultado ou
+// um corpo próprio (`children`). Sem `org` e sem `children`, o torneio fica
+// exatamente como estava.
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { toPng } from 'html-to-image'
 import { useTranslation } from 'react-i18next'
 import { Trophy } from 'lucide-react'
 import logoWordmark from '../../logo/primary-dark-card.svg'
+import iconMark from '../../logo/icon-mark.svg'
 
 export const T_CARD_W = 360
 export const T_CARD_H = 640
@@ -49,6 +57,52 @@ export async function bakePhoto(dataUrl) {
   return canvas.toDataURL('image/jpeg', 0.9)
 }
 
+/** O logótipo do clube num círculo, já em píxeis (canvas): o WebKit estraga
+ *  imagens cortadas em redondo por CSS ao rasterizar. null se não der (sem
+ *  CORS, ou sem imagem) — aí ficam as iniciais. */
+export async function bakeCircle(url, size = 64) {
+  if (!url) return null
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image()
+      i.crossOrigin = 'anonymous'
+      i.onload = () => resolve(i)
+      i.onerror = () => reject(new Error('logo_failed'))
+      i.src = url
+    })
+    const px = size * RATIO
+    const canvas = document.createElement('canvas')
+    canvas.width = px
+    canvas.height = px
+    const ctx = canvas.getContext('2d')
+    ctx.beginPath()
+    ctx.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2)
+    ctx.clip()
+    const scale = Math.max(px / img.naturalWidth, px / img.naturalHeight)
+    ctx.drawImage(img, (px - img.naturalWidth * scale) / 2, (px - img.naturalHeight * scale) / 2, img.naturalWidth * scale, img.naturalHeight * scale)
+    return canvas.toDataURL('image/png')
+  } catch {
+    return null
+  }
+}
+
+/** A imagem do mix como «foto» (sem foto escolhida): o mesmo corte da foto. */
+export const bakeImageUrl = async (url) => {
+  if (!url) return null
+  try {
+    const blob = await (await fetch(url, { mode: 'cors' })).blob()
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(r.result)
+      r.onerror = reject
+      r.readAsDataURL(blob)
+    })
+    return await bakePhoto(dataUrl)
+  } catch {
+    return null
+  }
+}
+
 const Mono = ({ children, className = '' }) => (
   <p className={`font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] ${className}`}>{children}</p>
 )
@@ -56,8 +110,36 @@ const Mono = ({ children, className = '' }) => (
 function Header({ date }) {
   return (
     <div className="flex items-center justify-between">
-      <img src={logoWordmark} alt="alinho" className="h-[18px] w-auto" />
+      {/* «alinho.pt» em tudo o que sai da app (regra de 29 set; UX, 12 out):
+          o logótipo de sempre com «.pt» logo a seguir, branco, da altura das letras. */}
+      <span className="flex items-end gap-[1px]">
+        <img src={logoWordmark} alt="alinho" className="h-[18px] w-auto" />
+        <span className="font-sans text-[15px] font-medium leading-[14px] text-white">.pt</span>
+      </span>
       <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{date}</span>
+    </div>
+  )
+}
+
+/** O clube ou grupo onde se jogou: o logótipo num círculo (ou as iniciais) e
+ *  o nome; por baixo, pequeno, o evento e o tipo. Sem clube (amigos), «📍»
+ *  e o sítio escrito no jogo. */
+function OrgLine({ org }) {
+  if (!org) return null
+  const circle = org.place
+    ? <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#1A1A1D] text-[11px]">📍</span>
+    // Sem clube (o Ranking geral): a bola lima da alinho no lugar da inicial.
+    : org.mark ? <img src={iconMark} alt="" className="block h-[22px] w-[22px] shrink-0 rounded-full" />
+    : org.logo
+      ? <img src={org.logo} alt="" className="block h-[22px] w-[22px] shrink-0" />
+      : <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[8px] font-extrabold" style={{ borderColor: LIME, color: LIME }}>{org.initials}</span>
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      {circle}
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-extrabold leading-tight text-white">{org.place || org.name}</p>
+        {org.sub && <p className="truncate text-[7.5px] leading-tight text-[#9CA3AF]">{org.sub}</p>}
+      </div>
     </div>
   )
 }
@@ -66,7 +148,7 @@ function Footer({ qr }) {
   return (
     <div className="flex items-end justify-between gap-3">
       <div>
-        <p className="text-[12px] font-extrabold leading-tight text-white">Joga padel<br />na alinho.pt</p>
+        <p className="text-[12px] font-extrabold leading-tight text-white">Joga padel<br />no alinho.pt</p>
         <p className="mt-0.5 text-[7.5px] text-[#9CA3AF]">alinho.pt · #alinhopadel</p>
       </div>
       {qr && (
@@ -96,11 +178,12 @@ function ResultBody({ d, compact }) {
   const mineBox = (
     <div className={`flex items-center justify-between gap-2 rounded-[10px] border-2 px-3 ${compact ? 'py-2' : 'py-3'}`} style={{ borderColor: LIME, background: compact ? 'rgba(11,11,12,0.6)' : '#0B0B0C' }}>
       <div className="min-w-0">
-        {!compact && d.won && <span className="mb-1 inline-block rounded-[4px] px-1.5 py-[1px] text-[7px] font-extrabold text-[#0B0B0C]" style={{ background: LIME }}>{t('tshare.won_tag')}</span>}
+        {!compact && d.won && !d.wonBelow && <span className="mb-1 inline-block rounded-[4px] px-1.5 py-[1px] text-[7px] font-extrabold text-[#0B0B0C]" style={{ background: LIME }}>{t('tshare.won_tag')}</span>}
         <p className={`truncate font-extrabold text-white ${compact ? 'text-[11px]' : 'text-[12.5px]'}`}>
           {compact && d.won && <span style={{ color: LIME }}>✓ </span>}{d.mine}
         </p>
         {!compact && d.teamName && <p className="truncate text-[8px] text-[#9CA3AF]">{d.teamName}</p>}
+        {d.won && d.wonBelow && <p className="text-[7.5px] font-extrabold uppercase" style={{ color: LIME }}>{d.wonBelow}</p>}
       </div>
       <b className={`font-display font-extrabold ${compact ? 'text-[16px]' : 'text-[24px]'}`} style={{ color: d.won ? LIME : '#FFFFFF' }}>{d.myScore}</b>
     </div>
@@ -108,7 +191,7 @@ function ResultBody({ d, compact }) {
   return (
     <div>
       <Mono>{d.kicker}</Mono>
-      <p className={`mt-1 font-display font-extrabold leading-none text-white ${compact ? 'text-[20px]' : 'text-[28px]'}`}>{t('tshare.result')}</p>
+      <p className={`mt-1 font-display font-extrabold leading-none text-white ${compact ? 'text-[20px]' : 'text-[28px]'}`}>{d.heading || t('tshare.result')}</p>
       <div className={`${compact ? 'mt-2 space-y-1.5' : 'mt-3 space-y-2'}`}>
         {mineBox}
         <div className={`flex items-center justify-between gap-2 rounded-[10px] bg-[#1A1A1D] px-3 ${compact ? 'py-2' : 'py-3'}`}>
@@ -134,10 +217,12 @@ function PodiumBody({ d, compact }) {
           <div key={r.place} className={`flex items-center gap-3 rounded-[10px] px-3 ${compact ? 'py-1.5' : 'py-2.5'} ${r.mine ? 'border-2' : 'bg-[#1A1A1D]'}`}
             style={r.mine ? { borderColor: LIME, background: compact ? 'rgba(11,11,12,0.6)' : '#0B0B0C' } : undefined}>
             <b className="w-4 text-[14px] font-extrabold text-white">{r.place}</b>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-[11.5px] font-extrabold text-white">{r.pair}</p>
               {r.title && <p className="truncate text-[8px] font-bold" style={{ color: r.mine ? LIME : '#9CA3AF' }}>{r.title}</p>}
             </div>
+            {/* Americano: os pontos de cada um, à direita (#622). */}
+            {r.score != null && <b className="shrink-0 font-display text-[13px] font-extrabold" style={{ color: r.mine ? LIME : '#FFFFFF' }}>{r.score}</b>}
           </div>
         ))}
       </div>
@@ -151,14 +236,24 @@ function PodiumBody({ d, compact }) {
  * data (result): { kicker, date, mine, teamName, theirs, myScore, theirScore, won, sets, record }
  * data (podium): { kicker, date, place, rows: [{ place, pair, title, mine }], record }
  * photo: data URL já cortado (bakePhoto), ou null · qr: data URL
+ * org (#622, opcional): { name, logo (bakeCircle), initials, sub, place, mark (a bola da alinho) }
+ * children (#622, opcional): um miolo próprio no lugar do pódio/resultado;
+ *   como função, recebe { compact } (com foto, o miolo encolhe)
  */
-const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, data, photo, qr }, ref) {
+const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, data, photo, qr, org = null, children = null }, ref) {
   const nodeRef = useRef(null)
   useImperativeHandle(ref, () => ({
     exportPng: async () => {
       const node = nodeRef.current
       if (!node) throw new Error('Card not ready')
-      const dataUrl = await toPng(node, { width: T_CARD_W, height: T_CARD_H, pixelRatio: RATIO, cacheBust: true })
+      const opts = { width: T_CARD_W, height: T_CARD_H, pixelRatio: RATIO, cacheBust: true }
+      // No iPhone (WebKit), a foto grande saía preta: o html-to-image desenha
+      // antes de ela estar descodificada (QA, 11 out). Espera-se pela
+      // descodificação de todas as imagens e faz-se uma primeira passagem
+      // que se deita fora; a segunda já leva a foto.
+      await Promise.all([...node.querySelectorAll('img')].map((img) => (img.decode ? img.decode().catch(() => {}) : null)))
+      await toPng(node, opts).catch(() => {})
+      const dataUrl = await toPng(node, opts)
       return (await fetch(dataUrl)).blob()
     },
   }))
@@ -169,9 +264,10 @@ const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, d
       {photo && <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: T_CARD_W, height: PHOTO_H }} />}
       <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: SAFE, bottom: SAFE }}>
         <Header date={data.date} />
+        <OrgLine org={org} />
         {/* Sem foto, o bloco fica ao centro entre o logótipo e o rodapé;
             com foto, em baixo, por baixo da foto (designer, 27 set). */}
-        <div className={compact ? 'mt-auto' : 'flex flex-1 flex-col justify-center'}><Body d={data} compact={compact} /></div>
+        <div className={compact ? 'mt-auto' : 'flex flex-1 flex-col justify-center'}>{children ? (typeof children === 'function' ? children({ compact }) : children) : <Body d={data} compact={compact} />}</div>
         <div className="mt-3"><Footer qr={qr} /></div>
       </div>
     </div>

@@ -140,7 +140,9 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false,
     }
   }
 
-  const pillButton = 'inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40'
+  // Botões a toda a largura, empilhados: a ação principal (lima) em cima, a
+  // outra em contorno por baixo (regra dos botões, Francisco 6 out; UX 10 out).
+  const pillButton = 'flex w-full items-center justify-center gap-1.5 text-sm font-extrabold px-4 min-h-[48px] rounded-ctrl transition-colors duration-fast disabled:opacity-40'
 
   return (
     <div className={bare ? 'relative' : `relative rounded-ctrl border border-line ${compact ? 'bg-ink-50 p-3' : 'card'}`}>
@@ -177,11 +179,11 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false,
             placeholder={t('login.phone_placeholder')}
             className="input-field w-full"
           />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             <button onClick={() => sendCode('sms')} disabled={busy} className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
               {busy ? <RefreshCw size={14} className="animate-spin" /> : <Smartphone size={14} />} {t('phoneconfirm.channel_sms')}
             </button>
-            <button onClick={() => sendCode('whatsapp')} disabled={busy} className={`${pillButton} bg-white border border-line text-ink-900 hover:bg-ink-200/40`}>
+            <button onClick={() => sendCode('whatsapp')} disabled={busy} className={`${pillButton} bg-white border-[1.5px] border-ink-900 text-ink-900 hover:bg-ink-200/40`}>
               <Users size={14} /> {t('phoneconfirm.channel_group')}
             </button>
           </div>
@@ -190,7 +192,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false,
 
       {step === 'code' && (
         <div className="mt-2.5 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-2">
             <input
               type="text"
               inputMode="numeric"
@@ -199,7 +201,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false,
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder={t('phoneconfirm.code_placeholder')}
-              className="input-field w-32 font-mono tracking-[0.3em] text-center tabular-nums"
+              className="input-field w-full font-mono tracking-[0.3em] text-center tabular-nums"
               autoFocus
             />
             <button onClick={confirmCode} disabled={busy || code.length !== 6} className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
@@ -219,11 +221,11 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false,
             {t('phoneconfirm.group_write')}{' '}
             <span className="font-mono font-extrabold tabular-nums">Confirmar {groupCode}</span>
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2">
             <button onClick={checkGroupConfirmed} disabled={busy} className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
               {busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('phoneconfirm.group_sent')}
             </button>
-            <button onClick={() => { setStep('phone'); setGroupCode(null); setNotYet(false) }} disabled={busy} className="text-xs font-extrabold text-muted hover:text-ink-900">
+            <button onClick={() => { setStep('phone'); setGroupCode(null); setNotYet(false) }} disabled={busy} className="min-h-[40px] text-xs font-extrabold text-muted hover:text-ink-900">
               {t('phoneconfirm.group_back')}
             </button>
           </div>

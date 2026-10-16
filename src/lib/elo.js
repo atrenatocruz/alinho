@@ -68,7 +68,9 @@ export function peopleRatingBand(rating, genders = []) {
   if (!known.size) return null
   const prefix = known.size === 2 ? 'MX' : known.has('feminino') ? 'F' : 'M'
   const band = BANDS.find((b) => rating >= b.min)
-  const label = band ? `${prefix}${band.num}` : `${prefix}INI`
+  // Iniciação sem letra colada, como no perfil: «INI», não «MINI» (que se
+  // lia «mini» — UX, 11 out).
+  const label = band ? `${prefix}${band.num}` : 'INI'
   return band ? { label, fullKey: 'ui.level_band', fullVars: { label } } : { label, fullKey: 'ui.group_level_beginner' }
 }
 

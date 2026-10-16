@@ -14,6 +14,12 @@ import { whatsappShare } from '../../lib/partnerInvite'
 import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 import { replaceTournamentPlayer, entryHasPlayedMatches } from '../../lib/tournamentApi'
 import { categoryGenderQuestion } from './genderCheck'
+import { usePriceRoster, PriceRosterSummary, PriceRosterTag } from '../SpecialPriceRoster'
+import { TshirtSummaryCard, PairShirts } from './TshirtAdmin'
+import { tshirtOn, shirtRulesOf } from './tshirt'
+import { useNavigate } from 'react-router-dom'
+import { listTournamentClashes } from '../../lib/tournamentApi'
+import { ClashBanner, ClashCaseSheet, ClashListSheet, ClashSwapSheet, casesFor } from './Clashes'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -40,6 +46,8 @@ const plain = (s) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').
 function pairName(e, t) {
   const second = e.player2_name || e.guest_name
   if (!second) return e.player1_name || '?'
+  // Parceiro ainda por aceitar: «Francisco Barros / à espera de Ana» (UX, 11 out).
+  if (e.status === 'convite') return `${e.player1_name} / ${t('tentries.waiting_for', { name: String(second).split(/\s+/)[0] })}`
   return `${e.player1_name} / ${second}`
 }
 
@@ -328,6 +336,42 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
   const [renameFor, setRenameFor] = useState(null)
   const [swap, setSwap] = useState(null) // { entry, slot, played }
   const [toast, setToast] = useState('')
+  // Preço especial (design-handoff/2026-10-07-preco-especial, ponto 3): o
+  // preço de cada jogador, só para quem organiza. Por pessoa: a categoria
+  // tem o preço da dupla (Dev 3, 10 out).
+  const normalEach = (category?.price_cents || 0) / 200
+  const roster = usePriceRoster(isAdmin && normalEach > 0 ? 'tournament_category' : null, category?.id, rows.length)
+  // Categorias que chocam (9 out): quem organiza vê quem está em duas
+  // categorias à mesma hora, e resolve daqui (tirar de uma, ou mudar a hora).
+  const navigate = useNavigate()
+  const [clashes, setClashes] = useState([])
+  const [clashList, setClashList] = useState(false)
+  const [clashCase, setClashCase] = useState(null)
+  const [clashKey, setClashKey] = useState(0)
+  useEffect(() => {
+    if (!isAdmin || !tournament?.id) return undefined
+    let cancelled = false
+    listTournamentClashes(tournament.id)
+      .then((r) => { if (!cancelled) setClashes(r) })
+      .catch((err) => { console.error('Error loading clashes:', err); if (!cancelled) setClashes([]) })
+    return () => { cancelled = true }
+  }, [isAdmin, tournament?.id, clashKey, rows.length])
+  // Antes do sorteio contam as categorias a começar juntas; depois, os jogos
+  // quase à mesma hora (alguém mudou horas à mão — acerto de 9 out).
+  // Jogos quase juntos só existem depois do sorteio: se a categoria os tem,
+  // é esse o caso (e a saída é trocar, não tirar).
+  const drawn = ['sorteada', 'a_decorrer', 'terminada'].includes(category?.status)
+    || casesFor(clashes, category?.id, 'match_overlap').length > 0
+  const clashKind = drawn ? 'match_overlap' : 'near_start'
+  const clashPeople = new Set((clashes || []).filter((c) => c.kind === clashKind).map((c) => c.user_id)).size
+  const clashOf = new Map(casesFor(clashes, category?.id, clashKind).map((c) => [c.here.entry, c]))
+  // «Trocar jogador» de quem choca, já com a pessoa escolhida.
+  const swapClash = (c) => {
+    const e = rows.find((r) => r.entry_id === c.entry_id_a || r.entry_id === c.entry_id_b)
+    if (!e) return
+    setSwap({ entry: e, slot: e.player1_id === c.user_id ? 1 : 2, played: null })
+    entryHasPlayedMatches(e.entry_id).then((played) => setSwap((cur) => (cur?.entry === e ? { ...cur, played } : cur)))
+  }
   useEffect(() => {
     if (!toast) return undefined
     const id = setTimeout(() => setToast(''), 3000)
@@ -446,7 +490,9 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
 
   const act = async (fn) => {
     setBusy(true); setError('')
-    try { await fn(); load(); if (searching) loadAll() }
+    // A página volta a ler os números (pending_count da pergunta de
+    // cancelar, contagens), sem ter de recarregar (QA, 12 out).
+    try { await fn(); load(); if (searching) loadAll(); window.dispatchEvent(new Event('tournament:reload')) }
     catch (err) { console.error('Error acting on a tournament entry:', err); say(err) }
     finally { setBusy(false) }
   }
@@ -484,6 +530,13 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
               <UserPlus size={18} /> {t('tentries.admin_add_title')}
             </button>
           )}
+          {/* As t-shirts do torneio todo (SPEC t-shirts, ponto 4). */}
+          <TshirtSummaryCard tournament={tournament} />
+          {clashPeople > 0 && (
+            <ClashBanner onResolve={() => setClashList(true)}>
+              <b>{t('tclash.entries_title', { count: clashPeople })}</b> {t('tclash.entries_body')}
+            </ClashBanner>
+          )}
         </>
       )}
 
@@ -496,6 +549,15 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
         })}
         {category.slots ? ` · ${t('tentries.count_slots', { count: category.slots })}` : ''}
       </p>}
+      {!searching && (
+        <PriceRosterSummary roster={roster} normalPrice={normalEach} className="-mt-2"
+          // Quem entrou sem conta também conta, e paga o normal (QA, 11 out:
+          // contava a dupla e dizia «Todos com preço especial»).
+          ids={rows.filter((r) => r.status !== 'desistiu' && !r.withdrawn).flatMap((r) => [
+            r.player1_id || (r.player1_name ? `sem-conta-1-${r.entry_id}` : null),
+            r.player2_id || (r.player2_name || r.guest_name ? `sem-conta-2-${r.entry_id}` : null),
+          ])} />
+      )}
 
       {searching && allRows !== null && shown.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">{t('tentries.search_none')}</p>
@@ -520,7 +582,9 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
               <div className="min-w-0 flex-1">
                 {/* Até duas linhas: com os botões ao lado, «Carla N…» não
                     dizia quem era (Trello #515). */}
-                <p className="font-extrabold text-ink-900 line-clamp-2 break-words">
+                {/* O nome inteiro, em duas linhas se for preciso, sem «…»: cortado
+                    não se via o parceiro (QA/UX, 11 out). */}
+                <p className="font-extrabold text-ink-900 break-words">
                   {/* A procurar em todas as categorias: a pastilha diz de qual. */}
                   {searching && e.category_code && (
                     <span className="mr-1.5 rounded-md bg-ink-900 px-1.5 py-0.5 align-[1px] font-mono text-xs font-bold text-white">{e.category_code}</span>
@@ -540,6 +604,25 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
                     e.created_at ? t('tentries.signed_up_on', { date: signedUpOn(e.created_at) }) : null,
                   ].filter(Boolean).join(' · ')}
                 </p>
+                {/* O preço de cada um, quando alguém na categoria tem o especial. */}
+                {roster && !searching && e.status !== 'desistiu' && (
+                  // Uma pessoa por linha, sempre (UX, 10 out): não depende da largura.
+                  <span className="mt-1 flex flex-col items-start gap-1">
+                    {[[e.player1_id, e.player1_name], [e.player2_id, e.player2_name || e.guest_name]].filter(([, n]) => n).map(([id, n], k) => (
+                      <span key={k} className="inline-flex items-center gap-1.5 text-xs text-muted">
+                        {String(n).split(' ')[0]} <PriceRosterTag roster={roster} userId={id} normalPrice={normalEach} />
+                      </span>
+                    ))}
+                  </span>
+                )}
+                {isAdmin && clashOf.has(e.entry_id) && e.status !== 'desistiu' && (
+                  <span className="mt-1 block text-xs font-semibold text-[#9A5B00]">
+                    ⚠️ {t('tclash.also_in', { name: clashOf.get(e.entry_id).name, code: clashOf.get(e.entry_id).other.code })}
+                  </span>
+                )}
+                {isAdmin && tshirtOn(shirtRulesOf(tournament)) && e.status !== 'desistiu' && (
+                  <p className="mt-1"><PairShirts entry={e} /></p>
+                )}
               </div>
 
               <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${STATE_TONE[e.status] || 'bg-ink-50 text-muted'}`}>
@@ -847,6 +930,29 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
           {toast}
         </div>,
         document.body,
+      )}
+      {clashList && !clashCase && (
+        <ClashListSheet clashes={(clashes || []).filter((c) => c.kind === clashKind)} onClose={() => setClashList(false)} onPick={(c) => setClashCase(c)}
+          onSchedule={drawn ? () => { setClashList(false); navigate(`/torneio/${tournament.slug || tournament.id}?admin=horario`) } : null} />
+      )}
+      {clashCase && drawn && (
+        <ClashSwapSheet clash={clashCase} hereId={category?.id}
+          onClose={() => setClashCase(null)}
+          onSwapHere={() => { const c = clashCase; setClashCase(null); setClashList(false); swapClash(c) }}
+          onSwapThere={() => {
+            const other = clashCase.category_a === category?.id ? clashCase.code_b : clashCase.code_a
+            setClashCase(null); setClashList(false)
+            navigate(`/torneio/${tournament.slug || tournament.id}?tab=entries&cat=${other}`)
+          }}
+          onSchedule={() => { setClashCase(null); setClashList(false); navigate(`/torneio/${tournament.slug || tournament.id}?admin=horario`) }} />
+      )}
+      {clashCase && !drawn && (
+        <ClashCaseSheet clash={clashCase} hereId={category?.id}
+          onClose={() => setClashCase(null)}
+          onRemoved={(from) => {
+            setToast(t('tclash.removed', { name: clashCase.name, code: from.code }))
+            setClashCase(null); setClashList(false); setClashKey((n) => n + 1); load()
+          }} />
       )}
     </div>
   )

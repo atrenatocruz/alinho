@@ -8,10 +8,16 @@ import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand, peopleRatingBand } from '../lib/elo'
 import { planName } from '../lib/plans'
-import { achievementIcon, RARITY_META } from '../lib/achievements'
+import { achievementIcon, RARITY_META, formatRarityPct } from '../lib/achievements'
+import { medalUrl } from '../lib/achievementMedals'
 import { formatDate } from '../lib/formatDate'
 import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '../lib/follows'
 import { describeError } from '../lib/errors'
+import Alino from './Alino'
+import { frameInsideBox, frameSrc } from '../lib/frames'
+import { useDragScroll } from '../lib/useDragScroll'
+import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
+import TimeInput from './TimeInput'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -114,7 +120,8 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
             value={year}
             onChange={(y) => onJumpTo(Number(y), month)}
             options={yearOptionsFor(min, max)}
-            className="w-24 shrink-0 py-2"
+            // Largura para «2026» inteiro com a seta (aparecia «20…» — UX, 16 out).
+            className="w-[7.25rem] shrink-0 py-2"
           />
         </div>
         <button
@@ -380,8 +387,7 @@ export function DateTimeField({ value, onChange, placeholder, min = null }) {
                   pushing past the card's right edge — `min-w-0` overrides
                   the implicit "don't shrink below content size" default
                   that causes it. */}
-              <input
-                type="time"
+              <TimeInput
                 value={pendingTime}
                 onChange={(e) => setPendingTime(e.target.value)}
                 className="input-field w-full min-w-0 box-border"
@@ -763,13 +769,170 @@ export function Chips({ options, value, onChange, label, className = '' }) {
   )
 }
 
+/* ─── A barra de filtros e o bloco preso em cima (R4, 13 out) ───────────
+   design-handoff/2026-10-13-redesign/R4-barras-e-separadores.md.
+   A barra da Home em todo o lado: fundo branco, 🔍 redondo, `lead` (ex.:
+   «Out 2026 ⌄»), uma linha fina a separar e as pastilhas soltas (a
+   escolhida a preto, com o ponto da cor quando é um tipo). Desliza para o
+   lado sem barra à vista; no computador também com o rato e a roda.
+
+     <StickyTop>                       ← preso em cima ao descer, num bloco branco
+       <Tabs … />                      ← o separador (pílula cinzenta), se houver
+       <FilterBar
+         search={{ value, onChange, placeholder, open?, onOpenChange? }}   ← 🔍 troca a barra pelo campo, «✕» volta
+         lead={<FilterPill chevron onClick={…}>Out 2026</FilterPill>}
+         options={[{ value: 'mix', label: 'Mixes', dot: KIND_COLORS.mix.strong, count: 2 }, …]}
+         value={kind} onChange={setKind} label="Tipo" />
+     </StickyTop>
+
+   Em vez de `options`, os filhos: <FilterPill on dot count chevron onClick>
+   ou um <Select variant="chip">. O título da página (PageHeader com
+   sticky={false}) e o que vem antes sobem e saem; o StickyTop fica. */
+
+const PILL_TAP = "before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+
+/** Uma pastilha da barra de filtros. `on` = escolhida (a preto); `dot` = a
+ *  cor do tipo; `count` = o número ao lado («Mixes · 2»); `chevron` = abre
+ *  uma escolha («Feminino ⌄»). */
+export function FilterPill({ on = false, dot = null, count = null, chevron = false, onClick, children, ...props }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={chevron ? undefined : on} data-on={on || undefined} {...props}
+      className={`relative inline-flex min-h-[36px] shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-extrabold transition-colors duration-fast ${PILL_TAP} ${
+        on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
+      {/* O ponto do tipo: redondo, 8 px, sem transparência (protótipo). */}
+      {dot && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: dot }} />}
+      {children}
+      {count != null && <span className={`tabular-nums ${on ? 'text-white/75' : 'text-muted'}`}>· {count}</span>}
+      {chevron && <ChevronDown size={14} className={on ? 'text-white/75' : 'text-muted'} />}
+    </button>
+  )
+}
+
+/** A barra de filtros (ver acima). `search`: { value, onChange, placeholder }
+ *  — a lupa troca a barra pelo campo, «✕» limpa e volta. `onSearch`: em vez
+ *  do campo, a lupa chama isto (ex.: abre uma folha). Sem nenhum, sem lupa. */
+export function FilterBar({ search = null, onSearch = null, lead = null, options = null, value, onChange, label, children, className = '' }) {
+  const { t } = useTranslation()
+  const ref = useDragScroll()
+  const inputRef = useRef(null)
+  // Aberta/fechada: por dentro, ou de fora com search.open e
+  // search.onOpenChange (a Home troca a lista do dia pelos resultados).
+  const [openInside, setOpenInside] = useState(!!search?.value)
+  const controlled = typeof search?.open === 'boolean'
+  const searching = controlled ? search.open : openInside
+  const setSearching = (v) => { if (controlled) search.onOpenChange?.(v); else setOpenInside(v) }
+  useEffect(() => { if (searching) inputRef.current?.focus() }, [searching])
+  // A pastilha escolhida fica sempre à vista: a barra desliza até ela.
+  useEffect(() => {
+    const el = ref.current
+    const on = el?.querySelector('[data-on]')
+    if (!el || !on || searching) return
+    const box = el.getBoundingClientRect()
+    const r = on.getBoundingClientRect()
+    if (r.right > box.right - 16) el.scrollLeft += r.right - box.right + 16
+    else if (r.left < box.left + 16) el.scrollLeft -= box.left + 16 - r.left
+  }, [value, searching, ref])
+  const close = () => { search?.onChange?.(''); setSearching(false) }
+  const hasLupa = !!(search || onSearch)
+  // «›» à direita, só no computador (rato), enquanto houver mais para o lado
+  // (SPEC do R2, o more-r do protótipo — QA, 13 out). No telemóvel, o dedo.
+  const [more, setMore] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const update = () => setMore(!searching && el.scrollWidth - el.clientWidth - el.scrollLeft > 4)
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    ro?.observe(el)
+    return () => { el.removeEventListener('scroll', update); ro?.disconnect() }
+  }, [ref, searching, options, children])
+  const nudge = () => { const el = ref.current; if (el) el.scrollBy({ left: Math.round(el.clientWidth * 0.7), behavior: 'smooth' }) }
+  return (
+    <div className="relative">
+    {/* A fila desliza dentro da margem da página, sem ir até à borda do ecrã
+        (Renato, 16 out: «tem de haver um inner container com margin»). */}
+    <div ref={ref} role={searching ? undefined : 'group'} aria-label={searching ? undefined : label}
+      className={`no-scrollbar flex cursor-grab items-center gap-1.5 overflow-x-auto py-1 active:cursor-grabbing ${className}`}>
+      {searching ? (
+        // A caixa da pesquisa, igual em todas as páginas (SPEC 2026-10-14-
+        // pesquisa-regra-unica): redonda, 36 px, branca com contorno preto de
+        // 1,5 px, a lupa cinzenta, o texto a 500 e o «✕» num círculo
+        // cinzento de 26 px que apaga e fecha. O texto fica a 16 px (e não 14):
+        // abaixo de 16 o iPhone aproxima a página ao tocar no campo.
+        <div className="flex min-h-[36px] w-full items-center gap-2 rounded-full border-[1.5px] border-ink-900 bg-white pl-3 pr-[5px]">
+          <Search size={16} className="shrink-0 text-muted" />
+          <input ref={inputRef} type="search" value={search?.value || ''} onChange={(e) => search?.onChange?.(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') close() }}
+            placeholder={search?.placeholder} aria-label={search?.placeholder || t('agenda.search_open')}
+            className="min-w-0 flex-1 bg-transparent text-[16px] font-medium leading-none text-ink-900 outline-none placeholder:font-medium placeholder:text-muted [&::-webkit-search-cancel-button]:hidden" />
+          <button type="button" onClick={close} aria-label={t('ui.close')}
+            className="relative flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-[#E7E9ED] text-ink-900 before:absolute before:-inset-2 before:content-['']">
+            <X size={14} strokeWidth={2.5} />
+          </button>
+        </div>
+      ) : (
+        <>
+          {hasLupa && (
+            <button type="button" onClick={() => (search ? setSearching(true) : onSearch())} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
+              className={`relative inline-flex min-h-[36px] w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink-900 ${PILL_TAP}`}>
+              <Search size={16} />
+            </button>
+          )}
+          {lead}
+          {(hasLupa || lead) && <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-line" />}
+          {options
+            ? options.map((o) => (
+              <FilterPill key={String(o.value)} on={o.value === value} dot={o.dot} count={o.count} onClick={() => onChange(o.value)}>{o.label}</FilterPill>
+            ))
+            : children}
+        </>
+      )}
+    </div>
+    {more && (
+      <button type="button" onClick={nudge} aria-label={t('ui.see_more_right')} tabIndex={-1}
+        // O esbatido acaba na cor de fundo da barra (--bar-bg): branco no topo
+        // da Home, o cinzento da página na StickyTop (R12b).
+        style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0), var(--bar-bg, #fff) 45%)' }}
+        // A seta fica para dentro dos cantos redondos da barra (revisão do
+        // Renato, 16 out: na Home saía do contentor curvo).
+        className="absolute inset-y-0 right-0 hidden w-[40px] items-center justify-end pr-1.5 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
+        ›
+      </button>
+    )}
+    </div>
+  )
+}
+
+/** O bloco que fica preso em cima ao descer: o separador e a barra de
+ *  filtros juntos, no cinzento da página (#F1F2EE), sem faixa branca nem
+ *  linha por baixo (R12b, 14 out) — tapa o que passa por baixo. Tem de ser filho
+ *  direto do contentor da página (o sticky só prende dentro do pai). Tem
+ *  sempre o mesmo tamanho, preso ou solto — não treme ao descer.
+ *  `belowBackBar`: nas páginas com o «‹» preso (BackBar, 64 px + a margem do
+ *  telemóvel), prende-se logo por baixo dele em vez de no topo. */
+const BELOW_BACKBAR = 'calc(4rem + var(--safe-top, env(safe-area-inset-top, 0px)))'
+export function StickyTop({ children, belowBackBar = false, className = '' }) {
+  return (
+    <div style={{ '--bar-bg': 'rgb(var(--ground))', ...(belowBackBar ? { top: BELOW_BACKBAR } : {}) }}
+      className={`sticky top-0 z-10 -mx-4 space-y-2 bg-ground px-4 pb-1.5 pt-2 ${className}`}>
+      {children}
+    </div>
+  )
+}
+
 export function PrimaryButton({ variant = 'lime', className = '', children, ...props }) {
+  // O escurecer só enquanto o dedo está no botão: no telemóvel o hover ficava
+  // preso depois de deslizar a página (o lima a verde-escuro, Francisco, 14 out).
   const variants = {
-    lime:     'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card',
-    navy:     'bg-ink-700 text-white hover:bg-ink-500 shadow-card',
-    ghost:    'bg-surface text-ink-900 border border-line hover:bg-ink-50 hover:border-ink-200',
-    danger:   'bg-danger/10 text-danger hover:bg-danger/15',
-    whatsapp: 'bg-[#25D366] text-white hover:bg-[#20bd5a] shadow-card',
+    lime:     'bg-lime-400 text-ink-900 [@media(hover:hover)]:hover:bg-lime-600 active:bg-lime-600 shadow-card',
+    navy:     'bg-ink-700 text-white [@media(hover:hover)]:hover:bg-ink-500 active:bg-ink-500 shadow-card',
+    // A preto: as ações de quem organiza (o lima é das de jogador).
+    ink:      'bg-ink-900 text-white [@media(hover:hover)]:hover:bg-ink-700 active:bg-ink-700 shadow-card',
+    // Secundário: branco com contorno de 1,5 px (UX, 14 out; o #F4F5F1 é só das caixas).
+    ghost:    'bg-white text-ink-900 border-[1.5px] border-[#CFD2D7] [@media(hover:hover)]:hover:bg-ink-50 active:bg-ink-50 [@media(hover:hover)]:hover:border-ink-200 active:border-ink-200',
+    danger:   'bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger/15 active:bg-danger/15',
+    whatsapp: 'bg-[#25D366] text-white [@media(hover:hover)]:hover:bg-[#20bd5a] active:bg-[#20bd5a] shadow-card',
   }
   return (
     <button
@@ -848,7 +1011,7 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    Default null = sem escudo, todos os call sites existentes intactos.
    Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
    não devem passar `xp` — dois rings sobrepõem-se. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false, shape = 'round' }) {
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false, shape = 'round', frame = null }) {
   // Nota: o aro de XP que aqui viveu foi removido a pedido do Ruben —
   // criava confusão com o ranking. O nível de XP mostra-se no painel do
   // perfil, no tab Assiduidade e nos troféus; no avatar só fica a pill
@@ -866,6 +1029,13 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
     ? <img src={url} alt={name || ''} className={`${base} object-cover object-[50%_30%]`} />
     : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
 
+  // Moldura do pódio do mês (design-handoff/2026-10-12-molduras-podio): cabe
+  // na mesma caixa da foto, e a foto encolhe para o buraco do meio — nada
+  // muda de sítio. `frame` = 'ouro' | 'prata' | 'bronze' (ou a linha da
+  // get_user_frames). Se a imagem não carregar, fica a foto sozinha.
+  const frameKind = typeof frame === 'string' ? frame : frame?.frame
+  if (frameKind && shape !== 'square') return <FramedAvatar kind={frameKind} name={name} url={url} size={size} colorClass={colorClass} />
+
   // Jogador provisório (<8 jogos de Elo): mini-pill "NOVO" sobre a borda
   // inferior — só quando pedido, para não mudar o layout dos ~40 call
   // sites existentes.
@@ -876,6 +1046,21 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
       <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-lime-400 text-ink-900 text-[8px] leading-tight font-mono font-extrabold tracking-wide uppercase whitespace-nowrap ring-1 ring-surface">
         {t('elo.provisional_short')}
       </span>
+    </span>
+  )
+}
+
+function FramedAvatar({ kind, name, url, size, colorClass }) {
+  const [failed, setFailed] = useState(false)
+  const box = frameInsideBox(kind)
+  if (failed || !box) return <Avatar name={name} url={url} size={size} colorClass={colorClass} />
+  return (
+    <span className={`${size} relative inline-block shrink-0`}>
+      <span className="absolute" style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.size}%`, height: `${box.size}%` }}>
+        <Avatar name={name} url={url} size="w-full h-full text-[60%]" colorClass={colorClass} />
+      </span>
+      <img src={frameSrc(kind)} alt="" aria-hidden="true" onError={() => setFailed(true)}
+        className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
     </span>
   )
 }
@@ -926,10 +1111,36 @@ export function PlanBadge({ tier, className = '' }) {
    ícone por key (achievementIcon), nome/descrição dos locales. Bloqueado =
    silhueta com cadeado e o critério visível (a descrição É o critério) —
    o "para onde subir". rarityPct = % de jogadores que o têm (PSN-style). */
-export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null }) {
-  const { t } = useTranslation()
+/* A medalha pintada (design-handoff/2026-10-11-medalhas-conquistas, aprovado
+   pelo Francisco a 11 out), ~84 px. Por conquistar: a mesma medalha a
+   cinzento, com um cadeado num círculo preto no canto de baixo. Sem medalha
+   (ou se a imagem falhar), o ícone redondo de sempre. */
+function AchievementMedal({ url, locked, name, max = 84 }) {
+  return (
+    // Nunca mais larga do que o cartão (iPhone a 375 px, 13 out): encolhe com
+    // ele e fica sempre centrada, com a mesma folga dos dois lados.
+    <span className="relative mx-auto block aspect-square w-full" style={{ maxWidth: max }}>
+      <img src={url} alt={name} loading="lazy" decoding="async" width="84" height="84"
+        className={`h-full w-full object-contain ${locked ? 'opacity-[.55] [filter:grayscale(1)]' : ''}`} />
+      {locked && (
+        <span className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-ink-900">
+          <Lock size={11} className="text-lime-400" />
+        </span>
+      )}
+    </span>
+  )
+}
+
+// A cor do texto de cada raridade (coleção das conquistas; UX, 13 out).
+const RARITY_TEXT = { comum: '#0F9D8A', raro: '#2563EB', epico: '#7C3AED', lendario: '#B8860B' }
+
+export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null, onOpen = null, compact = false }) {
+  const { t, i18n } = useTranslation()
   const Icon = achievementIcon(achievementKey, category)
   const meta = RARITY_META[rarity] || RARITY_META.comum
+  const [medalFailed, setMedalFailed] = useState(false)
+  const medal = medalFailed ? null : medalUrl(achievementKey)
+  const name = t(`achievements.${achievementKey}_name`)
 
   // GANHO grita, BLOQUEADO sussurra: o ganho tem medalhão preenchido da
   // cor da raridade, borda sólida e brilho nos tiers altos; o bloqueado é
@@ -937,10 +1148,12 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   // confunde os dois numa grelha mista.
   if (!earned) {
     return (
-      <div className="rounded-ctrl border border-dashed border-ink-200 bg-canvas p-3 text-center">
-        <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
-          <Lock size={16} className="text-ink-200" />
-        </span>
+      <div className="rounded-ctrl border border-dashed border-ink-200 bg-canvas p-3 text-center" onErrorCapture={() => setMedalFailed(true)}>
+        {medal ? <AchievementMedal url={medal} locked name={name} /> : (
+          <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
+            <Lock size={16} className="text-ink-200" />
+          </span>
+        )}
         <p className="mt-1.5 text-[12px] font-extrabold text-muted leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
         <p className="mt-0.5 text-[10px] text-ink-200 leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
         <div className="mt-1.5">
@@ -953,18 +1166,35 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   }
 
   return (
-    <div className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow}`}>
-      <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
-        <Icon size={22} className={meta.icon} />
-      </span>
-      <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
-      <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
-      <div className="mt-1.5 flex items-center justify-center gap-1.5">
-        <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
-          {t(meta.labelKey)}
+    // onOpen: tocar abre o cartão animado (Perfil, pedido do Francisco a 11 out).
+    <div
+      // compact (Perfil, R7): cartão branco próprio, sem borda grossa — a
+      // raridade vê-se na moldura da medalha e na palavra colorida.
+      // compact: como no protótipo, sem contorno, sombra leve, 10 px em cima
+      // e em baixo e 6 px dos lados.
+      className={`text-center ${compact ? 'rounded-card bg-white px-1.5 py-2.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]' : `p-3 rounded-ctrl border-2 bg-surface ${meta.frame} ${meta.glow}`} ${onOpen ? 'press cursor-pointer' : ''}`}
+      onErrorCapture={() => setMedalFailed(true)}
+      {...(onOpen ? { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } } : {})}
+    >
+      {medal ? <AchievementMedal url={medal} name={name} max={compact ? 72 : 84} /> : (
+        <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
+          <Icon size={22} className={meta.icon} />
         </span>
+      )}
+      <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
+      {/* compact (Perfil, R7): sem a descrição; a raridade e, por baixo, a «% têm». */}
+      {!compact && <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>}
+      <div className={`mt-1.5 flex items-center justify-center ${compact ? 'flex-col gap-0.5' : 'gap-1.5'}`}>
+        {compact ? (
+          // A raridade na cor dela, sem pastilha, como na coleção (UX, R7).
+          <span className="text-[9px] font-mono font-extrabold uppercase tracking-wide" style={{ color: RARITY_TEXT[rarity] || RARITY_TEXT.comum }}>{t(meta.labelKey)}</span>
+        ) : (
+          <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
+            {t(meta.labelKey)}
+          </span>
+        )}
         {rarityPct != null && (
-          <span className="text-[9px] text-muted tabular-nums">{t('achievements.rarity_pct', { pct: rarityPct })}</span>
+          <span className="text-[9px] text-muted tabular-nums">{t('achievements.rarity_pct', { pct: formatRarityPct(rarityPct, i18n.language) })}</span>
         )}
       </div>
     </div>
@@ -1448,7 +1678,9 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
   const empty = overflow > 0 ? 0 : Math.max(0, Math.min(max - players.length, cap - shown.length))
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex -space-x-2">
+      {/* isolate: a ordem das caras fica só dentro da fila, nunca por cima
+          das barras presas (13 out). */}
+      <div className="isolate flex -space-x-2">
         {shown.map((p, i) => (
           <div key={p.id || i} title={p.name} style={{ zIndex: cap - i }} className="relative">
             <Avatar name={p.name} url={p.avatar_url} size={`${dim} ring-2 ring-surface`} />
@@ -1500,6 +1732,60 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
 // Vouchers» do Gerir, 7 out). Sem `onBack` nem `to`, o lugar do «‹» fica vazio.
 // `solid`: fundo branco opaco em vez do vidro — no Gerir via-se o texto a
 // passar por trás da barra presa (UX, 7 out).
+// Com `solid` (R12b): sem margem por baixo, colada ao bloco branco que vem a
+// seguir, e os cantos de baixo a 16 px só quando esse bloco já saiu do ecrã
+// (presa sozinha ao descer) — parada, os cantos e a sombra são do último
+// bloco (QA, 14 out: via-se uma falha cinzenta entre a barra e o nome).
+// Sem `solid` (Francisco, 14 out — design-handoff/2026-10-14-capa-barra-
+// presa, pontos 5 e 6): a barra de vidro, como no topo da app do Claude
+// (GlassBar). De ponta a ponta da janela e a desvanecer em baixo; parada no
+// topo não tem fundo, só os botões. Quando o topo do título grande da página
+// (o primeiro h1/h2 a seguir à barra) chega ao fundo dos botões, o vidro e o
+// nome entram juntos e o título grande sai, numa troca cruzada de 150 ms — o
+// mesmo das páginas com capa (UX, 15 out). Nunca os dois, nunca o grande
+// cortado a meio do vidro.
+function GlassBackBar({ onBack, to, label, title, onShare, right }) {
+  const { t } = useTranslation()
+  const spaceRef = useRef(null)
+  const rowRef = useRef(null)
+  const headRef = useRef(null)
+  const [isHeading, setIsHeading] = useState(false)
+  useLayoutEffect(() => {
+    const space = spaceRef.current
+    // O título grande; sem ele, o que vem logo a seguir (o cartão do topo),
+    // que não se esconde.
+    const after = [...(space?.parentElement?.querySelectorAll('h1, h2') || [])]
+      .find((h) => space.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING)
+    headRef.current = after || space?.nextElementSibling || null
+    setIsHeading(!!after)
+  }, [title])
+  const under = useUnderBar(headRef, rowRef, [title, isHeading], { lastLine: isHeading })
+  const moved = useUnderBar(spaceRef, rowRef, [], { edge: 'bottom' })
+  // O vidro entra com a primeira linha do título; o nome sobe com a última.
+  const firstUnder = useUnderBar(headRef, rowRef, [title, isHeading])
+  useEffect(() => {
+    const head = headRef.current
+    if (!head || !isHeading) return undefined
+    head.style.transition = 'opacity 150ms'
+    head.style.opacity = under ? '0' : ''
+    return () => { head.style.opacity = ''; head.style.transition = '' }
+  }, [under, isHeading])
+  const back = to
+    ? <Link to={to} aria-label={label || t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></Link>
+    : onBack
+    ? <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button>
+    : null
+  return (
+    <>
+      {/* O lugar da barra na página (a barra em si vai para o <body>). */}
+      <div ref={spaceRef} aria-hidden="true" className="-mx-4 -mt-6 mb-1 h-16 box-content" style={{ paddingTop: SAFE_TOP }} />
+      <GlassBar anchorRef={spaceRef} rowRef={rowRef} filled={under || firstUnder} strip={moved} showTitle={under} title={title} left={back}
+        wide={!!right}
+        right={right || (onShare ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button> : null)} />
+    </>
+  )
+}
+
 export function BackBar({ onBack, to, label, title, onShare, right, solid = false }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
@@ -1516,8 +1802,9 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
     return () => io.disconnect()
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
+  if (!solid) return <GlassBackBar onBack={onBack} to={to} label={label} title={title} onShare={onShare} right={right} />
   return (
-    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 px-4 ${solid ? 'bg-white' : 'bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 px-4 mb-0 bg-white ${showTitle ? 'rounded-b-[16px]' : ''}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
       <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
@@ -1534,9 +1821,14 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
   )
 }
 
-export function PageHeader({ title, children }) {
+// `sticky={false}`: o título sobe e sai ao descer — nos ecrãs com o
+// StickyTop (separador e filtros presos em cima, R4), quem fica é ele.
+// R12b (14 out): o topo é branco, colado em cima, com os dois cantos de
+// baixo a 16 px e a sombra leve dos cartões — sem a linha fina por baixo.
+export const TOP_EDGE = 'rounded-b-[16px] shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
+export function PageHeader({ title, children, sticky = true }) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center justify-between gap-2 border-b border-line/70">
+    <div className={`${sticky ? 'sticky top-0 z-10' : ''} -mx-4 px-4 -mt-6 pt-4 pb-3 bg-white ${TOP_EDGE} flex items-center justify-between gap-2`}>
       <h2 className="text-3xl text-ink-900 min-w-0 truncate">{title}</h2>
       {children && <div className="flex items-center gap-1 shrink-0">{children}</div>}
     </div>
@@ -1572,27 +1864,53 @@ export function NeedsYou({ children, action, className = '' }) {
   )
 }
 
-export function EmptyState({ icon: Icon, title, subtitle, action }) {
-  return (
-    <div className="card text-center py-12 px-6 animate-fade-up">
-      <div className="relative w-24 h-24 mx-auto mb-5">
-        {/* faint court-line motif */}
-        <svg viewBox="0 0 96 96" className="absolute inset-0 text-ink-50" fill="none">
-          <rect x="8" y="14" width="80" height="68" rx="10" stroke="currentColor" strokeWidth="2.5" />
-          <line x1="48" y1="14" x2="48" y2="82" stroke="currentColor" strokeWidth="2.5" />
-          <line x1="8" y1="48" x2="88" y2="48" stroke="currentColor" strokeWidth="2.5" strokeDasharray="4 5" />
-          {/* ball-ring accent, echoing the logo's lime ring glyph */}
-          <circle cx="76" cy="24" r="9" stroke="#C5DD01" strokeWidth="2.5" />
-        </svg>
-        {Icon && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Icon size={32} strokeWidth={2} className="text-ink-700" />
-          </div>
-        )}
+/* O vazio de uma página: o Alino «a pensar» por cima do título e da frase
+   (regra do Francisco, 12 out: «o avatar quando não temos nada em páginas
+   para mostrar»; design-handoff/2026-10-12-mascote). Nos erros vai o
+   «ups»: pose="triste" (ou o LoadErrorState, com a frase e o botão).
+   Uma secção vazia dentro de uma página com outras coisas não leva o
+   Alino (ficava pesado): pose={null} dá uma linha só, sem caixa nem
+   ícone — o título a negrito e a frase a cinzento (UX, 12 out). O `icon`
+   já não se desenha; fica aceite para não mexer em quem o passa. */
+export function EmptyState({ title, subtitle, action, pose = 'a-pensar' }) {
+  if (!pose) {
+    const stop = /[.!?…]$/.test(String(title || '').trim()) ? '' : '.'
+    return (
+      <div className="space-y-2 py-1">
+        <p className="text-sm text-muted">
+          <b className="font-extrabold text-ink-900">{title}{subtitle ? stop : ''}</b>{subtitle ? ` ${subtitle}` : ''}
+        </p>
+        {action}
       </div>
-      <h3 className="text-lg text-ink-900 mb-1">{title}</h3>
-      {subtitle && <p className="text-muted text-sm mb-6">{subtitle}</p>}
-      {action}
+    )
+  }
+  return (
+    // O título e a frase como no protótipo (.empty) e no vazio do clube: letra
+    // da marca a 19 px, peso 900; a frase a 13,5 px em cinzento (UX, 15 out —
+    // o Francisco viu «Grupos ainda não sorteados» fino ao lado do clube). Linhas
+    // equilibradas (balance): nunca uma palavra sozinha na última.
+    <div className="card text-center py-10 px-6 animate-fade-up">
+      <Alino pose={pose} size={120} className="mx-auto" />
+      <h3 className="mt-2 font-display text-[19px] font-black leading-tight text-ink-900 [text-wrap:balance]">{title}</h3>
+      {subtitle && <p className="mt-1.5 text-[13.5px] leading-normal text-ink-500 [text-wrap:balance]">{subtitle}</p>}
+      {action && <div className="mt-6">{action}</div>}
+    </div>
+  )
+}
+
+/* Erro a carregar uma página inteira: o Alino «ups», a frase do erro, o que
+   fazer, e o botão para sair dali (SPEC da mascote: os erros levam sempre
+   uma saída). Por omissão, «Tentar outra vez» recarrega a página. */
+export function LoadErrorState({ title, subtitle, onRetry }) {
+  const { t } = useTranslation()
+  return (
+    <div role="alert">
+      <EmptyState pose="triste" title={title} subtitle={subtitle ?? t('ui.load_error_hint')}
+        action={(
+          <PrimaryButton variant="ghost" onClick={onRetry || (() => window.location.reload())} className="w-full">
+            {t('ui.try_again')}
+          </PrimaryButton>
+        )} />
     </div>
   )
 }
@@ -1675,7 +1993,9 @@ export function ShareModal({ title, message, url, onClose, imageCard }) {
   }
 
   const handleWhatsApp = () => {
-    window.open(`https://wa.me/?text=${encodeURIComponent(fullText)}`, '_blank', 'noopener,noreferrer')
+    // api.whatsapp.com/send e não wa.me: pelo wa.me os emojis (🎾, 🔗)
+    // chegavam ao WhatsApp como «�» (revisão do Renato, 16 out).
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(fullText)}`, '_blank', 'noopener,noreferrer')
   }
 
   const handleNativeShare = async () => {

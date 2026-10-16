@@ -16,7 +16,9 @@
    Nada aqui vai à base de dados.
    ════════════════════════════════════════════════════════════════════════ */
 
-export const EVENT_KINDS = ['mix', 'open', 'friends', 'lesson', 'tournament']
+// 'free' = os horários livres dos clubes, juntos num cartão por clube e por
+// dia (Home 4/4, SPEC-4 ponto 3): uma pastilha própria na barra dos tipos.
+export const EVENT_KINDS = ['mix', 'open', 'free', 'friends', 'lesson', 'tournament', 'league']
 
 // Dia local 'AAAA-MM-DD'. Local de propósito: um mix às 00:30 de sábado em
 // Lisboa pertence a sábado, não à sexta-feira em UTC.
@@ -177,6 +179,11 @@ export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
     const startsAt = first.scheduled_date ? scheduledAt(first.scheduled_date, first.scheduled_time) : new Date(first.played_at)
     const org = first.organization_id ? orgsById.get(first.organization_id) : null
     const done = (g) => g.score_a != null && g.score_b != null
+    // «Terminado» é o jogo enviado (session_finished_at: o finished_at da
+    // raiz, em cada linha — Dev 3), não as rondas marcadas: com uma ronda
+    // marcada e a seguinte por nascer, a Home já dizia «Terminado» (QA,
+    // 9 out). Sem o campo, como antes.
+    const finished = 'session_finished_at' in first ? Boolean(first.session_finished_at) : games.every(done)
     out.push({
       key: `friend_session:${first.session_id || first.id}`,
       source: 'friend_session',
@@ -192,7 +199,7 @@ export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
       orgLogo: org?.logo || null,
       mine: true,
       myState: 'in',
-      finished: games.every(done),
+      finished,
       raw: { ...first, games },
     })
   }
@@ -449,9 +456,18 @@ export const isAgendaGame = (game) => !HIDDEN_GAME.includes(game.status)
 export const SHOW_OPTIONS = ['all', 'enrolled', 'open', 'played']
 export const DEFAULT_FILTERS = { show: 'all', kinds: EVENT_KINDS, orgIds: null }
 
-/** Filtros guardados antes da mudança (com onlyMine) voltam ao início. */
-export const normalizeFilters = (f) =>
-  f && SHOW_OPTIONS.includes(f.show) && Array.isArray(f.kinds) && f.kinds.length ? f : DEFAULT_FILTERS
+/** Filtros guardados antes da mudança (com onlyMine) voltam ao início. Quem
+ *  tinha todos os tipos antes de haver «Horários livres» continua com todos. */
+const KINDS_BEFORE_FREE = ['mix', 'open', 'friends', 'lesson', 'tournament']
+const KINDS_BEFORE_LEAGUE = ['mix', 'open', 'free', 'friends', 'lesson', 'tournament']
+export const normalizeFilters = (f) => {
+  if (!(f && SHOW_OPTIONS.includes(f.show) && Array.isArray(f.kinds) && f.kinds.length)) return DEFAULT_FILTERS
+  if (!f.kinds.includes('free') && KINDS_BEFORE_FREE.every((k) => f.kinds.includes(k))) return { ...f, kinds: [...EVENT_KINDS] }
+  // A liga é um tipo novo (16 out): quem tinha todos os tipos de antes passa a ver a liga;
+  // ninguém a pode ter desligado de propósito.
+  if (!f.kinds.includes('league') && KINDS_BEFORE_LEAGUE.every((k) => f.kinds.includes(k))) return { ...f, kinds: [...EVENT_KINDS] }
+  return f
+}
 
 /** Já passou: terminou, ou o dia dele é antes de hoje. */
 export const isPastEvent = (e, todayKey) => e.finished || e.dayKey < todayKey

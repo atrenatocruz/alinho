@@ -1,0 +1,133 @@
+// A categoria, os separadores e os dias presos ao descer (design-handoff/
+// 2026-10-11-torneio-topo-preso, aprovado para experimentar pelo Francisco a
+// 11 out). Ficam por baixo da barra do título (BackBar, 64 px + a margem do
+// telemóvel), no cinzento da página (R12b, 14 out: nunca branco) e com uma
+// sombra leve; em cima, antes de descer,
+// tudo como hoje. Mudar de categoria, de separador ou de dia na barra presa
+// leva ao início dessa lista, logo abaixo da barra — não ao topo da página.
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useGlassBehind } from '../GlassBar'
+
+const SAFE_TOP = 'var(--safe-top, env(safe-area-inset-top, 0px))'
+const BAR_TOP = `calc(4rem + ${SAFE_TOP})`
+const SHADOW = 'shadow-[0_8px_12px_-10px_rgba(15,23,42,0.35)]'
+
+/** O que desliza: o <main> do Layout (overflow-y-auto), não a janela. */
+function scroller(el) {
+  for (let p = el?.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY
+    if (o === 'auto' || o === 'scroll') return p
+  }
+  return document.scrollingElement || document.documentElement
+}
+const topOf = (box) => (box === document.scrollingElement || box === document.documentElement ? 0 : box.getBoundingClientRect().top)
+
+/** Preso? A barra presa fica com o `top` que o CSS lhe dá; solta, está abaixo. */
+function useStuck(ref, onMeasure) {
+  const [stuck, setStuck] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const box = scroller(el)
+    const target = box === document.scrollingElement || box === document.documentElement ? window : box
+    const update = () => {
+      const top = parseFloat(getComputedStyle(el).top) || 0
+      const r = el.getBoundingClientRect()
+      setStuck(box.scrollTop > 0 && r.top - topOf(box) <= top + 0.5)
+      onMeasure?.(top, r.height)
+    }
+    update()
+    target.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    ro?.observe(el)
+    return () => {
+      target.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      ro?.disconnect()
+    }
+  }, [ref, onMeasure])
+  return stuck
+}
+
+/** Leva a lista ao início, logo abaixo da barra presa — só quando já se
+ *  desceu para lá dela (em cima, nada mexe). Vê-se pelo marcador que fica no
+ *  sítio da barra: se já passou para cima do topo preso, desceu-se. */
+function useBackToListStart(resetKey, sentinel, topPx, { pullUp = false } = {}) {
+  // A chave da última vez: só se mexe quando ela muda mesmo. Com «primeira
+  // vez» numa ref, o React em desenvolvimento (que corre o efeito duas vezes
+  // ao montar) fazia a página saltar sozinha ao abrir (14 out).
+  const last = useRef(resetKey)
+  useLayoutEffect(() => {
+    if (last.current === resetKey) return
+    last.current = resetKey
+    if (!sentinel.current) return
+    const box = scroller(sentinel.current)
+    const offset = sentinel.current.getBoundingClientRect().top - topOf(box) - topPx()
+    // Sem `pullUp`, só sobe (quem já desceu volta ao início da lista). Com
+    // `pullUp`, também desce até a barra ficar presa em cima, com o conteúdo
+    // à vista (Francisco, 14 out: «deveria puxar a tab para cima»).
+    if (pullUp ? Math.abs(offset) <= 1 : offset >= -1) return
+    box.scrollTo({ top: Math.max(0, box.scrollTop + offset) })
+  }, [resetKey]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** A categoria e os separadores. `resetKey` muda ao trocar de categoria ou de
+ *  separador; `shadow` sai quando há dias presos por baixo (Horário), para não
+ *  ficarem duas sombras. */
+// `belowBackBar`: com a barra do título presa por cima (Marcar resultados).
+// A página do torneio já não a tem (R3: o «‹» vive na capa) — aí a barra
+// prende-se logo no topo, abaixo da margem do telemóvel, e uma faixa da cor
+// do fundo tapa essa margem enquanto está presa (Francisco, iPhone, 14 out:
+// ficava um espaço em cima com o conteúdo a passar por trás). Aí sem sombra:
+// no cinzento da página, como os outros separadores (R12b; UX, 14 out).
+// `glass`: na página do torneio, presa por baixo da barra de vidro da capa
+// (GlassBar; Francisco, 14 out), «dentro do mesmo vidro»: sem fundo cinzento
+// nem sombra, o vidro a continuar por trás.
+export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true, belowBackBar = true, glass = false }) {
+  const ref = useRef(null)
+  const [, glassBg] = useGlassBehind(ref)
+  const sentinel = useRef(null)
+  const measure = useRef((top, h) => {
+    document.documentElement.style.setProperty('--t-sticky-bottom', `${top + h}px`)
+  }).current
+  const stuck = useStuck(ref, measure)
+  useEffect(() => () => document.documentElement.style.removeProperty('--t-sticky-bottom'), [])
+  useBackToListStart(resetKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0)
+  // Tocar num separador ou mudar a categoria (`pullKey` sobe a cada toque)
+  // puxa a barra para cima, presa por baixo do topo, com o conteúdo à vista
+  // (Francisco, 14 out). Só com um toque: ao abrir a página, nada salta.
+  useBackToListStart(pullKey, sentinel, () => parseFloat(getComputedStyle(ref.current).top) || 0, { pullUp: true })
+  return (
+    <>
+      <div ref={sentinel} aria-hidden />
+      {/* A mesma altura presa ou solta: o espaço que sai do meio (16 → 8 px)
+          passa para baixo — senão a página saltava ao prender. */}
+      <div ref={ref} style={{ top: belowBackBar || glass ? BAR_TOP : SAFE_TOP }}
+        className={`sticky z-[9] -mx-4 px-4 ${glass ? 'isolate' : 'bg-ground'} ${stuck ? `space-y-2 pb-4 pt-2 ${shadow && belowBackBar && !glass ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
+        {glass && stuck && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 -z-10" style={glassBg} />}
+        {stuck && !belowBackBar && !glass && (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-full bg-ground" style={{ height: SAFE_TOP }} />
+        )}
+        {children}
+      </div>
+    </>
+  )
+}
+
+/** Os dias do Horário, presos por baixo da categoria e dos separadores. */
+export function StickyDays({ children, resetKey }) {
+  const ref = useRef(null)
+  const sentinel = useRef(null)
+  const stuck = useStuck(ref)
+  useBackToListStart(resetKey, sentinel, () => (parseFloat(getComputedStyle(ref.current).top) || 0))
+  return (
+    <>
+      <div ref={sentinel} aria-hidden />
+      <div ref={ref} style={{ top: 'var(--t-sticky-bottom, 0px)' }}
+        className={`sticky z-[8] -mx-4 mb-2 bg-ground px-4 pb-2 ${stuck ? SHADOW : ''}`}>
+        {children}
+      </div>
+    </>
+  )
+}

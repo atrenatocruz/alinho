@@ -62,9 +62,17 @@ test('«In com» recusado pelo trigger das vagas → diz que não cabe a dupla',
 
 const sync = await import('../src/sync.js')
 
-test('«In» faz no máximo 4 idas à BD', async () => {
+// O «In» de quem já é conhecido (o número de WhatsApp já guardado no perfil:
+// a primeira mensagem de cada pessoa guarda-o uma vez, sem esperar).
+// 5 consultas em 3 esperas: os mixes ∥ o perfil, o jogo ∥ os inscritos
+// (loadGame, em paralelo — o jogo fresco por causa das vagas), e a
+// inscrição. O limite antigo (4) era de antes de o loadGame ler o jogo e os
+// inscritos em paralelo; o teste falhava desde então (PO, 10 out).
+test('«In» faz no máximo 5 consultas à BD (3 esperas)', async () => {
+  db.profiles.find((p) => p.id === 'a').whatsapp_jid = '351911111111@s.whatsapp.net'
   await say('in')
-  assert.ok(calls.length <= 4, `foram ${calls.length}: ${calls.join(', ')}`)
+  assert.ok(calls.length <= 5, `foram ${calls.length}: ${calls.join(', ')}`)
+  assert.ok(!calls.includes('profiles'), 'sem atualizar o perfil de quem já é conhecido')
 })
 
 test('«In» e «Out» pedem o repost logo', async (t) => {
@@ -97,6 +105,18 @@ test('«Out» com suplentes: o repost já leva quem subiu (sem esperar pelo Real
   assert.equal(asked.length, 1)
   assert.equal(asked[0][0], 'm')
   assert.deepEqual(asked[0][1].map((p) => [p.gameId, p.name]), [['m', 'Sofia Suplente']])
+})
+
+// «Out» de quem é suplente (PO, 11 out): sai da lista em todos os grupos,
+// também sem as mensagens novas — antes mandava-o para a app.
+test('«Out» de um suplente tira-o da lista, sem as mensagens novas', async () => {
+  db.participants.push(
+    { id: 'pb', game_id: 'm', user_id: 'b', status: 'confirmed', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'pa', game_id: 'm', user_id: 'a', status: 'waitlisted', created_at: '2026-09-01T11:00:00Z' },
+  )
+  const out = await say('out')
+  assert.deepEqual(db.participants.map((p) => p.id), ['pb'])
+  assert.match(out, /Saíste da lista de suplentes/)
 })
 
 // ── Sair de uma dupla (Renato, 25 set) ────────────────────────────────────

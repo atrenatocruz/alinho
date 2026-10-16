@@ -10,21 +10,52 @@
 //     scheduled_date, scheduled_time, teams }: «<Nome> cancelou o jogo de
 //     <dia>, <hora>.» / «<Nome> apagou o jogo de <dia> (<duplas>).» O jogo
 //     já não existe: levam à lista.
+//   'friend_match_left' («Sair do jogo», 8 out) — para quem organiza e quem
+//     disse «Vou»; data = { match_id, name, scheduled_date, scheduled_time }:
+//     «<Nome> saiu do jogo de <dia>, <hora>.» / o lugar fica livre.
 // Levam à página do jogo; responder marca o aviso como lido do lado da base
 // de dados.
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, UserMinus } from 'lucide-react'
+import { Users, UserMinus, ChevronRight } from 'lucide-react'
 import { dayText } from './dayText'
+import FriendResultNotice from './FriendResultNotice'
 
-export const FRIEND_NOTICE_KINDS = ['friend_match_invite', 'friend_match_declined', 'friend_match_cancelled', 'friend_match_deleted']
+export const FRIEND_NOTICE_KINDS = ['friend_match_invite', 'friend_match_declined', 'friend_match_cancelled', 'friend_match_deleted', 'friend_match_left', 'friend_match_result_sent', 'friend_match_result_rejected']
 
 export default function FriendInviteRow({ notice, onOpen }) {
+  // O resultado enviado (o fim, 9 out) tem os seus botões: componente à parte.
+  if (notice.kind === 'friend_match_result_sent') return <FriendResultNotice notice={notice} onOpen={onOpen} />
+  return <FriendNoticeRow notice={notice} onOpen={onOpen} />
+}
+
+function FriendNoticeRow({ notice, onOpen }) {
   const { t, i18n } = useTranslation()
   const d = notice.data || {}
   const day = dayText(d.scheduled_date, i18n.language)
   const when = [day, d.scheduled_time ? String(d.scheduled_time).slice(0, 5) : null].filter(Boolean).join(', ')
-  const declined = notice.kind === 'friend_match_declined'
+  const declined = notice.kind === 'friend_match_declined' || notice.kind === 'friend_match_left'
+  const left = notice.kind === 'friend_match_left'
+  // A quem enviou o resultado (o fim, 11 out): abre o jogo, com a caixa
+  // vermelha e «Corrigir o resultado».
+  if (notice.kind === 'friend_match_result_rejected') {
+    return (
+      <Link to={`/jogos-privados/sessao/${d.match_id}`} onClick={() => onOpen(notice)}
+        className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger"><Users size={16} /></div>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-ink-900">
+            {/* «Ana Marques disse que o resultado do jogo de sáb 10 out não
+                está certo.» — o nome e «não está certo» a negrito (UX, 11 out). */}
+            <b>{d.name || ''}</b> {t('friends.notice_rejected_rest', { when: day })} <b>{t('friends.notice_rejected_bold')}</b>.
+          </span>
+          {d.note && <span className="block text-xs text-ink-700">«{d.note}»</span>}
+          <span className="block text-xs text-muted">{t('friends.notice_rejected_hint')}</span>
+        </span>
+        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime-400" />
+      </Link>
+    )
+  }
   const gone = notice.kind === 'friend_match_cancelled' || notice.kind === 'friend_match_deleted'
   if (gone) {
     const deleted = notice.kind === 'friend_match_deleted'
@@ -42,6 +73,22 @@ export default function FriendInviteRow({ notice, onOpen }) {
       </Link>
     )
   }
+  // O convite por responder (convite-amigos-na-home, 12 out): sempre em cima,
+  // com fundo lima-claro, até se responder; abre logo o ecrã de responder.
+  if (notice.kind === 'friend_match_invite') {
+    const time = d.scheduled_time ? String(d.scheduled_time).slice(0, 5) : null
+    return (
+      <Link to={`/jogos-privados/sessao/${d.match_id}`} onClick={() => onOpen(notice)}
+        className="flex items-center gap-3 bg-lime-400/15 px-4 py-3 transition-colors duration-fast hover:bg-lime-400/25">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-ink-900"><Users size={16} /></div>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-extrabold text-ink-900">{t('friends.notice_invite_top', { name: d.creator_name || '' })}</span>
+          <span className="block text-xs text-ink-700">{[day, time, d.location].filter(Boolean).join(' · ')}</span>
+        </span>
+        <ChevronRight size={16} className="shrink-0 text-ink-700" />
+      </Link>
+    )
+  }
   return (
     <Link to={`/jogos-privados/sessao/${d.match_id}`} onClick={() => onOpen(notice)}
       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
@@ -51,9 +98,9 @@ export default function FriendInviteRow({ notice, onOpen }) {
       {declined ? (
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-ink-900">
-            <b>{t('friends.notice_declined_bold', { name: d.name || '' })}</b> {t('friends.notice_declined_rest', { when })}
+            <b>{t(left ? 'friends.notice_left_bold' : 'friends.notice_declined_bold', { name: d.name || '' })}</b> {t(left ? 'friends.notice_left_rest' : 'friends.notice_declined_rest', { when })}
           </span>
-          <span className="block text-xs text-muted">{t('friends.notice_declined_hint')}</span>
+          <span className="block text-xs text-muted">{t(left ? 'friends.notice_left_hint' : 'friends.notice_declined_hint')}</span>
         </span>
       ) : (
         <p className="min-w-0 flex-1 text-sm text-ink-900">

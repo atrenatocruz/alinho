@@ -10,6 +10,9 @@ const MOCK_ADMIN_KEY = 'mockAdminSession'
 const MOCK_ADMIN_USER = {
   id: '00000000-0000-0000-0000-000000000000',
   email: 'admin@dev.local',
+  // localStorage.mockNewAccount = 'true' → conta criada agora (o ecrã de
+  // consentimento com a frase das contas novas, #360).
+  created_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockNewAccount') === 'true' ? new Date().toISOString() : '2026-08-01T00:00:00Z',
 }
 const MOCK_ADMIN_PROFILE = {
   id: '00000000-0000-0000-0000-000000000000',
@@ -19,12 +22,17 @@ const MOCK_ADMIN_PROFILE = {
   gender: typeof localStorage !== 'undefined' && localStorage.getItem('mockNoGender') === 'true' ? null : 'masculino',
   phone_hash: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneUnconfirmed') === 'true' ? 'hash-de-teste' : 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass; mockPhoneUnconfirmed mostra o «Confirma o teu número» (#537)
   phone_verified_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneConfirmed') === 'true' ? '2026-09-24T20:00:00Z' : null,
+  // localStorage.mockXp = '8100' → XP de atividade do perfil de teste (R15).
+  xp: typeof localStorage !== 'undefined' && localStorage.getItem('mockXp') ? Number(localStorage.getItem('mockXp')) : 0,
   // localStorage.mockPlatformAdmin = 'true' → vê o seletor de plano no Gerir.
   is_platform_admin: typeof localStorage !== 'undefined' && localStorage.getItem('mockPlatformAdmin') === 'true',
   // Rating fictício (11 set 2026) — sem isto o aro de progresso do Perfil
   // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
   // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
   rating: 1450,
+  // localStorage.mockConsentPending = 'true' → ainda sem aceitar a Política
+  // (o ecrã de consentimento, #360).
+  consent_accepted_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockConsentPending') === 'true' ? null : '2026-09-01T00:00:00Z',
   // localStorage.mockDeletionRequestedAt = '2026-09-18' → ecrã de recuperar
   // a conta (apagar conta, Trello #306).
   deletion_requested_at: typeof localStorage !== 'undefined' ? localStorage.getItem('mockDeletionRequestedAt') : null,

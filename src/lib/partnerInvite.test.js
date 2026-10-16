@@ -28,6 +28,6 @@ describe('links', () => {
   })
   it('a partilha do WhatsApp escapa o texto', () => {
     expect(whatsappShare('Vens? https://alinho.pt/convite/abc'))
-      .toBe('https://wa.me/?text=Vens%3F%20https%3A%2F%2Falinho.pt%2Fconvite%2Fabc')
+      .toBe('https://api.whatsapp.com/send?text=Vens%3F%20https%3A%2F%2Falinho.pt%2Fconvite%2Fabc')
   })
 })

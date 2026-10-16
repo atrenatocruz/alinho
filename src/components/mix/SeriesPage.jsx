@@ -9,23 +9,24 @@
 //     jogados a cinzento, e «Ver os mais antigos (N)» no fim.
 // Tocar numa data abre a mesma folha do «Mais ⋯» da página desse mix, só
 // com o que mexe nesse dia.
+import { isMixLive } from '../../lib/mixLive'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../ui'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Lock } from 'lucide-react'
 import { ConfirmSheet } from '../ui'
 import EventActionsSheet from '../EventActionsSheet'
 import ChangeOneMixSheet from './ChangeOneMixSheet'
 import { cancelMixDate } from '../../lib/mixCancel'
 import { describeError } from '../../lib/errors'
 import { formatDate, formatTime } from '../../lib/formatDate'
+import { SectionLabel } from '../gerir/PastEvents'
 import { weekdayShort, weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
 import { mixCapacity, formatLabelKey } from '../../lib/mixLogic'
 
 const DONE = ['finished', 'completed', 'cancelled']
 const NOT_STARTED = ['pending', 'open', 'closed']
 // Quantos já jogados se veem antes do «Ver os mais antigos».
-const PAST_SHOWN = 2
 
 const people = (g) => (g.participants || [])
   .filter((p) => p.status === 'confirmed')
@@ -34,14 +35,13 @@ const signedUp = (g) => (g.participants || []).some((p) => ['confirmed', 'waitli
 
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
-export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChanged, onStopSeries, onDeleted, abreEm }) {
+export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChanged, onStopSeries, onDeleted, abreEm, pastCount = 0, onSeePast }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
   const [sheetGame, setSheetGame] = useState(null)
   const [changeGame, setChangeGame] = useState(null)
   const [cancelGame, setCancelGame] = useState(null)
   const [deleteAsk, setDeleteAsk] = useState(false)
-  const [showOld, setShowOld] = useState(false)
   const [notice, setNotice] = useState('')
   useEffect(() => {
     if (!notice) return undefined
@@ -52,8 +52,9 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
   const today = new Date()
   const sorted = [...games].sort((a, b) => new Date(b.date) - new Date(a.date))
   const isPast = (g) => DONE.includes(g.status) || (new Date(g.date) < today && !sameDay(new Date(g.date), today))
-  const upcoming = sorted.filter((g) => !isPast(g))
-  const past = sorted.filter(isPast)
+  // Só as próximas, da mais perto para a mais longe (SPEC 9 out): as que já
+  // passaram vivem em «Já passaram», juntas com o resto do Gerir.
+  const upcoming = sorted.filter((g) => !isPast(g)).reverse()
   // O mix que dá as regras: o último que a série marcou (é esse que leva as
   // regras de agora; um de hoje pode ter sido mudado só para esse dia).
   const base = upcoming[0] || sorted[0]
@@ -89,7 +90,9 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
     if (g.status === 'cancelled') return t('series.date_cancelled')
     if (DONE.includes(g.status)) return t('series.date_finished', { count: people(g) })
     if (g.status === 'pending') return abreEm(g) || t('series.date_not_open')
-    if (g.status === 'in_progress') return `${time(g)} · ${t('gerirclube.status_in_progress')}`
+    // Duplas formadas e ronda por começar: ainda não está a decorrer (12 out).
+    if (isMixLive(g)) return `${time(g)} · ${t('gerirclube.status_in_progress')}`
+    if (g.status === 'in_progress') return `${time(g)} · ${t('series.date_signed', { count: people(g), max: mixCapacity(g) })}`
     return `${time(g)} · ${t('series.date_signed', { count: people(g), max: mixCapacity(g) })}`
   }
 
@@ -134,9 +137,6 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
     )
   }
 
-  const pastShown = showOld ? past : past.slice(0, PAST_SHOWN)
-  const older = past.length - pastShown.length
-
   return (
     <div className="space-y-3">
       <BackBar onBack={onBack} label={t('series.back')} title={base.title} />
@@ -150,26 +150,34 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
         <p className="mt-1 text-[13px] text-ink-700">{rules}</p>
         {active && rec?.is_paused && <p className="mt-0.5 text-[13px] font-extrabold text-ink-900">{t('series.paused')}</p>}
         {active && !rec?.is_paused && opensLabel && <p className="mt-0.5 text-[13px] text-ink-700">{opensLabel}</p>}
-        {active && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => onEditRules(base)}
-              className="min-h-[44px] rounded-ctrl border border-line bg-white px-3 text-sm font-extrabold text-ink-900">
-              {t('series.edit_rules')}
-            </button>
-            <button type="button" onClick={() => setDeleteAsk(true)}
-              className="min-h-[44px] rounded-ctrl border-[1.5px] border-danger bg-white px-3 text-sm font-extrabold text-danger">
-              {t('series.delete')}
-            </button>
-          </div>
-        )}
+        {/* Um por cima do outro, nunca lado a lado (regra de 6 out). Numa
+            série acabada ficam à vista, apagados, com a razão — não
+            desaparecem (#586, ponto 1.4). */}
+        <div className="mt-3 space-y-2">
+          <button type="button" onClick={() => onEditRules(base)} disabled={!active}
+            className="w-full min-h-[44px] rounded-ctrl border border-line bg-white px-3 text-sm font-extrabold text-ink-900 disabled:opacity-40">
+            {t('series.edit_rules')}
+          </button>
+          <button type="button" onClick={() => setDeleteAsk(true)} disabled={!active}
+            className="w-full min-h-[44px] rounded-ctrl border-[1.5px] border-danger bg-white px-3 text-sm font-extrabold text-danger disabled:opacity-40">
+            {t('series.delete')}
+          </button>
+          {!active && (
+            <p className="flex items-start gap-1.5 text-sm text-muted">
+              <Lock size={14} className="mt-[3px] shrink-0 text-ink-500" /> {t('series.ended_locked')}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Um cartão por data: os próximos, o de hoje, os já jogados. */}
+      {/* «PRÓXIMAS DATAS»: só as por jogar. As que já passaram ficam na
+          página «Já passaram» do Gerir, filtrada a este mix (SPEC 9 out). */}
+      {upcoming.length > 0 && <SectionLabel>{t('series.next_dates')}</SectionLabel>}
       {upcoming.map(card)}
-      {pastShown.map(card)}
-      {older > 0 && (
-        <button type="button" onClick={() => setShowOld(true)} className="w-full min-h-[44px] text-sm font-extrabold text-ink-900">
-          {t('series.see_older', { count: older })}
+      {pastCount > 0 && onSeePast && (
+        <button type="button" onClick={onSeePast}
+          className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900">
+          {t('series.see_past', { count: pastCount })}
         </button>
       )}
 

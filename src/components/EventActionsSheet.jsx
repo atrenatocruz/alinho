@@ -7,10 +7,14 @@
 // frase do que acontece por baixo; só aparecem as que fazem sentido; a que
 // estraga (vermelho) vai em último e pergunta antes — quem pergunta é quem
 // chama, com a ConfirmSheet.
+// R3b (13 out, SPEC 2026-10-13-acoes-de-quem-organiza): o título a 19 px/900,
+// por baixo, em mono, «ORGANIZAÇÃO · <ESTADO>» (`eyebrow`); cada linha com o
+// nome (15 px/700), a frase (12,5 px cinzento) e «›»; a vermelha em último,
+// sem «›».
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-export default function EventActionsSheet({ open, title, subtitle, actions = [], onClose }) {
+export default function EventActionsSheet({ open, title, subtitle, eyebrow = null, actions = [], onClose }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -34,7 +38,8 @@ export default function EventActionsSheet({ open, title, subtitle, actions = [],
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-ink-200" />
-        <p id="event-actions-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{title}</p>
+        <p id="event-actions-title" className="font-display text-[19px] font-black leading-tight text-ink-900">{title}</p>
+        {eyebrow && <p className="mt-1 font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-[#4F535A]">{eyebrow}</p>}
         {subtitle && <p className="mt-1 text-[13px] text-ink-500">{subtitle}</p>}
         <div className="mt-3 divide-y divide-line border-t border-line">
           {ordered.map((a) => (
@@ -45,10 +50,13 @@ export default function EventActionsSheet({ open, title, subtitle, actions = [],
               // apagada, com a razão por baixo (torneio, 28 set).
               disabled={a.disabled}
               onClick={() => { onClose(); a.onClick() }}
-              className="block w-full py-3.5 text-left disabled:cursor-default"
+              className="flex w-full items-center gap-3 py-3.5 text-left disabled:cursor-default"
             >
-              <span className={`block text-[15px] font-extrabold ${a.disabled ? 'text-ink-500' : a.danger ? 'text-danger' : 'text-ink-900'}`}>{a.label}</span>
-              {a.hint && <span className="mt-0.5 block text-[13px] leading-snug text-ink-500">{a.hint}</span>}
+              <span className="min-w-0 flex-1">
+                <span className={`block font-display text-[15px] font-bold ${a.disabled ? 'text-ink-500' : a.danger ? 'text-danger' : 'text-ink-900'}`}>{a.label}</span>
+                {a.hint && <span className="mt-0.5 block text-[12.5px] leading-snug text-[#5B6068]">{a.hint}</span>}
+              </span>
+              {!a.danger && <span aria-hidden="true" className="shrink-0 text-[18px] text-[#8A8E95]">›</span>}
             </button>
           ))}
         </div>

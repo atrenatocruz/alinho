@@ -7,6 +7,8 @@ describe('cartões de partilha do torneio', () => {
   it('apelido abreviado', () => {
     expect(shortName('Rita Figueira')).toBe('Rita F.')
     expect(shortName('Ana Maria Marques')).toBe('Ana M.')
+    // Acaba num número: fica inteiro (QA, 11 out).
+    expect(shortName('QA 01')).toBe('QA 01')
     expect(shortName('Rui')).toBe('Rui')
     // O que está entre parênteses não é apelido (revisão dos torneios, 28
     // set): «Renato Cruz (dummy)» dava «Renato D.».
@@ -72,7 +74,8 @@ describe('imagem «Campeões» (28 set)', () => {
     const c = { code: 'M5', champion: team('Almeida / Sousa'), runner_up: team('Os do costume'), thirds: [team('Barros / Costa'), team('Gomes / Pais')] }
     const out = championsShare({ tournament: { name: 'Smash Open 2026' }, category: c, t, lang: 'pt' })
     expect(out.data.title).toBe('tshare.champions|')
-    expect(out.data.kicker).toBe('Smash Open 2026 · M5')
+    expect(out.data.kicker).toBe('')
+    expect(out.data.orgSub).toBe('Smash Open 2026 · M5')
     expect(out.data.rows.map((r) => r.place)).toEqual([1, 2, 3])
     expect(out.data.rows.some((r) => r.mine)).toBe(false)
     expect(out.data.rows[2].pair).toContain(' · ')

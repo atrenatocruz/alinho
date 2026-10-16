@@ -81,6 +81,21 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 - An **unregistered WhatsApp number can join a mix as a guest of that mix only** — no account is created (`game_guests`, no ranking). Two days after the game a daily job clears the guest's number/WhatsApp id and keeps only the name for history; the same applies to guest emails and claim links in tournaments and friend games (`migration_convidados_so_para_o_jogo.sql`). Old guest accounts (`guest-*@whatsapp.alinho.pt`, unclaimed partner accounts) with no games were deleted by that migration; ones with history stay, without phone data, and the bot ignores them when matching names.
 - Bot messages respect the player's `profiles.language`.
 
+## Liga entre Clubes (Phase 1 — on branch `feature/liga-entre-clubes`, not yet on `dev`)
+
+Clubs compete against each other in a league, round by round. Spec: `docs/superpowers/specs/2026-10-16-liga-entre-clubes-design.md`; plan: `docs/superpowers/plans/2026-10-16-liga-entre-clubes-fase1.md`. Lives only on the feature branch until migrations `migration_liga_1` → `6` run on alinho-dev and Renato merges it.
+
+- **Two kinds of league.** A **comunitária** league is created by the admins of a club (`organizations.kind = 'club'`; groups can't); a **Liga Alinho** can only be created by platform admins, enforced in `create_league`. The kind never changes after creation. Owners can name **co-organizadores**, who can do everything except name/remove organizers, delete the league or change its kind.
+- **Categories** reuse the tournament conventions (`masculino` / `feminino` / `misto`, level 1–7) with a rating tolerance, matches per encounter (1, 2, 3 or 5), optional **casa e fora**, points for win/draw/loss/walkover and a roster cap; all limits are validated on the server.
+- **Applications.** A club admin applies per category → pending → the organizer approves, rejects or waitlists (`category_full` is checked with the category row locked). Withdrawing closes that club's roster in the league and tells the organizers.
+- **Roster («plantel»).** Club admins and named captains add members of their club. A player can only be on one club's roster per league, even if they belong to several clubs; their level is frozen at entry (`rating_at_entry`), so improving during the league doesn't make them ineligible. The roster closes at a configurable round.
+- **Calendar.** Round robin (and home-and-away) is computed in the browser (`leagueSchedule.js`) and **validated** by `save_league_schedule`. Clubs propose a date inside the round window (Lisbon dates) and the other side accepts; organizers can set it directly. Re-generating asks for confirmation (agreed dates are lost) and is refused once results exist.
+- **Results.** One side submits (pairs + sets, validated like `leagueResult.js`); only the **other** side confirms or contests, never the submitter, and someone speaking for both clubs is refused (`conflict_of_interest`). Organizers resolve disputes, walkovers and corrections — except an organizer who represents one of the two clubs. Every change is logged in `league_events`.
+- **Standings** are never stored: they are computed from official encounters only (`leagueStandings.js`) — points → head-to-head among the tied → match / set / game difference → a deterministic draw — and the page says which criterion separated tied clubs.
+- **Ranking and XP.** Official matches feed the global rating (`apply_elo_pairing`), `player_stats` of the club each player represents, and XP (10 per match, +5 per win, also added to `profiles.xp`). Corrections revert and reapply the rating exactly; XP is never removed.
+- **Where it shows up.** No tab of its own: the public league page `/liga/:slug` (readable without an account — names and level bands only, never emails, phones or exact ratings), encounter pages, a roster page, the organizer page, «Liga» in Gerir's «＋ Criar», encounter cards and «Para ti» rows on the Home (saved «all kinds» filters gain the league automatically), and notifications in the bell. A daily `pg_cron` job reminds both clubs two days before a round's window ends.
+- **Security.** Every league table is read-only for `authenticated` and closed to `anon`; all writes go through `SECURITY DEFINER` RPCs with `SET search_path = public, pg_temp`; anon can only call `get_league_page` and `get_league_encounter`.
+
 ## UI/UX
 
 - **Bilingual: Portuguese (pt-PT) and English**, via `react-i18next`. Portuguese is the default and the fallback. A signed-in player's choice lives on `profiles.language` and is set from Profile → personal info; a pre-auth visitor can switch from Landing/Login and the choice is stashed in `localStorage` (cleared on sign-out, so a shared device doesn't leak it between accounts). Dates and times are locale-aware (`en` maps to en-GB, not en-US).
@@ -96,6 +111,7 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 - No payments; nothing beyond the informational price-per-player field. No monetization or pricing model exists yet.
 - No push notifications, no email notifications beyond the OTP itself.
 - No game formats beyond `sobe e desce` and `todos contra todos`, and both assume a **fixed dupla for the whole mix**. Rotating-partner formats (Americano / "pares partidos"), group stages, and 3rd/4th-place playoffs do not exist. See `docs/superpowers/specs/2026-09-08-game-formats-design.md` for what adding them costs and what is still undecided.
+- **Liga entre Clubes, later phases:** no playoffs, no challenges («desafios»), no inter-club tournament, no WhatsApp messages for the league, and a club can't enter two teams in the same category. Mockups exist for all of them (see the spec).
 
 ## Roadmap
 

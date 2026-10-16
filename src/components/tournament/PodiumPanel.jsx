@@ -8,7 +8,8 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Share2, Trophy } from 'lucide-react'
 import TournamentShareFlow from './TournamentShareFlow'
-import { podiumShare } from './shareData'
+import ShareAsSheet from '../mix/ShareAsSheet'
+import { championsShare, podiumShare } from './shareData'
 import { entriesHidingResults, getTournamentResults } from '../../lib/tournamentApi'
 import { errorKind } from '../../lib/errors'
 import { MonoLabel, Me } from './TournamentBits'
@@ -62,10 +63,12 @@ function PodiumRow({ place, team, prize, people, meName }) {
   )
 }
 
-export default function PodiumPanel({ tournament }) {
+export default function PodiumPanel({ tournament, isAdmin = false }) {
   const { t, i18n } = useTranslation()
   const [data, setData] = useState(null)
+  // false | 'me' | 'club': em nome de quem se partilha.
   const [sharing, setSharing] = useState(false)
+  const [askingAs, setAskingAs] = useState(false)
   const [hidingIds, setHidingIds] = useState([])
   // As duplas onde alguém esconde os resultados, só para o cartão de partilha.
   useEffect(() => {
@@ -141,13 +144,26 @@ export default function PodiumPanel({ tournament }) {
       )}
       {/* «↗ Partilhar resultado» do pódio da categoria (desenho de 27 set). */}
       {mine?.final_position && (
-        <button type="button" onClick={() => setSharing(true)}
+        // Quem organiza e também jogou escolhe em nome de quem partilha
+        // (design-handoff/2026-10-12-partilhar-em-nome-de-quem): pergunta-se
+        // sempre, não se guarda.
+        <button type="button" onClick={() => (isAdmin ? setAskingAs(true) : setSharing('me'))}
           className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-lime-400 px-4 text-base font-extrabold text-ink-900">
           <Share2 size={18} /> {t('tshare.cta')}
         </button>
       )}
+      {askingAs && (
+        <ShareAsSheet kind="tournament" place={mine.final_position}
+          won={mine.matches_won || 0} played={mine.matches || 0} orgName={tournament.club_name || ''}
+          onPick={(who) => { setAskingAs(false); setSharing(who) }}
+          onClose={() => setAskingAs(false)} />
+      )}
       {sharing && (() => {
-        const built = podiumShare({ tournament, results: data, myName: meName, hidingIds, t, lang: i18n.language })
+        // Em nome do clube: a imagem «Campeões» da categoria, sem destaque.
+        const myCat = data.categories.find((x) => x.code === mine?.category_code)
+        const built = sharing === 'club'
+          ? championsShare({ tournament, category: myCat, hidingIds, t, lang: i18n.language })
+          : podiumShare({ tournament, results: data, myName: meName, hidingIds, t, lang: i18n.language })
         return built && (
           <TournamentShareFlow tournament={tournament} variant="podium" data={built.data} text={built.text}
             filenameParts={built.filenameParts} onClose={() => setSharing(false)} />

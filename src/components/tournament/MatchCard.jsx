@@ -58,7 +58,7 @@ export function shortName(team) {
 function Side({ team, fallback, score, won, lost, mine, compact, onLilac }) {
   const { t } = useTranslation()
   const { title, sub } = teamLines(team)
-  const ring = mine ? 'ring-2 ring-[#DCFCE7]' : onLilac ? 'ring-2 ring-[#E9E7FB]' : 'ring-2 ring-white'
+  const ring = mine ? 'ring-2 ring-[#DCFCE7]' : onLilac ? 'ring-2 ring-kind-tournament-light' : 'ring-2 ring-white'
   return (
     <span
       className={`flex items-center ${compact ? 'gap-2' : 'gap-2.5'} ${mine ? `-mx-2 rounded-[10px] px-2 ${compact ? 'py-1' : 'py-1.5'}` : compact ? 'py-1' : 'py-[5px]'}`}
@@ -109,7 +109,9 @@ export function LiveChip({ small = false }) {
  * head     a linha de cima («Campo 1 · Sáb 09:00»)
  * foot     a linha de baixo (tie-break, falta…), ou nada
  */
-export default function MatchCard({ match, entries, labels = {}, myIds = [], head, foot, final = false, compact = false, onOpen }) {
+// warn: o nome de quem tem outro jogo quase à mesma hora (categorias que
+// chocam, 9 out) — o cartão fica a amarelo claro, com «⚠️ <Nome>».
+export default function MatchCard({ match, entries, labels = {}, myIds = [], head, foot, final = false, compact = false, onOpen, warn = null }) {
   const { t } = useTranslation()
   const done = isDone(match)
   const live = match.status === 'a_decorrer'
@@ -142,7 +144,7 @@ export default function MatchCard({ match, entries, labels = {}, myIds = [], hea
       data-mine={(myIds.includes(match.entry_a_id) || myIds.includes(match.entry_b_id)) || undefined}
       className={`flex w-full flex-col rounded-card bg-white text-left transition-[box-shadow,transform] duration-fast hover:shadow-lift active:scale-[0.98] ${compact ? 'gap-0.5 px-3 pb-2 pt-2' : 'gap-1.5 px-3.5 py-3'} ${frame}`}
       style={{
-        background: final ? LILAC.bg : undefined,
+        background: final ? LILAC.bg : warn ? '#FFF6DC' : undefined,
         borderColor: !final && !live && !(done || known) ? LILAC.border : undefined,
       }}
     >
@@ -162,6 +164,7 @@ export default function MatchCard({ match, entries, labels = {}, myIds = [], hea
         </span>
       )}
       <span className="block w-full">{side('b')}</span>
+      {warn && <span className="block w-full text-xs font-extrabold text-[#9A5B00]">⚠️ {warn}</span>}
       {foot && <span className={`block w-full text-ink-500 ${compact ? 'truncate font-mono text-[10px] uppercase tracking-wide' : 'text-xs'}`}>{foot}</span>}
     </button>
   )

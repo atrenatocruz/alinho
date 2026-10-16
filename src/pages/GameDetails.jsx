@@ -4,23 +4,31 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Clock } from 'lucide-react'
+import { parseLevel } from '../lib/mixLevels'
+import EventHero from '../components/event/EventHero'
+import { GlassPinned } from '../components/GlassBar'
+import EventFacts from '../components/event/EventFacts'
+import OrganizerBox from '../components/event/OrganizerBox'
+import { isMixLive } from '../lib/mixLive'
+import { SkeletonGate } from '../components/Skeleton'
+import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
+import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2 } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
+import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, Tabs, ConfirmSheet } from '../components/ui'
 import { isDraftMix } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { isMixLimitError, planLimitMessage } from '../lib/plans'
-import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/EventCard'
+import { KIND_STYLE } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
 import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
-import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
+import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -33,12 +41,19 @@ import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
+import MixWinnersBlock from '../components/mix/MixWinnersBlock'
+import ShareAsSheet from '../components/mix/ShareAsSheet'
+import Alino from '../components/Alino'
+import { openGameWinners } from '../lib/openGameWinners'
+import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
+import { bakeCircle } from '../components/tournament/TournamentShareCard'
+import { duplasWinners, americanoWinners, rotatingWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
-import MixAdminBar from '../components/mix/MixAdminBar'
+import { usePriceRoster, PriceRosterSummary, PriceRosterTag, useSpecialPriceLine } from '../components/SpecialPriceRoster'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
 import RoundAlarm from '../components/RoundAlarm'
@@ -50,6 +65,10 @@ import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKe
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
 const kindOf = (g) => (g?.origin === 'open_slot' ? 'open' : 'mix')
+// Jogo em aberto (SPEC design-handoff/2026-10-07-jogo-em-aberto-passo-a-passo,
+// aprovado a 9 out): na página, nada de palavras do mix — é um jogo de 4.
+const isOpenGame = (g) => kindOf(g) === 'open'
+const hhmm = (d, lang) => formatTime(d, lang, { hour: '2-digit', minute: '2-digit' })
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -112,12 +131,18 @@ export default function GameDetails() {
   // necessarily this mix's club.
   const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
   const isAdmin = gameMembership?.is_admin ?? false
+  // Preço especial (7 out): o preço de cada inscrito, só para quem organiza.
+  const specialPriceText = useSpecialPriceLine(game?.origin === 'open_slot' ? 'open_slot' : 'mix', game?.price_per_player > 0 ? game.id : null)
   const [scorekeeperIds, setScorekeeperIds] = useState([])
   const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
   const isScorekeeper = scorekeeperIds.includes(user.id)
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
   const [waitlist, setWaitlist] = useState([])
+  // Volta a pedir sempre que a lista de inscritos muda (QA, 10 out: depois de
+  // «Adicionar jogador» as etiquetas só apareciam ao recarregar).
+  const rosterKey = [...participants, ...waitlist].map((p) => `${p.id}:${p.status}`).join(',')
+  const priceRoster = usePriceRoster(isAdmin && game?.price_per_player > 0 ? (game.origin === 'open_slot' ? 'open_slot' : 'mix') : null, game?.id, rosterKey)
   // Aprovar quem entra pela app (SPEC 2026-10-02-mix-aprovar-quem-entra):
   // os pedidos por decidir, o estado do meu pedido e a pergunta do recusar.
   const [requests, setRequests] = useState([])
@@ -162,6 +187,9 @@ export default function GameDetails() {
   const [birthdayError, setBirthdayError] = useState('')
   const [justBooked, setJustBooked] = useState(false)
   const [mixError, setMixError] = useState('')
+  // Pares quebrados (12 out): a ronda teve de repetir uma dupla dos últimos
+  // 4 mixes — a tira amarela, só para quem organiza (é quem sorteia a ronda).
+  const [roundRepeatNotice, setRoundRepeatNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [scores, setScores] = useState({}) // matchId -> {a, b}
   // 👍 da noite (kudos) — pódio do mix + o meu voto, lidos por RPC.
@@ -236,6 +264,7 @@ export default function GameDetails() {
   // correctly render nothing for someone with no rating yet, Trello #176).
   const [ratingInfoById, setRatingInfoById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
+  const finishedTabsRef = useRef(null)
   const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
   const [savingMatchId, setSavingMatchId] = useState(null) // match id currently being persisted by handleSaveScore — guards ScoreEntry's save button against a double-tap double-submit
   // Histórico IN/OUT (Trello #171) — só admins, e carregado apenas quando o
@@ -251,6 +280,32 @@ export default function GameDetails() {
   const [clubMembers, setClubMembers] = useState([])
   const [swapFor, setSwapFor] = useState(null) // { team, player, slot } | null
   const [removeSlotAsk, setRemoveSlotAsk] = useState(null) // { person, duplaNumber } | null
+  // Partilhar os vencedores (#622): o logótipo do clube já cortado em círculo.
+  const [winnersShareOpen, setWinnersShareOpen] = useState(false)
+  // «Partilhar em nome de quem?» (12 out): 'me' | 'club' — escolhido de cada vez.
+  const [shareAsAsk, setShareAsAsk] = useState(false)
+  const [shareAs, setShareAs] = useState('me')
+  // As vitórias gerais de quem vê, as do perfil (get_player_profile): a
+  // pastilha do cartão do jogo em aberto (#622, UX 11 out).
+  const [overallRecord, setOverallRecord] = useState(null)
+  const wantsOverall = game?.status === 'finished' && game?.origin === 'open_slot' && !!user?.id
+  useEffect(() => {
+    if (!wantsOverall) return undefined
+    let cancelled = false
+    supabase.rpc('get_player_profile', { p_user_id: user.id }).then(({ data }) => {
+      const row = data?.[0]
+      if (!cancelled && row) setOverallRecord({ won: row.game_wins || 0, played: (row.game_wins || 0) + (row.game_losses || 0) })
+    })
+    return () => { cancelled = true }
+  }, [wantsOverall, user?.id])
+  const [orgLogoBaked, setOrgLogoBaked] = useState(null)
+  const orgLogoUrl = gameMembership?.organization?.group_logo_url || null
+  useEffect(() => {
+    if (!winnersShareOpen || !orgLogoUrl) return undefined
+    let alive = true
+    bakeCircle(orgLogoUrl).then((v) => { if (alive) setOrgLogoBaked(v) })
+    return () => { alive = false }
+  }, [winnersShareOpen, orgLogoUrl])
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
@@ -636,6 +691,8 @@ export default function GameDetails() {
 
       if (error) throw error
       if (!awaitsApproval) celebrate()
+      // Jogo em aberto (ponto 4): continua com um toque, e diz que entrou.
+      if (isOpenGame(game)) setDoneNotice(t('openday.joined', { time: hhmm(game.date, i18n.language) }))
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
@@ -815,7 +872,14 @@ export default function GameDetails() {
 
   const handleLeaveGame = async () => {
     setLeaveError('')
-    const ok = await askConfirm({
+    const ok = await askConfirm(isOpenGame(game) ? {
+      // Jogo em aberto (ponto 6): sair a vermelho, sem a frase dos suplentes.
+      title: t('openday.leave_title'),
+      message: t('openday.leave_text'),
+      confirmLabel: t('openday.leave'),
+      cancelLabel: t('openday.leave_keep'),
+      danger: true,
+    } : {
       title: t('gamedetails.leave_ask_title'),
       message: t('gamedetails.leave_ask_text'),
       confirmLabel: t('gamedetails.leave_ask_confirm'),
@@ -1235,7 +1299,15 @@ export default function GameDetails() {
           throw new Error(t('gamedetails.error_americano_too_many_players', { count: players.length, courts: game.num_courts || 1 }))
         }
         const numRounds = totalRounds(game)
-        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById, { mode: game.pairing_mode || 'por_nivel' })
+        // A regra dos últimos 4 mixes em todas as rondas (12 out).
+        const historyPairs = await loadRepeatPairKeys()
+        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById, { mode: game.pairing_mode || 'por_nivel', historyPairs })
+        // Sem outra forma: junta na mesma e avisa quem organiza (a tira amarela).
+        setRoundRepeatNotice(schedule.forcedHistory?.length
+          ? t('gamedetails.repeat_forced_round', {
+            pairs: schedule.forcedHistory.map(([x, y]) => t('gamedetails.repeat_pair', { a: shortPersonName(x?.name), b: shortPersonName(y?.name) })).join('; '),
+          })
+          : '')
 
         // Flatten every round's duplas into one teams-insert payload,
         // tracking which (round, court, side) each row belongs to so the
@@ -1751,6 +1823,54 @@ export default function GameDetails() {
     await handleStartMix({ start: false })
   }
 
+  // «Desfazer as duplas» (Francisco, 15 out: «Sinto mesmo falta duma forma
+  // para desfazer as equipas e voltar ao estado anterior»): as duplas da app
+  // saem e o mix volta aos inscritos, com «Fazer duplas». Quem se inscreveu
+  // em dupla continua junto (isso vive nos inscritos). Com a Ronda 1 já nos
+  // campos, os jogos saem primeiro (apontam para as duplas) — por isso a
+  // pergunta fica a vermelho. O estado do mix não muda: fazer as duplas
+  // também não o mudou.
+  const handleUndoDuplas = async () => {
+    const withGames = matches.length > 0
+    const ok = await askConfirm({
+      title: t('gamedetails.undo_duplas_title'),
+      // Começado sozinho: quem desfaz fica a saber que deixa de começar sozinho (UX, 15 out).
+      message: [t(withGames ? 'gamedetails.undo_duplas_text_games' : 'gamedetails.undo_duplas_text'),
+        game.status === 'in_progress' && game.auto_start_hours_before != null ? t('gamedetails.undo_duplas_no_autostart') : null].filter(Boolean).join(' '),
+      confirmLabel: t('gamedetails.undo_duplas_confirm'),
+      cancelLabel: t('gamedetails.ask_not_yet'),
+      danger: withGames,
+    })
+    if (!ok) return
+    setBusy(true)
+    setMixError('')
+    try {
+      if (withGames) {
+        const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
+        if (matchesError) throw matchesError
+      }
+      const { error } = await supabase.from('teams').delete().eq('game_id', id)
+      if (error) throw error
+      // Começado sozinho (o arranque automático, 15 out: o «+ 1 Mix de
+      // Quinta»), sem jogos marcados: volta às inscrições — «open» com lugar,
+      // «closed» cheio — e perde o arranque automático, só este mix, senão o
+      // robô formava as duplas outra vez logo a seguir. A série fica igual.
+      if (game.status === 'in_progress') {
+        const { error: statusError } = await supabase.from('games')
+          .update({ status: peopleCount < capacity ? 'open' : 'closed', auto_start_hours_before: null })
+          .eq('id', id)
+        if (statusError) throw statusError
+      }
+      setEditingPairs(false)
+      await loadGameDetails()
+    } catch (error) {
+      console.error('Error undoing duplas:', error)
+      setMixError(describeError(t, error, 'gamedetails.undo_duplas_error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const orderedTeamIds = (list = teams) =>
     [...list].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map(team => team.id)
 
@@ -2123,7 +2243,21 @@ export default function GameDetails() {
         }
         const globalRankings = await getGlobalRankings()
         const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
-        const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, { partnerPairs, rankOf })
+        // Pares quebrados (12 out): a regra dos últimos 4 mixes e, com
+        // «Respeitar os lados», esquerda com direita — sempre que der.
+        const historyPairs = await loadRepeatPairKeys()
+        const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, {
+          partnerPairs, rankOf, historyPairs, respectSides: !!game.respect_sides,
+        })
+        const forced = courts.filter((c) => c.forcedHistory)
+          .flatMap((c) => [c.duplaA, c.duplaB])
+          .filter(([x, y]) => historyPairs.has([x?.id, y?.id].sort().join('|')))
+        // Não havia outra forma: junta na mesma e avisa quem organiza.
+        setRoundRepeatNotice(forced.length > 0
+          ? t('gamedetails.repeat_forced_round', {
+            pairs: forced.map(([x, y]) => t('gamedetails.repeat_pair', { a: shortPersonName(x?.name), b: shortPersonName(y?.name) })).join('; '),
+          })
+          : '')
         // teamSlotCols: convidados sem conta vão para playerX_guest_id
         // (FK para game_guests) — escrevê-los em playerX_id violava a FK
         // para profiles e bloqueava a ronda. O pointsById do estado já
@@ -2580,6 +2714,12 @@ export default function GameDetails() {
   const canStart = isAdmin && !mixStarted && showClosed && !mixPaused && !mixCancelled
   const canStartGames = isAdmin && mixPaused && !mixCancelled
   const canRedoDuplas = canStartGames && matches.length === 0
+  // «Desfazer as duplas» (15 out): com as duplas feitas e o mix por começar,
+  // e também com o mix começado (sozinho, pelo arranque automático) enquanto
+  // não houver jogos a decorrer — sem jogos, ou só a Ronda 1 nos campos, por
+  // começar e sem resultados.
+  const canUndoDuplas = isAdmin && !mixCancelled && teams.length > 0
+    && (canStartGames || (game?.status === 'in_progress' && (matches.length === 0 || round1Pending)))
   // O × nas duplas (ponto 8): também com as duplas sorteadas e o mix por
   // começar — tira a pessoa e as duplas refazem-se com a mesma regra.
   const duplaRemovable = lastMinuteEditable || (canRedoDuplas && !editingPairs)
@@ -2678,8 +2818,22 @@ export default function GameDetails() {
     : matches.length > 0 ? 'rounds'
     : teams.length > 0 ? 'duplas'
     : 'hero'
+  // R3b (13 out): o estado de quem organiza, na caixa e na folha.
+  const orgStateText = (() => {
+    if (isDraftMix(game)) return t('mixdraft.draft')
+    if (game?.status === 'pending') return t('organizer.state_pending')
+    if (game?.status === 'open') return t('organizer.state_open')
+    // Com as duplas feitas e o mix por começar, «duplas feitas»: «parado»
+    // soava a avaria (QA, 14 out).
+    if (game?.status === 'closed') return mixPaused ? t('organizer.state_formed') : t('organizer.state_closed')
+    if (game?.status === 'in_progress') return isMixLive(game, { scored: matches.some((m) => m.score_a != null) }) ? t('ui.status_live') : t('organizer.state_formed')
+    if (game?.status === 'finished') return t('agenda.state_finished')
+    if (game?.status === 'cancelled') return t('homecard.cancelled')
+    return ''
+  })()
+  const goToStep = () => document.getElementById('mix-next-step')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   const renderStepButton = () => (
-    <div className="space-y-1.5">
+    <div id="mix-next-step" className="space-y-1.5 scroll-mt-24">
       <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
         className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
         {barPrimary.label}
@@ -2704,6 +2858,16 @@ export default function GameDetails() {
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
+  // Americano: quem ganhou é o 1.º por pessoa — o cartão do vencedor, o 🏆
+  // da lista e o voucher (Francisco, 8 out, design-handoff/2026-10-08-
+  // americano-voucher): mais pontos; com empate, a diferença de pontos
+  // (marcados menos sofridos); só com as duas iguais é que empatam.
+  // americanoStandings já ordena por pontos e, no empate, pela diferença.
+  const americanoTop = americanoStandingsResult[0] || null
+  const americanoFirsts = americanoTop
+    ? americanoStandingsResult.filter((r) => r.points === americanoTop.points && r.diff === americanoTop.diff)
+    : []
+  const americanoFirstIds = new Set(americanoFirsts.map((r) => r.player.id))
   const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
   // Uma lista só para a linha «Classificação · tu: N.º» (ponto 15).
   const classif = (() => {
@@ -2712,7 +2876,9 @@ export default function GameDetails() {
       rows = americanoStandingsResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
         extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.points} ${t('gamedetails.points_suffix')}` }))
     } else if (isRotating) {
-      rows = placarResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+      // Os dois do mesmo campo com o mesmo resultado partilham o lugar (pares quebrados, 12 out).
+      rows = placarResult.map((s, i, all) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+        place: s.hasResult ? all.findIndex((x) => x.hasResult && x.court === s.court && x.wonLast === s.wonLast) + 1 : i + 1,
         extra: `${s.wins}${t('gamedetails.wins_abbrev')}` }))
     } else if (isSobeDesce) {
       rows = sobeDesceStandings(matches).map((teamId) => ({ key: teamId, name: teamName(teamId), mine: myTeamIds.has(teamId) }))
@@ -2720,7 +2886,8 @@ export default function GameDetails() {
       rows = tctStandings.map((s) => ({ key: s.team.id, name: teamName(s.team.id), mine: myTeamIds.has(s.team.id),
         extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.diff > 0 ? '+' : ''}${s.diff}` }))
     }
-    return { rows, myPos: rows.findIndex((r) => r.mine) + 1 }
+    const me = rows.findIndex((r) => r.mine)
+    return { rows, myPos: me === -1 ? 0 : (rows[me].place ?? me + 1) }
   })()
   // "Ganhou no campo 1" / "Perdeu no campo 1" — o resultado que decide a
   // ordem do Placar (Francisco, 18 set). Sem jogos com resultado: "Campo 1".
@@ -2768,6 +2935,81 @@ export default function GameDetails() {
     ? sobeDesceStandings(matches)
     : []
   const statsByUser = Object.fromEntries(mixStats.map((s) => [s.user_id, s]))
+  // Os vencedores (#622). Mix de duplas: o vencedor em 1.º e as outras pela
+  // ordem da classificação. Americano: por pessoa, com o desempate.
+  const winnersOrg = gameMembership?.organization ? {
+    name: gameMembership.organization.name,
+    logo: orgLogoBaked,
+    initials: (gameMembership.organization.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
+    // Jogo em aberto (#622): «Jogo em aberto · 19:30».
+    sub: game && isOpenGame(game)
+      ? [t('gerirclube.event_label_open'), hhmm(game.date, i18n.language)].join(' · ')
+      : [game?.title, isAmericano ? t('mixwinners.sub_americano') : null].filter(Boolean).join(' · '),
+  } : null
+  // myId: quem partilha; null = o cartão do clube, só com os vencedores
+  // («Em nome do clube», 12 out).
+  const buildWinners = (myId) => {
+    if (game?.status !== 'finished') return null
+    const myStats = myId ? statsByUser[myId] : null
+    const record = myStats ? { won: myStats.matches_won || 0, played: myStats.matches_played || 0 } : null
+    // Jogo em aberto (#622, parte do Dev 1): «Ganharam», com o resultado do
+    // jogo que decidiu e a outra dupla apagada.
+    if (isOpenGame(game) && game.winner_team_id) {
+      const winner = teamById[game.winner_team_id]
+      if (!winner) return null
+      const decided = [...matches].reverse().find((m) => m.winner_team_id && (m.team_a_id === winner.id || m.team_b_id === winner.id))
+      const other = decided ? teamById[decided.team_a_id === winner.id ? decided.team_b_id : decided.team_a_id] : null
+      return openGameWinners({ winner, other, match: decided, myId, record: overallRecord, game, org: winnersOrg, t, lang: i18n.language })
+    }
+    // Pares quebrados: o pódio é por pessoa, pelo placar (QA, 13 out).
+    if (isRotating && placarResult.length > 0) {
+      return rotatingWinners({ placar: placarResult, myId, game, org: winnersOrg, t, lang: i18n.language })
+    }
+    if (game.winner_team_id) {
+      const winnerTeam = teamById[game.winner_team_id]
+      if (!winnerTeam) return null
+      const ordered = [winnerTeam, ...shareDuplas.filter((d) => d.id !== game.winner_team_id).map((d) => teamById[d.id]).filter(Boolean)]
+      return duplasWinners({ teams: ordered, myId, record, game, org: winnersOrg, t, lang: i18n.language })
+    }
+    if (isAmericano && americanoStandingsResult.length > 0) {
+      const w = americanoWinners({ standings: americanoStandingsResult, firsts: americanoFirsts, myId, game, org: winnersOrg, t, lang: i18n.language })
+      if (!w) return null
+      const firsts = americanoFirsts
+      // O voucher (regra de 30 set: sem conta, sem voucher).
+      const withAccount = firsts.filter((r) => !r.player.no_account)
+      const note = firsts.length > 1
+        ? t('gamedetails.americano_tied_first', { points: americanoTop.points })
+        : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: americanoTop.points })
+      const extra = game.has_voucher ? (withAccount.length > 0 ? (
+        <p className="mt-1.5 text-sm font-extrabold text-white">
+          {firsts.length > 1
+            // Com empate, diz-se quem o ganhou: só quem tem conta o recebe.
+            ? t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many_named' : 'gamedetails.americano_voucher_one_named', { names: new Intl.ListFormat(i18n.language === 'en' ? 'en' : 'pt-PT', { type: 'conjunction' }).format(withAccount.map((r) => r.player.name)) })
+            : t('gamedetails.americano_voucher_one')}
+        </p>
+      ) : (
+        <p className="mt-1.5 text-sm text-ink-200">{t('gamedetails.americano_voucher_no_account')}</p>
+      )) : null
+      return { ...w, note, extra }
+    }
+    return null
+  }
+  const winnersInfo = buildWinners(user?.id)
+  // Quem organizou (admin do clube ou do grupo, ou quem criou) e também jogou
+  // escolhe em nome de quem partilha. No jogo em aberto não há clube a
+  // organizar: não se pergunta (SPEC 2026-10-12-partilhar-em-nome-de-quem).
+  const askShareAs = (isAdmin || game?.created_by === user?.id)
+    && !!winnersInfo?.share?.data?.place && !(game && isOpenGame(game))
+  const openWinnersShare = () => {
+    if (askShareAs) { setShareAsAsk(true); return }
+    setShareAs('me')
+    setWinnersShareOpen(true)
+  }
+  const shownWinnersShare = shareAs === 'club' && askShareAs ? buildWinners(null)?.share : winnersInfo?.share
+
+  // Quem jogou e tem conta, e quem organizou (SPEC, ponto 5).
+  const canShareWinners = !!winnersInfo?.share && (isAdmin || game?.created_by === user?.id
+    || (!!statsByUser[user?.id] && !profile?.is_guest))
   const personById = Object.fromEntries(people.map((p) => [p.id, p]))
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
@@ -2818,18 +3060,15 @@ export default function GameDetails() {
                   </DndContext>
   )
 
-  if (loading) {
+  // A carregar: o esqueleto da página (SPEC 2026-10-12-esqueletos-app), em
+  // vez do círculo a rodar — «‹» a sério, o resto a cinzento só depois de
+  // 0,2 s, e o erro de sempre aos 8 s.
+  if (loading || (!game && orgHint === undefined)) {
     return (
-      <div className="flex items-center justify-center py-16" data-loading-game>
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-      </div>
-    )
-  }
-
-  if (!game && orgHint === undefined) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      <div data-loading-game>
+        <SkeletonGate frame={<BackBar onBack={goBack} label={t('gamedetails.back')} />}>
+          <GameDetailsSkeleton />
+        </SkeletonGate>
       </div>
     )
   }
@@ -2865,10 +3104,8 @@ export default function GameDetails() {
       {justBooked && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 animate-fade-in" aria-hidden="true">
           <div className="bg-surface rounded-card shadow-lift px-10 py-8 text-center animate-pop">
-            {/* Verde = inscrito, como a pastilha e o contorno (SPEC 17 set). */}
-            <div className="w-16 h-16 rounded-full bg-ok flex items-center justify-center mx-auto mb-3">
-              <Check size={32} strokeWidth={2} className="text-white" />
-            </div>
+            {/* O Alino em festa no lugar do ✓ verde (mascote, 12 out). */}
+            <Alino pose="festa" size={150} className="mb-3" />
             <p className="font-extrabold text-lg text-ink-900">{t('gamedetails.joined_confirmation_title')}</p>
             <p className="text-muted text-sm">{t('gamedetails.joined_confirmation_subtitle')}</p>
           </div>
@@ -2876,10 +3113,255 @@ export default function GameDetails() {
         document.body
       )}
 
-      {/* «← Voltar» sempre visível; o «Partilhar» fica na faixa (27 set).
-          Um rascunho não se partilha: quem recebesse o link não o abria (#544). */}
-      <BackBar onBack={goBack} label={t('gamedetails.back')} title={game?.title}
-        onShare={isDraftMix(game) ? undefined : () => setShowShare(true)} />
+      {/* R3 (13 out): o topo do evento — a foto do mix ou o Alino do tipo, o
+          «‹» e partilhar, o cartão branco com o clube, o nome, a hora em
+          grande e a data, e a faixa do estado (EventHero, peça comum do Dev 1).
+          Um rascunho não se partilha: quem recebesse o link não o abria (#544).
+          Mix acabado: o mesmo «Partilhar os vencedores» do bloco (#622). */}
+      {(() => {
+        const kind = kindOf(game)
+        const lvl = parseLevel(game.level)
+        const chip = [
+          t(KIND_STYLE[kind].labelKey),
+          kind === 'mix' && lvl ? `${lvl.scale}${lvl.num}` : isOpenGame(game) ? t('gamedetails.court_count', { count: numCourts }) : null,
+          isDraftMix(game) ? t('mixdraft.draft') : game.recurrence_id ? t('ui.recurring').toLowerCase() : null,
+        ].filter(Boolean).join(' · ')
+        const org = gameMembership?.organization
+        const ends = game.court_time_minutes ? new Date(new Date(game.date).getTime() + game.court_time_minutes * 60000) : null
+        const free = Math.max(0, capacity - peopleCount)
+        const toClose = (4 - (peopleCount % 4)) % 4
+        const done = ['finished', 'completed'].includes(game.status)
+        let text = null
+        let tone = 'kind'
+        // Terminado ou cancelado: a faixa a cinzento, como no torneio (UX, 13 out).
+        // Cancelado: só «Cancelado», com o ponto vermelho; a frase inteira fica
+        // no cartão logo a seguir (QA, 13 out: aparecia duas vezes).
+        let dot = null
+        if (game.status === 'cancelled') { text = t('homecard.cancelled'); tone = 'grey'; dot = '#DC2626' }
+        else if (done) { text = t('agenda.state_finished'); tone = 'grey' }
+        // «Estás dentro · campo 1» quando já se sabe o campo (QA, 13 out).
+        else if (isUserJoined) { text = myMatch?.court_number ? t('homecard.in_court', { n: myMatch.court_number }) : t('home.next_in'); tone = 'ok' }
+        else if (isUserWaitlisted) text = t('agenda.state_waitlist')
+        else if (isUserRequested) text = t('agenda.state_request_sent')
+        else if (isOpenGame(game)) text = free ? t('openday.missing', { count: free }) : t('openday.closed')
+        else if (free === 0) text = t('homecard.full')
+        else if (toClose > 0 && peopleCount > 0) text = t('homecard.to_close_court', { count: toClose, court: Math.floor(peopleCount / 4) + 1 })
+        else if (game.status === 'open') text = t('homecard.open')
+        return (
+          <EventHero
+            roundBottom
+            kind={kind}
+            imageUrl={game.image_url || null}
+            chip={chip}
+            org={org ? {
+              name: org.name,
+              kindLabel: t(org.kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'),
+              logo: org.group_logo_url || null,
+              onOpen: org.slug ? () => navigate(`/clube/${org.slug}`) : null,
+            } : null}
+            title={game.title}
+            time={formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+            // Sempre o fim ao lado (UX, 13 out): «até 22:00» com tempo de campo;
+            // sem ele, «recorrente» numa série.
+            timeAside={ends ? t('homecard.until', { time: formatTime(ends, i18n.language, { hour: '2-digit', minute: '2-digit' }) })
+              : game.recurrence_id ? t('ui.recurring').toLowerCase() : null}
+            dateLine={formatDateLib(game.date, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language)}
+            // Adicionar ao calendário (Trello #206) — escondido depois de o mix acabar.
+            onAddToCalendar={!['finished', 'completed', 'cancelled'].includes(game.status)
+              ? () => window.open(`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`, '_blank', 'noopener') : null}
+            onBack={goBack}
+            onShare={isDraftMix(game) ? null : () => (canShareWinners ? openWinnersShare() : setShowShare(true))}
+            // R3b (13 out, opção A + B da UX): a caixa de quem organiza logo
+            // depois da data — a etiqueta, o próximo passo e «Editar e mais
+            // opções». Com o passo mais abaixo (duplas ou rondas), fica lá e a
+            // caixa diz «Próximo passo: … ↓», que desce até ele.
+            nextStep={showAdminBar ? (
+              <OrganizerBox kind={kindOf(game)} onMore={() => setMoreOpen(true)}
+                label={t(isOpenGame(game) ? 'organizer.label_open' : 'organizer.label_mix', { state: orgStateText })}
+                next={stepSlot === 'hero' ? { label: barPrimary.label, onClick: barPrimary.onClick, disabled: barPrimary.disabled, hint: barPrimary.hint, error: mixError } : null}
+                nextLink={stepSlot && stepSlot !== 'hero' ? { label: barPrimary.label, onClick: goToStep } : null} />
+            ) : null}
+            status={{
+              faces: people.map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url })),
+              // Um tracejado por cada lugar que falta, com «+N» nos grandes (R1,
+              // Francisco, 14 out); nenhum depois de acabar.
+              slots: done ? 0 : free,
+              text,
+              tone,
+              dot,
+              // «· HOJE» quando é hoje, como no protótipo (QA, 13 out).
+              meta: [t('homecard.hero_meta', { n: peopleCount, total: capacity }),
+                new Date(game.date).toDateString() === new Date().toDateString() ? t('ui.today') : null].filter(Boolean).join(' · '),
+            }}
+          >
+          {/* A folha branca continua até ao fim da morada, com tudo dentro: os
+              vencedores, os avisos, os botões de quem joga, os quadrados e a
+              morada (protótipo; o cinzento sobre cinzento não se via, UX e
+              Francisco, 14 out). Os blocos de baixo ficam cartões à parte. */}
+          {/* Os vencedores no fim (#622, design-handoff/2026-10-11-vencedores-em-
+              todos-os-jogos): em cima da página do mix acabado, o vencedor e o
+              pódio, e «↗ Partilhar os vencedores» para quem jogou e tem conta, e
+              para quem organizou. O voucher do americano vem para aqui. */}
+          {winnersInfo && (
+            <MixWinnersBlock
+              winner={winnersInfo.winner}
+              rows={winnersInfo.rows}
+              note={winnersInfo.note}
+              extra={winnersInfo.extra}
+              onShare={canShareWinners ? openWinnersShare : null}
+            />
+          )}
+          {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
+              dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
+          {/* Mix que não encheu (pacote do mix, ponto 7): à hora do jogo a base
+              de dados pô-lo em rascunho (games.unfilled_at, Dev 3) e avisou quem
+              organiza. Sem resposta até ao fim do dia, cancela-se sozinho. */}
+          {isDraftMix(game) && isAdmin && game.unfilled_at && (
+            <div role="status" className="rounded-card bg-warning/10 px-4 py-3 text-sm text-[#92400E]">
+              <b>{t('mixdraft.unfilled_title')}</b> {t('mixdraft.unfilled_text')}
+            </div>
+          )}
+          {isDraftMix(game) && isAdmin && (
+            <div className="rounded-card border-2 border-dashed border-ink-200 bg-surface p-4 space-y-3">
+              <div>
+                <p className="font-extrabold text-ink-900">{t('mixdraft.banner_title')}</p>
+                <p className="text-sm text-muted mt-0.5">{t('mixdraft.banner_text')}</p>
+              </div>
+              <button type="button" onClick={() => setPublishOpen(true)}
+                className="w-full min-h-[48px] rounded-ctrl bg-ink-900 px-4 text-base font-extrabold text-white">
+                {t('mixdraft.publish')}
+              </button>
+            </div>
+          )}
+          {/* Mix cancelado (Trello #464): diz-se logo em cima, a toda a gente —
+              quem lá esteve chega aqui pelo link ou pelo grupo. */}
+          {game.status === 'cancelled' && (
+            <div className="rounded-card border border-line bg-surface p-4">
+              {/* Cancelado sozinho por não encher: só «Cancelado porque não encheu.»,
+                  nunca «Quem organiza cancelou» (ponto 7; UX, 2 out). */}
+              {game.unfilled_at ? (
+                <p className="font-extrabold text-ink-900">{t('mixcancel.banner_text_unfilled')}</p>
+              ) : (
+                <>
+                  <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
+                  <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
+              duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
+              não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
+              da barra (barPrimary), por isso fazem sempre o mesmo. */}
+
+          {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
+              ainda não existe. Os outros caminhos (suplente, escalão etário,
+              admin) continuam em "Ações de inscrição" mais abaixo. */}
+          {game.status === 'in_progress' ? (
+            myMatch ? (
+              <PrimaryButton onClick={() => goToMatch(myMatch.id)} className="w-full">
+                <Play size={18} /> {t('gamedetails.your_game_court', { number: myMatch.court_number })}
+              </PrimaryButton>
+            ) : isUserJoined && maxRound > 0 ? (
+              <p className="rounded-card bg-[#F4F5F1] py-3.5 text-center text-sm font-extrabold text-ink-700">{t('gamedetails.resting_this_round')}</p>
+            ) : null
+          ) : !mixStarted && !isUserJoined && waGuestName ? (
+            // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
+            // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
+            // robô do #537; a validação vai ser por SMS, mais tarde).
+            <div className="rounded-card bg-[#F4F5F1] p-4">
+              <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
+            </div>
+          // Quem organiza só vê o verde de jogador enquanto não tiver um botão
+          // preto para carregar (UX, 2 out: dois botões grandes, não).
+          ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
+            <div className="space-y-2">
+              <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
+                {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : isOpenGame(game) ? 'openday.join' : 'gamedetails.join_mix')}
+              </PrimaryButton>
+              {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
+              {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
+                  conta ou não (Trello #339). Num mix que roda parceiros a dupla
+                  desfazia-se na ronda seguinte, por isso não aparece lá. */}
+              {!game.rotate_partners && game.allow_pair_signup && (
+                <PrimaryButton variant="ghost" onClick={withGender(() => setPartnerSheet(true))} disabled={joining} className="w-full">
+                  <Users size={20} /> {t('gamedetails.join_with_partner')}
+                </PrimaryButton>
+              )}
+            </div>
+          ) : !mixStarted && isUserRequested && !mixCancelled ? (
+            // Pedido enviado: não ocupa vaga e não aparece nos inscritos até
+            // quem organiza aceitar.
+            <div className="space-y-2">
+              <p className="rounded-card bg-[#F4F5F1] px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
+              <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full">
+                {t('mixrequest.cancel')}
+              </PrimaryButton>
+            </div>
+          ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
+            // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
+            // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
+            // refazem-se as duplas primeiro.
+            <div className="space-y-1.5">
+              {/* «Estás dentro» diz-se só na faixa de cima; aqui fica o «Sair»
+                  (revisão do Renato, Francisco 16 out: aparecia duas vezes). */}
+              <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full">
+                {t(isOpenGame(game) ? 'openday.leave' : 'gamedetails.leave_mix')}
+              </PrimaryButton>
+              {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
+            </div>
+          ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
+            // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
+            // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
+            // recebe aviso (base de dados).
+            <div className="space-y-1.5">
+              <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
+                {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.stay_suplente')}
+              </PrimaryButton>
+              <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
+            </div>
+          ) : null}
+
+          {/* R3 (13 out): depois dos botões, os dados do mix em quadrados (EventFacts, Dev 1) e, a
+              seguir, a morada com «Abrir com…». Quem ganha, em cada formato, fica
+              escrito por baixo (Francisco, 22 set). */}
+          {(() => {
+            const lvl = parseLevel(game.level)
+            const gender = game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null
+            const age = game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null
+            const items = isOpenGame(game) ? [
+              { key: 'courts', label: t('homecard.fact_courts'), value: t('gamedetails.court_count', { count: numCourts }) },
+              { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
+              { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
+            ] : [
+              { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
+              { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
+            ]
+            items.push(
+              { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
+              { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
+              { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
+              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
+              { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
+            )
+            return (
+              <div className="space-y-2.5">
+                <EventFacts items={items} />
+                {!isOpenGame(game) && (
+                  <p className="px-0.5 text-sm text-muted">
+                    {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
+                  </p>
+                )}
+                {game.location && (
+                  <LocationOpenWith location={game.location} latitude={game.latitude} longitude={game.longitude} />
+                )}
+              </div>
+            )
+          })()}
+          </EventHero>
+        )
+      })()}
 
       {showShare && (
         <ShareModal
@@ -2888,7 +3370,8 @@ export default function GameDetails() {
           url={shareUrl}
           onClose={() => setShowShare(false)}
           imageCard={{
-            variant: !isAmericano && game.status === 'finished' && shareDuplas.length > 0 ? 'podium' : 'invite',
+            // Pares quebrados: as duplas não dizem o pódio (é por pessoa) — fica o convite.
+            variant: !isAmericano && !isRotating && game.status === 'finished' && shareDuplas.length > 0 ? 'podium' : 'invite',
             game,
             people,
             capacity,
@@ -2899,35 +3382,36 @@ export default function GameDetails() {
         />
       )}
 
-      {showAdminBar && (
-        <MixAdminBar
-          onEdit={orgSlug ? () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) : null}
-          onMore={() => setMoreOpen(true)}
+      {shareAsAsk && (
+        <ShareAsSheet
+          kind={isAmericano ? 'americano' : 'mix'}
+          place={winnersInfo?.share?.data?.place}
+          {...(() => {
+            // As vitórias verdadeiras: no americano, as da classificação.
+            const meA = isAmericano ? americanoStandingsResult.find((r) => r.player.id === user?.id) : null
+            return meA ? { won: meA.wins || 0, played: meA.played || 0 }
+              : { won: statsByUser[user?.id]?.matches_won || 0, played: statsByUser[user?.id]?.matches_played || 0 }
+          })()}
+          orgName={winnersOrg?.name || ''}
+          onPick={(who) => { setShareAs(who); setShareAsAsk(false); setWinnersShareOpen(true) }}
+          onClose={() => setShareAsAsk(false)}
+        />
+      )}
+      {winnersShareOpen && shownWinnersShare && (
+        <TournamentShareFlow
+          variant={shownWinnersShare.variant}
+          data={shownWinnersShare.data}
+          text={shownWinnersShare.text}
+          filenameParts={shownWinnersShare.filenameParts}
+          shareTitle={game.title}
+          qrUrl={orgSlug ? `${window.location.origin}/clube/${orgSlug}` : window.location.origin}
+          org={winnersOrg}
+          fallbackImage={game.image_url || null}
+          onClose={() => setWinnersShareOpen(false)}
         />
       )}
 
-      {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
-          dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
-      {/* Mix que não encheu (pacote do mix, ponto 7): à hora do jogo a base
-          de dados pô-lo em rascunho (games.unfilled_at, Dev 3) e avisou quem
-          organiza. Sem resposta até ao fim do dia, cancela-se sozinho. */}
-      {isDraftMix(game) && isAdmin && game.unfilled_at && (
-        <div role="status" className="rounded-card bg-warning/10 px-4 py-3 text-sm text-[#92400E]">
-          <b>{t('mixdraft.unfilled_title')}</b> {t('mixdraft.unfilled_text')}
-        </div>
-      )}
-      {isDraftMix(game) && isAdmin && (
-        <div className="rounded-card border-2 border-dashed border-ink-200 bg-surface p-4 space-y-3">
-          <div>
-            <p className="font-extrabold text-ink-900">{t('mixdraft.banner_title')}</p>
-            <p className="text-sm text-muted mt-0.5">{t('mixdraft.banner_text')}</p>
-          </div>
-          <button type="button" onClick={() => setPublishOpen(true)}
-            className="w-full min-h-[48px] rounded-ctrl bg-ink-900 px-4 text-base font-extrabold text-white">
-            {t('mixdraft.publish')}
-          </button>
-        </div>
-      )}
+
       {/* «Abrem as inscrições» ao publicar (28 set): «Já» ou um dia e hora. */}
       <PublishDraftSheet
         game={publishOpen ? game : null}
@@ -2937,237 +3421,6 @@ export default function GameDetails() {
         errorOf={(error) => (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', gameMembership?.organization?.plan_tier))
           || describeError(t, error, 'mixdraft.publish_error')}
       />
-
-      {/* Mix cancelado (Trello #464): diz-se logo em cima, a toda a gente —
-          quem lá esteve chega aqui pelo link ou pelo grupo. */}
-      {game.status === 'cancelled' && (
-        <div className="rounded-card border border-line bg-surface p-4">
-          {/* Cancelado sozinho por não encher: só «Cancelado porque não encheu.»,
-              nunca «Quem organiza cancelou» (ponto 7; UX, 2 out). */}
-          {game.unfilled_at ? (
-            <p className="font-extrabold text-ink-900">{t('mixcancel.banner_text_unfilled')}</p>
-          ) : (
-            <>
-              <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
-              <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Topo = o cartão da Home em grande (SPEC 17 set, design-handoff/
-          2026-09-17-cores-e-pagina-do-evento): cor e etiqueta do tipo, dono,
-          hora grande, data em minúsculas, morada com "Abrir com…" na mesma
-          caixa. Inscrito = contorno verde + pastilha "Inscrito"; lista de
-          espera = âmbar tracejado. Saiu a barra lima. */}
-      <div className={`rounded-card p-4 ${
-        game.status === 'finished' || game.status === 'cancelled'
-          ? 'bg-surface border border-line'
-          // Rascunho: sem cor e a tracejado até ser publicado (#544).
-          : isDraftMix(game)
-          ? 'bg-white border-2 border-dashed border-ink-200'
-          : isUserJoined
-          ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-ok`
-          : isUserWaitlisted
-            ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-dashed border-[#B86E00]`
-            : `${KIND_STYLE[kindOf(game)].card} border`
-      }`}>
-        <div className="flex items-start justify-between gap-2">
-          <KindTag kind={kindOf(game)} suffix={isDraftMix(game) ? t('mixdraft.draft') : game.recurrence_id ? t('ui.recurring') : null} />
-          {/* Terminado: cinza, como o cartão passado na Home. */}
-          {game.status === 'finished' ? (
-            <StateTag tone="grey" icon={Check}>{t('agenda.state_finished')}</StateTag>
-          ) : isUserJoined ? (
-            <StateTag tone="in" icon={Check}>{t('gamedetails.joined_badge')}</StateTag>
-          ) : isUserWaitlisted ? (
-            <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
-          ) : isUserRequested ? (
-            // «Pedido enviado», a palavra que a app já usa nos grupos.
-            <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
-          ) : null}
-        </div>
-
-        <h1 className="font-display text-2xl text-ink-900 leading-tight mt-2.5">{game.title}</h1>
-        {gameMembership?.organization && (
-          <div className="mt-1">
-            <Owner
-              event={{
-                orgName: gameMembership.organization.name,
-                orgKind: gameMembership.organization.kind,
-                orgLogo: gameMembership.organization.group_logo_url,
-                orgSlug: gameMembership.organization.slug,
-                orgId: game.organization_id,
-              }}
-              fallbackKey="agenda.owner_none"
-              link
-            />
-          </div>
-        )}
-
-        <p className="font-display text-[28px] font-extrabold text-ink-900 leading-none mt-3">
-          {formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        </p>
-        <p className="text-[13px] text-ink-700 mt-1.5">
-          {formatDateLib(game.date, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language)}
-          {/* Adicionar ao calendário (Trello #206) — escondido depois de o
-              mix acabar. */}
-          {!['finished', 'completed', 'cancelled'].includes(game.status) && (
-            <>
-              {' · '}
-              <a
-                href={`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-extrabold text-ink-900 underline underline-offset-2"
-              >
-                {t('gamedetails.add_to_calendar')}
-              </a>
-            </>
-          )}
-        </p>
-
-        {game.location && (
-          <LocationOpenWith
-            location={game.location}
-            latitude={game.latitude}
-            longitude={game.longitude}
-            className="mt-3 bg-white/75 rounded-xl px-3 py-2"
-          />
-        )}
-
-        <div className="mt-3 space-y-1.5 text-[13px] text-ink-700">
-          <p className="flex items-start gap-1.5">
-            <Swords size={15} className="shrink-0 mt-0.5" />
-            <span>
-              {t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
-              {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
-            </span>
-          </p>
-            {/* Quem ganha, em cada formato — o Americano dá a vitória a um
-                jogador e não a uma dupla, e isso não estava escrito em lado
-                nenhum (Francisco, 22 set 2026). */}
-            <p className="text-sm text-muted mt-1">
-              {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
-            </p>
-          {game.price_per_player > 0 && (
-            <p className="flex items-center gap-1.5">
-              <Euro size={15} className="shrink-0" />
-              {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
-            </p>
-          )}
-          {game.prize && (
-            <p className="flex items-center gap-1.5">
-              <Trophy size={15} className="shrink-0" />
-              {t('gamedetails.prize_label', { prize: game.prize })}
-            </p>
-          )}
-          {((game.gender_restriction && game.gender_restriction !== 'indiferente') || (game.age_restriction && AGE_LABEL_KEY[game.age_restriction])) && (
-            <p className="font-extrabold text-ink-900">
-              {[
-                game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null,
-                game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null,
-              ].filter(Boolean).join(' · ')}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-ink-900/10">
-          <PlayerAvatarRow
-            players={people.map(p => ({ id: p.id, name: p.name, avatar_url: p.avatar_url }))}
-            max={capacity}
-            size="sm"
-          />
-          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} genders={heroRated.map((p) => ratingInfoById[p.id]?.gender)} /></span>
-        </div>
-        {game.status === 'open' && (
-          <p className="text-xs text-muted mt-2">
-            🔒 {Math.floor(peopleCount / 4)}/{numCourts} {t('gamedetails.courts_locked_suffix')}
-            {peopleCount < capacity && (
-              <> · {t('gamedetails.missing_to_close_court', { count: (4 - (peopleCount % 4)) % 4 || 4 })}</>
-            )}
-          </p>
-        )}
-      </div>
-
-      {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
-          duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
-          não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
-          da barra (barPrimary), por isso fazem sempre o mesmo. */}
-      {stepSlot === 'hero' && renderStepButton()}
-
-      {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
-          ainda não existe. Os outros caminhos (suplente, escalão etário,
-          admin) continuam em "Ações de inscrição" mais abaixo. */}
-      {game.status === 'in_progress' ? (
-        myMatch ? (
-          <PrimaryButton onClick={() => goToMatch(myMatch.id)} className="w-full">
-            <Play size={18} /> {t('gamedetails.your_game_court', { number: myMatch.court_number })}
-          </PrimaryButton>
-        ) : isUserJoined && maxRound > 0 ? (
-          <p className="card !shadow-none py-3.5 text-center text-sm font-extrabold text-ink-700">{t('gamedetails.resting_this_round')}</p>
-        ) : null
-      ) : !mixStarted && !isUserJoined && waGuestName ? (
-        // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
-        // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
-        // robô do #537; a validação vai ser por SMS, mais tarde).
-        <div className="card">
-          <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
-        </div>
-      // Quem organiza só vê o verde de jogador enquanto não tiver um botão
-      // preto para carregar (UX, 2 out: dois botões grandes, não).
-      ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
-        <div className="space-y-2">
-          <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.join_mix')}
-          </PrimaryButton>
-          {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
-          {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
-              conta ou não (Trello #339). Num mix que roda parceiros a dupla
-              desfazia-se na ronda seguinte, por isso não aparece lá. */}
-          {!game.rotate_partners && game.allow_pair_signup && (
-            <PrimaryButton variant="ghost" onClick={withGender(() => setPartnerSheet(true))} disabled={joining} className="w-full !bg-white !border-ink-900">
-              <Users size={20} /> {t('gamedetails.join_with_partner')}
-            </PrimaryButton>
-          )}
-        </div>
-      ) : !mixStarted && isUserRequested && !mixCancelled ? (
-        // Pedido enviado: não ocupa vaga e não aparece nos inscritos até
-        // quem organiza aceitar.
-        <div className="space-y-2">
-          <p className="rounded-card bg-white px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
-          <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full !bg-white !border-ink-900">
-            {t('mixrequest.cancel')}
-          </PrimaryButton>
-        </div>
-      ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
-        // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
-        // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
-        // refazem-se as duplas primeiro.
-        <div className="space-y-1.5">
-          <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
-            {t('gamedetails.leave_mix')}
-          </PrimaryButton>
-          {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
-        </div>
-      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
-        // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
-        // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
-        // recebe aviso (base de dados).
-        <div className="space-y-1.5">
-          <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.stay_suplente')}
-          </PrimaryButton>
-          <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
-        </div>
-      ) : null}
-
-      {/* Winner (mix finalizado) */}
-      {game.status === 'finished' && game.winner_team_id && (
-        <div className="card bg-ink-900 text-center">
-          <p className="text-ink-200 text-xs font-extrabold uppercase tracking-widest mb-2">{t('gamedetails.mix_winners_label')}</p>
-          <p className="text-2xl font-extrabold text-white">{teamName(game.winner_team_id)}</p>
-        </div>
-      )}
 
       {/* 👍 da noite — cada participante dá 1 kudos a um colega do mix
           (+1 XP para quem recebe; guardas todas no RPC). Janela: 48h após
@@ -3246,27 +3499,36 @@ export default function GameDetails() {
       {/* Tabs — a finished mix's results (stats, duplas, rounds) are shown
           one section at a time instead of stacked in a continuous scroll.
           Matches the tab-bar pattern from Comunidade.jsx. */}
+      {/* Tocar num separador sobe a página até ele ficar em cima, com o
+          conteúdo logo à vista, como no torneio (Francisco, 14 out). */}
       {game.status === 'finished' && rounds.length > 0 && (
+        <GlassPinned pinRef={finishedTabsRef}>
         <Tabs
           value={finishedTab}
-          onChange={setFinishedTab}
+          onChange={(v) => {
+            setFinishedTab(v)
+            requestAnimationFrame(() => finishedTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+          }}
           options={[
             { value: 'stats', label: t('gamedetails.tab_stats') },
             { value: 'duplas', label: t('gamedetails.tab_duplas') },
             { value: 'rondas', label: t('gamedetails.tab_rondas') },
           ].filter((tab) => !(showIndividualStandings && tab.value === 'duplas'))}
         />
+        </GlassPinned>
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}
-      {game.status === 'finished' && finishedTab === 'stats' && mixStats.length > 0 && (() => {
+      {game.status === 'finished' && finishedTab === 'stats' && (mixStats.length > 0 || (isRotating && placarResult.length > 0)) && (() => {
         // A linha de um jogador, partilhada pelas duas vistas: avatar com a
         // pill NOVO (como no ranking e nas listas de participantes), nome +
         // nível + 🏆, jogos/% e, à direita, o delta + rating do mix.
         // rating_delta/rating_after only exist from the Elo rollout
         // (2026-08-25) onward — older finished mixes fall back to the
         // legacy points_earned they were actually finalized with.
-        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won }) => {
+        // `points`: no americano, os pontos do mix (os mesmos do cartão do
+        // vencedor), em vez do points_earned da tabela (QA, 10 out: 24 em vez de 48).
+        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won, points = null }) => {
           const s = statsByUser[id]
           const hasRating = s?.rating_delta != null
           const nameBlock = (
@@ -3305,7 +3567,8 @@ export default function GameDetails() {
                 <div className="text-right shrink-0">
                   {hasRating ? (
                     <p className="flex items-center justify-end gap-1.5">
-                      <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                      {/* Os pontos que descem a cinzento, nunca a vermelho (UX, 13 out — como nos Rankings). */}
+                      <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-muted'}`}>
                         {s.rating_delta >= 0 ? '+' : ''}{Math.round(s.rating_delta)}
                       </span>
                       {s.rating_after != null && (
@@ -3313,7 +3576,7 @@ export default function GameDetails() {
                       )}
                     </p>
                   ) : (
-                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
+                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{points ?? s.points_earned}</p>
                   )}
                   <p className="text-[11px] text-muted">
                     {hasRating ? t('gamedetails.rating_label') : t('gamedetails.points_label')}
@@ -3360,14 +3623,103 @@ export default function GameDetails() {
                   )
                 })}
               </div>
+            ) : isRotating && placarResult.length > 0 ? (
+              // Pares quebrados (PO e QA, 13 out): a lista segue a
+              // Classificação por pessoa, com o lugar partilhado do pódio; quem
+              // não tem conta entra a cinzento, «sem conta» — nunca some.
+              <div className="space-y-1.5">
+                {placarResult.map((r, i, all) => {
+                  const place = r.hasResult ? all.findIndex((x) => x.hasResult && x.court === r.court && x.wonLast === r.wonLast) + 1 : i + 1
+                  const s = statsByUser[r.player.id]
+                  const won = place === 1
+                  return (
+                    <div key={r.player.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                        won ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                      }`}>
+                        {place}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {s && !r.player.no_account ? statsPlayerRow({
+                          id: r.player.id,
+                          name: s.user?.name || r.player.name,
+                          avatarUrl: personById[r.player.id]?.avatar_url,
+                          isGuest: !!isGuestById[r.player.id],
+                          won,
+                        }) : (
+                          // Sem conta (UX, 13 out): tudo a cinzento, a mesma linha das
+                          // outras pessoas por baixo do nome e nada à direita (sem ranking).
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="opacity-50 grayscale"><Avatar name={r.player.name} url={null} size="w-10 h-10 text-sm" /></span>
+                            <div className="min-w-0 flex-1">
+                              <p className="flex items-center gap-1.5 min-w-0 font-extrabold text-muted">
+                                <span className="truncate min-w-0">{firstLastName(r.player.name)}</span>
+                                {won && <span className="shrink-0">🏆</span>}
+                              </p>
+                              <p className="text-[11px] text-muted">
+                                {t('gamedetails.americano_no_account')} · {r.wins}/{r.played} {t('gamedetails.games_suffix')} • {winRatePct(r.wins, r.played)}% {t('gamedetails.win_rate_suffix')}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
+              isAmericano && americanoStandingsResult.length > 0 ? (
+              // Americano (UX, 8 out): a lista segue a classificação por pessoa
+              // e o número é o lugar no mix (empates partilham o lugar). Quem
+              // não tem conta entra a cinzento, «sem conta», só com os pontos.
+              <div className="space-y-1.5">
+                {americanoStandingsResult.map((r, i, all) => {
+                  const place = all.findIndex((x) => x.points === r.points && x.diff === r.diff) + 1
+                  const s = statsByUser[r.player.id]
+                  const first = place === 1
+                  return (
+                    <div key={r.player.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                        first ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                      }`}>
+                        {place}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {s && !r.player.no_account ? statsPlayerRow({
+                          id: r.player.id,
+                          name: s.user?.name || r.player.name,
+                          avatarUrl: personById[r.player.id]?.avatar_url,
+                          isGuest: !!isGuestById[r.player.id],
+                          won: americanoFirstIds.has(r.player.id),
+                          points: r.points,
+                        }) : (
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Avatar name={r.player.name} url={null} size="w-10 h-10 text-sm" />
+                            <div className="min-w-0 flex-1">
+                              <p className="flex items-center gap-1.5 min-w-0 font-extrabold text-muted">
+                                <span className="truncate min-w-0">{firstLastName(r.player.name)}</span>
+                                {americanoFirstIds.has(r.player.id) && <span className="shrink-0">🏆</span>}
+                              </p>
+                              <p className="text-[11px] text-muted">{t('gamedetails.americano_no_account')}</p>
+                            </div>
+                            <span className="shrink-0 text-sm text-muted tabular-nums">{t('gamedetails.americano_points', { count: r.points })}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              ) : (
               <div className="space-y-1.5">
                 {mixStats.map((s, i) => (
                   <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                    {/* Americano com empate no 1.º (UX, 8 out): «1» nos dois, e quem
+                        vem a seguir fica «3», como no desporto. */}
                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
-                      i === 0 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                      i === 0 || (isAmericano && americanoFirstIds.has(s.user_id)) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
                     }`}>
-                      {i + 1}
+                      {isAmericano && americanoFirstIds.has(s.user_id) ? 1 : i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       {statsPlayerRow({
@@ -3375,17 +3727,21 @@ export default function GameDetails() {
                         name: s.user?.name,
                         avatarUrl: personById[s.user_id]?.avatar_url,
                         isGuest: !!isGuestById[s.user_id],
-                        won: s.mix_won,
+                        won: isAmericano ? americanoFirstIds.has(s.user_id) : s.mix_won,
                       })}
                     </div>
                   </div>
                 ))}
               </div>
+              )
             )}
           </div>
         )
       })()}
 
+      {roundRepeatNotice && isAdmin && (
+        <p role="status" className="rounded-ctrl bg-warning/10 px-4 py-3 text-sm font-bold text-[#92400E]">{roundRepeatNotice}</p>
+      )}
       {/* Com a barra de quem organiza, o erro aparece nela, junto ao botão. */}
       {mixError && !(showAdminBar && barPrimary) && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
@@ -3429,6 +3785,32 @@ export default function GameDetails() {
           </div>
           {editingPairs ? renderPairsEditor() : renderDuplasList()}
           <p className="mt-2 text-xs text-muted">{t('eventactions.drawn_everyone_sees')}</p>
+          {/* Partilhar as duplas logo que estão feitas, não só depois de
+              começar (revisão do Renato, Francisco 16 out). */}
+          {!editingPairs && (
+            <button type="button" onClick={() => setShowDuplasShare(true)}
+              className="press mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-[#CFD2D7] bg-white px-4 font-display text-[14.5px] font-extrabold text-ink-900">
+              <Share2 size={16} /> {t('gamedetails.share_duplas_button')}
+            </button>
+          )}
+          {showDuplasShare && !mixStarted && (
+            <ShareModal
+              title={t('gamedetails.share_duplas_title')}
+              message={buildDuplasShareMessage()}
+              url={shareUrl}
+              onClose={() => setShowDuplasShare(false)}
+              imageCard={{ variant: 'duplas', game, duplas: teams, formattedDate: formatDate(game.date) }}
+            />
+          )}
+          {/* Voltar aos inscritos, sem duplas (Francisco, 15 out). A cor
+              segue a da pergunta (UX): preto sem jogos; vermelho com a
+              Ronda 1 nos campos, porque os jogos saem. */}
+          {canUndoDuplas && !editingPairs && (
+            <button type="button" onClick={handleUndoDuplas} disabled={busy}
+              className={`mt-3 min-h-[44px] text-sm font-extrabold underline underline-offset-2 disabled:opacity-40 ${matches.length > 0 ? 'text-danger' : 'text-ink-900'}`}>
+              {t('gamedetails.undo_duplas')}
+            </button>
+          )}
         </div>
       )}
       {mixPaused && stepSlot === 'duplas' && renderStepButton()}
@@ -3509,6 +3891,14 @@ export default function GameDetails() {
                   renderDuplasList()
                 )}
               </>
+            )}
+            {/* Começado sozinho, sem jogos a decorrer: voltar aos inscritos
+                (15 out). À vista também com o cartão dobrado. */}
+            {canUndoDuplas && !editingPairs && (
+              <button type="button" onClick={handleUndoDuplas} disabled={busy}
+                className={`mt-3 min-h-[44px] text-sm font-extrabold underline underline-offset-2 disabled:opacity-40 ${matches.length > 0 ? 'text-danger' : 'text-ink-900'}`}>
+                {t('gamedetails.undo_duplas')}
+              </button>
             )}
           </div>
           )}
@@ -3607,7 +3997,7 @@ export default function GameDetails() {
                 <div className="space-y-1.5">
                   {classif.rows.map((row, i) => (
                     <div key={row.key} className={`flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0 ${row.mine ? 'font-extrabold' : ''}`}>
-                      <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                      <span className="w-6 font-extrabold text-ink-900 tabular-nums">{row.place ?? i + 1}</span>
                       <span className="flex-1 font-extrabold text-ink-900 truncate">{row.name}</span>
                       {row.extra && <span className="text-muted tabular-nums text-right whitespace-nowrap">{row.extra}</span>}
                     </div>
@@ -3826,9 +4216,13 @@ export default function GameDetails() {
                           <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
                           <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')} {t(game.ranked === false ? 'gamedetails.placar_ranking_friendly' : 'gamedetails.placar_ranking_ranked')}</p>
                           <div className="space-y-1.5">
-                            {placarResult.map((s, i) => (
+                            {placarResult.map((s, i, all) => (
                               <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                                <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                                {/* Os dois do mesmo campo com o mesmo resultado partilham o lugar:
+                                    «1.º Rita e Tiago» (pares quebrados, 12 out — escolha A). */}
+                                <span className="w-6 font-extrabold text-ink-900 tabular-nums">{s.hasResult
+                                  ? all.findIndex((x) => x.hasResult && x.court === s.court && x.wonLast === s.wonLast) + 1
+                                  : i + 1}</span>
                                 <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
                                 <span className={`text-xs font-extrabold whitespace-nowrap ${s.hasResult && s.wonLast ? 'text-ok' : 'text-muted'}`}>{placarCourtLabel(s)}</span>
                                 <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
@@ -3842,9 +4236,10 @@ export default function GameDetails() {
                     <div className="card">
                       <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
                       <div className="space-y-1.5">
-                        {americanoStandingsResult.map((s, i) => (
+                        {americanoStandingsResult.map((s, i, all) => (
                           <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                            {/* Os empatados (pontos e diferença) partilham o lugar, como nas Estatísticas (QA, 10 out). */}
+                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{all.findIndex((x) => x.points === s.points && x.diff === s.diff) + 1}</span>
                             <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
                             <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
                             <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
@@ -4104,6 +4499,12 @@ export default function GameDetails() {
           {/* Intervalo de pontos dos inscritos com nível (Ruben, 29 set):
               responde ao «que nível é que este mix tem?» sem abrir perfis. */}
           {(() => {
+            // Jogo em aberto (ponto 5): o nível do jogo explicado, sem os
+            // números do ranking.
+            if (isOpenGame(game)) {
+              const band = heroAvgRating != null ? peopleRatingBand(heroAvgRating, heroRated.map((p) => ratingInfoById[p.id]?.gender)) : null
+              return band ? <p className="text-xs text-muted mb-4">{t('openday.level', { level: band.label })}</p> : <div className="mb-3" />
+            }
             const rated = people.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
             if (rated.length < 2) return <div className="mb-3" />
             const min = Math.round(Math.min(...rated))
@@ -4115,6 +4516,7 @@ export default function GameDetails() {
               </p>
             )
           })()}
+          <PriceRosterSummary roster={priceRoster} ids={people.map((x) => x.id)} normalPrice={game.price_per_player} className="-mt-2 mb-3" />
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -4192,6 +4594,7 @@ export default function GameDetails() {
                     )}
                     {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
                         Cancelado (#464): a lista fica como estava, sem mexer. */}
+                    <PriceRosterTag roster={priceRoster} userId={person.id} normalPrice={game.price_per_player} />
                     {isAdmin && !mixPaused && game.status !== 'cancelled' && (
                       <button
                         onClick={() => handleRemovePerson(person)}
@@ -4463,6 +4866,18 @@ export default function GameDetails() {
           // (migration_mix_trocar_sem_sortear.sql); as outras duplas ficam.
           const { error } = await supabase.from('participants').delete().eq('id', removeSlotAsk.person.rowId)
           if (error) throw error
+          // O aviso a quem foi tirado (QA e UX, 8 out): «Quem organiza tirou-te
+          // do <mix>…», no sino e no WhatsApp (notify_mix_changes guarda quem
+          // tirou). Quem não tem conta não tem onde o receber. Um aviso que
+          // falha não desfaz a mudança — fica só no log.
+          const out = removeSlotAsk.person
+          if (out?.id && !out.is_guest) {
+            try {
+              await notifyMixChanges(id, [{ user_id: out.id, kind: 'mix_removed' }])
+            } catch (notifyError) {
+              console.error('Error notifying the removed player:', notifyError)
+            }
+          }
           await loadGameDetails()
         }}
         onClose={() => setRemoveSlotAsk(null)}
@@ -4897,7 +5312,16 @@ export default function GameDetails() {
         const notStarted = (['pending', 'open', 'closed'].includes(game.status) || (isDraftMix(game) && !!game.unfilled_at)) && !mixPaused
         const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
         const actions = [
+          // R3b: «Editar o mix» é a primeira linha (saiu o «Editar» do topo).
+          orgSlug && !['finished', 'cancelled'].includes(game.status) && { key: 'edit', label: t(isOpenGame(game) ? 'organizer.edit_open' : 'organizer.edit_mix'), hint: t('eventactions.edit_hint'),
+            // O jogo em aberto tem o seu editor, o da publicação (QA, 14 out:
+            // pelo do mix dava «Este mix já não existe»).
+            onClick: () => navigate(isOpenGame(game) && game.open_batch_id
+              ? `/gerir/${orgSlug}/editar/em-aberto/${game.open_batch_id}`
+              : `/gerir/${orgSlug}/editar/mix/${game.id}`) },
           isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
+          // Com as duplas formadas e o mix por começar: voltar aos inscritos.
+          canUndoDuplas && { key: 'undo_duplas', label: t('gamedetails.undo_duplas'), hint: t('gamedetails.undo_duplas_hint'), onClick: handleUndoDuplas, danger: matches.length > 0 },
           // «Voltar a rascunho» (unpublish_mix, Dev 3) — regra nova do
           // Francisco (6 out): sempre, até o mix terminar, também com
           // inscritos e depois de o robô o anunciar. Quem está inscrito sai e
@@ -4906,8 +5330,11 @@ export default function GameDetails() {
             && { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) },
           game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },
           // Sem ninguém inscrito o mix desaparece: chama-se «Eliminar o mix».
-          { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
-            hint: t(nobody ? 'eventactions.delete_mix_hint' : isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
+          // Jogo em aberto (ponto 3): «Cancelar este jogo», só este horário.
+          isOpenGame(game)
+            ? { key: 'cancel', danger: true, label: t('openday.cancel'), hint: t('openday.cancel_hint'), onClick: () => setCancelOpen(true) }
+            : { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
+              hint: t(nobody ? 'eventactions.delete_mix_hint' : isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
         ].filter(Boolean)
         const dateTitle = isSeriesDate ? `${game.title} · ${shortDay}` : game.title
         return (
@@ -4915,7 +5342,7 @@ export default function GameDetails() {
             <EventActionsSheet
               open={moreOpen}
               title={dateTitle}
-              subtitle={isSeriesDate ? [time, game.location].filter(Boolean).join(' · ') : `${shortDay} · ${time}`}
+              eyebrow={t('eventactions.bar_label', { state: orgStateText })}
               actions={actions}
               onClose={() => setMoreOpen(false)}
             />
@@ -4969,17 +5396,17 @@ export default function GameDetails() {
             <ConfirmSheet
               open={cancelOpen}
               danger
-              title={t('mixcancel.confirm_title', { name: dateTitle || '' })}
-              message={nobody
+              title={isOpenGame(game) ? t('openday.cancel_title') : t('mixcancel.confirm_title', { name: dateTitle || '' })}
+              message={isOpenGame(game) ? t('openday.cancel_hint') : nobody
                 ? t(isSeriesDate ? 'eventactions.cancel_nobody_series' : 'eventactions.cancel_nobody')
                 : t(isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint')}
-              cancelLabel={t('mixcancel.keep')}
-              confirmLabel={t('mixcancel.confirm')}
+              cancelLabel={isOpenGame(game) ? t('openday.cancel_keep') : t('mixcancel.keep')}
+              confirmLabel={isOpenGame(game) ? t('openday.cancel') : t('mixcancel.confirm')}
               onConfirm={async () => {
                 const { outcome } = await cancelMixDate(game)
                 if (outcome === 'cancel') { loadGameDetails(); return }
                 // Desapareceu: volta ao Gerir, com a tira a dizer o que aconteceu.
-                const notice = t('eventactions.cancel_done_removed', { name: dateTitle })
+                const notice = isOpenGame(game) ? t('openday.cancel_done', { time }) : t('eventactions.cancel_done_removed', { name: dateTitle })
                 if (orgSlug) navigate(`/gerir/${orgSlug}`, { replace: true, state: { notice } })
                 else navigate('/', { replace: true })
               }}

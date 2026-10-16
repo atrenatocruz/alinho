@@ -17,7 +17,7 @@ const testEnvHtml = (isTest) => ({
     .replace('<title>alinho.pt — mixes, rankings e clubes de padel</title>', '<title>alinho TESTE</title>')
     .replace('href="/favicon.ico"', 'href="/favicon-teste.ico"')
     .replace('href="/apple-touch-icon.png"', 'href="/apple-touch-icon-teste.png"')
-    .replace('<meta name="theme-color" content="#040404" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
+    .replace('<meta name="theme-color" content="#0E1A12" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
     .replace('</head>', '  <meta name="apple-mobile-web-app-title" content="alinho TESTE" />\n  </head>')),
 })
 
@@ -41,8 +41,9 @@ export default defineConfig(({ mode }) => {
         name: isTest ? 'alinho TESTE' : 'alinho',
         short_name: isTest ? 'alinho TESTE' : 'alinho',
         description: 'A comunidade de jogadores, grupos e clubes de padel.',
-        theme_color: isTest ? TEST_ORANGE : '#040404',
-        background_color: '#FFFFFF',
+        // O verde do splash «Rally» (12 out): sem clarão de outra cor ao abrir.
+        theme_color: isTest ? TEST_ORANGE : '#0E1A12',
+        background_color: '#0E1A12',
         display: 'standalone',
         icons: [
           {
@@ -69,11 +70,14 @@ export default defineConfig(({ mode }) => {
         // precisos vários refreshes até «limpar» (Francisco, 26 set).
         globPatterns: ['**/*.{js,css,ico,png,svg}'],
         navigateFallback: null,
-        // Só se a rede falhar é que se usa a última página guardada.
+        // Só se a rede falhar é que se usa a última página guardada — sem
+        // tempo limite (14 out): com 4 s, numa rede lenta vinha a página
+        // antiga, que pedia o ficheiro principal antigo (já 404) e a app não
+        // arrancava (um jogador ficou parado no texto para o Google).
         runtimeCaching: [{
           urlPattern: ({ request }) => request.mode === 'navigate',
           handler: 'NetworkFirst',
-          options: { cacheName: 'paginas', networkTimeoutSeconds: 4 },
+          options: { cacheName: 'paginas' },
         }],
         // A versão nova NÃO ativa sozinha (29 set): ativá-la logo apagava os
         // ficheiros da versão aberta, e ao mudar de ecrã a página pedia um

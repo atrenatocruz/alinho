@@ -1,9 +1,11 @@
 // Peças pequenas partilhadas pelos ecrãs das aulas (Trello #49). Cores do
 // desenho aprovado (design-handoff/2026-09-18-aulas-com-treinadores, SPEC §9):
-// aula = turquesa — fundo #CCFBF1, contorno #8FE3D6, texto #0F766E.
+// aula = verde desde o R0 do redesign (13 out; antes turquesa) — as cores
+// vêm de src/lib/kindColors.js.
 import { ratingBand } from '../../lib/elo'
+import { KIND_COLORS } from '../../lib/kindColors'
 
-export const TEAL = { bg: '#CCFBF1', border: '#8FE3D6', text: '#0F766E' }
+export const TEAL = { bg: KIND_COLORS.lesson.light, border: KIND_COLORS.lesson.line, text: KIND_COLORS.lesson.strong }
 
 /** "M5", "F2", "INI" — pastilha preta em mono, como nos wireframes. */
 export function LevelPill({ label, className = '' }) {

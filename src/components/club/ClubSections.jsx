@@ -4,100 +4,147 @@
 // grupo: cabeçalho · o que vem aí · pessoas · (grupos do clube) · jogos
 // entre membros · sobre. O clube só ACRESCENTA professores, grupos, local e
 // contactos — não é outra página.
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, CheckCircle2, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, Phone, Plus, Share2 } from 'lucide-react'
+import KindHero from '../KindHero'
+import GlassBar, { GLASS_ROUND, GlassPinned, useUnderBar } from '../GlassBar'
+import Alino from '../Alino'
+import LocationOpenWith from '../LocationOpenWith'
+import { formatLabelKey } from '../../lib/mixLogic'
+import { formatCurrency } from '../../lib/formatDate'
+import { CLUB_HERO, GROUP_HERO } from '../../lib/kindColors'
 import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
-import { KIND_STYLE, KindTag, StateTag } from '../agenda/EventCard'
+import { KIND_STYLE, CardClub } from '../agenda/EventCard'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardButton, kindColorsOf } from '../agenda/HomeCard'
+import FaceCircles from '../event/FaceCircles'
+import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
+import { formatDate } from '../../lib/formatDate'
+import { daysAside, shortDay } from '../event/heroDates'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
   ? value : `https://instagram.com/${value.trim().replace(/^@/, '')}`)
 
-/** Símbolo do dono: quadrado = clube, redondo = grupo (regra de 18 set). */
+/** Símbolo do dono: quadrado (cantos de 28%) = clube, redondo = grupo
+ *  (regra de 18 set; confirmada pela UX a 13 out). */
 function Symbol({ club, size = 'w-14 h-14 text-lg' }) {
-  const group = club.kind === 'group'
+  const shape = club.kind === 'group' ? 'rounded-full' : 'rounded-[28%]'
   if (club.group_logo_url) {
-    return <img src={club.group_logo_url} alt="" className={`${size} shrink-0 object-cover ${group ? 'rounded-full' : 'rounded-[12px]'}`} />
+    return <img src={club.group_logo_url} alt="" className={`${size} shrink-0 object-cover ${shape}`} />
   }
   const initials = (club.name || '?').split(/\s+/).filter(Boolean).slice(0, 1).map((w) => w[0]).join('').toUpperCase()
   return (
-    <span className={`${size} flex shrink-0 items-center justify-center font-extrabold ${group ? 'rounded-full bg-ink-700 text-white' : 'rounded-[12px] bg-ink-900 text-lime-400'}`}>
+    <span className={`${size} flex shrink-0 items-center justify-center bg-ink-900 font-extrabold text-lime-400 ${shape}`}>
       {initials}
     </span>
   )
 }
 
-/* ── Cabeçalho ──────────────────────────────────────────────────────────
-   O nome nunca é cortado (passa a duas linhas) e o botão fica SEMPRE por
-   baixo, a toda a largura. Lima só no «Seguir»/«Pedir para entrar» — a
-   única coisa lima do ecrã. «A seguir» abre a pergunta das janelas de 24
-   set: «Continuar a seguir» a preto primeiro, o risco a vermelho por baixo.
-   «Pedido enviado» tem saída (Francisco, 8 out: «deveria dar para cancelar
-   pedido»): «Cancelar pedido» em contorno por baixo, com a pergunta das
-   aulas (LessonEventCard). */
-export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite }) {
+/* ── Cabeçalho (R5 do redesign, 13 out) ────────────────────────────────
+   design-handoff/2026-10-13-redesign/R5-clube-e-grupo.md. O topo a toda a
+   largura com o Alino do clube ou do grupo (R0; a foto do clube entra
+   quando houver onde a guardar — dados novos, para 23), e nos cantos «‹»,
+   ♡ favorito (só para membros) e partilhar, em botões redondos. O cartão
+   branco sobe por cima, com o logótipo a passar por cima do topo, o nome e
+   «Clube · Lisboa · 48 membros». Por baixo, UM botão a toda a largura:
+   «Entrar» (lima) ou «Pedir para entrar» (contorno); dentro, a caixa
+   verde-clara «✓ És membro» (tocar pergunta se queres sair, como o «A
+   seguir» de antes); com o pedido feito, a cinzenta «⏳ Pedido enviado» e
+   «Cancelar pedido». O favorito saiu de ao lado do botão (nunca lado a
+   lado). Só aspeto: as ações são as de antes. */
+export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite, onBack = null, onShare = null }) {
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [asking, setAsking] = useState(false)
   const [askingCancel, setAskingCancel] = useState(false)
-  // A terra pode ser uma morada inteira (A2N, 26 set): essa parte pode partir
-  // a linha; «Clube» e «N membros» nunca partem. Nada pode empurrar a página
-  // para o lado.
+  const member = club.my_status === 'member'
+  // «Clube · <cidade> · N membros» (R5). Os dados só têm a morada inteira,
+  // que fica em «Sobre»: sem cidade, «Clube · N membros» (UX, 13 out).
   const sub = [
     { text: t(club.kind === 'group' ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), long: false },
-    club.kind !== 'group' && club.location ? { text: club.location, long: true } : null,
+    club.kind !== 'group' && club.city ? { text: club.city, long: true } : null,
     club.member_count != null ? { text: t('clubprofile.member_count', { count: club.member_count }), long: false } : null,
   ].filter(Boolean)
+  // O «‹», o ♡ e o partilhar sempre no mesmo sítio, presos em cima em
+  // círculos de vidro, também por cima da foto (GlassBar; Francisco, 15 out:
+  // nada muda de sítio). O vidro e o nome entram juntos quando o nome grande
+  // chega aos botões, numa troca cruzada com ele (UX).
+  const coverRef = useRef(null)
+  const nameRef = useRef(null)
+  const rowRef = useRef(null)
+  const under = useUnderBar(nameRef, rowRef, [], { lastLine: true })
+  // O vidro entra com a primeira linha do nome; o nome sobe para a barra com
+  // a última (UX, 15 out).
+  const firstUnder = useUnderBar(nameRef, rowRef)
+  const coverGone = useUnderBar(coverRef, rowRef, [], { edge: 'bottom' })
 
   return (
-    <div className="card space-y-3.5">
-      <div className="flex items-center gap-3.5">
-        <Symbol club={club} />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            {sub.map((part, i) => (
-              <span key={i} className={part.long ? '[overflow-wrap:anywhere]' : 'whitespace-nowrap'}>{i > 0 && ' · '}{part.text}</span>
-            ))}
-          </p>
-        </div>
-      </div>
-
-      {club.my_status === 'member' ? (
-        <div className="flex gap-2.5">
-          <button type="button" onClick={() => setAsking(true)} disabled={acting}
-            className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-ctrl border border-line bg-canvas text-base font-extrabold text-ink-900 disabled:opacity-40">
-            <Check size={17} /> {t('clubprofile.following')}
-          </button>
-          <button type="button" onClick={onToggleFavorite} disabled={favoriting}
-            aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
-            title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
-            className="flex h-12 w-14 shrink-0 items-center justify-center rounded-ctrl border-2 border-lime-400 bg-canvas disabled:opacity-40">
-            <Heart size={20} className={isFavorite ? 'fill-lime-600 text-lime-600' : 'text-ink-300'} />
-          </button>
-        </div>
-      ) : club.my_status === 'pending' ? (
-        <div>
-          <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-50 text-base font-extrabold text-muted">
-            <Clock size={16} /> {t('clubprofile.request_sent')}
-          </span>
-          <p className="mt-1.5 text-center text-[13px] text-muted">{t(kk('clubprofile.request_waiting'))}</p>
-          {onCancelRequest && (
-            <button type="button" onClick={() => setAskingCancel(true)} disabled={acting}
-              className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white text-base font-extrabold text-ink-900 disabled:opacity-40">
-              {t('lessons.cancel_request')}
+    // Sai das margens da página, como o topo dos eventos (R3).
+    <div className="-mx-4 -mt-6">
+      <GlassBar anchorRef={coverRef} rowRef={rowRef} filled={under || firstUnder} strip={coverGone} showTitle={under} title={club.name} wide={member && !!onShare}
+        left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
+        right={<>
+          {member && (
+            <button type="button" onClick={onToggleFavorite} disabled={favoriting}
+              aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
+              title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
+              aria-pressed={isFavorite} className={`${GLASS_ROUND} disabled:opacity-50`}>
+              <Heart size={19} className={isFavorite ? 'fill-lime-400 text-lime-600' : ''} />
             </button>
           )}
+          {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button>}
+        </>} />
+      <div ref={coverRef}>
+      <KindHero kind="club" src={club.kind === 'group' ? GROUP_HERO : CLUB_HERO} className="relative h-40">
+      </KindHero>
+      </div>
+
+      <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-0">
+        <div className="flex items-end gap-3.5">
+          {/* O logótipo grande, a passar por cima do topo. */}
+          <span className={`-mt-7 bg-white p-[3px] ${club.kind === 'group' ? 'rounded-full' : 'rounded-[28%]'}`}>
+            <Symbol club={club} size="w-[58px] h-[58px] text-xl" />
+          </span>
+          <div className="min-w-0 flex-1 pt-3">
+            <h1 ref={nameRef} className={`font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere] transition-opacity duration-fast ${under ? 'opacity-0' : 'opacity-100'}`}>{club.name}</h1>
+          </div>
         </div>
-      ) : (
-        <PrimaryButton onClick={onFollow} disabled={acting} className="w-full">
-          {club.open_join ? t('clubprofile.follow_button') : t('clubprofile.request_join_button')}
-        </PrimaryButton>
-      )}
+        <p className="mt-1 text-sm text-muted">
+          {sub.map((part, i) => (
+            <span key={i} className={part.long ? '[overflow-wrap:anywhere]' : 'whitespace-nowrap'}>{i > 0 && ' · '}{part.text}</span>
+          ))}
+        </p>
+
+        <div className="mt-4">
+          {member ? (
+            <button type="button" onClick={() => setAsking(true)} disabled={acting}
+              className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F8DC] py-3 font-display text-[14px] font-extrabold leading-none text-[#3F6212] disabled:opacity-40">
+              <Check size={15} /> {t('clubprofile.is_member')}
+            </button>
+          ) : club.my_status === 'pending' ? (
+            <div>
+              <span className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F5F1] py-3 font-display text-[14px] font-extrabold leading-none text-ink-500">
+                <Clock size={15} /> {t('clubprofile.request_sent')}
+              </span>
+              <p className="mt-1.5 text-center text-[13px] text-muted">{t(kk('clubprofile.request_waiting'))}</p>
+              {onCancelRequest && (
+                <button type="button" onClick={() => setAskingCancel(true)} disabled={acting}
+                  className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white text-base font-extrabold text-ink-900 disabled:opacity-40">
+                  {t('lessons.cancel_request')}
+                </button>
+              )}
+            </div>
+          ) : club.open_join ? (
+            <PrimaryButton onClick={onFollow} disabled={acting} className="w-full">{t('clubprofile.follow_button')}</PrimaryButton>
+          ) : (
+            <PrimaryButton variant="ghost" onClick={onFollow} disabled={acting} className="w-full !border-ink-900">{t('clubprofile.request_join_button')}</PrimaryButton>
+          )}
+        </div>
+      </div>
 
       <ConfirmSheet
         open={asking}
@@ -136,8 +183,25 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
    dizer (`locked` vem da base de dados, Dev 3). */
 const SHOW = 5
 
+// «O que vem aí» só leva o que ainda não aconteceu, e nunca os cancelados
+// (QA, 11 out): um mix que ficou «a decorrer» de outro dia e um torneio
+// cancelado apareciam lá. Os de hoje ficam (um mix a decorrer hoje também).
+const todayKey = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const localDayKey = (iso) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function buildClubEvents(club, tournaments = []) {
-  const games = (club.open_games || []).map((g) => ({
+  const today = todayKey()
+  const now = Date.now()
+  // Um jogo em aberto cuja hora já passou também sai (relatório do QA, 9 out):
+  // só fica o que ainda vai acontecer. Os mixes de hoje ficam (a decorrer).
+  const games = (club.open_games || []).filter((g) => g.date && localDayKey(g.date) >= today && g.status !== 'cancelled'
+    && !(g.origin === 'open_slot' && new Date(g.date).getTime() <= now)).map((g) => ({
     key: `g-${g.id}`,
     kind: g.origin === 'open_slot' ? 'open' : 'mix',
     when: g.date,
@@ -148,7 +212,7 @@ export function buildClubEvents(club, tournaments = []) {
     recurring: !!g.recurrence_id,
   }))
   const tours = tournaments
-    .filter((x) => x.status !== 'terminado')
+    .filter((x) => !['terminado', 'cancelado'].includes(x.status) && (x.ends_on || x.starts_on || today) >= today)
     .map((x) => ({
       key: `t-${x.id}`,
       kind: 'tournament',
@@ -159,50 +223,122 @@ export function buildClubEvents(club, tournaments = []) {
   return [...games, ...tours].sort((a, b) => String(a.when || '9').localeCompare(String(b.when || '9')))
 }
 
+// R5 (13 out): os eventos do clube com o cartão do R1 (faixa na cor forte do
+// tipo e corpo branco), e o tipo no lugar do clube («Mix · recorrente»).
 function EventRow({ event, member }) {
   const { t, i18n } = useTranslation()
-  // «sáb 27 set» e «18:00» — como na Home, sem o ano nem a data repetida.
-  const dayOf = (iso, withWeekday) => new Date(iso).toLocaleDateString(i18n.language,
-    { ...(withWeekday ? { weekday: 'short' } : {}), day: 'numeric', month: 'short' }).replace(/\./g, '').replace(',', '')
-  const timeOf = (iso) => new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
-  let line = ''
+  const navigate = useNavigate()
+  const kindLabel = t(KIND_STYLE[event.kind]?.labelKey || 'agenda.kind_mix')
+  const recurring = event.recurring ? t('ui.recurring') : null
+  let time, timeAside = null, count = null, chips = null, stateRow = null, free = null
   if (event.tournament) {
     const x = event.tournament
-    const a = x.starts_on ? dayOf(`${x.starts_on}T12:00:00`) : ''
-    const b = x.ends_on && x.ends_on !== x.starts_on ? dayOf(`${x.ends_on}T12:00:00`) : ''
-    line = [b ? `${a} – ${b}` : a, t(`tournament.status_${x.status}`)].filter(Boolean).join(' · ')
+    const a = shortDay(x.starts_on, i18n.language)
+    const b = x.ends_on && String(x.ends_on).slice(0, 10) !== String(x.starts_on || '').slice(0, 10) ? shortDay(x.ends_on, i18n.language) : null
+    time = b ? `${a.split(' ')[0]}–${b}` : a || '—'
+    timeAside = daysAside(x.starts_on, x.ends_on, i18n.language, t)
+    chips = null
+    if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   } else {
     const g = event.game
-    line = [
-      dayOf(event.when, true),
-      timeOf(event.when),
-      // Um evento fechado a quem não é membro não traz vagas nem inscritos.
-      !event.locked && g.max_players ? t('clubprofile.players_ratio', { count: g.confirmed_count || 0, max: g.max_players }) : null,
-    ].filter(Boolean).join(' · ')
+    time = new Date(event.when).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+    timeAside = recurring ? recurring.toLowerCase() : null
+    // Um evento fechado a quem não é membro não traz vagas nem inscritos.
+    if (!event.locked && g.max_players) {
+      count = { n: g.confirmed_count || 0, of: g.max_players, unit: t(event.kind === 'open' ? 'homecard.unit_players' : 'homecard.unit_signed') }
+    }
+    // A linha cinzenta do R1: formato · campos · preço (CONFORMIDADE-R5-R8,
+    // n.º 3). Só com os dados na lista do clube (pedido ao Dev 3).
+    chips = [
+      g.format ? t(formatLabelKey(g)) : null,
+      g.num_courts ? t('gamedetails.court_count', { count: g.num_courts }) : null,
+      g.price_per_player > 0 ? formatCurrency(g.price_per_player, i18n.language) : null,
+    ].filter(Boolean).join(' · ') || null
+    free = g.max_players ? Math.max(0, g.max_players - (g.confirmed_count || 0)) : null
+    if (event.myState === 'in') stateRow = <CardState tone="ok">{t('home.next_in')}</CardState>
+    else if (event.myState === 'waitlist') stateRow = <CardState tone="warn">{t('agenda.state_line_waitlist')}</CardState>
+    else if (!event.locked && free === 0) stateRow = <CardState tone="warn">{t('homecard.full')}</CardState>
+    else if (!event.locked && free > 0) stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   }
-
-  const state = event.myState === 'in' ? <StateTag tone="in" icon={Check}>{t('agenda.state_in')}</StateTag>
-    : event.myState === 'waitlist' ? <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
-      : null
-  const frame = event.myState === 'in' ? `${KIND_STYLE[event.kind].bg} border-2 border-ok`
-    : event.myState === 'waitlist' ? `${KIND_STYLE[event.kind].bg} border-2 border-dashed border-[#B86E00]`
-      : `${KIND_STYLE[event.kind].card} border`
-  const body = (
-    <>
-      <div className="flex items-start justify-between gap-2">
-        <KindTag kind={event.kind} suffix={event.recurring ? t('ui.recurring') : null} />
-        {event.locked ? <Lock size={15} className="mt-1 text-muted" /> : state}
-      </div>
-      <h4 className="mt-2 text-base font-extrabold leading-snug text-ink-900 [overflow-wrap:anywhere]">{event.title}</h4>
-      <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
-    </>
-  )
-  const cls = `block rounded-card p-3.5 ${frame}`
+  const pill = event.locked
+    ? <BandPill tone="dark"><Lock size={11} className="inline align-[-1px]" aria-label={t('clubprofile.events')} /></BandPill>
+    : event.myState === 'in' ? <BandPill>✓ {t('home.next_in')}</BandPill> : null
   // O torneio abre a toda a gente (página pública). O mix só a membros: a
   // quem não é, a página do mix dava «não encontrado» (#535).
-  if (event.tournament) return <Link to={`/torneio/${event.tournament.slug || event.tournament.id}`} className={`${cls} press`}>{body}</Link>
-  if (member && !event.locked) return <Link to={`/jogo/${event.game.id}`} className={`${cls} press`}>{body}</Link>
-  return <div className={`${cls} opacity-60`} aria-disabled="true">{body}</div>
+  const to = event.tournament ? `/torneio/${event.tournament.slug || event.tournament.id}`
+    : member && !event.locked ? `/jogo/${event.game.id}` : null
+  const card = (
+    <HomeCard colors={kindColorsOf(event.kind)} label={kindLabel} pill={pill} time={time} timeAside={timeAside} count={count}
+      imageUrl={event.game?.image_url || null} mine={event.myState === 'in'} to={to} ariaLabel={`${event.title} — ${time}`}>
+      <CardClub event={{}} label={[kindLabel, recurring].filter(Boolean).join(' · ')} />
+      <CardTitle>{event.title}</CardTitle>
+      {chips && <CardChips>{chips}</CardChips>}
+      {stateRow}
+      {/* Os círculos e o botão, como na Home (R1; UX, 14 out), em todos os
+          cartões — também quando já estou dentro (QA, 14 out). A lista do
+          clube só traz quantos estão: o cinzento cheio com o número e os
+          tracejados dos lugares que faltam — nunca caras inventadas.
+          «Entrar» leva à página do mix, onde se entra; dentro, «Ver». */}
+      {(count || (event.myState === 'in' && to)) && (
+        <div className="mt-3 flex items-center gap-2.5">
+          {count && <FaceCircles count={count.n} free={free || 0} size="sm" />}
+          {event.myState === 'in' && to ? (
+            <span className="pointer-events-none ml-auto whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
+          ) : to && free > 0 && !event.myState && (
+            <div className="relative ml-auto"><CardButton onClick={() => navigate(to)}>{t('home.join_short')}</CardButton></div>
+          )}
+        </div>
+      )}
+    </HomeCard>
+  )
+  if (to) return card
+  return event.locked ? <div className="opacity-60" aria-disabled="true">{card}</div> : card
+}
+
+// O cabeçalho do dia como o da Home (dayParts, AgendaControls): «Hoje» e
+// «segunda, 12 out», ou «Sábado» e «17 out». Não se importa de lá porque
+// AgendaControls traz o Google Maps, que não corre nos testes.
+const capitalize = (x) => (x ? x[0].toUpperCase() + x.slice(1) : x)
+function dayParts(dayKey, t, lang) {
+  const today = toDayKey(new Date())
+  const d = fromDayKey(dayKey)
+  const part = (opts) => formatDate(d, lang, opts).replace(/\./g, '').replace(/-feira$/, '')
+  const date = `${d.getDate()} ${part({ month: 'short' })}`
+  const near = dayKey === today ? t('ui.today') : dayKey === addDays(today, 1) ? t('ui.tomorrow') : null
+  if (near) return { big: near, small: `${part({ weekday: 'long' })}, ${date}` }
+  return { big: capitalize(part({ weekday: 'long' })), small: date }
+}
+
+// Os eventos por dia, com o cabeçalho da Home (R1): «Hoje» em grande, a data
+// a cinzento e, à direita, «2 jogos».
+const eventDayKey = (e) => (e.tournament ? String(e.tournament.starts_on || '').slice(0, 10) : e.when ? localDayKey(e.when) : '')
+function EventDays({ events, member }) {
+  const { t, i18n } = useTranslation()
+  const days = []
+  for (const e of events) {
+    const k = eventDayKey(e)
+    if (days.length && days[days.length - 1].k === k) days[days.length - 1].list.push(e)
+    else days.push({ k, list: [e] })
+  }
+  return (
+    <div className="space-y-5">
+      {days.map(({ k, list }, i) => {
+        const dp = k ? dayParts(k, t, i18n.language) : null
+        return (
+          <section key={k || i} className="space-y-2.5">
+            {dp && (
+              <div className={`flex items-baseline gap-2 px-0.5 ${i === 0 ? '' : 'pt-1'}`}>
+                <b className="font-display text-[22px] font-black leading-none tracking-[-.02em] text-ink-900">{dp.big}</b>
+                <span className="font-display text-[14px] font-semibold leading-none text-[#5B6068]">{dp.small}</span>
+                <em className="ml-auto font-mono text-[10.5px] not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: list.length })}</em>
+              </div>
+            )}
+            {list.map((e) => <EventRow key={e.key} event={e} member={member} />)}
+          </section>
+        )
+      })}
+    </div>
+  )
 }
 
 export function ClubEvents({ club, events, isAdmin, gerirHref }) {
@@ -220,20 +356,16 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t(canSeePast ? 'clubprofile.events' : 'clubprofile.upcoming')}</h3>
-        {tab === 'upcoming' && events.length > SHOW && !all && (
-          <button type="button" onClick={() => setAll(true)} className="inline-flex min-h-[44px] items-center gap-0.5 text-sm font-extrabold text-ink-900">
-            {t('clubprofile.see_all')} <ChevronRight size={15} />
-          </button>
-        )}
-      </div>
-
+      {/* Sem rótulo por cima: o separador vem logo a seguir ao botão (R5,
+          protótipo; UX 13 out). */}
+      {/* Preso por baixo da barra de vidro ao descer (Francisco, 14 out). */}
       {canSeePast && (
-        <Tabs className="mb-3" label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
-          { value: 'upcoming', label: t('clubprofile.upcoming') },
-          { value: 'played', label: t('agenda.show_played') },
-        ]} />
+        <GlassPinned className="mb-1">
+          <Tabs label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
+            { value: 'upcoming', label: t('clubprofile.upcoming') },
+            { value: 'played', label: t('agenda.show_played') },
+          ]} />
+        </GlassPinned>
       )}
 
       {tab === 'played' ? <ClubPlayed club={club} /> : <>
@@ -244,24 +376,27 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
       )}
 
       {events.length === 0 ? (
-        isAdmin ? (
-          <div className="rounded-card border-2 border-dashed border-line p-3.5">
-            <p className="text-sm font-extrabold text-ink-900">{t('clubprofile.nothing_yet_admin')}</p>
-            <p className="text-[13px] text-muted">{t(kk('clubprofile.nothing_yet_admin_hint'))}</p>
-            <Link to={gerirHref} className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-ink-900">
+        // O Alino «a pensar», «Ainda sem jogos marcados» (R5, regra de 12 out:
+        // o Alino em todos os vazios). Quem organiza tem o caminho para marcar.
+        <div className="px-2.5 py-6 text-center">
+          <Alino pose="a-pensar" size={120} className="mx-auto" />
+          <b className="mt-2 block font-display text-[19px] font-black leading-tight text-ink-900">{t('clubprofile.empty_title')}</b>
+          <p className="mt-1.5 text-[13.5px] leading-normal text-ink-500">{t(kk('clubprofile.empty_hint'))}</p>
+          {isAdmin && (
+            <Link to={gerirHref} className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-ink-900">
               <Plus size={15} /> {t('clubprofile.schedule_mix')} <ChevronRight size={15} />
             </Link>
-          </div>
-        ) : (
-          <div className="rounded-card border border-line bg-canvas px-3.5 py-3">
-            <p className="text-sm font-extrabold text-ink-900">{t('clubprofile.nothing_yet')}</p>
-            <p className="text-[13px] text-muted">{t(kk('clubprofile.nothing_yet_hint'))}</p>
-          </div>
-        )
-      ) : (
-        <div className="space-y-2.5">
-          {shown.map((e) => <EventRow key={e.key} event={e} member={member} />)}
+          )}
         </div>
+      ) : (
+        <>
+          <EventDays events={shown} member={member} />
+          {events.length > SHOW && !all && (
+            <button type="button" onClick={() => setAll(true)} className="mt-1 inline-flex min-h-[44px] items-center gap-0.5 text-sm font-extrabold text-ink-900">
+              {t('clubprofile.see_all')} <ChevronRight size={15} />
+            </button>
+          )}
+        </>
       )}
       </>}
     </section>
@@ -312,20 +447,20 @@ function ClubPlayed({ club }) {
         const people = r.kind === 'tournament'
           ? (r.entries_count != null ? t('agenda.played_teams', { count: Number(r.entries_count) }) : null)
           : r.players_count != null ? t(r.kind === 'mix' ? 'agenda.played_players' : 'agenda.played_people', { count: Number(r.players_count) }) : null
-        const line = [dayOf(r.date), r.kind === 'tournament' ? null : timeOf(r.date), people].filter(Boolean).join(' · ')
+        // Na faixa já vai a hora (ou o dia, no torneio): por baixo, o dia e quantos jogaram.
+        const line = [dayOf(r.date), people].filter(Boolean).join(' · ')
         const points = r.i_played && r.my_points != null ? Math.round(Number(r.my_points)) : null
         return (
-          <Link key={`${r.kind}-${r.id}`} to={to} className={`press block rounded-card bg-surface p-3.5 ${r.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
-            <div className="flex items-start justify-between gap-2">
-              <KindTag kind={kind} past />
-              <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+          // R5 (13 out): o cartão do R1, a cinzento por já ter passado.
+          <HomeCard key={`${r.kind}-${r.id}`} colors={kindColorsOf(kind)} label={t(KIND_STYLE[kind]?.labelKey || 'agenda.kind_mix')}
+            pill={<BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
+            time={r.kind === 'tournament' ? shortDay(r.date, i18n.language) : timeOf(r.date)} past to={to} ariaLabel={title}>
+            <div className="flex items-baseline justify-between gap-2">
+              <CardTitle past>{title}</CardTitle>
+              {points != null && <b className={`shrink-0 text-sm font-extrabold ${points > 0 ? 'text-[#3F6212]' : 'text-muted'}`}>{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}
             </div>
-            <div className="mt-2 flex items-baseline justify-between gap-2">
-              <h4 className="text-base font-extrabold leading-snug text-muted [overflow-wrap:anywhere]">{title}</h4>
-              {points != null && <b className="shrink-0 text-sm font-extrabold text-ink-900">{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}
-            </div>
-            <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
-          </Link>
+            <CardChips>{line}</CardChips>
+          </HomeCard>
         )
       })}
       {!all && rows.length > PLAYED_FIRST && (
@@ -343,81 +478,96 @@ function ClubPlayed({ club }) {
    a largura — nunca cortado (provado a 320 px no desenho). Quem organiza à
    vista. Professores (só clube) com o seguir de pessoas que já existe —
    nada de preços nem horários: as aulas estão escondidas até 11 out. */
+// Os blocos de baixo (protótipo .blk e .pl): o cartão cinzento-claro e a
+// linha branca de cada pessoa.
+export const BLOCK = 'rounded-[16px] bg-[#F4F5F1] p-3'
+export const ROW = 'mt-2 flex items-center gap-3 rounded-[12px] bg-white px-2.5 py-2'
+export const BLOCK_TITLE = 'font-display text-[15px] font-bold leading-tight text-ink-900'
+
 export function ClubPeople({ club, members, teachers, follows, followActing, onFollowTeacher, onUnfollowTeacher }) {
   const { t } = useTranslation()
   const admins = members.filter((m) => m.is_admin)
-  const faces = members.slice(0, 3)
+  const faces = members.slice(0, 6)
   const count = club.member_count ?? members.length
   const extra = Math.max(count - faces.length, 0)
 
   if (!count && !teachers.length) return null
+  // R5 (protótipo, UX 13 out): cada bloco num cartão cinzento-claro com o
+  // título dentro — «Pessoas» com «6 MEMBROS» em mono à direita, as caras e
+  // «Ver todos os membros ›»; «Quem organiza» com cada pessoa numa linha
+  // branca. O «Falar» do protótipo precisa do contacto de quem organiza, que
+  // vem com os dados de 23 (DADOS-PARA-23): até lá a linha abre o perfil.
   return (
-    <section className="space-y-2.5">
-      <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.people')}</h3>
-
+    <section className="space-y-2">
       {count > 0 && (
-        <div className="card overflow-hidden p-0">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex shrink-0 -space-x-2">
-              {faces.map((m) => <Avatar key={m.id} name={m.name} url={m.avatar_url} size="w-9 h-9 text-xs ring-2 ring-surface" />)}
-              {extra > 0 && (
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-700 text-[11px] font-extrabold text-white ring-2 ring-surface">+{extra}</span>
-              )}
-            </div>
-            <p className="font-extrabold text-ink-900">{t('clubprofile.member_count', { count })}</p>
+        <div className={BLOCK}>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.people')}</h3>
+            <span className="font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-ink-500">{t('clubprofile.member_count', { count })}</span>
           </div>
-          <Link to={`/clube/${club.slug}/membros`}
-            className="flex min-h-[48px] items-center justify-between border-t border-line px-4 text-sm font-extrabold text-ink-900 hover:bg-ink-50">
-            {t('clubprofile.see_all_members')} <ChevronRight size={16} />
+          {/* Sem caras, sem a linha: um «+340» sozinho parecia um erro (UX, 14 out). */}
+          {faces.length > 0 && <div className="mt-2.5 flex">
+            {faces.map((m, i) => (
+              <span key={m.id} className="-mr-2 rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
+                <Avatar name={m.name} url={m.avatar_url} size="w-8 h-8 text-[11px]" />
+              </span>
+            ))}
+            {extra > 0 && (
+              <span className="-mr-2 grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-[#F1F2EE] font-display text-[10.5px] font-bold text-[#4F535A]">+{extra}</span>
+            )}
+          </div>}
+          <Link to={`/clube/${club.slug}/membros`} className="block pb-0.5 pt-3 font-display text-[13px] font-bold text-ink-900">
+            {t('clubprofile.see_all_members')} ›
           </Link>
         </div>
       )}
 
       {admins.length > 0 && (
-        <div className="card space-y-2.5">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.organizers')}</p>
+        <div className={BLOCK}>
+          <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.organizers')}</h3>
           {admins.map((m) => (
-            <Link key={m.id} to={`/jogador/${m.id}`} className="flex items-center gap-3">
-              <Avatar name={m.name} url={m.avatar_url} size="w-10 h-10 text-sm" />
-              <span className="min-w-0">
-                <span className="block truncate font-extrabold text-ink-900">{m.name}</span>
-                <span className="block text-[13px] text-muted">{t('clubprofile.organizes_mixes')}</span>
+            <Link key={m.id} to={`/jogador/${m.id}`} className={ROW}>
+              <Avatar name={m.name} url={m.avatar_url} size="w-9 h-9 text-xs" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-[14px] font-bold text-ink-900">{m.name}</span>
+                <span className="block text-[12px] text-ink-500">{t('clubprofile.organizes_mixes')}</span>
               </span>
+              <ChevronRight size={16} className="shrink-0 text-ink-500" />
             </Link>
           ))}
         </div>
       )}
 
       {club.kind !== 'group' && teachers.length > 0 && (
-        <div className="card space-y-2.5">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.tab_teachers')}</p>
+        <div className={BLOCK}>
+          <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.tab_teachers')}</h3>
           {teachers.map((x) => {
             const follow = x.user_id ? follows[x.user_id] : null
             return (
-              <div key={x.teacher_profile_id || x.user_id} className="flex items-center gap-3">
+              <div key={x.teacher_profile_id || x.user_id} className={ROW}>
                 <Link to={`/professor/${x.teacher_profile_id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  <Avatar name={x.name} url={x.avatar_url} size="w-10 h-10 text-sm" />
+                  <Avatar name={x.name} url={x.avatar_url} size="w-9 h-9 text-xs" />
                   <span className="min-w-0">
-                    <span className="block truncate font-extrabold text-ink-900">{x.name}</span>
-                    <span className="block truncate text-[13px] text-muted">
+                    <span className="block truncate font-display text-[14px] font-bold text-ink-900">{x.name}</span>
+                    <span className="block truncate text-[12px] text-ink-500">
                       {[t('comunidade.teacher_label'), club.kind !== 'group' ? club.location : null].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                 </Link>
                 {x.user_id && (follow?.status === 'accepted' ? (
                   <button type="button" disabled={followActing === x.user_id} onClick={() => onUnfollowTeacher(x)}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-line bg-canvas px-3.5 text-sm font-extrabold text-ink-900">
-                    <Check size={14} /> {t('playerdetails.following_button')}
+                    className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-[12px] border border-[#D5D8DE] bg-white px-2.5 font-display text-[12.5px] font-bold text-ink-900">
+                    <Check size={13} /> {t('playerdetails.following_button')}
                   </button>
                 ) : follow?.status === 'pending' ? (
                   <button type="button" disabled={followActing === x.user_id} onClick={() => onUnfollowTeacher(x, false)}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-line bg-canvas px-3.5 text-sm font-extrabold text-muted">
-                    <Clock size={14} /> {t('playerdetails.requested_button')}
+                    className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-[12px] border border-[#D5D8DE] bg-white px-2.5 font-display text-[12.5px] font-bold text-ink-900 !text-ink-500">
+                    <Clock size={13} /> {t('playerdetails.requested_button')}
                   </button>
                 ) : (
                   <button type="button" disabled={followActing === x.user_id} onClick={() => onFollowTeacher(x)}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border-2 border-ink-900 bg-canvas px-3.5 text-sm font-extrabold text-ink-900">
-                    <Plus size={14} /> {t('playerdetails.follow_button')}
+                    className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-[12px] border border-[#D5D8DE] bg-white px-2.5 font-display text-[12.5px] font-bold text-ink-900">
+                    {t('playerdetails.follow_button')}
                   </button>
                 ))}
               </div>
@@ -462,23 +612,23 @@ export function ClubAbout({ club, isAdmin, gerirHref }) {
   }
 
   return (
+    // R5 (protótipo): «Sobre o clube» / «Sobre o grupo» no cartão
+    // cinzento-claro, com a morada na peça comum («Abrir com…», Dev 2).
     <section>
-      <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.about')}</h3>
-      <div className="card space-y-3">
-        {club.description && <p className="whitespace-pre-line text-ink-900">{club.description}</p>}
-        {hasLocation && (
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(club.location)}`} target="_blank" rel="noopener noreferrer"
-            className="flex min-h-[44px] items-center justify-between gap-2 border-t border-line pt-2 text-ink-900">
-            <span className="flex min-w-0 items-center gap-1.5"><MapPin size={15} className="shrink-0" /> <span className="truncate">{club.location}</span></span>
-            <span className="inline-flex shrink-0 items-center text-sm font-extrabold">{t('clubprofile.open_map')} <ChevronRight size={15} /></span>
-          </a>
-        )}
+      <div className={`${BLOCK} space-y-3`}>
+        <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t(kk('clubprofile.about_title'))}</h3>
+        {club.description && <p className="whitespace-pre-line text-[13px] leading-normal text-ink-700">{club.description}</p>}
+        {hasLocation && <LocationOpenWith location={club.location} surface="white" />}
+        {/* Cada contacto numa linha branca, empilhadas (UX, 13 out — nunca
+            lado a lado): o ícone, o nome e «›». */}
         {contacts.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+          <div className="space-y-2">
             {contacts.map((c) => (
               <a key={c.href} href={c.href} target={c.external ? '_blank' : undefined} rel={c.external ? 'noopener noreferrer' : undefined}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-line bg-canvas px-4 text-sm font-extrabold text-ink-900">
-                <c.icon size={15} /> {c.label}
+                className="press flex min-h-[48px] items-center gap-3 rounded-[12px] bg-white px-3 py-2.5 font-display text-[14px] font-bold text-ink-900">
+                <c.icon size={17} className="shrink-0 text-ink-700" />
+                <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                <ChevronRight size={16} className="shrink-0 text-ink-500" />
               </a>
             ))}
           </div>

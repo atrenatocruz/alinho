@@ -11,6 +11,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
+import { shareLinkOrCopy } from '../lib/shareImage'
 import { ArrowLeft, Building2, Check, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -22,12 +23,13 @@ import { Avatar, EmptyState } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
 import { describeError, errorKind } from '../lib/errors'
 import { listClubTeachers } from '../lib/lessonsApi'
-import { ClubHeader, ClubEvents, ClubPeople, ClubAbout, buildClubEvents } from '../components/club/ClubSections'
+import { ClubHeader, ClubEvents, ClubPeople, ClubAbout, buildClubEvents, BLOCK, BLOCK_TITLE, ROW } from '../components/club/ClubSections'
 import LiveStrip from '../components/live/LiveStrip'
 
 export default function ClubProfile() {
   const { t } = useTranslation()
   const { slug } = useParams()
+  const [linkCopied, setLinkCopied] = useState(false)
   const goBack = useGoBack('/comunidade')
   const { user, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
@@ -227,7 +229,17 @@ export default function ClubProfile() {
     )
   }
 
-  const back = <BackBar onBack={goBack} title={club?.name} />
+  // ⤴ «Partilhar o link», para toda a gente (partilhar-link, 12 out): a
+  // frase com o link, ou copiá-lo com «✓ Link copiado» durante 2 s.
+  const shareClub = async () => {
+    const url = `${window.location.origin}/clube/${club.slug || slug}`
+    const text = t('clubprofile.share_text', { name: club.name, link: `${window.location.host}/clube/${club.slug || slug}` })
+    if (await shareLinkOrCopy({ title: club.name, text, url }) === 'copied') {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }
+  }
+  const back = <BackBar onBack={goBack} title={club?.name} onShare={club ? shareClub : undefined} />
 
   if (notFound || !club) {
     return (
@@ -242,17 +254,17 @@ export default function ClubProfile() {
   const events = buildClubEvents(club, tournaments)
 
   return (
-    <div className="space-y-5">
-      {back}
-      <div>
-        {club.kind === 'group' && club.parent_slug && (
-          <Link to={`/clube/${club.parent_slug}`}
-            className="flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">
-            <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })} <ChevronRight size={14} />
-          </Link>
-        )}
-      </div>
-
+    // R5 (protótipo): por baixo da foto, a página é toda branca — os blocos
+    // cinzento-claros («Pessoas», «Quem organiza», «Sobre») só se leem sobre
+    // o branco, não sobre o fundo novo da app (R12).
+    <div className="-mx-4 -mb-28 min-h-full space-y-5 bg-white px-4 pb-28">
+      {/* R5: o «‹» e o partilhar passam para o topo novo, no ClubHeader. */}
+      {linkCopied && createPortal(
+        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-[70] mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white animate-fade-up">
+          {t('clubprofile.link_copied')}
+        </div>,
+        document.body,
+      )}
       <ClubHeader
         club={club}
         isFavorite={isFavorite}
@@ -262,7 +274,18 @@ export default function ClubProfile() {
         onUnfollow={handleUnfollow}
         onCancelRequest={handleCancelRequest}
         onToggleFavorite={handleToggleFavorite}
+        onBack={goBack}
+        onShare={shareClub}
       />
+      <div>
+        {club.kind === 'group' && club.parent_slug && (
+          <Link to={`/clube/${club.parent_slug}`}
+            className="flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">
+            <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })} <ChevronRight size={14} />
+          </Link>
+        )}
+      </div>
+
       {error && <p role="alert" className="rounded-ctrl bg-danger/10 px-4 py-3 text-sm font-extrabold text-danger">{error}</p>}
 
       {/* «A decorrer agora no clube» por cima dos próximos (27 set). */}
@@ -280,47 +303,41 @@ export default function ClubProfile() {
         onUnfollowTeacher={handleUnfollowTeacher}
       />
 
+      {/* «Grupos do clube» e «Do clube» como os outros blocos (UX, 13 out):
+          o cartão cinzento-claro com o título dentro e uma linha branca por
+          grupo, só com «›» (sem «Ver»). Pedir para entrar faz-se na página
+          do grupo (SPEC de 24 set, §4). */}
       {groups.length > 0 && (
-        <section>
-          <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.club_groups')}</h3>
-          <div className="space-y-2.5">
-            {groups.map((group) => {
-              const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
-              return (
-                <div key={group.id} className="card flex items-center gap-3.5">
-                  <Avatar name={group.name} url={group.group_logo_url} size="w-11 h-11 text-sm" />
-                  <div className="min-w-0 flex-1">
-                    <h4 className="truncate font-extrabold text-ink-900">{group.name}</h4>
-                    <p className="text-sm text-muted">
-                      {isMemberish
-                        ? t('clubprofile.member_count', { count: group.member_count })
-                        : group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
-                    </p>
-                  </div>
-                  {/* «Ver ›» em todas (SPEC de 24 set, §4): pedir para entrar
-                      faz-se na página do grupo, onde o botão lima é o único
-                      do ecrã — não um lima por cada linha aqui. */}
-                  <Link to={`/clube/${group.slug}`}
-                    className="inline-flex min-h-[44px] shrink-0 items-center gap-0.5 whitespace-nowrap text-sm font-extrabold text-ink-900">
-                    {t('clubprofile.view')} <ChevronRight size={15} />
-                  </Link>
-                </div>
-              )
-            })}
-          </div>
+        <section className={BLOCK}>
+          <h3 className={BLOCK_TITLE}>{t('clubprofile.club_groups')}</h3>
+          {groups.map((group) => {
+            const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
+            return (
+              <Link key={group.id} to={`/clube/${group.slug}`} className={`${ROW} press`}>
+                <Avatar name={group.name} url={group.group_logo_url} size="w-9 h-9 text-xs" colorClass="bg-ink-900 text-lime-400" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-display text-[14px] font-bold text-ink-900">{group.name}</span>
+                  <span className="block text-[12px] text-ink-500">
+                    {isMemberish
+                      ? t('clubprofile.member_count', { count: group.member_count })
+                      : group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
+                  </span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-ink-500" />
+              </Link>
+            )
+          })}
         </section>
       )}
 
       {/* Jogo dentro do grupo/clube (Trello #239) — qualquer membro pode
           criar/ver. «Jogos entre amigos» em grupos e clubes (Francisco, 27 set). */}
       {club.my_status === 'member' && (
-        <section>
-          <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">
-            {t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}
-          </h3>
-          <Link to={`/clube/${slug}/jogos`} className="card press flex min-h-[52px] items-center justify-between gap-3">
-            <span className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</span>
-            <ChevronRight size={17} className="shrink-0 text-ink-700" />
+        <section className={BLOCK}>
+          <h3 className={BLOCK_TITLE}>{t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}</h3>
+          <Link to={`/clube/${slug}/jogos`} className={`${ROW} press min-h-[48px]`}>
+            <span className="min-w-0 flex-1 font-display text-[14px] font-bold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</span>
+            <ChevronRight size={16} className="shrink-0 text-ink-500" />
           </Link>
         </section>
       )}

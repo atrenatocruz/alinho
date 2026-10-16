@@ -44,20 +44,24 @@
 
   /* Color — ink (near-black + neutral grays). Primary family, replaces
      the old navy/blue ramp. */
-  --ink-50:  243 244 246;   /* #F3F4F6 — card background */
+  --ink-50:  244 245 241;   /* #F4F5F1 — caixas claras (era #F3F4F6; R12 — UX, 14 out: um cinzento só) */
   --ink-200: 156 163 175;   /* #9CA3AF — muted text, placeholders, icon borders */
   --ink-500: 75 85 99;      /* #4B5563 — supporting body copy, secondary labels */
   --ink-700: 31 41 55;      /* #1F2937 — high-hierarchy text, links, secondary btn border */
   --ink-900: 4 4 4;         /* #040404 — near black: headings, header/nav bg */
 
   /* Color — lime (the ball). ONE accent, used sparingly. */
-  --lime-100: 248 252 212;  /* #F8FCD4 — soft badge tint */
+  --lime-100: 244 248 220;  /* #F4F8DC — o lima-claro do «✓ Estás dentro» (R3); também «gravado», «contou» (era #F8FCD4; UX, 14 out) */
   --lime-400: 197 221 1;    /* #C5DD01 — CTA / confirmed states / brand accent */
   --lime-600: 153 178 0;    /* #99B200 — CTA hover/active (darker), accessible interactive text */
 
   /* Color — neutrals & semantics */
   --canvas:  255 255 255;   /* #FFFFFF — app background (was: card background) */
-  --surface: 243 244 246;   /* #F3F4F6 — cards (was: #FFFFFF; now the recessed light-gray card) */
+  --surface: 244 245 241;   /* #F4F5F1 — caixas claras dentro dos cartões, campos por trás (R12, 13 out; era #F3F4F6) */
+  /* O fundo das páginas da app (R12 do redesign, 13 out): cinzento-claro,
+     com os cartões em branco por cima. Só a app (Layout); o site de fora
+     fica no canvas. */
+  --ground:  241 242 238;   /* #F1F2EE */
   --line:    229 231 235;   /* #E5E7EB — hairline borders */
   --muted:   75 85 99;      /* #4B5563 — Dark Gray: "supporting body copy and
                                 secondary label values" per the style guide.
@@ -133,23 +137,37 @@
   }
 
   /* Secondary — quiet ink outline. */
+  /* Botão secundário (UX, 14 out): branco com contorno de 1,5 px #CFD2D7 —
+     a regra é lima ou preto cheio + contorno; o #F4F5F1 é só das caixas.
+     Desde o R12 ficava cinzento cheio. O escurecer só com rato. */
   .btn-secondary {
-    @apply bg-surface text-ink-900 font-extrabold py-3.5 px-6 rounded-ctrl
-           border border-line transition-all duration-fast
-           hover:border-ink-200 hover:bg-ink-50 active:scale-[0.98]
+    @apply bg-white text-ink-900 font-extrabold py-3.5 px-6 rounded-ctrl
+           border-[1.5px] border-[#CFD2D7] transition-all duration-fast
+           active:bg-ink-50 active:scale-[0.98]
            min-h-[48px] text-base;
   }
+  @media (hover: hover) {
+    .btn-secondary:hover { @apply border-ink-200 bg-ink-50; }
+  }
 
+  /* Cartão: branco, sem contorno, sombra muito suave, sobre o fundo
+     cinzento-claro da app (R12, 13 out). */
   .card {
-    @apply bg-surface rounded-card shadow-card p-5
+    @apply bg-white rounded-card p-5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]
            transition-shadow duration-base;
   }
 
   .input-field {
-    @apply w-full px-4 py-3.5 text-base rounded-ctrl bg-surface
+    @apply w-full px-4 py-3.5 text-base rounded-ctrl bg-white
            border border-line text-ink-900 placeholder:text-muted/60
            focus:border-ink-500 focus:ring-2 focus:ring-ink-50
            outline-none transition-all duration-fast min-h-[48px];
+  }
+
+  /* O campo em falta depois de «Seguinte» (StepPage, 11 out). */
+  .input-field[data-step-missing='true'],
+  [data-step-missing='true'] .input-field {
+    @apply border-danger ring-2 ring-danger/15;
   }
 
   /* Pressable card affordance */
@@ -263,8 +281,29 @@
 .animate-pulse-soft { animation: pulse-soft 1.6s ease-in-out infinite; }
 .animate-swap-confirm { animation: swap-confirm 900ms ease-out both; }
 
+/* Esqueletos (SPEC 2026-10-12-esqueletos-app): uma faixa clara passa devagar
+   pelo cinzento (1,6 s, só transform); os dados entram com um fade de 0,35 s. */
+@keyframes sk-shine {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-100%);
+  animation: sk-shine 1.6s ease-in-out infinite;
+}
+@keyframes fill-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fill-in { animation: fill-in 350ms ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-up, .animate-pop, .animate-fade-in, .animate-pulse-soft, .animate-swap-confirm { animation: none; }
+  .animate-fade-up, .animate-pop, .animate-fade-in, .animate-pulse-soft, .animate-swap-confirm, .animate-fill-in { animation: none; }
+  .sk::after { animation: none; display: none; }
   .press { transition: none; }
 }
 

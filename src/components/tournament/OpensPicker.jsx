@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Chips } from '../ui'
 import { weekdayLong, weekdayShort, isMasculineWeekday } from '../../lib/launchDay'
+import TimeInput from '../TimeInput'
 
 const MAX_DAYS = 60
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -83,7 +84,7 @@ export default function OpensPicker({ value, time, onChange, onTime, until, firs
         <>
           <div className="flex items-center gap-2 pt-1">
             <span className="text-sm font-medium text-gray-700">{t('launchday.at')}</span>
-            <input type="time" value={time} onChange={(e) => onTime(e.target.value)} className="input-field !w-auto" required />
+            <TimeInput value={time} onChange={(e) => onTime(e.target.value)} className="input-field !w-auto" required />
           </div>
           {summary && <p className="rounded-ctrl bg-lime-100 px-3.5 py-2.5 text-sm text-ink-900">{summary}</p>}
         </>

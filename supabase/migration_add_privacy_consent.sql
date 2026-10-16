@@ -4,17 +4,23 @@
 -- complete_rating_onboarding — see migration_elo_rating.sql), and
 -- `consents`, the append-only audit log of what was actually agreed to.
 --
--- Existing pilot accounts are grandfathered (backfilled to already-
--- consented) below — this migration does not retroactively gate anyone who
--- already had an account before it ran. See
--- docs/superpowers/specs/2026-08-31-cookie-consent-privacy-policy-design.md
--- for the full reasoning.
+-- MUDOU A 10 OUT 2026 (Trello #360, opção A do Francisco; Dev 3): já NÃO há
+-- «grandfathering». Todas as contas, as de agora e as novas, veem a caixa
+-- uma vez e aceitam a Política atual. O UPDATE em massa que marcava as
+-- contas existentes como já aceites saiu. Ainda não tinha corrido em lado
+-- nenhum (nem produção nem alinho-dev, verificado a 10 out).
+--
+-- ORDEM (inverteu-se): correr DEPOIS de publicado o ConsentGate novo (Dev 4,
+-- POLICY_VERSION = data da Política atual). Enquanto a coluna não existe, a
+-- Guard lê `undefined` e a caixa não aparece; ao correr isto, a coluna nasce
+-- vazia para todos e a caixa aparece a cada um, já com a versão nova. Se
+-- corresse antes, quem entrasse aceitava a versão antiga.
+-- Vai no main de sexta 16 out, logo a seguir à publicação (PO).
+--
+-- Desenho original: docs/superpowers/specs/2026-08-31-cookie-consent-
+-- privacy-policy-design.md.
 --
 -- Run this whole file in Supabase → SQL Editor → New query → Run.
--- Run this BEFORE deploying the frontend change that reads
--- profiles.consent_accepted_at (App.jsx's Guard) — otherwise every account
--- reads `undefined` for the missing column and the gate silently never
--- fires until this has run.
 -- ════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS consent_accepted_at TIMESTAMPTZ;
@@ -25,10 +31,7 @@ COMMENT ON COLUMN profiles.consent_accepted_at IS
    complete_privacy_consent() — never add this column to the client
    GRANT UPDATE allowlist in migration_fix_profiles_column_grants.sql.';
 
--- Existing pilot accounts are grandfathered — the ticket's urgency is about
--- new signups with no documented consent, not retroactively re-gating
--- already-active users.
-UPDATE profiles SET consent_accepted_at = NOW() WHERE consent_accepted_at IS NULL;
+-- (Sem UPDATE em massa: todas as contas passam pela caixa uma vez — #360.)
 
 CREATE TABLE IF NOT EXISTS consents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,6 +47,12 @@ COMMENT ON TABLE consents IS
    complete_privacy_consent().';
 
 ALTER TABLE consents ENABLE ROW LEVEL SECURITY;
+
+-- O registo que prova a aceitação não se muda nem se apaga, mesmo que um
+-- dia alguém junte uma política (SI, 12 out): os privilégios por omissão
+-- davam SELECT a anon e INSERT/UPDATE/DELETE a authenticated.
+REVOKE ALL ON consents FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON consents FROM authenticated;
 
 DROP POLICY IF EXISTS "select own consents" ON consents;
 CREATE POLICY "select own consents" ON consents FOR SELECT

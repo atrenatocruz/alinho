@@ -8,6 +8,7 @@ import { whatsappShare } from '../../lib/partnerInvite'
 import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } from '../../lib/tournamentPublic'
 import { pricePerPlayer } from '../../lib/tournaments'
 import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
+import { CategoryPriceText } from './CategorySpecialPrice'
 
 /** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
  *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
@@ -24,7 +25,7 @@ const eachOf = (cents, locale) => pricePerPlayer((cents || 0) / 100, locale)
 // `entriesOpen`: as vagas só se mostram com as inscrições abertas; o resto
 // (categorias, dias e horas, preço, texto da organização) vê-se sempre —
 // em rascunho, na pré-visualização, e nos dias do torneio (QA, 26 set).
-export default function PublicInfo({ tournament, categories = [], entriesOpen = true }) {
+export default function PublicInfo({ tournament, categories = [], entriesOpen = true, plain = false }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
 
@@ -36,7 +37,10 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
   }
 
   return (
-    <div className="card space-y-3">
+    // `plain` (dentro da folha branca do topo, UX 14 out): sem a moldura do
+    // cartão — uma secção da folha, com uma linha fina por cima. Dentro de um
+    // branco, as caixas são #F4F5F1 e nunca cartões brancos.
+    <div className={plain ? 'space-y-3 border-t border-[#EEF0EC] pt-5' : 'card space-y-3'}>
       <div className="flex items-center justify-between gap-2">
         <MonoLabel>{t('tpublic.title')}</MonoLabel>
         <button onClick={share} className="press flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900">
@@ -53,6 +57,8 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
           senão, depois do sorteio da M4, lia-se que o formato ainda não era
           conhecido (ensaio do QA, 30 set). */}
       {(() => {
+        // Terminado ou cancelado já não se anuncia nada (UX, 13 out).
+        if (['terminado', 'cancelado'].includes(tournament.status)) return null
         const unknown = categories.filter((c) => formatWords(c).key === 'tpublic.format_unknown')
         if (!unknown.length) return null
         const text = unknown.length === categories.length
@@ -83,8 +89,12 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
                 {[
                   when && (typeof when === 'string' ? when : t('tpublic.when', when)),
                   fmt.key === 'tpublic.format_unknown' ? null : t(fmt.key, fmt.values),
-                  c.price_cents != null ? t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) }) : null,
                 ].filter(Boolean).join(' · ')}
+                {/* O preço de quem vê, com o preço especial (7 out). */}
+                {c.price_cents != null && (
+                  <>{when || fmt.key !== 'tpublic.format_unknown' ? ' · ' : ''}<CategoryPriceText category={c}
+                    fallback={t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) })} /></>
+                )}
               </p>
             </div>
           )

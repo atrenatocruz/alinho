@@ -8,12 +8,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { SkLine } from '../Skeleton'
+import { BigCard } from '../home/HomeSkeleton'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toDayKey } from '../../lib/agenda'
 import { formatTime } from '../../lib/formatDate'
-import { KindTag, OrgHeader, StateTag } from './EventCard'
+import { KindLine, OrgHeader, StateTag } from './EventCard'
+import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
 import { dayLabel } from './AgendaControls'
+import { EmptyState, LoadErrorState } from '../ui'
 
 const PAGE = 20
 const KIND = { mix: 'mix', tournament: 'tournament', friends: 'friends' }
@@ -55,8 +59,10 @@ export default function PlayedList({ orgIds = null, kinds }) {
   }
   useEffect(() => { setRows(null); load() }, [oneOrg]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A carregar: a etiqueta do dia e 2 cartões grandes a cinzento, com a forma
+  // dos verdadeiros (regra dos esqueletos; UX, 12 out), não o círculo.
   if (rows === null) {
-    return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return <div className="mt-3 space-y-2.5"><SkLine size="label" w={150} /><BigCard /><BigCard /></div>
   }
   const shown = rows.filter((r) => kinds.includes(kindOf(r)) && (!orgIds || orgIds.includes(r.organization_id)))
   const days = []
@@ -69,10 +75,12 @@ export default function PlayedList({ orgIds = null, kinds }) {
 
   return (
     <div className="mt-3 space-y-5">
+      {/* O separador inteiro vazio (ou com erro): o Alino, como nas outras
+          páginas sem nada (mascote, 12 out). */}
       {shown.length === 0 && (
-        <p className="rounded-card border border-dashed border-line px-3 py-3 text-sm text-muted">
-          {error ? t('agenda.played_error') : t('agenda.played_empty')}
-        </p>
+        error
+          ? <LoadErrorState title={t('agenda.played_error')} />
+          : <EmptyState title={t('agenda.played_empty')} />
       )}
       {days.map((d) => (
         <section key={d.key} className="space-y-2.5">
@@ -108,20 +116,26 @@ function PlayedCard({ row }) {
     : row.players_count != null ? t(row.kind === 'mix' ? 'agenda.played_players' : 'agenda.played_people', { count: Number(row.players_count) }) : null
   const points = row.i_played && row.my_points != null ? Number(row.my_points) : null
   const event = { orgName: row.org_name, orgKind: row.org_kind, orgLogo: row.org_logo, orgId: row.organization_id }
-  const state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+  // Quem ganhou vê «🏆 Venceste» no canto, no lugar de «Terminado» (UX,
+  // 10 out). i_won vem do list_played_events (Dev 3); sem ele, «Terminado».
+  const state = row.i_won
+    ? <StateTag tone="live">{t('agenda.result_won')}</StateTag>
+    : <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+  const mascot = mascotFor(kind)
   return (
-    <div className={`relative overflow-hidden rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
       <Link to={to} className="absolute inset-0" aria-label={title || ''} />
+      {/* O boneco do tipo (Dev 2, 12 out — o mesmo dos cartões da Home). */}
+      <CardMascot type={mascot} />
       {/* O estado ao canto, à direita de quem organiza (como nos outros cartões da Home). */}
-      <OrgHeader event={event} past right={state} />
-      <div className="flex items-start justify-between gap-2">
-        <KindTag kind={kind} past />
-        {!event.orgName && state}
-      </div>
+      {/* O tipo por baixo de quem organiza, sem pastilha (Home do futuro, SPEC-3). */}
+      <OrgHeader event={event} past right={state} kind={<KindLine kind={kind} past />} mascot={!!mascot} />
+      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}><KindLine kind={kind} past />{!mascot && state}</div>}
+      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
       {row.kind !== 'tournament' && (
         <p className="mt-2.5 text-[22px] font-extrabold leading-none text-muted">{formatTime(row.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}</p>
       )}
-      <h3 className="mt-1.5 text-base leading-snug text-muted">{title}</h3>
+      <h3 className={`mt-1.5 text-base leading-snug text-muted ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{title}</h3>
       {(people || points != null) && (
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-ink-900/10 pt-2.5 text-[13px]">
           <span className="text-ink-700">{people}</span>
