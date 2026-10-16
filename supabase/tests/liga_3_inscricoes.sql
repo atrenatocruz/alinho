@@ -3,7 +3,7 @@
 -- jogador masculino membro de AMBOS (para o caso «um clube por liga").
 BEGIN;
 CREATE TEMP TABLE _r (ok boolean, label text);
-CREATE TEMP TABLE _ctx (org_a UUID, admin_a UUID, org_b UUID, admin_b UUID, both_player UUID, owner UUID, league UUID, cat UUID, team_a UUID, team_b UUID);
+CREATE TEMP TABLE _ctx (org_a UUID, admin_a UUID, org_b UUID, admin_b UUID, both_player UUID, owner UUID, league UUID, cat UUID, team_a UUID, team_b UUID, roster_a UUID);
 -- Preencher à mão com ids da dev (ver comentário no topo):
 INSERT INTO _ctx (org_a, admin_a, org_b, admin_b, both_player, owner)
 VALUES ('<org A>', '<admin A>', '<org B>', '<admin B>', '<jogador em A e B>', '<admin de um 3.º clube>');
@@ -45,13 +45,13 @@ INSERT INTO _r SELECT count(*) = 2, 'duas aprovadas' FROM league_teams WHERE cat
 
 -- Plantel: o jogador dos dois clubes entra por A e é recusado por B.
 SELECT pg_temp.as_user(admin_a) FROM _ctx;
-SELECT add_to_roster(team_a, both_player) FROM _ctx;
+UPDATE _ctx SET roster_a = add_to_roster(team_a, both_player);
 SELECT pg_temp.as_user(admin_b) FROM _ctx;
 DO $$ BEGIN PERFORM add_to_roster((SELECT team_b FROM _ctx), (SELECT both_player FROM _ctx));
   INSERT INTO _r VALUES (false, 'jogador entrou por dois clubes');
 EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM LIKE '%already_in_league%', 'um clube por liga'); END $$;
 -- Admin B não mexe no plantel de A.
-DO $$ BEGIN PERFORM remove_from_roster((SELECT id FROM league_roster WHERE team_id = (SELECT team_a FROM _ctx) LIMIT 1));
+DO $$ BEGIN PERFORM remove_from_roster((SELECT roster_a FROM _ctx));
   INSERT INTO _r VALUES (false, 'admin B tirou um jogador de A');
 EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM LIKE '%not_team_rep%', 'cada clube só mexe no seu plantel'); END $$;
 
