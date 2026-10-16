@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar, Tabs, Chips, PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
-import { getLeaguePage, decideApplication, saveSchedule, finishCategory, addOrganizer, removeOrganizer, listOrganizers, leagueErrorMessage } from '../lib/leagueApi'
+import { getLeaguePage, decideApplication, saveSchedule, finishCategory, addOrganizer, removeOrganizer, leagueErrorMessage } from '../lib/leagueApi'
 import { roundRobin } from '../lib/leagueSchedule'
 import { needsRescheduleConfirm } from '../lib/leagueDistricts'
 import { categoryCode } from '../lib/tournaments'
@@ -28,7 +28,6 @@ export default function LeagueManagePage() {
   const [redoOpen, setRedoOpen] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
   const [removing, setRemoving] = useState(null)
-  const [organizers, setOrganizers] = useState([])
   const [firstStart, setFirstStart] = useState(toDayKey(new Date()))
   const [days, setDays] = useState(14)
   const [error, setError] = useState('')
@@ -39,7 +38,6 @@ export default function LeagueManagePage() {
     setPage(p || null)
     setCatId((cur) => (p?.categories.some((c) => c.id === cur) ? cur : p?.categories[0]?.id || null))
   }).catch(() => { if (!isCancelled()) setLoadError(true) })
-  const loadOrganizers = (leagueId) => listOrganizers(leagueId).then(setOrganizers).catch(() => setOrganizers([]))
 
   useEffect(() => {
     let cancelled = false
@@ -48,9 +46,6 @@ export default function LeagueManagePage() {
     return () => { cancelled = true }
   }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const leagueId = page?.league?.id
-  const canManage = !!page?.viewer?.can_manage
-  useEffect(() => { if (leagueId && canManage) loadOrganizers(leagueId) }, [leagueId, canManage]) // eslint-disable-line react-hooks/exhaustive-deps
   // Quem não organiza esta liga volta à página pública.
   useEffect(() => { if (page && !page.viewer.can_manage) navigate(`/liga/${slug}`, { replace: true }) }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -69,14 +64,16 @@ export default function LeagueManagePage() {
   const approved = teams.filter((x) => x.status === 'aprovada')
   const disputes = page.encounters.filter((e) => e.category_id === catId && e.status === 'contestado')
   const hasRounds = needsRescheduleConfirm(page.rounds, catId)
+  const organizers = page.organizers || []
   const isOwner = !!page.viewer.is_owner
   const run = async (fn) => { setError(''); try { await fn(); await load() } catch (e) { setError(leagueErrorMessage(t, e)) } }
 
-  const makeSchedule = () => run(() => {
+  const saveCalendar = () => {
     // Ordem estável: a da aprovação (applied_at), para o calendário ser repetível.
     const ids = [...approved].sort((a, b) => String(a.applied_at).localeCompare(String(b.applied_at))).map((x) => x.id)
     return saveSchedule(catId, roundRobin(ids, { homeAway: cat.home_away }), firstStart, days)
-  })
+  }
+  const makeSchedule = () => run(saveCalendar)
   // Refazer um calendário que já tem datas combinadas apaga-as: pergunta antes.
   const onMakeSchedule = () => (hasRounds ? setRedoOpen(true) : makeSchedule())
 
@@ -155,7 +152,7 @@ export default function LeagueManagePage() {
             ? (
               <div className={card}>
                 <PlayerSearch label={t('league.organizer_search_ph')} excludeIds={organizers.map((o) => o.user_id)}
-                  onSelect={(p) => run(async () => { await addOrganizer(page.league.id, p.id); await loadOrganizers(page.league.id) })} />
+                  onSelect={(p) => run(() => addOrganizer(page.league.id, p.id))} />
               </div>
             )
             : <p className="text-[13px] text-ink-500">{t('league.organizers_owner_only')}</p>}
@@ -173,11 +170,7 @@ export default function LeagueManagePage() {
       <ConfirmSheet open={redoOpen} title={t('league.redo_title')} message={t('league.redo_message')}
         confirmLabel={t('league.redo_confirm')} cancelLabel={t('league.not_yet')}
         onClose={() => setRedoOpen(false)} errorOf={(e) => leagueErrorMessage(t, e)}
-        onConfirm={async () => {
-          const ids = [...approved].sort((a, b) => String(a.applied_at).localeCompare(String(b.applied_at))).map((x) => x.id)
-          await saveSchedule(catId, roundRobin(ids, { homeAway: cat.home_away }), firstStart, days)
-          await load()
-        }} />
+        onConfirm={async () => { await saveCalendar(); await load() }} />
 
       <ConfirmSheet open={finishOpen} title={t('league.finish_title')} message={t('league.finish_message')}
         confirmLabel={t('league.finish_category')} cancelLabel={t('league.not_yet')}
@@ -187,7 +180,7 @@ export default function LeagueManagePage() {
       <ConfirmSheet open={!!removing} danger title={removing ? t('league.organizer_remove_title', { name: removing.name }) : ''}
         message={t('league.organizer_remove_message')} confirmLabel={t('league.organizer_remove')} cancelLabel={t('league.not_yet')}
         onClose={() => setRemoving(null)} errorOf={(e) => leagueErrorMessage(t, e)}
-        onConfirm={async () => { await removeOrganizer(page.league.id, removing.user_id); await loadOrganizers(page.league.id) }} />
+        onConfirm={async () => { await removeOrganizer(page.league.id, removing.user_id); await load() }} />
     </div>
   )
 }

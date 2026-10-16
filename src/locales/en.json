@@ -6177,5 +6177,6 @@
   "league.walkover_title": "Walkover",
   "league.walkover_message": "Pick the club that did not show up. Both clubs get your note.",
   "league.walkover_who": "Club that did not show",
-  "league.walkover_confirm": "Record the walkover"
+  "league.walkover_confirm": "Record the walkover",
+  "league.open_draft": "Open the league to manage it"
 }

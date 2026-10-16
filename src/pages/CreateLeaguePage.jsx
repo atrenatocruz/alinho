@@ -3,14 +3,15 @@
 // plataforma escolhe «Liga Alinho» aqui). Passo 2: categoria (com os valores
 // por omissão). No fim: criar, gravar a categoria e publicar. O servidor
 // valida tudo outra vez; aqui é para dizer o que falta antes de tentar.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import StepPage from '../components/steps/StepPage'
-import { Chips, Select } from '../components/ui'
+import { Chips, PrimaryButton, Select } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
 import { createLeague, saveCategory, publishLeague, leagueErrorMessage } from '../lib/leagueApi'
 import { CATEGORY_DEFAULTS, categoryProblem } from '../lib/leagueConfig'
+import { emptyCreateProgress, nextCreateStep } from '../lib/leagueCreate'
 import { districtOptions } from '../lib/leagueDistricts'
 
 const field = 'min-h-[48px] w-full rounded-ctrl border border-line bg-white px-3.5 text-base'
@@ -33,17 +34,26 @@ export default function CreateLeaguePage() {
   // «Comunitária» é de um clube: sem o clube (ainda a carregar, ou sem acesso), não há onde a pôr.
   const noOrg = league.kind === 'comunitaria' && !org?.id
 
+  // O que já ficou feito no servidor: uma nova tentativa continua daí, não cria outra liga.
+  const progress = useRef(emptyCreateProgress())
+  const [createdSlug, setCreatedSlug] = useState(null)
+
   const finish = async () => {
     setBusy(true); setError('')
     try {
-      const created = await createLeague({
-        kind: league.kind, ownerOrgId: league.kind === 'comunitaria' ? org?.id : null, name: league.name.trim(), scope: league.scope,
-        district: league.district || null, applicationsCloseAt: league.applicationsCloseAt ? new Date(league.applicationsCloseAt).toISOString() : null,
-        maxTeams: league.maxTeams || null,
-      })
-      await saveCategory(created.id, null, cat)
-      await publishLeague(created.id)
-      navigate(`/liga/${created.slug}`, { replace: true })
+      const pr = progress.current
+      if (nextCreateStep(pr) === 'create') {
+        const created = await createLeague({
+          kind: league.kind, ownerOrgId: league.kind === 'comunitaria' ? org?.id : null, name: league.name.trim(), scope: league.scope,
+          district: league.district || null, applicationsCloseAt: league.applicationsCloseAt ? new Date(league.applicationsCloseAt).toISOString() : null,
+          maxTeams: league.maxTeams || null,
+        })
+        pr.league = { id: created.id, slug: created.slug }
+        setCreatedSlug(created.slug)
+      }
+      if (nextCreateStep(pr) === 'category') { await saveCategory(pr.league.id, null, cat); pr.categoryDone = true }
+      if (nextCreateStep(pr) === 'publish') { await publishLeague(pr.league.id); pr.published = true }
+      navigate(`/liga/${pr.league.slug}`, { replace: true })
     } catch (e) { setError(leagueErrorMessage(t, e)) } finally { setBusy(false) }
   }
 
@@ -91,6 +101,9 @@ export default function CreateLeaguePage() {
           options={[1, 2, 3, 5].map((n) => ({ value: n, label: String(n) }))} />
         <Chips label={t('league.create_home_away')} value={cat.home_away} onChange={(v) => setCat({ ...cat, home_away: v })}
           options={[{ value: false, label: t('league.one_leg') }, { value: true, label: t('league.create_home_away') }]} />
+        {createdSlug && error && (
+          <PrimaryButton variant="ghost" className="w-full" onClick={() => navigate(`/liga/${createdSlug}/gerir`)}>{t('league.open_draft')}</PrimaryButton>
+        )}
         <p className="text-[13px] text-ink-500">
           {t('league.create_points_summary', { win: cat.points_win, draw: cat.points_draw, loss: cat.points_loss, walkover: cat.points_walkover, lock: cat.roster_locks_at_round })}
         </p>

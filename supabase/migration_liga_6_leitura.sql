@@ -51,6 +51,11 @@ BEGIN
                                    THEN (SELECT jsonb_agg(m.sets ORDER BY m.slot) FROM league_matches m WHERE m.encounter_id = e.id) END)
                     ORDER BY e.scheduled_at NULLS LAST), '[]'::jsonb)
                      FROM league_encounters e WHERE e.league_id = v_l.id),
+    -- Os co-organizadores (nomes incluídos: o profiles esconde quem não partilha clube). Só para quem gere.
+    'organizers', CASE WHEN v_manage THEN
+      (SELECT COALESCE(jsonb_agg(jsonb_build_object('user_id', p.id, 'name', p.name) ORDER BY p.name), '[]'::jsonb)
+         FROM league_organizers lo JOIN profiles p ON p.id = lo.user_id WHERE lo.league_id = v_l.id)
+      ELSE '[]'::jsonb END,
     'viewer', jsonb_build_object(
       'signed_in', auth.uid() IS NOT NULL, 'can_manage', v_manage,
       'is_owner', auth.uid() IS NOT NULL AND league_is_owner(v_l.id),

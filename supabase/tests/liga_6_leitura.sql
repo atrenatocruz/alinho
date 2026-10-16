@@ -17,6 +17,7 @@ DO $$ DECLARE p jsonb; s text; e jsonb; BEGIN
   INSERT INTO _r VALUES (NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p->'teams') t WHERE t ? 'organization_id'),
                          'anon não vê ids de clubes');
   INSERT INTO _r VALUES ((p->'viewer'->>'can_manage')::boolean IS FALSE, 'anon não gere');
+  INSERT INTO _r VALUES (jsonb_array_length(p->'organizers') = 0, 'anon não vê organizadores');
   e := get_league_encounter((p->'encounters'->0->>'id')::uuid);
   INSERT INTO _r VALUES (e IS NOT NULL AND (e->'encounter'->>'resolution_note') IS NULL, 'anon não vê a nota da decisão');
 END $$;

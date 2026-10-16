@@ -6192,5 +6192,6 @@
   "league.walkover_title": "Falta de comparência",
   "league.walkover_message": "Escolhe o clube que faltou. Os dois clubes recebem a tua nota.",
   "league.walkover_who": "Clube que faltou",
-  "league.walkover_confirm": "Registar a falta"
+  "league.walkover_confirm": "Registar a falta",
+  "league.open_draft": "Abrir a liga para gerir"
 }
