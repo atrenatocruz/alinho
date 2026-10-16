@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import { BackBar } from '../components/ui'
+import XpShield from '../components/XpShield'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { XP_TIERS, tierFromXp, preTierProgress } from '../lib/xp'
+import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { KIND_COLORS } from '../lib/kindColors'
 import { groupXpByGame } from '../lib/xpMonth'
 
@@ -13,10 +14,6 @@ import { groupXpByGame } from '../lib/xpMonth'
    R15-pagina-do-xp.md). Entra-se pelo cartão «XP DE ATIVIDADE» do Perfil.
    Os níveis e os valores são os da app (lib/xp.js); o mês vem de xp_events,
    que cada pessoa lê só para si (RLS), junto por jogo. */
-
-// Ponto nos milhares, sempre (1.300, 12.000): o pt-PT do browser não o põe
-// abaixo de 10.000 (UX, 14 out).
-const formatXp = (n) => String(Math.round(n ?? 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
 // Do mais baixo para o mais alto, como na lista do desenho.
 const LEVELS = [...XP_TIERS].reverse()
@@ -60,7 +57,9 @@ export default function ProfileXp() {
 
       {/* O cartão preto: o nível, o XP e a barra até ao seguinte. */}
       <div className="rounded-[22px] bg-ink-900 px-5 pt-6 pb-5 text-center text-white">
-        <span aria-hidden="true" className={`mx-auto block h-11 w-11 rounded-full ${tier ? tier.dotClass : 'bg-white/20'}`} />
+        {/* O escudo do nível (16 out); no nível 0, o do Iniciado a cinzento. */}
+        <XpShield tierKey={tier ? tier.key : 'iniciado'} size={104} dim={!tier} className="mx-auto block"
+          style={{ filter: `${tier ? '' : 'grayscale(1) '}drop-shadow(0 8px 18px rgba(0,0,0,.45))` }} />
         <p className="mt-3 font-display text-[26px] font-black leading-tight">
           {tier ? t('xp_page.level', { name: t(tier.labelKey), level: tier.level }) : t('profile.xp_no_shield')}
         </p>
@@ -72,7 +71,7 @@ export default function ProfileXp() {
             </div>
             <div className="mt-2 flex justify-between font-mono text-[12px] font-medium uppercase tracking-[0.06em] text-white/70">
               <span>{formatXp(xp)}</span>
-              <span>{t(next.labelKey)} · {formatXp(next.min)}</span>
+              <span className="flex items-center gap-1.5"><XpShield tierKey={next.key} size={18} />{t(next.labelKey)} · {formatXp(next.min)}</span>
             </div>
           </>
         ) : (
@@ -99,16 +98,18 @@ export default function ProfileXp() {
           {LEVELS.map((l) => {
             const here = tier?.key === l.key
             const passed = xp >= l.min && !here
+            const future = xp < l.min
             return (
-              <li key={l.key} className={`flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 ${here ? 'bg-[#F4F8DC]' : ''}`}>
+              <li key={l.key} className={`flex items-center gap-3 border-b border-line px-4 py-2 last:border-b-0 ${here ? 'bg-[#F4F8DC]' : ''}`}>
                 <span className="w-5 shrink-0 font-mono text-[13px] font-medium text-muted">
                   {passed ? <Check size={15} className="text-[#4D7C0F]" strokeWidth={2.5} /> : l.level}
                 </span>
-                <span aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 rounded-full ${l.dotClass}`} />
-                <span className={`min-w-0 flex-1 truncate text-[15px] font-extrabold ${passed ? 'text-muted' : 'text-ink-900'}`}>
+                {/* Escudos (16 out): a cores os que já tens; os outros a cinzento e meio apagados. */}
+                <XpShield tierKey={l.key} size={32} dim={future} />
+                <span className={`min-w-0 flex-1 truncate text-[15px] font-extrabold ${future ? 'text-[#6B7280]' : 'text-ink-900'}`}>
                   {here ? t('xp_page.you_are_here', { name: t(l.labelKey) }) : t(l.labelKey)}
                 </span>
-                <span className={`shrink-0 font-mono text-[13px] font-medium tabular-nums ${passed ? 'text-muted' : 'text-ink-900'}`}>{formatXp(l.min)} XP</span>
+                <span className={`shrink-0 font-mono text-[13px] font-medium tabular-nums ${future ? 'text-[#6B7280]' : 'text-ink-900'}`}>{formatXp(l.min)} XP</span>
               </li>
             )
           })}

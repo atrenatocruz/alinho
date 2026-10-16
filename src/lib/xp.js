@@ -64,4 +64,6 @@ export function isGlowing(lastPlayedAt) {
   return Date.now() - played < GLOW_WINDOW_DAYS * 24 * 60 * 60 * 1000
 }
 
-export const formatXp = (xp) => (xp ?? 0).toLocaleString('pt-PT')
+// Ponto nos milhares, sempre (1.300, 12.000): o pt-PT do browser não o põe
+// abaixo de 10.000 e usa espaço acima (UX, 16 out).
+export const formatXp = (xp) => String(Math.round(xp ?? 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')

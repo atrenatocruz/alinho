@@ -11,6 +11,7 @@ import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
+import XpShield from '../components/XpShield'
 import { winRatePct } from '../lib/statsLogic'
 import { followPlayer, removeFollow } from '../lib/follows'
 import { getGlobalRankings, getPublicRankings } from '../lib/privateMatches'
@@ -332,6 +333,10 @@ export default function PlayerDetails() {
                   >
                     <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
                   </button>
+                  {/* O escudo do nível de XP no canto da foto, se o nível for visível (16 out). */}
+                  {playerXp && tierFromXp(playerXp.xp) && (
+                    <XpShield tierKey={tierFromXp(playerXp.xp).key} size={30} className="absolute -bottom-1 -right-1 z-10" />
+                  )}
                   {!resultsHidden && !myFrame && globalEntry?.rating != null && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                       <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
@@ -542,7 +547,8 @@ export default function PlayerDetails() {
               )}
             </div>
             <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
-              <span>
+              <span className="flex items-center gap-1.5">
+                {tier && <XpShield tierKey={tier.key} size={20} />}
                 {tier
                   ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
                   : t('profile.xp_no_shield')}

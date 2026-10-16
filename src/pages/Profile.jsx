@@ -17,6 +17,7 @@ import TeacherSection from '../components/TeacherSection'
 import DeleteAccountSection from '../components/DeleteAccountSection'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
+import XpShield from '../components/XpShield'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
@@ -673,6 +674,10 @@ export default function Profile() {
                     <Avatar name={profile?.name} url={profile?.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" />
                   )}
                 </button>
+                {/* O escudo do nível de XP no canto da foto (16 out); a moldura fica igual. */}
+                {tierFromXp(profile?.xp) && (
+                  <XpShield tierKey={tierFromXp(profile?.xp).key} size={30} className="absolute -bottom-1 -right-1 z-10" />
+                )}
                 {profile?.rating != null && !myFrame && (
                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                     <RatingBadge rating={profile?.rating} gender={profile?.gender} />
@@ -924,7 +929,7 @@ export default function Profile() {
             <div className="mt-2 flex items-center justify-between gap-2 text-ink-900">
               <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-extrabold">
                 {tier
-                  ? <><span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${tier.dotClass}`} /> {t('profile.r7_xp_level', { name: t(tier.labelKey), level: tier.level })}</>
+                  ? <><XpShield tierKey={tier.key} size={20} /> {t('profile.r7_xp_level', { name: t(tier.labelKey), level: tier.level })}</>
                   : t('profile.xp_no_shield')}
               </span>
               <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums">
