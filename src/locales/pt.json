@@ -6193,5 +6193,9 @@
   "league.walkover_message": "Escolhe o clube que faltou. Os dois clubes recebem a tua nota.",
   "league.walkover_who": "Clube que faltou",
   "league.walkover_confirm": "Registar a falta",
-  "league.open_draft": "Abrir a liga para gerir"
+  "league.open_draft": "Abrir a liga para gerir",
+  "league.set_time": "Marcar data",
+  "league.time_window": "Tem de ser dentro da jornada: {{window}}.",
+  "league.venue_optional": "Onde (opcional)",
+  "league.publish": "Publicar"
 }
