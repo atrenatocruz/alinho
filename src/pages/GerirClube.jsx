@@ -4359,11 +4359,16 @@ export default function GerirClube() {
                     <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
                   </span>
                   {/* O lápis diz que o nome se edita aqui (Renato, 16 out). */}
-                  <label className="group mt-2 flex items-center gap-2 rounded-ctrl focus-within:bg-surface focus-within:px-2">
+                  {/* O campo tem a largura do nome (uma cópia invisível do texto
+                      dá-lhe o tamanho), por isso o lápis vai andando com ele. */}
+                  <label className="group mt-2 flex max-w-full items-center gap-2 rounded-ctrl focus-within:bg-surface focus-within:px-2">
                     <span className="sr-only">{t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}</span>
-                    <input type="text" value={settings.name} required form="club-settings-form"
-                      onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-                      className="min-w-0 flex-1 bg-transparent font-display text-xl font-extrabold text-ink-900 outline-none" />
+                    <span className="inline-grid min-w-0 font-display text-xl font-extrabold">
+                      <span aria-hidden="true" className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre">{settings.name || ' '}</span>
+                      <input type="text" value={settings.name} required form="club-settings-form" size={1}
+                        onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+                        className="col-start-1 row-start-1 w-full min-w-[2ch] bg-transparent text-ink-900 outline-none" />
+                    </span>
                     <Pencil size={16} aria-hidden="true" className="shrink-0 text-ink-500 group-focus-within:text-ink-900" />
                   </label>
                   <OrgNameTakenHint taken={settingsNameTaken} />
