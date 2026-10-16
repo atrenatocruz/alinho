@@ -127,7 +127,7 @@ describe('filters and days', () => {
     expect(normalizeFilters(ok)).toBe(ok)
   })
   it('keeps "everything" when the saved filters predate «Horários livres»', () => {
-    const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament'], orgIds: null }
+    const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament', 'league'], orgIds: null }
     expect(normalizeFilters(before).kinds).toEqual(EVENT_KINDS)
     expect(isDefaultFilters(normalizeFilters(before))).toBe(true)
     const onlyFree = { show: 'all', kinds: ['free'], orgIds: null }
@@ -327,6 +327,7 @@ describe('torneios na agenda (Trello #363)', () => {
 
   it('o filtro Tipo passa a conhecer os torneios', () => {
     expect(EVENT_KINDS).toContain('tournament')
+    expect(EVENT_KINDS).toContain('league')
   })
 })
 

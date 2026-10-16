@@ -19,6 +19,7 @@ import { useNoOverlayOpen } from '../lib/useNoOverlayOpen'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
+import LeagueNoticeRow, { LEAGUE_NOTICE_KINDS } from './league/LeagueNoticeRow'
 import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
 import { changesText } from '../lib/mixChanges'
@@ -366,6 +367,7 @@ export default function Layout({ children }) {
   const [tournamentNotices, setTournamentNotices] = useState([])
   // Convites para jogos entre amigos (#342): ficam até se responder.
   const [friendNotices, setFriendNotices] = useState([])
+  const [leagueNotices, setLeagueNotices] = useState([])
   // Quem criou conta por causa de um convite por email fica logo com o
   // jogo: junta-se uma vez por sessão do browser (Dev 3, #342).
   useEffect(() => {
@@ -381,6 +383,7 @@ export default function Layout({ children }) {
       setLessonNotices([])
       setTournamentNotices([])
       setFriendNotices([])
+      setLeagueNotices([])
       return
     }
     let cancelled = false
@@ -391,6 +394,7 @@ export default function Layout({ children }) {
         setLessonNotices(isLessonsEnabled ? data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)) : [])
         setTournamentNotices(data.filter((n) => TOURNAMENT_NOTICE_KINDS.includes(n.kind)))
         setFriendNotices(data.filter((n) => FRIEND_NOTICE_KINDS.includes(n.kind)))
+        setLeagueNotices(data.filter((n) => LEAGUE_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {
@@ -422,6 +426,12 @@ export default function Layout({ children }) {
   const openLessonNotice = (notice) => {
     setShowNotifications(false)
     setLessonNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
+  const openLeagueNotice = (notice) => {
+    setShowNotifications(false)
+    setLeagueNotices((list) => list.filter((n) => n.id !== notice.id))
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
@@ -485,7 +495,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length + leagueNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -669,6 +679,9 @@ export default function Layout({ children }) {
                   ))}
                   {friendNotices.filter((n) => n.kind !== 'friend_match_invite').map((notice) => (
                     <FriendInviteRow key={notice.id} notice={notice} onOpen={openFriendNotice} />
+                  ))}
+                  {leagueNotices.map((notice) => (
+                    <LeagueNoticeRow key={notice.id} notice={notice} onOpen={openLeagueNotice} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link
