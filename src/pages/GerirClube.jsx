@@ -17,7 +17,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -1140,6 +1140,9 @@ export default function GerirClube() {
         is_admin: m.is_admin,
         is_guest: m.is_guest,
         level: m.level,
+        // O nível global (M5, F2…) — o que se mostra na lista de Pessoas.
+        rating: m.profile?.rating ?? null,
+        gender: m.profile?.gender ?? null,
         avatar_url: m.profile?.avatar_url,
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -4237,9 +4240,9 @@ export default function GerirClube() {
                             <span className="block truncate text-xs text-muted">{role}</span>
                           </span>
                         </Link>
-                        {member.level && (
-                          <span className="shrink-0 rounded-full bg-ink-900 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wide text-lime-400">{member.level}</span>
-                        )}
+                        {/* O nível global do jogador, não o «nível no clube» antigo
+                            (que era «iniciante» para quase toda a gente). */}
+                        <span className="shrink-0"><RatingBadge rating={member.rating} gender={member.gender} /></span>
                         {/* O dono não tem «···»: ninguém lhe tira poderes nem o remove. */}
                         {!isOwner ? (
                           <button type="button" onClick={() => setMemberSheet(member)} aria-label={t('people.actions_aria', { name: member.name })}

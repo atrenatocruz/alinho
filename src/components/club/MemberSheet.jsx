@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { User, Star, StarOff, Crown, UserX } from 'lucide-react'
-import { Avatar } from '../ui'
+import { Avatar, RatingBadge } from '../ui'
 
 /* Gerir › Pessoas, proposta A (Renato, 16 out): tudo o que se faz a um
    membro numa folha — ver o perfil, dar ou tirar admin, passar a dono,
@@ -30,8 +30,9 @@ export default function MemberSheet({ member, isSelf, canTransfer, onClose, onTo
           <Avatar name={member.name} url={member.avatar_url} size="w-12 h-12 text-base" />
           <div className="min-w-0 flex-1">
             <p id="member-sheet-name" className="truncate font-display text-lg font-extrabold text-ink-900">{member.name}</p>
-            <p className="text-xs text-muted">
-              {[member.is_admin ? t('people.role_admin') : t('people.role_member'), member.level ? t('gerirclube.level_label', { level: member.level }) : null].filter(Boolean).join(' · ')}
+            <p className="flex items-center gap-2 text-xs text-muted">
+              {member.is_admin ? t('people.role_admin') : t('people.role_member')}
+              <RatingBadge rating={member.rating} gender={member.gender} />
             </p>
           </div>
         </div>
