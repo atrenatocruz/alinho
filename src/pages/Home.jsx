@@ -42,6 +42,8 @@ import { cancelLessonRequest, listMyLessonRequests, listMyLessons, listLessonEve
 import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
 import TournamentEventCard from '../components/agenda/TournamentEventCard'
+import LeagueEventCard from '../components/league/LeagueEventCard'
+import { loadLeagueHome, leagueForYouItems } from '../lib/leagueAgenda'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
@@ -226,6 +228,9 @@ export default function Home() {
   // Torneios (Trello #363): o cartão de inscrição antes do sorteio, e os
   // meus jogos depois dele — é na Home que a malta vê a que horas joga.
   const [tournamentEvents, setTournamentEvents] = useState([])
+  // A liga entre clubes: os encontros em que jogo e o «Para ti» dela.
+  const [leagueEvents, setLeagueEvents] = useState([])
+  const [leagueAgenda, setLeagueAgenda] = useState(null)
   const [location, setLocation] = useState(getSavedLocation)
   const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -478,6 +483,22 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, orgIdsKey])
 
+  useEffect(() => {
+    if (!user) {
+      setLeagueEvents([])
+      setLeagueAgenda(null)
+      return
+    }
+    let cancelled = false
+    // Sem as migrações da liga devolve vazio — nunca é motivo para partir.
+    loadLeagueHome().then(({ events: rows, agenda }) => {
+      if (cancelled) return
+      setLeagueEvents(rows)
+      setLeagueAgenda(agenda)
+    })
+    return () => { cancelled = true }
+  }, [user?.id])
+
   const events = useMemo(() => {
     if (!user) return []
     return [
@@ -492,9 +513,10 @@ export default function Home() {
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
       ...tournamentEvents.filter((e) => e.dayKey)
         .map((e) => (e.orgKind ? e : { ...e, orgKind: (memberships || []).find((ms) => ms.organization_id === e.orgId)?.organization?.kind || null })),
+      ...leagueEvents,
       ...friendInviteEvents,
     ].filter((e, _, all) => !(e.source === 'friend_session' && e.id && all.some((x) => x.key === `friend_invite:${e.id}`)))
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, friendInviteEvents, user, memberships])
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, leagueEvents, friendInviteEvents, user, memberships])
 
   const visible = useMemo(() => applyFilters(markFreeSlots(events), filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
@@ -813,6 +835,7 @@ export default function Home() {
   // O caminho de cada evento: o mesmo na pesquisa e nos próximos jogos.
   const eventLink = (e) => (
     e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
+      : e.kind === 'league' ? `/liga/${e.slug}/encontro/${e.id}`
       : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
         : e.source === 'lesson' ? `/aula/${e.id}`
           : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
@@ -825,8 +848,11 @@ export default function Home() {
   // sem conta — migration_mix_guest_sem_conta.sql) é uma linha do «Para ti»
   // que abre a caixa de sempre numa folha (UX, 10 out).
   const phoneToConfirm = !!profile && !profile.phone_verified_at && profile.phone_hash !== 'dev-bypass'
-  const forYou = forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language,
-    onConfirmPhone: phoneToConfirm ? () => setPhoneOpen(true) : null })
+  const forYou = [
+    ...forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language,
+      onConfirmPhone: phoneToConfirm ? () => setPhoneOpen(true) : null }),
+    ...leagueForYouItems(leagueAgenda, t, i18n.language),
+  ]
   const firstUpcomingDay = days.find((d) => d.dayKey >= today)?.dayKey
   const topBlock = (
     <div ref={topBlockRef} className="space-y-4">
@@ -971,6 +997,9 @@ export default function Home() {
           onJoin={() => handleExploreJoin(event)}
         />
       )
+    }
+    if (event.kind === 'league') {
+      return <LeagueEventCard key={event.key} event={event} past={past} />
     }
     if (event.kind === 'tournament') {
       return <TournamentEventCard key={event.key} event={event} past={past} />

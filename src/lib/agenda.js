@@ -18,7 +18,7 @@
 
 // 'free' = os horários livres dos clubes, juntos num cartão por clube e por
 // dia (Home 4/4, SPEC-4 ponto 3): uma pastilha própria na barra dos tipos.
-export const EVENT_KINDS = ['mix', 'open', 'free', 'friends', 'lesson', 'tournament']
+export const EVENT_KINDS = ['mix', 'open', 'free', 'friends', 'lesson', 'tournament', 'league']
 
 // Dia local 'AAAA-MM-DD'. Local de propósito: um mix às 00:30 de sábado em
 // Lisboa pertence a sábado, não à sexta-feira em UTC.
@@ -459,9 +459,13 @@ export const DEFAULT_FILTERS = { show: 'all', kinds: EVENT_KINDS, orgIds: null }
 /** Filtros guardados antes da mudança (com onlyMine) voltam ao início. Quem
  *  tinha todos os tipos antes de haver «Horários livres» continua com todos. */
 const KINDS_BEFORE_FREE = ['mix', 'open', 'friends', 'lesson', 'tournament']
+const KINDS_BEFORE_LEAGUE = ['mix', 'open', 'free', 'friends', 'lesson', 'tournament']
 export const normalizeFilters = (f) => {
   if (!(f && SHOW_OPTIONS.includes(f.show) && Array.isArray(f.kinds) && f.kinds.length)) return DEFAULT_FILTERS
   if (!f.kinds.includes('free') && KINDS_BEFORE_FREE.every((k) => f.kinds.includes(k))) return { ...f, kinds: [...EVENT_KINDS] }
+  // A liga é um tipo novo (16 out): quem tinha todos os tipos de antes passa a ver a liga;
+  // ninguém a pode ter desligado de propósito.
+  if (!f.kinds.includes('league') && KINDS_BEFORE_LEAGUE.every((k) => f.kinds.includes(k))) return { ...f, kinds: [...EVENT_KINDS] }
   return f
 }
 

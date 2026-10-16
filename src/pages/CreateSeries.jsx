@@ -24,6 +24,7 @@ import { Toggle, euros } from '../components/lessons/LessonBits'
 import StepPage from '../components/steps/StepPage'
 import WhatsappHoursField from '../components/WhatsappHoursField'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
+import TimeInput from '../components/TimeInput'
 
 const pad = (n) => String(n).padStart(2, '0')
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -302,7 +303,7 @@ export default function CreateSeries() {
           </div>
           <div>
             <p className={label}>{t('lessons.f_start')}</p>
-            <input type="time" step={1800} value={f.start_time} aria-label={t('lessons.f_start')}
+            <TimeInput step={1800} value={f.start_time} aria-label={t('lessons.f_start')}
               onChange={(e) => set({ start_time: e.target.value, peak_choice: null })} className="input-field w-full" />
           </div>
           <div>

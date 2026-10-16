@@ -78,6 +78,12 @@ const EditOpenSlots = lazyPage(() => import('./pages/EditOpenSlots'))
 const CreateSeries = lazyPage(() => import('./pages/CreateSeries'))
 const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
+const LeaguePage = lazyPage(() => import('./pages/LeaguePage'))
+const LeagueEncounterPage = lazyPage(() => import('./pages/LeagueEncounterPage'))
+const LeagueTeamPage = lazyPage(() => import('./pages/LeagueTeamPage'))
+const CreateLeaguePage = lazyPage(() => import('./pages/CreateLeaguePage'))
+const LeagueManagePage = lazyPage(() => import('./pages/LeagueManagePage'))
+const LeagueResultPage = lazyPage(() => import('./pages/LeagueResultPage'))
 const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
@@ -540,6 +546,13 @@ function AppRoutes() {
           }
         />
         {/* Torneios (Trello #361 a #366) — abre sem conta */}
+        {/* Liga entre Clubes (Fase 1): pública, como o torneio. */}
+        <Route path="/liga/:slug" element={<Guard require="public" showSplash={showSplash}><LeaguePage /></Guard>} />
+        <Route path="/liga/:slug/encontro/:id" element={<Guard require="public" showSplash={showSplash}><LeagueEncounterPage /></Guard>} />
+        <Route path="/gerir/:slug/criar/liga" element={<Guard require="protected" showSplash={showSplash}><CreateLeaguePage /></Guard>} />
+        <Route path="/liga/:slug/gerir" element={<Guard require="protected" showSplash={showSplash}><LeagueManagePage /></Guard>} />
+        <Route path="/liga/:slug/equipa/:teamId" element={<Guard require="protected" showSplash={showSplash}><LeagueTeamPage /></Guard>} />
+        <Route path="/liga/:slug/encontro/:id/resultado" element={<Guard require="protected" showSplash={showSplash}><LeagueResultPage /></Guard>} />
         <Route
           path="/torneio/:id"
           element={

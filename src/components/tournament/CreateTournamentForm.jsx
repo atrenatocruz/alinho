@@ -21,6 +21,7 @@ import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
 import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
 import { maxCategories } from '../../lib/tournamentSignup'
+import TimeInput from '../TimeInput'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
@@ -128,8 +129,7 @@ function DayCategories({ draft, set, dayLabel }) {
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
-                <input
-                  type="time"
+                <TimeInput
                   aria-label={t('tournament.create.start_time')}
                   aria-invalid={outside || undefined}
                   className={`input-field !w-[100px] !px-2 shrink-0 ${outside ? '!border !border-danger' : ''}`}
@@ -226,8 +226,7 @@ function CategoryTimes({ draft, set, dayLabel, focusCode }) {
               <div className="flex items-center gap-2">
                 <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
-                <input
-                  type="time"
+                <TimeInput
                   data-code={String(c.code).toUpperCase()}
                   aria-label={t('tournament.create.start_time')}
                   aria-invalid={outside || undefined}
@@ -640,7 +639,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                     virar 5 out 00:59, a véspera à noite. */}
                 <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T23:59` })} />
               </div>
-              <input type="time" className="input-field !w-[104px] !px-2" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
+              <TimeInput className="input-field !w-[104px] !px-2" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
           <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')} error={fieldError(DRAW_PROBLEMS)}>
@@ -857,7 +856,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <div className="min-w-0 flex-1">
                 <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T23:59` })} />
               </div>
-              <input type="time" className="input-field !w-[104px] !px-2" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
+              <TimeInput className="input-field !w-[104px] !px-2" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
           <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')} error={fieldError(DRAW_PROBLEMS)}>
@@ -878,9 +877,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             <div key={d.date} className="card">
               <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
               <div className="mt-2 flex items-center gap-2">
-                <input type="time" className="input-field !w-[100px] !px-2" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
+                <TimeInput className="input-field !w-[100px] !px-2" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
                 <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
-                <input type="time" className="input-field !w-[100px] !px-2" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
+                <TimeInput className="input-field !w-[100px] !px-2" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <input type="number" min="1" max="30" className="input-field !w-[72px] !px-2" value={d.courts} onChange={(e) => patchDay(i, { courts: e.target.value })} />
