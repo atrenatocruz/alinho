@@ -55,7 +55,16 @@ DO $$ BEGIN PERFORM remove_from_roster((SELECT roster_a FROM _ctx));
   INSERT INTO _r VALUES (false, 'admin B tirou um jogador de A');
 EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM LIKE '%not_team_rep%', 'cada clube só mexe no seu plantel'); END $$;
 
+-- Retirar o pedido fecha o plantel: o jogador fica livre e o clube B já o pode inscrever.
+SELECT pg_temp.as_user(admin_a) FROM _ctx;
+SELECT withdraw_application(team_a) FROM _ctx;
+SELECT pg_temp.as_user(admin_b) FROM _ctx;
+DO $$ BEGIN PERFORM add_to_roster((SELECT team_b FROM _ctx), (SELECT both_player FROM _ctx));
+  INSERT INTO _r VALUES (true, 'depois de retirar A, o jogador entra por B');
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (false, 'depois de retirar A, o jogador entra por B: ' || SQLERRM); END $$;
+
 RESET ROLE;
+INSERT INTO _r SELECT removed_at IS NOT NULL, 'retirar fecha o plantel de A' FROM league_roster WHERE id = (SELECT roster_a FROM _ctx);
 -- Lotação: com o máximo em 2, uma 3.ª aprovação falha (feito como owner).
 -- (A corrida real — duas aprovações ao mesmo tempo — é coberta pelo
 -- SELECT … FOR UPDATE na categoria; ver a função.)

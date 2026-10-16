@@ -55,7 +55,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION withdraw_application(p_team_id UUID)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_t league_teams; v_c league_categories;
+DECLARE v_t league_teams; v_c league_categories; v_l leagues;
 BEGIN
   SELECT * INTO v_t FROM league_teams WHERE id = p_team_id FOR UPDATE;
   IF v_t.id IS NULL THEN RAISE EXCEPTION 'team_not_found'; END IF;
@@ -64,7 +64,14 @@ BEGIN
   IF v_c.status <> 'inscricoes' THEN RAISE EXCEPTION 'category_started'; END IF;
   IF v_t.status NOT IN ('pendente', 'suplente', 'aprovada') THEN RAISE EXCEPTION 'cannot_withdraw'; END IF;
   UPDATE league_teams SET status = 'retirada', waitlist_order = NULL WHERE id = p_team_id;
+  -- O plantel acaba com o pedido: os jogadores ficam livres para outro clube e,
+  -- se o clube voltar a pedir, não reaparece um plantel antigo.
+  UPDATE league_roster SET removed_at = NOW() WHERE team_id = p_team_id AND removed_at IS NULL;
+  SELECT * INTO v_l FROM leagues WHERE id = v_t.league_id;
   PERFORM league_log(v_t.league_id, NULL, 'application_withdrawn', jsonb_build_object('team_id', p_team_id));
+  PERFORM league_notify(ARRAY(SELECT league_manager_ids(v_l.id)), 'league_application_withdrawn',
+    jsonb_build_object('league_id', v_l.id, 'league_slug', v_l.slug, 'league_name', v_l.name,
+                       'club_name', (SELECT name FROM organizations WHERE id = v_t.organization_id), 'team_id', p_team_id));
 END;
 $$;
 
