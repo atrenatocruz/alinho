@@ -6203,7 +6203,7 @@
   "playerstats.chart_aria": "Points over time, one point per event",
   "playerstats.chart_hint": "Tap or drag on the chart to see each event.",
   "playerstats.card_hint": "How your ranking has been moving",
-  "playerstats.card_last_3m": "Last 3 months",
+  "playerstats.card_last_month": "Last month",
   "playerstats.card_since_start": "Since the start",
   "profile.friends_create_short": "Create",
   "playerstats.card_hint_other": "Progress, opponents and partners",

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket } from 'lucide-react'
+import { Plus, Calendar, Trash2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -4358,11 +4358,13 @@ export default function GerirClube() {
                     </button>
                     <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
                   </span>
-                  <label className="mt-2 block">
+                  {/* O lápis diz que o nome se edita aqui (Renato, 16 out). */}
+                  <label className="group mt-2 flex items-center gap-2 rounded-ctrl focus-within:bg-surface focus-within:px-2">
                     <span className="sr-only">{t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}</span>
                     <input type="text" value={settings.name} required form="club-settings-form"
                       onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-                      className="w-full rounded-ctrl bg-transparent font-display text-xl font-extrabold text-ink-900 outline-none focus:bg-surface focus:px-2" />
+                      className="min-w-0 flex-1 bg-transparent font-display text-xl font-extrabold text-ink-900 outline-none" />
+                    <Pencil size={16} aria-hidden="true" className="shrink-0 text-ink-500 group-focus-within:text-ink-900" />
                   </label>
                   <OrgNameTakenHint taken={settingsNameTaken} />
                   <p className="text-xs text-muted">

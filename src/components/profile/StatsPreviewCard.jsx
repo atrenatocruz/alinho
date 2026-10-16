@@ -8,7 +8,7 @@ import { timelineSince } from '../../lib/statsLogic'
 import { smoothPath } from './RatingChart'
 
 /* Perfil › o cartão das Estatísticas com um gráfico pequeno (proposta A,
-   Renato, 16 out): pontos atuais, quanto mexeram nos últimos 3 meses e a
+   Renato, 16 out): pontos atuais, quanto mexeram no último mês e a
    curva. O cartão inteiro abre /perfil/estatisticas. Sem linha do tempo
    (get_rating_timeline ainda não existe, ou menos de 2 eventos), volta ao
    cartão de texto de antes — nunca um gráfico vazio. Cores como no
@@ -31,8 +31,9 @@ export default function StatsPreviewCard({ userId }) {
   }, [userId])
 
   const all = (timeline || []).filter((r) => r.rating_after != null)
-  const recent = timelineSince(all, 3)
-  // Menos de 2 eventos em 3 meses: mostra tudo o que há.
+  // O último mês (Renato, 16 out — antes eram 3). Menos de 2 eventos no
+  // mês: mostra tudo o que há.
+  const recent = timelineSince(all, 1)
   const rows = recent.length >= 2 ? recent : all
   const rich = rows.length >= 2
 
@@ -75,7 +76,7 @@ export default function StatsPreviewCard({ userId }) {
       <div className="flex items-start gap-2">
         <span className="min-w-0 flex-1">
           <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>
-          <span className="block truncate text-xs text-muted">{rows === recent ? t('playerstats.card_last_3m') : t('playerstats.card_since_start')}</span>
+          <span className="block truncate text-xs text-muted">{rows === recent ? t('playerstats.card_last_month') : t('playerstats.card_since_start')}</span>
         </span>
         <span className="shrink-0 text-right">
           <span className="block font-display text-xl font-extrabold leading-none text-ink-900 tabular-nums">{Math.round(current)}</span>
