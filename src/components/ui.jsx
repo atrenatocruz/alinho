@@ -17,6 +17,7 @@ import Alino from './Alino'
 import { frameInsideBox, frameSrc } from '../lib/frames'
 import { useDragScroll } from '../lib/useDragScroll'
 import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
+import TimeInput from './TimeInput'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -119,7 +120,8 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
             value={year}
             onChange={(y) => onJumpTo(Number(y), month)}
             options={yearOptionsFor(min, max)}
-            className="w-24 shrink-0 py-2"
+            // Largura para «2026» inteiro com a seta (aparecia «20…» — UX, 16 out).
+            className="w-[7.25rem] shrink-0 py-2"
           />
         </div>
         <button
@@ -385,8 +387,7 @@ export function DateTimeField({ value, onChange, placeholder, min = null }) {
                   pushing past the card's right edge — `min-w-0` overrides
                   the implicit "don't shrink below content size" default
                   that causes it. */}
-              <input
-                type="time"
+              <TimeInput
                 value={pendingTime}
                 onChange={(e) => setPendingTime(e.target.value)}
                 className="input-field w-full min-w-0 box-border"

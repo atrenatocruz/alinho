@@ -10,6 +10,7 @@ import { createLessonSeries } from '../../lib/lessonsApi'
 import { describeError } from '../../lib/errors'
 import { LESSON_CAPACITY, LESSON_DURATIONS, peakStatus, priceRowFor } from '../../lib/lessons'
 import { ChipGroup, MonoLabel, Toggle, euros, lessonTypeLabel } from './LessonBits'
+import TimeInput from '../TimeInput'
 
 const pad = (n) => String(n).padStart(2, '0')
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -100,7 +101,7 @@ export default function CreateSeriesForm({ teachers, prices, peakHours, onCancel
           <div className="flex gap-3">
             <div className="flex-1">
               <MonoLabel className="mb-2">{t('lessons.f_start')}</MonoLabel>
-              <input type="time" step={1800} value={f.start_time} onChange={(e) => set({ start_time: e.target.value, peak_choice: null })} className={`${fieldCls} w-full`} />
+              <TimeInput step={1800} value={f.start_time} onChange={(e) => set({ start_time: e.target.value, peak_choice: null })} className={`${fieldCls} w-full`} />
             </div>
             <div className="flex-1">
               <MonoLabel className="mb-2">{t('lessons.f_starts_on')}</MonoLabel>
