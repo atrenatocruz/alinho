@@ -1,0 +1,18 @@
+-- ─────────────────────────────────────────────────────────────────────────
+-- organizations.district no GRANT UPDATE por colunas (Rui Gomes, 16 out).
+--
+-- migration_liga_1_base.sql acrescentou a coluna `district` e o Gerir ›
+-- Definições passou a enviá-la em cada «Guardar definições», mas a coluna
+-- nunca entrou no GRANT UPDATE (colunas) de migration_self_serve_groups.sql.
+-- Resultado: o Postgres recusava o UPDATE inteiro com 42501 («Não tens
+-- permissão…») — a descrição, o contacto, etc. deixavam de gravar para
+-- qualquer admin que não fosse super admin.
+--
+-- O cliente (GerirClube.jsx) já só envia `district` quando muda, por isso o
+-- guardar volta a funcionar mesmo antes disto correr; isto serve para o
+-- distrito em si poder ser escolhido.
+--
+-- Correr primeiro: migration_liga_1_base.sql (a coluna tem de existir).
+-- Idempotente.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT UPDATE (district) ON organizations TO authenticated;

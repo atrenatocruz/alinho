@@ -15,6 +15,7 @@ import LocationOpenWith from '../LocationOpenWith'
 import { formatLabelKey } from '../../lib/mixLogic'
 import { formatCurrency } from '../../lib/formatDate'
 import { CLUB_HERO, GROUP_HERO } from '../../lib/kindColors'
+import { coverOf, useOrgCovers } from '../../lib/orgCover'
 import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
@@ -60,6 +61,8 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [asking, setAsking] = useState(false)
+  // A capa escolhida no Gerir (o get_club_profile não a traz).
+  const covers = useOrgCovers([club.id])
   const [askingCancel, setAskingCancel] = useState(false)
   const member = club.my_status === 'member'
   // «Clube · <cidade> · N membros» (R5). Os dados só têm a morada inteira,
@@ -99,7 +102,7 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
           {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button>}
         </>} />
       <div ref={coverRef}>
-      <KindHero kind="club" src={club.kind === 'group' ? GROUP_HERO : CLUB_HERO} className="relative h-40">
+      <KindHero kind="club" src={coverOf(club, covers[club.id])} className="relative h-40">
       </KindHero>
       </div>
 

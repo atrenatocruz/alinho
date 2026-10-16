@@ -39,7 +39,7 @@ function useWidth() {
 
 // Curva monótona (Fritsch–Carlson): suave, mas nunca passa acima/abaixo
 // dos pontos — um máximo no gráfico é sempre um ranking que existiu.
-function smoothPath(pts) {
+export function smoothPath(pts) {
   const n = pts.length
   const dx = [], m = []
   for (let i = 0; i < n - 1; i++) {

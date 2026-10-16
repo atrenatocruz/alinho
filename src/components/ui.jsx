@@ -1025,8 +1025,10 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
   // (a maioria das que as pessoas usam) o centro é o peito e a cabeça
   // ficava cortada — Francisco, 22 set 2026, com a foto dele no cartão do
   // mix. A 30% a cabeça fica enquadrada e ainda se vê o corpo.
+  // Logótipos (shape='square') ao centro: a 30% o desenho descaía e ficava
+  // diferente do topo do Gerir, que o mostra centrado (Renato, 16 out).
   const core = url
-    ? <img src={url} alt={name || ''} className={`${base} object-cover object-[50%_30%]`} />
+    ? <img src={url} alt={name || ''} className={`${base} object-cover ${shape === 'square' ? 'object-center' : 'object-[50%_30%]'}`} />
     : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
 
   // Moldura do pódio do mês (design-handoff/2026-10-12-molduras-podio): cabe

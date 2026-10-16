@@ -4,16 +4,20 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket } from 'lucide-react'
+import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
+import { uploadOrgCover, removeOldCover, rememberCover, coverOf } from '../lib/orgCover'
+import CoverSheet from '../components/club/CoverSheet'
+import MemberSheet from '../components/club/MemberSheet'
+import KindHero from '../components/KindHero'
 import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -264,6 +268,55 @@ function RequestPerson({ req, fallbackName }) {
   )
 }
 
+// Gerir › Clube (proposta A): os campos que contam para o «N alterações por
+// guardar». O contacto do robô não está aqui — saiu do ecrã.
+const CARD_BOX = 'rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
+const SECTION_KICKER = 'mb-2 mt-5 px-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
+const BARE_INPUT = 'mt-0.5 w-full bg-transparent text-[15px] text-ink-900 placeholder:text-ink-200 outline-none'
+const SETTINGS_FIELDS = ['name', 'description', 'location', 'district', 'phone', 'instagram', 'website', 'is_global', 'open_join', 'searchable']
+
+// Gerir › Pessoas (proposta A): quantos membros se veem antes do «Ver todos».
+const MEMBERS_PREVIEW = 8
+
+// Um pedido de entrada numa linha: a pessoa, «✕» e «Aceitar».
+function RequestRow({ req, fallbackName, approveLabel, rejectLabel, onApprove, onReject }) {
+  return (
+    <div className="flex min-h-[60px] items-center gap-2.5 border-t border-line px-4 py-2.5 first:border-t-0">
+      <RequestPerson req={req} fallbackName={fallbackName} />
+      <button type="button" onClick={onReject} aria-label={rejectLabel} title={rejectLabel}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl border-[1.5px] border-line bg-white text-ink-700 hover:text-danger">
+        <X size={16} />
+      </button>
+      <button type="button" onClick={onApprove}
+        className="min-h-[40px] shrink-0 rounded-ctrl bg-ink-900 px-3.5 text-sm font-extrabold text-white">
+        {approveLabel}
+      </button>
+    </div>
+  )
+}
+
+function SettingsField({ label, children }) {
+  return (
+    <label className="block border-t border-line px-4 py-3 first:border-t-0">
+      <span className="block text-xs text-muted">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function SettingsSwitch({ label, hint, checked, onChange }) {
+  return (
+    <label className="flex min-h-[56px] cursor-pointer items-center gap-3 border-t border-line px-4 py-3 first:border-t-0">
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-extrabold text-ink-900">{label}</span>
+        {hint && <span className="block text-xs text-muted">{hint}</span>}
+      </span>
+      <input type="checkbox" role="switch" checked={!!checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span aria-hidden="true" className="relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-ink-900 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2" />
+    </label>
+  )
+}
+
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
   const { slug, editId, serieId } = useParams()
@@ -383,6 +436,10 @@ export default function GerirClube() {
   const clubLogoInputRef = useRef(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
+  const [coverOpen, setCoverOpen] = useState(false)
+  // Gerir › Pessoas (proposta A): a folha de um membro e o «Ver todos».
+  const [memberSheet, setMemberSheet] = useState(null)
+  const [showAllMembers, setShowAllMembers] = useState(false)
   // Eliminar grupo (Trello #241). deleteBlocker: undefined = still asking the
   // server, null = can delete, string = the reason code it can't.
   const navigate = useNavigate()
@@ -1083,6 +1140,9 @@ export default function GerirClube() {
         is_admin: m.is_admin,
         is_guest: m.is_guest,
         level: m.level,
+        // O nível global (M5, F2…) — o que se mostra na lista de Pessoas.
+        rating: m.profile?.rating ?? null,
+        gender: m.profile?.gender ?? null,
         avatar_url: m.profile?.avatar_url,
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -1163,6 +1223,8 @@ export default function GerirClube() {
     }
   }
 
+  // O que veio da base de dados — para só enviar o distrito quando muda.
+  const loadedSettingsRef = useRef(null)
   const loadSettings = async () => {
     const { data, error } = await supabase
       .from('organizations')
@@ -1174,6 +1236,7 @@ export default function GerirClube() {
       console.error('Error loading settings:', error)
       return
     }
+    loadedSettingsRef.current = data
     setSettings(data)
   }
 
@@ -2181,12 +2244,35 @@ export default function GerirClube() {
       const { error } = await supabase.from('organizations').update({ group_logo_url }).eq('id', settings.id)
       if (error) throw error
       setSettings((s) => ({ ...s, group_logo_url }))
+      // O topo do Gerir lê do org e o resto da app das memberships — sem
+      // isto a imagem nova só aparecia depois de recarregar (Rui Gomes, 16 out).
+      setOrg((o) => ({ ...o, group_logo_url }))
+      refreshMemberships?.()
     } catch (error) {
       console.error('Error uploading club logo:', error)
       setLogoError(describeError(t, error, 'gerirclube.error_logo_upload'))
     } finally {
       setUploadingLogo(false)
     }
+  }
+
+  // A capa (proposta A, 16 out): grava logo, como o logótipo — não espera
+  // pelo «Guardar». A foto antiga sai do balde; as capas do alinho não são
+  // ficheiros nossos.
+  const settingsBase = loadedSettingsRef.current || {}
+  const settingsDirty = settings ? SETTINGS_FIELDS.filter((k) => settings[k] !== undefined && (settings[k] ?? '') !== (settingsBase[k] ?? '')).length : 0
+
+  const handleSaveCover = async ({ file, y, url }) => {
+    const previous = settings.cover_url
+    const cover_url = file ? await uploadOrgCover(settings.id, file, y) : (url || null)
+    const { error } = await supabase.from('organizations').update({ cover_url }).eq('id', settings.id)
+    if (error) throw error
+    if (previous && previous !== cover_url) removeOldCover(previous).catch((err) => console.error('Error removing old cover:', err))
+    rememberCover(settings.id, cover_url)
+    setSettings((s) => ({ ...s, cover_url }))
+    if (loadedSettingsRef.current) loadedSettingsRef.current = { ...loadedSettingsRef.current, cover_url }
+    setOrg((o) => ({ ...o, cover_url }))
+    refreshMemberships?.()
   }
 
   const handleRemoveLogo = async () => {
@@ -2197,6 +2283,8 @@ export default function GerirClube() {
       const { error } = await supabase.from('organizations').update({ group_logo_url: null }).eq('id', settings.id)
       if (error) throw error
       setSettings((s) => ({ ...s, group_logo_url: null }))
+      setOrg((o) => ({ ...o, group_logo_url: null }))
+      refreshMemberships?.()
     } catch (error) {
       console.error('Error removing club logo:', error)
       setLogoError(describeError(t, error, 'gerirclube.error_logo_remove'))
@@ -2294,8 +2382,10 @@ export default function GerirClube() {
           name: settings.name,
           description: settings.description,
           location: settings.location,
-          // Só existe depois de migration_liga_1_base.sql — não enviar antes.
-          ...(settings.district !== undefined ? { district: settings.district || null } : {}),
+          // Só quando muda: district não estava no GRANT UPDATE por colunas e
+          // mandá-lo sempre fazia falhar o guardar inteiro (descrição incluída —
+          // Rui Gomes, 16 out). migration_organization_district_grant.sql.
+          ...(settings.district !== undefined && (settings.district || null) !== (loadedSettingsRef.current?.district || null) ? { district: settings.district || null } : {}),
           latitude: settings.latitude ?? null,
           longitude: settings.longitude ?? null,
           phone: settings.phone,
@@ -2311,7 +2401,9 @@ export default function GerirClube() {
 
       if (error) throw error
 
-      setOrg((o) => ({ ...o, name: settings.name }))
+      loadedSettingsRef.current = settings
+      setOrg((o) => ({ ...o, name: settings.name, description: settings.description }))
+      refreshMemberships?.()
       setDoneNotice(t('gerirclube.settings_updated_success'))
     } catch (error) {
       console.error('Error updating settings:', error)
@@ -4044,22 +4136,22 @@ export default function GerirClube() {
 
           {/* Members Tab */}
           {activeTab === 'members' && (
-            <div className="space-y-3">
-
+            <div>
+              {/* Proposta A (Renato, 16 out), a linguagem do separador Clube:
+                  o que espera resposta primeiro, depois convidar, depois os
+                  membros numa lista; as ações de cada membro numa folha («···»). */}
               {membersError && (
-                <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3">{membersError}</p>
+                <p className="mb-3 rounded-ctrl bg-danger/10 p-3 text-sm font-extrabold text-danger">{membersError}</p>
               )}
 
               {requests.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: requests.length })}
-                  </h3>
+                <>
+                  <p className={SECTION_KICKER.replace('mt-5', 'mt-1')}>{t('gerirclube.join_requests_heading', { count: requests.length })}</p>
                   {/* Grupo cheio (Trello #447): os pedidos (muitos vêm do link)
                       ficam à espera de lugar. Aviso «Precisa de ti» — âmbar,
                       junto ao sítio, com a ação que resolve; fica até haver lugar. */}
                   {memberTotal != null && limitsFor(org?.plan_tier).members != null && memberTotal >= limitsFor(org?.plan_tier).members && (
-                    <p role="status" className="rounded-ctrl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm font-semibold text-ink-900">
+                    <p role="status" className="mb-2 rounded-ctrl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm font-semibold text-ink-900">
                       {t('gerirclube.requests_group_full', { plan: planName(org?.plan_tier), members: limitsFor(org?.plan_tier).members })}{' '}
                       {nextPlanTier(org?.plan_tier) && t('plans.next_plan_members', { next: planName(nextPlanTier(org?.plan_tier)) })}{' '}
                       <button type="button" onClick={() => document.getElementById('gerir-membros')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -4068,183 +4160,120 @@ export default function GerirClube() {
                       </button>
                     </p>
                   )}
-                  {requests.map((req) => (
-                    <div key={req.id} className="card flex items-center gap-3">
-                      <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
-                      <button
-                        onClick={() => handleApproveRequest(req.id)}
-                        type="button"
-                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                        title={t('gerirclube.approve_action')}
-                        aria-label={t('gerirclube.approve_action')}
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleRejectRequest(req.id)}
-                        type="button"
-                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                        title={t('gerirclube.reject_action')}
-                        aria-label={t('gerirclube.reject_action')}
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                  <div className={CARD_BOX}>
+                    {requests.map((req) => (
+                      <RequestRow key={req.id} req={req} fallbackName={t('gerirclube.fallback_player_name')}
+                        approveLabel={t('gerirclube.approve_action')} rejectLabel={t('gerirclube.reject_action')}
+                        onApprove={() => handleApproveRequest(req.id)} onReject={() => handleRejectRequest(req.id)} />
+                    ))}
+                  </div>
+                </>
               )}
 
               {pedidosDosGrupos.map(({ group, requests: pedidos }) => (
-                <div key={group.id} className="space-y-2">
-                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: pedidos.length })}
-                    <span className="font-normal text-muted truncate">· {group.name}</span>
-                  </h3>
-                  {pedidos.map((req) => (
-                    <div key={req.id} className="card flex items-center gap-3">
-                      <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
-                      <button
-                        onClick={async () => { await handleApproveGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
-                        type="button"
-                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                        title={t('gerirclube.approve_action')}
-                        aria-label={t('gerirclube.approve_action')}
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={async () => { await handleRejectGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
-                        type="button"
-                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                        title={t('gerirclube.reject_action')}
-                        aria-label={t('gerirclube.reject_action')}
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  ))}
+                <div key={group.id}>
+                  <p className={SECTION_KICKER}>{t('gerirclube.join_requests_heading', { count: pedidos.length })} · {group.name}</p>
+                  <div className={CARD_BOX}>
+                    {pedidos.map((req) => (
+                      <RequestRow key={req.id} req={req} fallbackName={t('gerirclube.fallback_player_name')}
+                        approveLabel={t('gerirclube.approve_action')} rejectLabel={t('gerirclube.reject_action')}
+                        onApprove={async () => { await handleApproveGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
+                        onReject={async () => { await handleRejectGroupRequest(req.id, group.id); loadPedidosDosGrupos() }} />
+                    ))}
+                  </div>
                 </div>
               ))}
 
               {!isGroupOrg && clubTeachers.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.teacher_requests_heading', { count: clubTeachers.length })}
-                  </h3>
+                <>
+                  <p className={SECTION_KICKER}>{t('gerirclube.teacher_requests_heading', { count: clubTeachers.length })}</p>
                   {/* Desenho aprovado 25 set (professores, assunto 2). */}
-                  {clubTeachers.map((req) => (
-                    <TeacherRequestCard key={req.id} req={req} organizationId={currentOrganizationId}
-                      onResolved={loadClubTeachers} />
-                  ))}
-                </div>
+                  <div className="space-y-2">
+                    {clubTeachers.map((req) => (
+                      <TeacherRequestCard key={req.id} req={req} organizationId={currentOrganizationId}
+                        onResolved={loadClubTeachers} />
+                    ))}
+                  </div>
+                </>
               )}
 
-              <div className="card space-y-4">
-                <div>
-                  <h3 className="text-sm font-extrabold text-ink-900 mb-2">{t('gerirclube.invite_player_heading')}</h3>
-                  <div className="mb-3">
-                    {/* Escolha num formulário = pastilhas soltas, a escolhida a
-                        preto e a outra de contorno branca (regra de 24 set; UX,
-                        14 out). */}
-                    <Chips
-                      label={t('gerirclube.invite_player_heading')}
-                      options={[
-                        { value: 'member', label: t('gerirclube.invite_as_member') },
-                        { value: 'admin', label: t('gerirclube.invite_as_admin') },
-                      ]}
-                      value={inviteAsAdmin ? 'admin' : 'member'}
-                      onChange={(value) => setInviteAsAdmin(value === 'admin')}
-                    />
-                    {inviteAsAdmin && (
-                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.invite_as_admin_hint')}</p>
-                    )}
-                  </div>
-                  <PlayerSearch
-                    label={t('gerirclube.search_by_name_placeholder')}
-                    searchFn={searchPlayers}
-                    disabledIds={members.map((m) => m.id)}
-                    disabledLabel={t('comunidade.member_label')}
-                    onSelect={handleInvitePlayer}
-                  />
-                  {inviteError && <div className="mt-2"><p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{inviteError}</p></div>}
-                </div>
-                <div className="pt-3 border-t border-line">
-                  <button
-                    type="button"
-                    onClick={handleCopyInviteLink}
-                    className="w-full flex items-center justify-center gap-2 text-sm font-extrabold px-4 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-                  >
-                    <Copy size={16} />
-                    {linkCopied ? t('gerirclube.link_copied') : t('gerirclube.copy_invite_link')}
-                  </button>
-                </div>
+              <p className={SECTION_KICKER}>{t('gerirclube.invite_player_heading')}</p>
+              <div className={`${CARD_BOX} space-y-3 p-4`}>
+                {/* Escolha num formulário = pastilhas soltas (regra de 24 set). */}
+                <Chips
+                  label={t('gerirclube.invite_player_heading')}
+                  options={[
+                    { value: 'member', label: t('gerirclube.invite_as_member') },
+                    { value: 'admin', label: t('gerirclube.invite_as_admin') },
+                  ]}
+                  value={inviteAsAdmin ? 'admin' : 'member'}
+                  onChange={(value) => setInviteAsAdmin(value === 'admin')}
+                />
+                {inviteAsAdmin && <p className="text-[11px] text-muted">{t('gerirclube.invite_as_admin_hint')}</p>}
+                <PlayerSearch
+                  label={t('gerirclube.search_by_name_placeholder')}
+                  searchFn={searchPlayers}
+                  disabledIds={members.map((m) => m.id)}
+                  disabledLabel={t('comunidade.member_label')}
+                  onSelect={handleInvitePlayer}
+                />
+                {inviteError && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{inviteError}</p>}
+                <button type="button" onClick={handleCopyInviteLink}
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-sm font-extrabold text-ink-900">
+                  <Copy size={16} />
+                  {linkCopied ? t('gerirclube.link_copied') : t('gerirclube.copy_invite_link')}
+                </button>
               </div>
 
-              {/* «MEMBROS · N» em mono, como os outros títulos de lista (UX,
-                  14 out): saiu a caixa azul-clara, que não é cor da app. */}
-              <div id="gerir-membros" className="scroll-mt-4 pt-1">
-                <SectionLabel count={members.length}>{t('clubprofile.members_title')}</SectionLabel>
-              </div>
-
-              {members.map(member => (
-                <div key={member.id} className="card">
-                  <div className="flex items-center gap-3.5">
-                    <Link to={`/jogador/${member.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
-                      <Avatar name={member.name} url={member.avatar_url} size="w-11 h-11 text-sm" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
-                          <span className="truncate">{member.name}</span>
-                          {member.is_admin && (
-                            <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title={t('gerirclube.admin_badge_title')} />
-                          )}
-                          {member.id === ownerId && (
-                            <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ink-900 text-white">
-                              {t('gerirclube.owner_badge')}
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-sm text-muted truncate">
-                          {t('gerirclube.level_label', { level: member.level })}
-                        </p>
+              <p id="gerir-membros" className={`${SECTION_KICKER} scroll-mt-4`}>{t('clubprofile.members_title')} · {members.length}</p>
+              <div className={CARD_BOX}>
+                {(showAllMembers ? members : members.slice(0, MEMBERS_PREVIEW)).map((member) => {
+                  const isOwner = member.id === ownerId
+                  const role = isOwner ? t('people.role_owner') : member.is_admin ? t('people.role_admin') : t('people.role_member')
+                  return (
+                    <div key={member.id} className="border-t border-line first:border-t-0">
+                      <div className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
+                        <Link to={`/jogador/${member.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                          <Avatar name={member.name} url={member.avatar_url} size="w-10 h-10 text-sm" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-extrabold text-ink-900">{member.name}</span>
+                            <span className="block truncate text-xs text-muted">{role}</span>
+                          </span>
+                        </Link>
+                        {/* O nível global do jogador, não o «nível no clube» antigo
+                            (que era «iniciante» para quase toda a gente). */}
+                        <span className="shrink-0"><RatingBadge rating={member.rating} gender={member.gender} /></span>
+                        {/* O dono não tem «···»: ninguém lhe tira poderes nem o remove. */}
+                        {!isOwner ? (
+                          <button type="button" onClick={() => setMemberSheet(member)} aria-label={t('people.actions_aria', { name: member.name })}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-700 hover:bg-surface">
+                            <MoreHorizontal size={20} />
+                          </button>
+                        ) : <span className="w-10 shrink-0" aria-hidden="true" />}
                       </div>
-                    </Link>
+                      {memberError?.id === member.id && <p role="alert" className="px-4 pb-2.5 text-sm font-extrabold text-danger">{memberError.text}</p>}
+                    </div>
+                  )
+                })}
+                {members.length > MEMBERS_PREVIEW && (
+                  <button type="button" onClick={() => setShowAllMembers((v) => !v)}
+                    className="flex min-h-[48px] w-full items-center justify-center border-t border-line text-sm font-extrabold text-ink-900">
+                    {showAllMembers ? t('people.show_less') : t('people.show_all', { count: members.length })}
+                  </button>
+                )}
+              </div>
 
-                    {/* The owner row has no admin toggle and no remove
-                        button: nobody can demote or remove the owner. */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {member.id !== ownerId && (
-                        <button
-                          onClick={() => handleToggleAdmin(member.id, member.is_admin)}
-                          className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-                        >
-                          {member.is_admin ? t('gerirclube.revoke_admin_button') : t('gerirclube.grant_admin_button')}
-                        </button>
-                      )}
-                      {member.id !== currentUser?.id && member.id !== ownerId && (
-                        <button
-                          onClick={() => handleDeleteUser(member)}
-                          title={t('gerirclube.delete_member_title', { name: member.name })}
-                          className="w-10 h-10 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                        >
-                          <UserX size={20} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {canTransferOwnership && member.is_admin && member.id !== ownerId && (
-                    <div className="mt-3 pt-3 border-t border-line flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => { setTransferError(''); setTransferTarget(member) }}
-                        className="text-xs font-extrabold text-ink-700 hover:underline"
-                      >
-                        {t('gerirclube.transfer_owner_button')}
-                      </button>
-                    </div>
-                  )}
-                  {memberError?.id === member.id && <p role="alert" className="mt-2.5 text-sm font-extrabold text-danger">{memberError.text}</p>}
-                </div>
-              ))}
+              {memberSheet && (
+                <MemberSheet
+                  member={memberSheet}
+                  isSelf={memberSheet.id === currentUser?.id}
+                  canTransfer={canTransferOwnership && memberSheet.is_admin}
+                  onClose={() => setMemberSheet(null)}
+                  onToggleAdmin={() => { setMemberSheet(null); handleToggleAdmin(memberSheet.id, memberSheet.is_admin) }}
+                  onTransfer={() => { const m = memberSheet; setMemberSheet(null); setTransferError(''); setTransferTarget(m) }}
+                  onRemove={() => { const m = memberSheet; setMemberSheet(null); handleDeleteUser(m) }}
+                />
+              )}
 
               <DangerConfirmModal
                 open={!!transferTarget}
@@ -4273,229 +4302,143 @@ export default function GerirClube() {
               instead of closing an overlay. */}
           {activeTab === 'settings' && settings && (
             <div>
-              <h3 className="text-xl font-semibold text-ink-900 mb-6">
-                {t(kk('gerirclube.settings_heading'))}
-              </h3>
-
-              <form onSubmit={handleUpdateSettings} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}
+              {/* A identidade: capa, logótipo e nome — como na Comunidade. */}
+              <div className={`overflow-hidden ${CARD_BOX}`}>
+                <KindHero kind="club" src={coverOf(settings)} className="relative h-32">
+                  {settings.cover_url !== undefined && (
+                    <button type="button" onClick={() => setCoverOpen(true)}
+                      className="absolute right-3 top-3 inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-white/95 px-3 text-xs font-extrabold text-ink-900 shadow-card">
+                      <Camera size={14} /> {t('cover.change')}
+                    </button>
+                  )}
+                </KindHero>
+                <div className="px-4 pb-4">
+                  <span className={`relative -mt-8 inline-block bg-white p-[3px] ${isGroupOrg ? 'rounded-full' : 'rounded-[28%]'}`}>
+                    <Avatar name={settings.name} url={settings.group_logo_url} size="w-16 h-16 text-xl" shape={isGroupOrg ? 'round' : 'square'} colorClass="bg-ink-900 text-lime-400" />
+                    <button type="button" onClick={() => clubLogoInputRef.current?.click()} disabled={uploadingLogo}
+                      aria-label={t(kk('gerirclube.change_logo_aria'))}
+                      className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-white ring-2 ring-white disabled:opacity-50">
+                      {uploadingLogo ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Camera size={14} />}
+                    </button>
+                    <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
+                  </span>
+                  {/* O lápis diz que o nome se edita aqui (Renato, 16 out). */}
+                  {/* O campo tem a largura do nome (uma cópia invisível do texto
+                      dá-lhe o tamanho), por isso o lápis vai andando com ele. */}
+                  <label className="group mt-2 flex max-w-full items-center gap-2 rounded-ctrl focus-within:bg-surface focus-within:px-2">
+                    <span className="sr-only">{t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}</span>
+                    <span className="inline-grid min-w-0 font-display text-xl font-extrabold">
+                      <span aria-hidden="true" className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre">{settings.name || ' '}</span>
+                      <input type="text" value={settings.name} required form="club-settings-form" size={1}
+                        onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+                        className="col-start-1 row-start-1 w-full min-w-[2ch] bg-transparent text-ink-900 outline-none" />
+                    </span>
+                    <Pencil size={16} aria-hidden="true" className="shrink-0 text-ink-500 group-focus-within:text-ink-900" />
                   </label>
-                  <input
-                    type="text"
-                    value={settings.name}
-                    onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-                    className="input-field"
-                    required
-                  />
                   <OrgNameTakenHint taken={settingsNameTaken} />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.robot_contact_label')}
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.robot_contact}
-                    onChange={(e) => setSettings({ ...settings, robot_contact: e.target.value })}
-                    className="input-field"
-                    placeholder={t('gerirclube.phone_placeholder')}
-                  />
-                  <p className="text-sm text-gray-500 mt-2">
-                    {t('gerirclube.robot_contact_help')}
+                  <p className="text-xs text-muted">
+                    {[t(isGroupOrg ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), settings.location, planName(settings.plan_tier)].filter(Boolean).join(' · ')}
                   </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t(kk('gerirclube.club_logo_label'))}
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-16 h-16 shrink-0">
-                      <Avatar name={settings.name} url={settings.group_logo_url} size="w-16 h-16 text-xl" />
-                      <button
-                        type="button"
-                        onClick={() => clubLogoInputRef.current?.click()}
-                        disabled={uploadingLogo}
-                        aria-label={t(kk('gerirclube.change_logo_aria'))}
-                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
-                                   ring-2 ring-canvas hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
-                      >
-                        {uploadingLogo ? (
-                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <Camera size={14} />
-                        )}
-                      </button>
-                      <input
-                        ref={clubLogoInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoSelect}
-                        className="hidden"
-                      />
-                    </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                    <Link to={`/clube/${settings.slug}`} className="inline-flex min-h-[32px] items-center gap-1 rounded-full bg-surface px-3 text-xs font-extrabold text-ink-700">
+                      {t('cover.see_as_player')} <ChevronRight size={14} />
+                    </Link>
                     {settings.group_logo_url && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        disabled={uploadingLogo}
-                        className="text-danger text-sm font-extrabold hover:underline disabled:opacity-50"
-                      >
+                      <button type="button" onClick={handleRemoveLogo} disabled={uploadingLogo} className="text-xs font-extrabold text-muted underline-offset-2 hover:underline disabled:opacity-50">
                         {t('gerirclube.remove_logo_button')}
                       </button>
                     )}
                   </div>
-                  {logoError && (
-                    <p className="text-danger text-sm font-extrabold mt-2">{logoError}</p>
-                  )}
+                  {logoError && <p className="mt-2 text-sm font-extrabold text-danger">{logoError}</p>}
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.description_label')}
-                  </label>
-                  <textarea
-                    value={settings.description || ''}
-                    onChange={(e) => setSettings({ ...settings, description: e.target.value })}
-                    className="input-field resize-none"
-                    rows={4}
-                    placeholder={t(kk('gerirclube.description_placeholder'))}
-                  />
-                </div>
-
-                {/* Localização + contactos are club-only: ClubProfile.jsx hides
-                    them entirely for groups, so offering them here would let a
-                    group admin save data that's never displayed anywhere. */}
-                {org?.kind !== 'group' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.location_field_label')}
-                      </label>
-                      <input
-                        ref={clubLocationInputRef}
-                        type="text"
-                        value={settings.location || ''}
+              <form id="club-settings-form" onSubmit={handleUpdateSettings}>
+                <p className={SECTION_KICKER}>{t(isGroupOrg ? 'cover.section_about_group' : 'cover.section_about_club')}</p>
+                <div className={CARD_BOX}>
+                  <SettingsField label={t('gerirclube.description_label')}>
+                    <textarea value={settings.description || ''} rows={3}
+                      onChange={(e) => setSettings({ ...settings, description: e.target.value })}
+                      className={`${BARE_INPUT} resize-none`} placeholder={t(kk('gerirclube.description_placeholder'))} />
+                  </SettingsField>
+                  {/* Local + contactos só nos clubes: ClubProfile.jsx esconde-os
+                      nos grupos — guardar aqui seria guardar o que ninguém vê. */}
+                  {org?.kind !== 'group' && (
+                    <SettingsField label={t('gerirclube.location_field_label')}>
+                      <input ref={clubLocationInputRef} type="text" value={settings.location || ''}
                         // Ver a nota no campo equivalente do mix.
                         onChange={(e) => setSettings({ ...settings, location: e.target.value, latitude: null, longitude: null })}
-                        className="input-field"
-                        placeholder={t(kk('gerirclube.address_placeholder'))}
-                      />
+                        className={BARE_INPUT} placeholder={t(kk('gerirclube.address_placeholder'))} />
                       <PlacesUnavailableHint />
-                    </div>
-
-                    {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1). */}
-                    {settings.district !== undefined && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerirclube.district_label')}</label>
+                    </SettingsField>
+                  )}
+                  {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1). */}
+                  {org?.kind !== 'group' && settings.district !== undefined && (
+                    <SettingsField label={t('gerirclube.district_label')}>
+                      <div className="mt-1">
                         <Select value={settings.district || ''} onChange={(v) => setSettings({ ...settings, district: v })}
                           options={districtOptions(t('gerirclube.district_none'))} />
                       </div>
-                    )}
+                    </SettingsField>
+                  )}
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.phone_label')}
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.phone || ''}
-                          onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                          className="input-field"
-                          placeholder={t('gerirclube.phone_placeholder')}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.instagram_label')}
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.instagram || ''}
-                          onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
-                          className="input-field"
-                          placeholder={t(kk('gerirclube.instagram_placeholder'))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.website_label')}
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.website || ''}
-                          onChange={(e) => setSettings({ ...settings, website: e.target.value })}
-                          className="input-field"
-                          placeholder={t(kk('gerirclube.website_placeholder'))}
-                        />
-                      </div>
+                {org?.kind !== 'group' && (
+                  <>
+                    <p className={SECTION_KICKER}>{t('cover.section_contacts')}</p>
+                    <div className={CARD_BOX}>
+                      <SettingsField label={t('gerirclube.phone_label')}>
+                        <input type="tel" value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                          className={BARE_INPUT} placeholder={t('gerirclube.phone_placeholder')} />
+                      </SettingsField>
+                      <SettingsField label={t('gerirclube.instagram_label')}>
+                        <input type="text" value={settings.instagram || ''} onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
+                          className={BARE_INPUT} placeholder={t(kk('gerirclube.instagram_placeholder'))} />
+                      </SettingsField>
+                      <SettingsField label={t('gerirclube.website_label')}>
+                        <input type="text" value={settings.website || ''} onChange={(e) => setSettings({ ...settings, website: e.target.value })}
+                          className={BARE_INPUT} placeholder={t(kk('gerirclube.website_placeholder'))} />
+                      </SettingsField>
                     </div>
                   </>
                 )}
 
-                {/* Visibilidade (Trello #272). Dois interruptores, decisão do
-                    Francisco (16 set): ser encontrado na pesquisa não obriga a
-                    mostrar a agenda a desconhecidos. Agora também para grupos
-                    criados na Comunidade: cada grupo escolhe. `searchable` só
-                    existe depois de correr migration_searchable_orgs.sql. */}
-                <div className="pt-2 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                    {t('gerirclube.public_visibility_heading')}
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">
-                    {t(kk('gerirclube.public_visibility_description'))}
-                  </p>
+                {/* Visibilidade (Trello #272): ser encontrado na pesquisa não
+                    obriga a mostrar a agenda a desconhecidos (Francisco, 16 set).
+                    `searchable` só existe depois de migration_searchable_orgs.sql. */}
+                <p className={SECTION_KICKER}>{t('gerirclube.public_visibility_heading')}</p>
+                <div className={CARD_BOX}>
                   {settings.searchable !== undefined && (
-                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
-                      <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.searchable_label')}</p>
-                        <p className="text-[11px] text-muted">{t(kk('gerirclube.searchable_hint'))}</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={settings.searchable}
-                        onChange={(e) => setSettings({ ...settings, searchable: e.target.checked })}
-                        className="w-5 h-5 shrink-0"
-                      />
-                    </label>
+                    <SettingsSwitch label={t('gerirclube.searchable_label')} hint={t(kk('gerirclube.searchable_hint'))}
+                      checked={settings.searchable} onChange={(v) => setSettings({ ...settings, searchable: v })} />
                   )}
-                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
-                    <div>
-                      <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.public_club_label')}</p>
-                      <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.is_global}
-                      onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
-                      className="w-5 h-5 shrink-0"
-                    />
-                  </label>
+                  <SettingsSwitch label={t('gerirclube.public_club_label')} hint={t('gerirclube.appears_in_community_hint')}
+                    checked={settings.is_global} onChange={(v) => setSettings({ ...settings, is_global: v })} />
                   {(settings.is_global || settings.searchable) && (
-                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
-                      <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.open_join_label')}</p>
-                        <p className="text-[11px] text-muted">{t('gerirclube.open_join_hint')}</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={settings.open_join}
-                        onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
-                        className="w-5 h-5 shrink-0"
-                      />
-                    </label>
+                    <SettingsSwitch label={t('gerirclube.open_join_label')} hint={t('gerirclube.open_join_hint')}
+                      checked={settings.open_join} onChange={(v) => setSettings({ ...settings, open_join: v })} />
                   )}
                 </div>
+                <p className="mt-2 px-0.5 text-xs text-muted">{t(kk('gerirclube.public_visibility_description'))}</p>
 
-                {settingsError && <p role="alert" className="text-sm font-extrabold text-danger">{settingsError}</p>}
-                <button type="submit" className="btn-primary w-full">
-                  {t('gerirclube.save_settings_button')}
-                </button>
+                {settingsError && <p role="alert" className="mt-4 text-sm font-extrabold text-danger">{settingsError}</p>}
+                {settingsDirty > 0 && (
+                  <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+96px)] z-10 mt-4 flex items-center gap-2 rounded-card bg-ink-900 py-2.5 pl-4 pr-2.5 text-white shadow-lift animate-fade-in">
+                    <span className="min-w-0 flex-1 text-sm">{t('cover.unsaved', { count: settingsDirty })}</span>
+                    <button type="button" onClick={() => setSettings({ ...settingsBase })}
+                      className="min-h-[40px] shrink-0 rounded-ctrl px-3 text-sm font-extrabold text-white/70 hover:text-white">
+                      {t('cover.discard')}
+                    </button>
+                    <button type="submit" className="min-h-[40px] shrink-0 rounded-ctrl bg-lime-400 px-4 text-sm font-extrabold text-ink-900 hover:bg-lime-600">
+                      {t('cover.save')}
+                    </button>
+                  </div>
+                )}
               </form>
+
+              {coverOpen && (
+                <CoverSheet org={settings} onSave={handleSaveCover} onRemove={() => handleSaveCover({ url: null })} onClose={() => setCoverOpen(false)} />
+              )}
 
               {/* Plano — depois da identidade e de quem ve (ordem do desenho
                   de 23 set; antes vinha primeiro). O admin ve o que
