@@ -1,35 +1,45 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { BackBar } from '../components/ui'
+import { BackBar, StickyTop, Tabs } from '../components/ui'
 import { sharePageLink } from '../lib/shareImage'
-import { ArrowLeft, Award, Swords, ChevronDown, ChevronRight, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp, TrendingUp } from 'lucide-react'
+import { Award, ChevronRight, UserPlus, UserCheck, Clock, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, ConfirmSheet } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
-import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
+import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import XpShield from '../components/XpShield'
 import { winRatePct } from '../lib/statsLogic'
 import { followPlayer, removeFollow } from '../lib/follows'
 import { getGlobalRankings, getPublicRankings } from '../lib/privateMatches'
-import { positionOf, scaleOf } from '../lib/rankingScales'
-import { formatDate } from '../lib/formatDate'
+import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import { describeError } from '../lib/errors'
+import StatsPreviewCard from '../components/profile/StatsPreviewCard'
+import PlayedHistory, { usePlayedHistory } from '../components/profile/PlayedHistory'
+
+const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
+const AchievementViewer = lazy(() => import('../components/achievements/AchievementViewer'))
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
-// Mesmas chaves que o Profile.jsx usa, para o genero ler igual nos dois
-// perfis (Trello #202).
-const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
 const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
+const TABS = [
+  { key: 'perfil', labelKey: 'profile.tab_profile' },
+  { key: 'jogos', labelKey: 'profile.tab_history' },
+]
+const CARD = 'rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
+const KICKER = 'mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
 
-// Aggregated across every club the player belongs to (not scoped to the
-// viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
-// — this page works for any player in the app, not just someone who
-// shares a club with the viewer.
+/* R13 · Perfil de outra pessoa (design-handoff/2026-10-13-redesign/R13, com a
+   atualização de 17 out: igual ao teu Perfil). Topo com a barra de vidro, o
+   mesmo cartão branco do Perfil, «Seguir» a toda a largura, os separadores
+   Perfil · Jogos presos ao descer. No Perfil: «Tu vs.» em destaque, o ranking,
+   as Estatísticas, o XP, as conquistas, «Sobre» e os clubes. As regras de
+   privacidade são as de sempre (get_player_profile) e o «Tu vs.» vê-se
+   sempre (10 out). Funciona para qualquer jogador da app, não só do teu clube. */
 export default function PlayerDetails() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
@@ -39,82 +49,68 @@ export default function PlayerDetails() {
   const [loading, setLoading] = useState(true)
   const [friendActing, setFriendActing] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
+  const [tab, setTab] = useState('perfil')
   // A moldura do pódio do mês (#626): aparece como a foto, mesmo num perfil privado.
   const frameList = useFrameList(id)
   const myFrame = frameList[0]?.frame || null
-  const [followListTab, setFollowListTab] = useState(null) // null = closed, else 'followers'|'following'
+  const [followListTab, setFollowListTab] = useState(null)
 
   const [h2h, setH2h] = useState(null)
-  const [h2hLoading, setH2hLoading] = useState(true)
-  const [expanded, setExpanded] = useState(false)
   const [h2hMatches, setH2hMatches] = useState([])
-  const [matchesLoading, setMatchesLoading] = useState(false)
-
-  const [matchHistory, setMatchHistory] = useState([])
-  const [matchHistoryLoading, setMatchHistoryLoading] = useState(true)
-  const [expandedMixes, setExpandedMixes] = useState(new Set())
-  const [globalRank, setGlobalRank] = useState(null)
+  const [h2hAll, setH2hAll] = useState(false)
+  const [rankInfo, setRankInfo] = useState(null)
   const [globalEntry, setGlobalEntry] = useState(null)
   const [playerXp, setPlayerXp] = useState(null)
   const [playerTrophies, setPlayerTrophies] = useState([])
-  // Nacionalidade e genero do jogador visitado (Trello #191/#202). RPC
-  // dedicado, pelo mesmo motivo do get_player_xp logo abaixo.
+  const [trophyCatalog, setTrophyCatalog] = useState([])
+  const [trophiesExpanded, setTrophiesExpanded] = useState(false)
+  const [trophyOpen, setTrophyOpen] = useState(null)
   const [playerExtras, setPlayerExtras] = useState(null)
 
-  const toggleMix = (gameId) => {
-    setExpandedMixes((prev) => {
-      const next = new Set(prev)
-      if (next.has(gameId)) next.delete(gameId)
-      else next.add(gameId)
-      return next
-    })
-  }
+  // «Jogos» só carrega da primeira vez que se abre.
+  const [playedOn, setPlayedOn] = useState(false)
+  useEffect(() => { if (tab === 'jogos') setPlayedOn(true) }, [tab])
+  const played = usePlayedHistory({ query: '', kind: null, enabled: playedOn, userId: id })
 
   useEffect(() => {
+    setTab('perfil')
+    setPlayedOn(false)
+    setH2hAll(false)
+    setTrophiesExpanded(false)
     loadPlayer()
     loadH2h()
-    loadMatchHistory()
     loadGlobalRank()
     loadXp()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // RPC dedicado em vez de estender get_player_profile (7 versões no repo)
-  // — o escudo de assiduidade é público por design.
+  // RPCs dedicados (o escudo de assiduidade é público por design).
   const loadXp = async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_player_xp', { p_user_id: id })
-      if (error) throw error
-      setPlayerXp(data?.[0] || null)
-    } catch (error) {
-      console.error('Error loading player xp:', error)
-    }
-    try {
-      const { data, error } = await supabase.rpc('get_player_achievements', { p_user_id: id })
-      if (error) throw error
-      setPlayerTrophies(data || [])
-    } catch (error) {
-      console.error('Error loading player trophies:', error)
-    }
-    try {
-      const { data, error } = await supabase.rpc('get_player_public_extras', { p_user_id: id })
-      if (error) throw error
-      setPlayerExtras(data?.[0] || null)
-    } catch (error) {
-      // Fail-soft: sem migração, a estante não aparece.
-      console.error('Error loading player trophies:', error)
-    }
+    const [xp, trophies, catalog, extras] = await Promise.all([
+      supabase.rpc('get_player_xp', { p_user_id: id }),
+      supabase.rpc('get_player_achievements', { p_user_id: id }),
+      supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
+      supabase.rpc('get_player_public_extras', { p_user_id: id }),
+    ])
+    if (xp.error) console.error('Error loading player xp:', xp.error)
+    else setPlayerXp(xp.data?.[0] || null)
+    // Fail-soft: sem migração, a estante não aparece.
+    if (!trophies.error) setPlayerTrophies(trophies.data || [])
+    if (!catalog.error) setTrophyCatalog(catalog.data || [])
+    if (!extras.error) setPlayerExtras(extras.data?.[0] || null)
   }
 
   const loadGlobalRank = async () => {
     try {
-      // O nível e o progresso vêm da lista de toda a gente (também de uma
-      // conta de teste que se esteja a ver); o lugar vem da lista que se
-      // mostra e pelas regras da página do ranking — só Masculino e
-      // Feminino, só depois do primeiro jogo (Trello #422).
+      // O nível vem da lista de toda a gente; o lugar, da lista que se mostra
+      // e pelas regras da página do ranking (Trello #422).
       const [rankings, visible] = await Promise.all([getGlobalRankings(), getPublicRankings()])
-      const index = rankings.findIndex((p) => p.user_id === id)
-      setGlobalRank(positionOf(visible.map((p) => ({ ...p, ranked: p.rating != null })), id))
-      setGlobalEntry(index === -1 ? null : rankings[index])
+      const entry = rankings.find((p) => p.user_id === id) || null
+      setGlobalEntry(entry)
+      const rows = visible.map((p) => ({ ...p, ranked: p.rating != null }))
+      const position = positionOf(rows, id)
+      const scale = scaleOf(entry?.gender)
+      setRankInfo(position ? { position, total: rankedCount(rows, scale), scale } : null)
     } catch (error) {
       console.error('Error loading global rank:', error)
     }
@@ -133,9 +129,6 @@ export default function PlayerDetails() {
     }
   }
 
-  // Patches local state instead of calling loadPlayer() — that sets
-  // loading=true, which the top-level render guard turns into replacing
-  // the whole page with a spinner just to flip one button.
   // Janelas do navegador → peças da app (parte 2, 2 out).
   const [followError, setFollowError] = useState('')
   const [askUnfollow, setAskUnfollow] = useState(false)
@@ -157,9 +150,8 @@ export default function PlayerDetails() {
     }
   }
 
-  // Covers both unfollowing an accepted follow and cancelling your own
-  // pending request — same row (player.follow_request_id) either way,
-  // see get_player_profile's doc comment on that column.
+  // Deixar de seguir e cancelar o pedido usam a mesma linha
+  // (player.follow_request_id).
   const handleRemoveFollow = async () => {
     setFollowError('')
     setFriendActing(true)
@@ -179,54 +171,20 @@ export default function PlayerDetails() {
     }
   }
 
+  // «Tu vs.»: o resumo e os jogos de uma vez — o cartão mostra os 2 últimos.
   const loadH2h = async () => {
-    setH2hLoading(true)
-    setExpanded(false)
+    setH2h(null)
     setH2hMatches([])
-    try {
-      const { data, error } = await supabase.rpc('get_head_to_head_summary', { p_opponent_id: id })
-      if (error) throw error
-      setH2h(data?.[0] || { wins: 0, losses: 0, matches_played: 0 })
-    } catch (error) {
-      console.error('Error loading head-to-head:', error)
-    } finally {
-      setH2hLoading(false)
-    }
+    const [sum, list] = await Promise.all([
+      supabase.rpc('get_head_to_head_summary', { p_opponent_id: id }),
+      supabase.rpc('get_head_to_head_matches', { p_opponent_id: id }),
+    ])
+    if (sum.error) console.error('Error loading head-to-head:', sum.error)
+    setH2h(sum.error ? { wins: 0, losses: 0, matches_played: 0 } : (sum.data?.[0] || { wins: 0, losses: 0, matches_played: 0 }))
+    if (!list.error) setH2hMatches([...(list.data || [])].sort((a, b) => (a.match_date < b.match_date ? 1 : -1)))
   }
 
-  const toggleExpanded = async () => {
-    if (expanded) {
-      setExpanded(false)
-      return
-    }
-    setExpanded(true)
-    setMatchesLoading(true)
-    try {
-      const { data, error } = await supabase.rpc('get_head_to_head_matches', { p_opponent_id: id })
-      if (error) throw error
-      setH2hMatches(data || [])
-    } catch (error) {
-      console.error('Error loading match history:', error)
-    } finally {
-      setMatchesLoading(false)
-    }
-  }
-
-  const loadMatchHistory = async () => {
-    setMatchHistoryLoading(true)
-    try {
-      const { data, error } = await supabase.rpc('get_player_match_history', { p_user_id: id })
-      if (error) throw error
-      setMatchHistory(data || [])
-    } catch (error) {
-      console.error('Error loading match history:', error)
-    } finally {
-      setMatchHistoryLoading(false)
-    }
-  }
-
-  const formatMatchDate = (dateString) =>
-    formatDate(dateString, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' })
+  const dayMonth = (d) => { const x = new Date(`${String(d).slice(0, 10)}T12:00:00`); return `${x.getDate()}${i18n.language?.startsWith('en') ? '' : ' de'} ${x.toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT', { month: 'long' })}` }
 
   if (loading) {
     return (
@@ -252,123 +210,149 @@ export default function PlayerDetails() {
     )
   }
 
-  // total_points is only ever null when results_visibility hid the whole
-  // section for this viewer (a player with genuinely zero games returns 0,
-  // never null) — game_wins/losses etc. are nulled the same way, together.
+  // total_points só é null quando results_visibility escondeu a secção a
+  // quem vê (com zero jogos vem 0) — vitórias e títulos vêm a null juntos.
   const resultsHidden = player.total_points === null
-  // activity/clubs are never nulled for the owner, so this only ever fires
-  // for someone else's profile — matches the same can_view_section rule
-  // the backend enforces (public always visible; friends only if the
-  // backend's own is_mutual_follow says true; private never).
+  // Atividade e clubes: a mesma regra can_view_section da base (público
+  // sempre; amigos só com seguir mútuo; privado nunca).
   const isHidden = (visibility) =>
     !player.my_profile && (visibility === 'private' || (visibility === 'friends' && !player.is_mutual_follow))
   const activityHidden = isHidden(player.activity_visibility)
   const clubsHidden = isHidden(player.clubs_visibility)
-  const played = (player.game_wins || 0) + (player.game_losses || 0)
-  const winRate = winRatePct(player.game_wins || 0, played)
+  const gamesPlayed = (player.game_wins || 0) + (player.game_losses || 0)
+  const winRate = winRatePct(player.game_wins || 0, gamesPlayed)
+  const firstName = String(player.name || '').split(/\s+/)[0]
+  const gender = playerExtras?.gender ?? globalEntry?.gender
+  const rating = globalEntry?.rating
 
+  // O «Sobre»: só o que está preenchido; o lado aparece sempre.
+  const about = [
+    [t('profile.preferred_side_label'), t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both)],
+    HAND_LABEL_KEY[playerExtras?.dominant_hand] && [t('profile.dominant_hand_label'), t(HAND_LABEL_KEY[playerExtras.dominant_hand])],
+    AGE_LABEL_KEY[playerExtras?.age_category] && [t('playerdetails.age_category_label'), t(AGE_LABEL_KEY[playerExtras.age_category])],
+    playerExtras?.nationality && [t('profile.nationality_label'), countryName(playerExtras.nationality, i18n.language)],
+  ].filter(Boolean)
 
-  // A mix with several rounds ("todos contra todos") returns one row per
-  // round, all sharing the same game_id — grouped here into one
-  // collapsible card instead of repeating the mix's title/date per round.
-  // Private matches (game_id null) are already a single match each, so
-  // they stay as their own flat, non-collapsible entries.
-  const matchGroups = []
-  const mixGroupByGameId = new Map()
-  for (const m of matchHistory) {
-    if (m.game_id) {
-      let group = mixGroupByGameId.get(m.game_id)
-      if (!group) {
-        group = { type: 'mix', game_id: m.game_id, label: m.label, date: m.match_date, matches: [] }
-        mixGroupByGameId.set(m.game_id, group)
-        matchGroups.push(group)
-      }
-      group.matches.push(m)
-    } else {
-      matchGroups.push({ type: 'private', match: m })
-    }
-  }
+  const followButton = !player.my_profile && (
+    player.follow_status === 'following' ? (
+      <button type="button" onClick={() => { setFollowError(''); setAskUnfollow(true) }} disabled={friendActing}
+        className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-ink-200 bg-white font-extrabold text-ink-900 disabled:opacity-40">
+        <UserCheck size={17} /> {t('playerdetails.following_button')}
+      </button>
+    ) : player.follow_status === 'pending' ? (
+      <button type="button" onClick={() => handleRemoveFollow()} disabled={friendActing}
+        className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-ink-200 bg-white font-extrabold text-muted disabled:opacity-40">
+        <Clock size={17} /> {t('playerdetails.requested_button')}
+      </button>
+    ) : (
+      <button type="button" onClick={handleFollow} disabled={friendActing}
+        className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-ctrl bg-lime-400 font-extrabold text-ink-900 disabled:opacity-40">
+        <UserPlus size={17} /> {t('playerdetails.follow_button')}
+      </button>
+    )
+  )
+
+  // «Tu vs. <nome>»: o cartão preto. h2h.wins/losses são sempre os de quem vê.
+  const h2hCard = h2h && (
+    <div className="overflow-hidden rounded-card bg-ink-900 px-4 pt-3.5 pb-1 text-white">
+      <div className="flex items-center justify-between font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white/60">
+        <span className="min-w-0 truncate">{t('playerdetails.you_vs', { name: firstName })}</span>
+        {h2h.matches_played > 0 && <span className="shrink-0">{t('playerdetails.r13_games', { count: h2h.matches_played })}</span>}
+      </div>
+      {h2h.matches_played === 0 ? (
+        <p className="py-4 text-sm text-white/75">{t('playerdetails.r13_no_h2h')}</p>
+      ) : (
+        <>
+          <div className="flex items-start justify-center gap-6 py-3 text-center">
+            <div>
+              <p className="font-display text-[40px] font-black leading-none text-lime-400 tabular-nums">{h2h.wins}</p>
+              <p className="mt-1 text-[13px] text-white/80">{t('playerdetails.r13_you_won')}</p>
+            </div>
+            <span className="pt-4 text-white/40">–</span>
+            <div>
+              <p className="font-display text-[40px] font-black leading-none tabular-nums">{h2h.losses}</p>
+              <p className="mt-1 text-[13px] text-white/80">{t('playerdetails.r13_they_won', { name: firstName })}</p>
+            </div>
+          </div>
+          {(h2hAll ? h2hMatches : h2hMatches.slice(0, 2)).map((m) => (
+            <div key={m.match_id} className="flex items-center gap-3 border-t border-white/10 py-3">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-extrabold">{m.label}</span>
+                <span className="block text-[12px] text-white/60">{dayMonth(m.match_date)}</span>
+              </span>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-extrabold ${m.won ? 'bg-lime-400 text-ink-900' : 'bg-white/15 text-white'}`}>
+                {t(m.won ? 'playerdetails.r13_pill_won' : 'playerdetails.r13_pill_lost', { score: `${m.player_score}-${m.opponent_score}` })}
+              </span>
+            </div>
+          ))}
+          {h2hMatches.length > 2 && (
+            <button type="button" onClick={() => setH2hAll((v) => !v)}
+              className="w-full border-t border-white/10 py-3 text-center text-[14px] font-extrabold text-lime-400">
+              {h2hAll ? t('achievements.collapse') : `${t('playerdetails.r13_see_games', { count: Math.max(h2h.matches_played, h2hMatches.length) })} ›`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+
+  const privateBox = (
+    <div className="rounded-card border-[1.5px] border-dashed border-line px-4 py-3.5 text-sm text-muted">
+      🔒 {t('playerdetails.r13_private', { name: firstName })}
+    </div>
+  )
 
   return (
     <div className="space-y-4">
-      <BackBar onBack={goBack} label={t('playerdetails.back')} title={player?.name}
-        onShare={player ? () => sharePageLink({ title: player.name, url: window.location.href }) : undefined} />
+      <BackBar onBack={goBack} label={t('playerdetails.back')} title={player.name}
+        onShare={() => sharePageLink({ title: player.name, url: window.location.href })} />
 
-      {/* Hero — cartão claro, mesmo tratamento do cabeçalho do perfil
-          próprio (Profile.jsx, 11 set 2026): aro de progresso à volta da
-          foto em vez da barra horizontal, crachá do nível no topo do aro,
-          pontos + "quanto falta para o próximo nível" em texto ao lado do
-          nome. Sem cartões de Registar jogo/Ranking global aqui — são
-          ações pessoais, não fazem sentido no perfil de outra pessoa; o
-          nº do ranking global entra na mesma linha de texto em vez disso. */}
-      <div className="card">
+      {/* O mesmo cartão branco do teu Perfil (R7): foto com moldura, aro ou
+          escudo, nome, nível e pontos, seguidores e os três números. */}
+      <div className="rounded-card border border-line bg-white p-4 shadow-card">
         <div className="flex items-start gap-4">
-          {/* Aro + foto + crachá — o botão de Seguir vive agora na linha
-              de baixo, ao lado do ranking global, para os dois ficarem
-              alinhados (pedido do Francisco, 11 set 2026) em vez de
-              dependerem de margens adivinhadas para bater certo. */}
-          <div className="shrink-0">
-            {(() => {
-              const bp = !resultsHidden ? bandProgress(globalEntry?.rating) : null
-              const pct = bp?.pct ?? 0
-              const r = 35
-              const circumference = 2 * Math.PI * r
-              return (
-                <div className={`relative w-20 h-20 shrink-0 ${myFrame ? 'mt-5 mb-3' : ''}`}>
-                  <FrameAround frame={myFrame} photo={64} left={8} top={8} />
-                  {!myFrame && <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
-                    <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
-                    <circle
-                      cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
-                      className="stroke-lime-400"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={circumference * (1 - pct / 100)}
-                    />
-                  </svg>}
-                  <button
-                    type="button"
-                    onClick={() => player.avatar_url && setShowPhoto(true)}
-                    aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
-                    className="absolute inset-2 block"
-                  >
-                    <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
-                  </button>
-                  {/* O escudo do nível de XP no canto da foto, se o nível for visível (16 out). */}
-                  {playerXp && tierFromXp(playerXp.xp) && (
-                    <XpShield tierKey={tierFromXp(playerXp.xp).key} size={30} className="absolute -bottom-1 -right-1 z-10" />
-                  )}
-                  {!resultsHidden && !myFrame && globalEntry?.rating != null && (
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
-                      <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
-                    </span>
-                  )}
-                </div>
-              )
-            })()}
-          </div>
-          {showPhoto && (
-            <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
-          )}
-          {followListTab && (
-            <FollowListModal userId={player.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} />
-          )}
+          {(() => {
+            const bp = !resultsHidden ? bandProgress(rating) : null
+            const pct = bp?.pct ?? 0
+            const r = 35
+            const circumference = 2 * Math.PI * r
+            return (
+              <div className={`relative w-20 h-20 shrink-0 ${myFrame ? 'mt-5 mb-3' : ''}`}>
+                <FrameAround frame={myFrame} photo={64} left={8} top={8} />
+                {!myFrame && <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
+                  <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
+                  <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round" className="stroke-lime-400"
+                    strokeDasharray={circumference} strokeDashoffset={circumference * (1 - pct / 100)} />
+                </svg>}
+                <button type="button" onClick={() => player.avatar_url && setShowPhoto(true)}
+                  aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined} className="absolute inset-2 block">
+                  <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
+                </button>
+                {/* O escudo do nível de XP no canto da foto (16 out). */}
+                {playerXp && tierFromXp(playerXp.xp) && (
+                  <XpShield tierKey={tierFromXp(playerXp.xp).key} size={30} className="absolute -bottom-1 -right-1 z-10" />
+                )}
+                {!resultsHidden && !myFrame && rating != null && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <RatingBadge rating={rating} gender={gender} />
+                  </span>
+                )}
+              </div>
+            )
+          })()}
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
             <FrameTitle list={frameList} mine={false} />
-            {/* Pontos em destaque, igual ao Perfil próprio (11 set 2026) —
-                antes ia tudo espremido numa linha pequena só; agora os
-                pontos ganham o mesmo peso visual, com o resto (próximo
-                nível, ranking) em linhas próprias por baixo. */}
             {!resultsHidden && globalEntry && (() => {
-              const bp = bandProgress(globalEntry?.rating)
-              const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, playerExtras?.gender ?? globalEntry?.gender)?.label : null
-              const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(globalEntry?.rating ?? 0)) : null
+              const bp = bandProgress(rating)
+              const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, gender)?.label : null
+              const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(rating ?? 0)) : null
               return (
                 <>
                   <div className="mt-0.5 flex items-center gap-2">
-                    {myFrame && globalEntry?.rating != null && <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />}
+                    {myFrame && rating != null && <RatingBadge rating={rating} gender={gender} />}
                     <span className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">
-                      {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)}
+                      {formatRatingMaybeProvisional(rating, globalEntry?.rating_games)}
                     </span>
                     <span className="text-xs font-extrabold text-muted">{t('profile.card_points_word')}</span>
                   </div>
@@ -380,12 +364,7 @@ export default function PlayerDetails() {
                 </>
               )
             })()}
-            {/* Seguidores/A seguir — junto ao nome, igual ao Perfil próprio.
-                Profile.jsx subiu esta linha para aqui a pedido do Renato
-                (11 set 2026: a secção própria lá em baixo era "muita poluição
-                visual"); este ecrã tinha ficado com a versão antiga (Francisco,
-                15 set 2026). Fora do bloco dos pontos de propósito: os
-                seguidores mostram-se mesmo quando os resultados estão ocultos. */}
+            {/* Os seguidores mostram-se mesmo com os resultados escondidos. */}
             <div className="mt-1 flex items-center gap-2 text-[11px]">
               <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
                 {t('playerdetails.followers_count', { count: player.followers_count })}
@@ -398,382 +377,198 @@ export default function PlayerDetails() {
           </div>
         </div>
 
-        {/* Seguir + ranking global, lado a lado — mesma linha flex garante
-            que ficam alinhados um com o outro sem depender de margens
-            adivinhadas (pedido do Francisco, 11 set 2026). */}
-        {(!player.my_profile || globalRank) && (
-          <div className="mt-3 flex items-center gap-3">
-            {!player.my_profile && (
-              player.follow_status === 'following' ? (
-                <button
-                  onClick={() => { setFollowError(''); setAskUnfollow(true) }}
-                  disabled={friendActing}
-                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full border border-line bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
-                >
-                  <UserCheck size={14} /> {t('playerdetails.following_button')}
-                </button>
-              ) : player.follow_status === 'pending' ? (
-                <button
-                  onClick={() => handleRemoveFollow()}
-                  disabled={friendActing}
-                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full border border-line bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
-                >
-                  <Clock size={14} /> {t('playerdetails.requested_button')}
-                </button>
-              ) : (
-                <button
-                  onClick={handleFollow}
-                  disabled={friendActing}
-                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
-                >
-                  <UserPlus size={14} /> {t('playerdetails.follow_button')}
-                </button>
-              )
-            )}
-            {!resultsHidden && globalRank && (
-              <p className="text-xs text-muted tabular-nums">
-                {t('profile.card_global_ranking')} #{globalRank} · {t(`rankings.scale_${scaleOf(playerExtras?.gender ?? globalEntry?.gender)}`)}
-              </p>
-            )}
-          </div>
-        )}
-        {followError && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{followError}</p>}
-        <ConfirmSheet open={askUnfollow} title={t('playerdetails.unfollow_confirm', { name: player.name })}
-          cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
-          onConfirm={() => handleRemoveFollow()} onClose={() => setAskUnfollow(false)} />
-
         {!resultsHidden && (
           <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
             <div className="px-1">
-              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{player.game_wins || 0}/{played}</p>
-              <p className="mt-1 text-[11px] text-muted">{t('profile.stat_game_wins')}</p>
+              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{gamesPlayed}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.r7_games')}</p>
             </div>
             <div className="px-1">
               <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{winRate}%</p>
-              <p className="mt-1 text-[11px] text-muted">{t('profile.card_winrate')}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.r7_wins')}</p>
             </div>
             <div className="px-1">
               <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{player.mix_wins || 0}</p>
-              <p className="mt-1 text-[11px] text-muted">{t('profile.card_titles')}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.r7_titles')}</p>
             </div>
           </div>
         )}
-
       </div>
 
-      {/* Estatísticas da evolução do ranking (Francisco, 16 out): só quando
-          os resultados estão visíveis — escondidos, a página só mostrava o
-          cadeado, não vale a pena o desvio. */}
-      {!resultsHidden && (
-        <Link to={`/jogador/${id}/estatisticas`} state={{ name: player.name }}
-          className="press card flex items-center gap-3 !py-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl bg-surface">
-            <TrendingUp size={18} className="text-ink-700" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>
-            <span className="block truncate text-xs text-muted">{t('playerstats.card_hint_other')}</span>
-          </span>
-          <ChevronRight size={18} className="shrink-0 text-ink-500" />
-        </Link>
-      )}
+      {showPhoto && <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />}
+      {followListTab && <FollowListModal userId={player.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} />}
 
-      {/* Sobre — lado preferido, país, género. Antes vivia no cabeçalho;
-          saiu de lá para bater certo com o cabeçalho limpo do Perfil
-          próprio (só nome + pontos). Não gated por results_visibility nem
-          activity_visibility — lado preferido nunca foi um resultado, e
-          saber isso é o motivo principal de visitar o perfil de alguém
-          antes de o convidar (decisão original, 9 set 2026, mantida).
-          Sempre visível (sem condição no card): lado preferido tem sempre
-          um valor a mostrar, com fallback "Ambos" — gatear o card inteiro
-          por ele fazia-o desaparecer por completo nos perfis sem
-          nacionalidade/género/escalão preenchidos, perdendo precisamente
-          o campo que motivou o card existir (achado de code review, 14
-          set 2026). */}
-      <div className="card">
-        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.about_heading')}</h3>
-        <div className="space-y-3">
-          <div>
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.preferred_side_label')}</p>
-            <p className="text-base text-ink-900 mt-0.5">
-              {t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both)}
-            </p>
-          </div>
-          {/* Só aparece se a pessoa a indicou (e a migração já correu). */}
-          {HAND_LABEL_KEY[playerExtras?.dominant_hand] && (
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.dominant_hand_label')}</p>
-              <p className="text-base text-ink-900 mt-0.5">{t(HAND_LABEL_KEY[playerExtras.dominant_hand])}</p>
-            </div>
-          )}
-          {playerExtras?.nationality && (
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.nationality_label')}</p>
-              <p className="text-base text-ink-900 mt-0.5">{countryName(playerExtras.nationality, i18n.language)}</p>
-            </div>
-          )}
-          {GENDER_LABEL_KEY[playerExtras?.gender] && (
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.gender_label')}</p>
-              <p className="text-base text-ink-900 mt-0.5">{t(GENDER_LABEL_KEY[playerExtras.gender])}</p>
-            </div>
-          )}
-          {AGE_LABEL_KEY[playerExtras?.age_category] && (
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('playerdetails.age_category_label')}</p>
-              <p className="text-base text-ink-900 mt-0.5">{t(AGE_LABEL_KEY[playerExtras.age_category])}</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* «Seguir» sozinho, a toda a largura (R13, 17 out). */}
+      {followButton}
+      {followError && <p role="alert" className="text-xs font-extrabold text-danger">{followError}</p>}
+      <ConfirmSheet open={askUnfollow} title={t('playerdetails.unfollow_confirm', { name: player.name })}
+        cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
+        onConfirm={() => handleRemoveFollow()} onClose={() => setAskUnfollow(false)} />
 
-      {/* XP DE ATIVIDADE — painel claro separado (público, como o tab
-          Assiduidade). */}
-      {playerXp && (() => {
-        const tier = tierFromXp(playerXp.xp)
-        const progress = tier ?? preTierProgress(playerXp.xp)
-        return (
-          <div className="rounded-ctrl bg-ink-50 border border-line p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
-                {t('profile.card_xp_heading')}
-              </p>
-              {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
-                  XP e são envolvimento, não resultado. */}
-              {(playerXp.kudos ?? 0) > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-700 tabular-nums">
-                  <ThumbsUp size={11} className="text-lime-600" /> {playerXp.kudos} {t('profile.stat_kudos')}
+      <StickyTop>
+        <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
+      </StickyTop>
+
+      {tab === 'perfil' && (
+        <>
+          {h2hCard}
+          {resultsHidden && privateBox}
+
+          {/* O ranking numa linha branca: o lima é do «Seguir». */}
+          {!resultsHidden && (
+            <Link to="/rankings" state={{ tab: 'global' }} className={`press flex items-center gap-3 px-3.5 py-3 text-ink-900 ${CARD}`}>
+              <span className="flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-ctrl bg-ink-900 px-1.5 font-display text-base font-extrabold text-lime-400 tabular-nums">
+                {rankInfo ? `${rankInfo.position}.º` : '—'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-extrabold leading-tight">{t('rankings.title_global')}</span>
+                <span className="block truncate text-xs text-muted">
+                  {rankInfo
+                    ? [t('profile.r7_rank_line', { position: rankInfo.position, total: rankInfo.total }), t(`rankings.scale_${rankInfo.scale}`)].join(' · ')
+                    : t('playerdetails.r13_no_rank')}
                 </span>
-              )}
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
-              <span className="flex items-center gap-1.5">
-                {tier && <XpShield tierKey={tier.key} size={20} />}
-                {tier
-                  ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
-                  : t('profile.xp_no_shield')}
               </span>
-              <span className="tabular-nums text-muted">{formatXp(playerXp.xp)} XP</span>
-            </div>
-            <div className="mt-1.5 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
-              <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
-            </div>
-          </div>
-        )
-      })()}
+              <ChevronRight size={18} className="shrink-0" />
+            </Link>
+          )}
 
-      {/* Aviso de resultados privados — o cartão do hero esconde as
-          secções de ranking, isto explica porquê. */}
-      {resultsHidden && (
-        <div className="card text-center py-6 text-muted">
-          <Lock size={18} className="mx-auto mb-1.5" />
-          <p className="text-sm">{t('playerdetails.results_private')}</p>
-        </div>
-      )}
+          {/* As Estatísticas do Renato, com o id desta pessoa. */}
+          {!resultsHidden && <StatsPreviewCard userId={id} to={`/jogador/${id}/estatisticas`} hint="playerstats.card_hint_other" />}
 
-      {/* Estante de troféus — só os ganhos, com a mesma gate de
-          privacidade das stats (resultsHidden). */}
-      {!resultsHidden && playerTrophies.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg text-ink-900 mb-3 flex items-center gap-2">
-            <Award size={20} className="text-lime-600" /> {t('achievements.shelf_title')}
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {playerTrophies.map((tr) => (
-              <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Clubes & Grupos */}
-      <div>
-        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.clubs_groups_heading')}</h3>
-        {clubsHidden ? (
-          <div className="card text-center py-6 text-muted">
-            <Lock size={18} className="mx-auto mb-1.5" />
-            <p className="text-sm">{t('playerdetails.clubs_private')}</p>
-          </div>
-        ) : !player.clubs || player.clubs.length === 0 ? (
-          <EmptyState
-            icon={ShieldCheck}
-            pose={null}
-            title={t('playerdetails.no_clubs_title')}
-            subtitle={t('playerdetails.no_clubs_subtitle')}
-          />
-        ) : (
-          <div className="space-y-3">
-            {player.clubs.map((c) => (
-              <Link key={c.id} to={`/clube/${c.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
-                <Avatar name={c.name} size="w-10 h-10 text-sm" />
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-extrabold text-ink-900 truncate">{c.name}</h4>
-                  {c.kind === 'group' && <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700">{t('playerdetails.group_badge')}</p>}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Confrontos diretos — this page now always targets one specific
-          player, so it's a single row (this player vs the viewer) that
-          expands to the combined mix + private-match list, instead of a
-          list of every opponent the viewer has ever faced. */}
-      <div>
-        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.head_to_head')}</h3>
-
-        {/* Os confrontos diretos veem-se sempre: são os MEUS jogos contra esta
-            pessoa, mesmo com a atividade dela só para amigos (Francisco,
-            10 out; migration_confrontos_diretos_sempre.sql, Dev 3). O
-            cadeado fica só no resto da atividade. */}
-        {h2hLoading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : !h2h || h2h.matches_played === 0 ? (
-          <EmptyState
-            icon={Swords}
-            pose={null}
-            title={t('playerdetails.no_h2h_title')}
-            subtitle={t('playerdetails.no_h2h_subtitle')}
-          />
-        ) : (
-          <div className="card p-0 overflow-hidden">
-            <button
-              onClick={toggleExpanded}
-              aria-expanded={expanded}
-              className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
-            >
-              <Avatar name={player.name} url={player.avatar_url} size="w-9 h-9 text-sm" />
-              {/* h2h.wins/losses is always the viewer's own record (the RPC
-                  compares auth.uid() vs this player) — labelling the row with
-                  just this player's name made it read as his record against
-                  himself instead of the viewer's record against him. */}
-              <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">{t('playerdetails.you_vs', { name: player.name })}</p>
-              <span className="text-sm font-extrabold tabular-nums shrink-0">
-                <span className="text-ok">{h2h.wins}{t('playerdetails.win_abbr')}</span>
-                <span className="text-muted"> – </span>
-                <span className="text-danger">{h2h.losses}{t('playerdetails.loss_abbr')}</span>
-              </span>
-              <ChevronDown
-                size={20}
-                className={`text-muted transition-transform duration-base shrink-0 ${expanded ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {expanded && (
-              <div className="border-t border-line divide-y divide-line animate-fade-up">
-                {matchesLoading ? (
-                  <p className="text-muted text-sm text-center py-4">{t('common.loading')}</p>
-                ) : (
-                  h2hMatches.map(m => (
-                    <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-ink-900 text-sm truncate">{m.label}</p>
-                        <p className="text-[11px] text-muted">{formatMatchDate(m.match_date)}</p>
-                      </div>
-                      <span className="text-base font-extrabold tabular-nums shrink-0">
-                        {m.player_score}–{m.opponent_score}
-                      </span>
-                      <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
-                        m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
-                      }`}>
-                        {m.won ? t('playerdetails.win_abbr') : t('playerdetails.loss_abbr')}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Histórico de jogos — this player's own matches (mixes + confirmed
-          private matches), independent of who's viewing. */}
-      <div>
-        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.match_history')}</h3>
-
-        {matchHistoryLoading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : activityHidden ? (
-          <div className="card text-center py-6 text-muted">
-            <Lock size={18} className="mx-auto mb-1.5" />
-            <p className="text-sm">{t('playerdetails.activity_private')}</p>
-          </div>
-        ) : matchHistory.length === 0 ? (
-          <EmptyState
-            icon={Swords}
-            pose={null}
-            title={t('playerdetails.no_matches_title')}
-            subtitle={t('playerdetails.no_matches_subtitle')}
-          />
-        ) : (
-          <div className="space-y-3">
-            {matchGroups.map((group) =>
-              group.type === 'private' ? (
-                <div key={group.match.match_id} className="card flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-extrabold text-ink-900 text-sm truncate">{group.match.label}</p>
-                    <p className="text-[11px] text-muted">{formatMatchDate(group.match.match_date)}</p>
-                  </div>
-                  <span className="text-base font-extrabold tabular-nums shrink-0">
-                    {group.match.player_score}–{group.match.opponent_score}
-                  </span>
-                  <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
-                    group.match.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
-                  }`}>
-                    {group.match.won ? t('playerdetails.win_abbr') : t('playerdetails.loss_abbr')}
-                  </span>
-                </div>
-              ) : (
-                <div key={group.game_id} className="card p-0 overflow-hidden">
-                  <button
-                    onClick={() => toggleMix(group.game_id)}
-                    aria-expanded={expandedMixes.has(group.game_id)}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
-                  >
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className="font-extrabold text-ink-900 text-sm truncate">{group.label}</p>
-                      <p className="text-[11px] text-muted">{formatMatchDate(group.date)}</p>
-                    </div>
-                    <span className="text-sm font-extrabold tabular-nums shrink-0">
-                      <span className="text-ok">{group.matches.filter((m) => m.won).length}{t('playerdetails.win_abbr')}</span>
-                      <span className="text-muted"> – </span>
-                      <span className="text-danger">{group.matches.filter((m) => !m.won).length}{t('playerdetails.loss_abbr')}</span>
+          {/* XP: o mesmo cartão do teu Perfil, sem «Ver como se ganha» e sem abrir nada. */}
+          {playerXp && (() => {
+            const xp = playerXp.xp ?? 0
+            const tier = tierFromXp(xp)
+            const progress = tier ?? preTierProgress(xp)
+            const missing = progress.nextMin != null ? progress.nextMin - xp : null
+            const nextTier = XP_TIERS.find((x) => x.min === progress.nextMin) || null
+            return (
+              <div className="rounded-card bg-white border border-line p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">{t('profile.card_xp_heading')}</p>
+                  {(playerXp.kudos ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-700 tabular-nums">
+                      <ThumbsUp size={11} className="text-lime-600" /> {playerXp.kudos} {t('profile.stat_kudos')}
                     </span>
-                    <ChevronDown
-                      size={20}
-                      className={`text-muted transition-transform duration-base shrink-0 ${expandedMixes.has(group.game_id) ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {expandedMixes.has(group.game_id) && (
-                    <div className="border-t border-line divide-y divide-line animate-fade-up">
-                      {group.matches.map((m, i) => (
-                        <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
-                          <p className="flex-1 min-w-0 text-sm text-muted">{t('playerdetails.match_number', { number: i + 1 })}</p>
-                          <span className="text-base font-extrabold tabular-nums shrink-0">
-                            {m.player_score}–{m.opponent_score}
-                          </span>
-                          <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
-                            m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
-                          }`}>
-                            {m.won ? t('playerdetails.win_abbr') : t('playerdetails.loss_abbr')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
                   )}
                 </div>
-              )
+                <div className="mt-2 flex items-center justify-between gap-2 text-ink-900">
+                  <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-extrabold">
+                    {tier
+                      ? <><XpShield tierKey={tier.key} size={20} /> {t('profile.r7_xp_level', { name: t(tier.labelKey), level: tier.level })}</>
+                      : t('profile.xp_no_shield')}
+                  </span>
+                  <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums">
+                    {progress.nextMin != null
+                      ? t('profile.xp_progress', { current: formatXp(xp), next: formatXp(progress.nextMin) })
+                      : `${formatXp(xp)} XP`}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 rounded-full bg-ink-200/50 overflow-hidden">
+                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+                </div>
+                {missing != null && missing > 0 && (
+                  <p className="mt-1.5 text-xs text-muted">
+                    {nextTier ? t('profile.r7_xp_missing', { missing: formatXp(missing), name: t(nextTier.labelKey) }) : t('profile.card_xp_missing', { missing: formatXp(missing) })}
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Conquistas: como no teu Perfil (título sobre o fundo, grelha de 3). */}
+          {!resultsHidden && trophyCatalog.length > 0 && (
+            <div>
+              <div className="mb-2.5 flex items-center justify-between">
+                <h3 className="font-display text-lg font-extrabold text-ink-900">{t('achievements.shelf_title')}</h3>
+                <button type="button" onClick={() => setTrophiesExpanded((v) => !v)} className="text-[13px] font-extrabold text-ink-900">
+                  {trophiesExpanded
+                    ? t('achievements.collapse')
+                    : `${t('profile.r7_view_all', { earned: playerTrophies.length, total: trophyCatalog.length })} ›`}
+                </button>
+              </div>
+              {!trophiesExpanded ? (
+                playerTrophies.length === 0 ? (
+                  <p className="text-sm text-muted">{t('playerdetails.r13_no_trophies', { name: firstName })}</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {playerTrophies.slice(0, 6).map((tr) => (
+                      <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} compact
+                        onOpen={() => setTrophyOpen(tr.achievement_key)} />
+                    ))}
+                  </div>
+                )
+              ) : (
+                <Suspense fallback={<div className="h-40" />}>
+                  <AchievementCollection catalog={trophyCatalog} mine={playerTrophies} />
+                </Suspense>
+              )}
+              {/* A folha da conquista é a do Dev 2 (AchievementViewer, com o dono). */}
+              {trophyOpen && (() => {
+                const items = playerTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at }))
+                return (
+                  <Suspense fallback={null}>
+                    <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))}
+                      owner={{ id, name: player.name, avatar_url: player.avatar_url }} onClose={() => setTrophyOpen(null)} />
+                  </Suspense>
+                )
+              })()}
+            </div>
+          )}
+
+          {/* «SOBRE» em quadrados de 2. */}
+          <section className={`p-4 ${CARD}`}>
+            <h3 className="mb-3 text-lg text-ink-900">{t('playerdetails.about_heading')}</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {about.map(([label, value]) => (
+                <div key={label} className="min-w-0 rounded-ctrl bg-[#F4F5F1] px-3.5 py-3">
+                  <p className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted">{label}</p>
+                  <p className="mt-0.5 truncate font-extrabold text-ink-900">{value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* «CLUBES E GRUPOS · N», cartões pequenos que deslizam. */}
+          <section>
+            <p className={KICKER}>{t('playerdetails.r13_clubs', { count: clubsHidden ? 0 : (player.clubs || []).length })}</p>
+            {clubsHidden ? (
+              <p className="rounded-card border-[1.5px] border-dashed border-line px-4 py-3.5 text-sm text-muted">🔒 {t('playerdetails.clubs_private')}</p>
+            ) : !(player.clubs || []).length ? (
+              <p className="text-sm text-muted">{t('playerdetails.no_clubs_title')}</p>
+            ) : (
+              <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
+                {player.clubs.map((c) => {
+                  const group = c.kind === 'group'
+                  const fallback = group ? '/topo/topo-grupo-alino.webp' : '/topo/topo-clube-alino.webp'
+                  return (
+                    <Link key={c.id} to={`/clube/${c.slug}`} className={`press w-[150px] shrink-0 overflow-hidden ${CARD}`}>
+                      <img src={c.logo_url || c.avatar_url || (group ? '/topo/avatar-grupo.webp' : '/topo/avatar-clube.webp')} alt=""
+                        className="h-[88px] w-full bg-ink-900 object-cover" loading="lazy"
+                        onError={(e) => { if (!e.currentTarget.src.endsWith(fallback)) e.currentTarget.src = fallback }} />
+                      <span className="block px-3 pt-2 pb-2.5">
+                        <span className="block truncate text-[14px] font-extrabold text-ink-900">{c.name}</span>
+                        <span className="block text-[12px] text-muted">{t(group ? 'playerdetails.r13_group' : 'playerdetails.r13_club')}</span>
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
             )}
-          </div>
-        )}
-      </div>
+          </section>
+        </>
+      )}
+
+      {tab === 'jogos' && (
+        <>
+          {h2hCard}
+          {resultsHidden || activityHidden ? privateBox : (
+            played.state === 'missing'
+              ? <p className="text-sm text-muted">{t('playerdetails.no_matches_title')}</p>
+              : <PlayedHistory data={played} query="" kind={null} other />
+          )}
+        </>
+      )}
     </div>
   )
 }

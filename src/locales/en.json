@@ -6289,5 +6289,20 @@
   "cover.preset_podium": "Podium",
   "cover.preset_clay": "Clay",
   "cover.preset_practice": "Practice",
-  "cover.preset_pair": "Pair"
+  "cover.preset_pair": "Pair",
+  "playerdetails.r13_games_one": "{{count}} game",
+  "playerdetails.r13_games_other": "{{count}} games",
+  "playerdetails.r13_you_won": "you won",
+  "playerdetails.r13_they_won": "{{name}} won",
+  "playerdetails.r13_pill_won": "You won {{score}}",
+  "playerdetails.r13_pill_lost": "You lost {{score}}",
+  "playerdetails.r13_see_games_one": "See the game",
+  "playerdetails.r13_see_games_other": "See the {{count}} games",
+  "playerdetails.r13_no_h2h": "You haven't played against each other yet.",
+  "playerdetails.r13_private": "{{name}} keeps results and games private. You only see the profile and the games you played together.",
+  "playerdetails.r13_no_rank": "No ranking position yet",
+  "playerdetails.r13_no_trophies": "{{name}} has no achievements yet.",
+  "playerdetails.r13_clubs": "Clubs and groups · {{count}}",
+  "playerdetails.r13_club": "Club",
+  "playerdetails.r13_group": "Group"
 }

@@ -55,7 +55,10 @@ const durationText = (min) => {
 
 /** Os dados da lista, com os filtros. history null = as funções ainda não
  *  existem (PGRST202): o Perfil mostra a lista antiga. */
-export function usePlayedHistory({ query, kind, enabled = true }) {
+export function usePlayedHistory({ query, kind, enabled = true, userId = null }) {
+  // R13: o histórico de OUTRA pessoa (as definições dela vêm aplicadas pela
+  // função: escondido → vazio). Sem userId, o teu.
+  const who = userId ? { p_user_id: userId } : {}
   const month = null // o «📅» salta para o mês, não filtra (UX, 14 out)
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -75,7 +78,7 @@ export function usePlayedHistory({ query, kind, enabled = true }) {
     // Uma chamada de cada vez (PO, 14 out): primeiro a lista, que é o que se
     // vê; os resumos dos meses e as contagens dos tipos vêm depois, sem
     // prender o ecrã nem disputar a base com a lista.
-    supabase.rpc('get_my_played_history', { ...args, p_limit: PAGE }).then(async (h) => {
+    supabase.rpc('get_my_played_history', { ...who, ...args, p_limit: PAGE }).then(async (h) => {
       if (my !== seq.current) return
       if (h.error) {
         if (errorKind(h.error) === 'not_ready') { setState('missing'); return }
@@ -88,28 +91,28 @@ export function usePlayedHistory({ query, kind, enabled = true }) {
       setTotal(h.data?.total ?? list.length)
       setHasMore(list.length >= PAGE)
       setState('ready')
-      const m = await supabase.rpc('get_my_played_months', { p_kind: kind, p_query: q })
+      const m = await supabase.rpc('get_my_played_months', { ...who, p_kind: kind, p_query: q })
       if (my !== seq.current) return
       setMonths(m.error ? [] : (m.data || []))
-      const k = await supabase.rpc('get_my_played_kinds', { p_query: q })
+      const k = await supabase.rpc('get_my_played_kinds', { ...who, p_query: q })
       if (my !== seq.current) return
       setKinds(k.error ? [] : (k.data || []))
     })
-  }, [kind, q, month, enabled])
+  }, [kind, q, month, enabled, userId])
 
   const loadMore = useCallback(() => {
     if (!hasMore || state !== 'ready' || !rows.length) return
     const my = seq.current
     const before = rows[rows.length - 1].starts_at
     setHasMore(false)
-    supabase.rpc('get_my_played_history', { p_kind: kind, p_query: q, p_month: month, p_before: before, p_limit: PAGE })
+    supabase.rpc('get_my_played_history', { ...who, p_kind: kind, p_query: q, p_month: month, p_before: before, p_limit: PAGE })
       .then(({ data, error }) => {
         if (my !== seq.current || error) return
         const more = data?.rows || []
         setRows((r) => [...r, ...more])
         setHasMore(more.length >= PAGE)
       })
-  }, [hasMore, state, rows, kind, q, month])
+  }, [hasMore, state, rows, kind, q, month, userId])
 
   /** Carrega até o mês `key` estar na lista (para o salto). */
   const loadUntil = useCallback(async (key) => {
@@ -117,7 +120,7 @@ export function usePlayedHistory({ query, kind, enabled = true }) {
     let more = hasMore
     const my = seq.current
     while (more && !list.some((r) => monthKeyOf(r.starts_at) === key) && list.length) {
-      const { data, error } = await supabase.rpc('get_my_played_history', { p_kind: kind, p_query: q, p_before: list[list.length - 1].starts_at, p_limit: PAGE })
+      const { data, error } = await supabase.rpc('get_my_played_history', { ...who, p_kind: kind, p_query: q, p_before: list[list.length - 1].starts_at, p_limit: PAGE })
       if (my !== seq.current || error) return
       const page = data?.rows || []
       list = [...list, ...page]
@@ -125,7 +128,7 @@ export function usePlayedHistory({ query, kind, enabled = true }) {
     }
     setRows(list)
     setHasMore(more)
-  }, [rows, hasMore, kind, q])
+  }, [rows, hasMore, kind, q, userId])
 
   return { rows, total, state, hasMore, loadMore, loadUntil, months, kinds }
 }
@@ -255,7 +258,7 @@ function PointsCol({ delta }) {
   )
 }
 
-function PlayedCard({ r, query = '' }) {
+function PlayedCard({ r, query = '', other = false }) {
   const { t, i18n } = useTranslation()
   const lang = lang2(i18n.language)
   const color = KIND_COLORS[r.kind] || KIND_COLORS.mix
@@ -359,10 +362,13 @@ function PlayedCard({ r, query = '' }) {
               {status && <span className="text-[12.5px] text-muted">{status}</span>}
               {cheer && <span className="text-[12.5px] text-muted">{cheer}</span>}
             </div>
-            <Link to={to} aria-label={t('played.share_aria')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-900">
-              <ArrowUpRight size={15} />
-            </Link>
+            {/* No perfil de outra pessoa não há partilha (R13). */}
+            {!other && (
+              <Link to={to} aria-label={t('played.share_aria')}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-900">
+                <ArrowUpRight size={15} />
+              </Link>
+            )}
           </>
         )}
       </div>
@@ -371,7 +377,7 @@ function PlayedCard({ r, query = '' }) {
 }
 
 /** A lista: por mês, com o resumo do mês, e ao descer carrega mais. */
-export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpTo, onJumped }) {
+export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpTo, onJumped, other = false }) {
   const month = null
   const { t, i18n } = useTranslation()
   const lang = lang2(i18n.language)
@@ -437,7 +443,7 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
   if (!rows.length) {
     return q
       ? <EmptyState title={t('comunidade.nothing_found_title')} subtitle={t('comunidade.try_another_name')} />
-      : <EmptyState title={t('played.empty_title')} subtitle={t('played.empty_body')} />
+      : other ? <EmptyState title={t('playerdetails.no_matches_title')} subtitle={t('playerdetails.no_matches_subtitle')} /> : <EmptyState title={t('played.empty_title')} subtitle={t('played.empty_body')} />
   }
   const oldest = rows[rows.length - 1]?.starts_at
   return (
@@ -473,7 +479,7 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
                 </div>
               )}
             </div>
-            {g.rows.map((r) => <PlayedCard key={`${r.kind}:${r.event_id}:${r.category_code || ''}`} r={r} query={query} />)}
+            {g.rows.map((r) => <PlayedCard key={`${r.kind}:${r.event_id}:${r.category_code || ''}`} r={r} query={query} other={other} />)}
           </section>
         )
       })}

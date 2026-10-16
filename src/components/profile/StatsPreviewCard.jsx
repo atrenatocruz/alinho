@@ -17,7 +17,8 @@ import { smoothPath } from './RatingChart'
 const W = 300
 const H = 64
 
-export default function StatsPreviewCard({ userId }) {
+// `to` e `hint`: no perfil de outra pessoa abre as estatísticas dela (R13).
+export default function StatsPreviewCard({ userId, to = '/perfil/estatisticas', hint = 'playerstats.card_hint' }) {
   const { t, i18n } = useTranslation()
   const [timeline, setTimeline] = useState(undefined)
 
@@ -43,14 +44,14 @@ export default function StatsPreviewCard({ userId }) {
 
   if (!rich) {
     return (
-      <Link to="/perfil/estatisticas"
+      <Link to={to}
         className="press flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl bg-surface">
           <TrendingUp size={18} className="text-ink-700" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>
-          <span className="block truncate text-xs text-muted">{t('playerstats.card_hint')}</span>
+          <span className="block truncate text-xs text-muted">{t(hint)}</span>
         </span>
         <ChevronRight size={18} className="shrink-0 text-ink-500" />
       </Link>
@@ -71,7 +72,7 @@ export default function StatsPreviewCard({ userId }) {
   const dateLabel = (r) => formatDate(r.starts_at || r.done_at, i18n.language, { day: 'numeric', month: 'short' })
 
   return (
-    <Link to="/perfil/estatisticas" aria-label={t('playerstats.title')}
+    <Link to={to} aria-label={t('playerstats.title')}
       className="press block rounded-card bg-white px-3.5 pb-2.5 pt-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
       <div className="flex items-start gap-2">
         <span className="min-w-0 flex-1">

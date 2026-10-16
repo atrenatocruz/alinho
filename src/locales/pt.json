@@ -6304,5 +6304,20 @@
   "cover.preset_podium": "Pódio",
   "cover.preset_clay": "Terra",
   "cover.preset_practice": "Treino",
-  "cover.preset_pair": "Dupla"
+  "cover.preset_pair": "Dupla",
+  "playerdetails.r13_games_one": "{{count}} jogo",
+  "playerdetails.r13_games_other": "{{count}} jogos",
+  "playerdetails.r13_you_won": "ganhaste",
+  "playerdetails.r13_they_won": "ganhou {{name}}",
+  "playerdetails.r13_pill_won": "Ganhaste {{score}}",
+  "playerdetails.r13_pill_lost": "Perdeste {{score}}",
+  "playerdetails.r13_see_games_one": "Ver o jogo",
+  "playerdetails.r13_see_games_other": "Ver os {{count}} jogos",
+  "playerdetails.r13_no_h2h": "Ainda não jogaram um contra o outro.",
+  "playerdetails.r13_private": "{{name}} mantém os resultados e os jogos privados. Vês só o perfil e os jogos que fizeram juntos.",
+  "playerdetails.r13_no_rank": "Ainda sem lugar no ranking",
+  "playerdetails.r13_no_trophies": "{{name}} ainda não tem conquistas.",
+  "playerdetails.r13_clubs": "Clubes e grupos · {{count}}",
+  "playerdetails.r13_club": "Clube",
+  "playerdetails.r13_group": "Grupo"
 }

@@ -173,10 +173,10 @@ const RPC_MOCKS = {
       following_count: 18,
       follow_status: 'none',
       follow_request_id: null,
-      total_points: 40,
-      game_wins: 24,
-      game_losses: 16,
-      mix_wins: 3,
+      // localStorage.mockResultsPrivate = 'true': resultados privados (R13).
+      ...(localStorage.getItem('mockResultsPrivate') === 'true'
+        ? { total_points: null, game_wins: null, game_losses: null, mix_wins: null }
+        : { total_points: 40, game_wins: 24, game_losses: 16, mix_wins: 3 }),
       // localStorage.mockActivityFriends = 'true': atividade só para amigos
       // (os confrontos diretos veem-se na mesma, 10 out).
       activity_visibility: localStorage.getItem('mockActivityFriends') === 'true' ? 'friends' : 'public',
@@ -257,11 +257,13 @@ const RPC_MOCKS = {
     const person = FAKE_PEOPLE[params?.p_user_id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
     return [{ nationality: 'PT', gender: person.gender, age_category: 'senior' }]
   },
-  get_head_to_head_summary: () => [{ wins: 3, losses: 2, matches_played: 5 }],
-  get_head_to_head_matches: () => [
+  // localStorage.mockNoH2h = 'true': nunca jogaram um contra o outro (R13).
+  get_head_to_head_summary: () => [localStorage.getItem('mockNoH2h') === 'true' ? { wins: 0, losses: 0, matches_played: 0 } : { wins: 2, losses: 1, matches_played: 3 }],
+  get_head_to_head_matches: () => (localStorage.getItem('mockNoH2h') === 'true' ? [] : [
     { match_id: 'm1', label: 'Mix de Segunda-feira', match_date: '2026-09-01', player_score: 6, opponent_score: 4, won: true },
     { match_id: 'm2', label: 'Mix de Segunda-feira', match_date: '2026-08-25', player_score: 3, opponent_score: 6, won: false },
-  ],
+    { match_id: 'm3', label: 'Jogo entre amigos', match_date: '2026-08-12', player_score: 6, opponent_score: 2, won: true },
+  ]),
   get_player_match_history: () => [],
   get_follow_counts: () => [{ followers_count: 8, following_count: 5 }],
   list_followers: () => [],
