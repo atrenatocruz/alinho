@@ -850,8 +850,10 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
   const nudge = () => { const el = ref.current; if (el) el.scrollBy({ left: Math.round(el.clientWidth * 0.7), behavior: 'smooth' }) }
   return (
     <div className="relative">
+    {/* A fila desliza dentro da margem da página, sem ir até à borda do ecrã
+        (Renato, 16 out: «tem de haver um inner container com margin»). */}
     <div ref={ref} role={searching ? undefined : 'group'} aria-label={searching ? undefined : label}
-      className={`no-scrollbar -mx-4 flex cursor-grab items-center gap-1.5 overflow-x-auto px-4 py-1 active:cursor-grabbing ${className}`}>
+      className={`no-scrollbar flex cursor-grab items-center gap-1.5 overflow-x-auto py-1 active:cursor-grabbing ${className}`}>
       {searching ? (
         // A caixa da pesquisa, igual em todas as páginas (SPEC 2026-10-14-
         // pesquisa-regra-unica): redonda, 36 px, branca com contorno preto de
@@ -894,7 +896,7 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
         style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0), var(--bar-bg, #fff) 45%)' }}
         // A seta fica para dentro dos cantos redondos da barra (revisão do
         // Renato, 16 out: na Home saía do contentor curvo).
-        className="absolute inset-y-0 -right-4 hidden w-[54px] items-center justify-end pr-6 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
+        className="absolute inset-y-0 right-0 hidden w-[40px] items-center justify-end pr-1.5 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
         ›
       </button>
     )}
