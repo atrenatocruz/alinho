@@ -1163,6 +1163,8 @@ export default function GerirClube() {
     }
   }
 
+  // O que veio da base de dados — para só enviar o distrito quando muda.
+  const loadedSettingsRef = useRef(null)
   const loadSettings = async () => {
     const { data, error } = await supabase
       .from('organizations')
@@ -1174,6 +1176,7 @@ export default function GerirClube() {
       console.error('Error loading settings:', error)
       return
     }
+    loadedSettingsRef.current = data
     setSettings(data)
   }
 
@@ -2181,6 +2184,10 @@ export default function GerirClube() {
       const { error } = await supabase.from('organizations').update({ group_logo_url }).eq('id', settings.id)
       if (error) throw error
       setSettings((s) => ({ ...s, group_logo_url }))
+      // O topo do Gerir lê do org e o resto da app das memberships — sem
+      // isto a imagem nova só aparecia depois de recarregar (Rui Gomes, 16 out).
+      setOrg((o) => ({ ...o, group_logo_url }))
+      refreshMemberships?.()
     } catch (error) {
       console.error('Error uploading club logo:', error)
       setLogoError(describeError(t, error, 'gerirclube.error_logo_upload'))
@@ -2197,6 +2204,8 @@ export default function GerirClube() {
       const { error } = await supabase.from('organizations').update({ group_logo_url: null }).eq('id', settings.id)
       if (error) throw error
       setSettings((s) => ({ ...s, group_logo_url: null }))
+      setOrg((o) => ({ ...o, group_logo_url: null }))
+      refreshMemberships?.()
     } catch (error) {
       console.error('Error removing club logo:', error)
       setLogoError(describeError(t, error, 'gerirclube.error_logo_remove'))
@@ -2294,8 +2303,10 @@ export default function GerirClube() {
           name: settings.name,
           description: settings.description,
           location: settings.location,
-          // Só existe depois de migration_liga_1_base.sql — não enviar antes.
-          ...(settings.district !== undefined ? { district: settings.district || null } : {}),
+          // Só quando muda: district não estava no GRANT UPDATE por colunas e
+          // mandá-lo sempre fazia falhar o guardar inteiro (descrição incluída —
+          // Rui Gomes, 16 out). migration_organization_district_grant.sql.
+          ...(settings.district !== undefined && (settings.district || null) !== (loadedSettingsRef.current?.district || null) ? { district: settings.district || null } : {}),
           latitude: settings.latitude ?? null,
           longitude: settings.longitude ?? null,
           phone: settings.phone,
@@ -2311,7 +2322,9 @@ export default function GerirClube() {
 
       if (error) throw error
 
-      setOrg((o) => ({ ...o, name: settings.name }))
+      loadedSettingsRef.current = settings
+      setOrg((o) => ({ ...o, name: settings.name, description: settings.description }))
+      refreshMemberships?.()
       setDoneNotice(t('gerirclube.settings_updated_success'))
     } catch (error) {
       console.error('Error updating settings:', error)
