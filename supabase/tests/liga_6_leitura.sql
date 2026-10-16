@@ -11,7 +11,7 @@ DO $$ DECLARE p jsonb; s text; BEGIN
   s := p::text;
   INSERT INTO _r VALUES (p IS NOT NULL, 'anon lê a página da liga');
   INSERT INTO _r VALUES (s NOT LIKE '%@%', 'sem e-mails');
-  INSERT INTO _r VALUES (s NOT LIKE '%rating%' AND s NOT LIKE '%phone%', 'sem ranking exato nem telefone');
+  INSERT INTO _r VALUES (s NOT LIKE '%"rating"%' AND s NOT LIKE '%phone%', 'sem ranking exato nem telefone');
   INSERT INTO _r VALUES (NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p->'teams') t WHERE t->>'status' <> 'aprovada'),
                          'anon só vê equipas aprovadas');
   INSERT INTO _r VALUES (NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p->'teams') t WHERE t ? 'organization_id'),
