@@ -482,7 +482,7 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
       <div className="mt-3 flex items-center gap-2.5">
         {/* Sem a lista de quem vai: quantos já estão num círculo cinzento e os
             lugares que faltam a tracejado (R1; UX, 14 out). */}
-        <FaceCircles count={peopleCount || 0} free={Math.max(0, capacity - (peopleCount || 0))} size="sm" />
+        <FaceCircles count={peopleCount || 0} free={Math.max(0, capacity - (peopleCount || 0))} size="sm" className="pointer-events-none" />
         {!pending && onJoin && (
           <div className="relative ml-auto">
             <CardButton variant={openJoin ? 'lime' : 'out'} disabled={busy} onClick={onJoin}>

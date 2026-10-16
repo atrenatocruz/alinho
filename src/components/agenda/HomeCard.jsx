@@ -44,11 +44,15 @@ export default function HomeCard({ colors = FALLBACK, label, pill = null, time, 
       {to && <Link to={to} className="absolute inset-0" aria-label={ariaLabel} />}
       {imageUrl ? (
         <>
-          <div className="relative h-[120px] bg-cover bg-center" style={{ backgroundImage: `url("${String(imageUrl).replace(/"/g, "%22")}")`, backgroundColor: band }}>
+          <div className="pointer-events-none relative h-[120px] bg-cover bg-center" style={{ backgroundImage: `url("${String(imageUrl).replace(/"/g, "%22")}")`, backgroundColor: band }}>
             <span className="absolute left-3 top-3 rounded-md px-2 py-[5px] font-mono text-[10.5px] font-medium uppercase leading-none tracking-[.1em] text-white"
               style={{ background: band }}>{label}</span>
-            {/* Por cima da foto, a pastilha escura ganha fundo para se ler (QA, 13 out). */}
-            {pill && <span className="absolute right-3 top-3 rounded-full bg-black/55">{pill}</span>}
+            {/* Por cima da foto, a pastilha escura ganha fundo para se ler; a
+                lima «✓ Estás dentro» já se lê e o fundo ficava como uma sombra
+                (Francisco, 16 out). */}
+            {pill && (
+              <span className={`absolute right-3 top-3 rounded-full ${pill.type === BandPill && (pill.props.tone ?? 'me') === 'me' ? '' : 'bg-black/55'}`}>{pill}</span>
+            )}
           </div>
           <div className="px-3.5 py-[9px] text-white" style={{ background: band }}>{hourRow}</div>
         </>
@@ -103,7 +107,8 @@ export function CardFoot({ people = [], slots = 0, free = null, children }) {
   const missing = free ?? Math.max(0, slots - people.length)
   return (
     <div className="mt-3 flex items-center gap-2.5">
-      <FaceCircles people={people} free={missing} size="sm" />
+      {/* pointer-events-none: tocar nas caras abre o cartão, como o resto (Francisco, 16 out). */}
+      <FaceCircles people={people} free={missing} size="sm" className="pointer-events-none" />
       {children && <div className="relative ml-auto flex flex-col items-stretch gap-1">{children}</div>}
     </div>
   )
