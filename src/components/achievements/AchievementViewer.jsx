@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Lock } from 'lucide-react'
@@ -6,14 +6,19 @@ import { medalUrl } from '../../lib/achievementMedals'
 import { RARITY_META, formatRarityPct } from '../../lib/achievements'
 import './achievementsFx.css'
 
+// Partilhar a conquista (SPEC 2026-10-13-partilhar-conquistas): só carrega ao abrir.
+const AchievementShareFlow = lazy(() => import('./AchievementShareFlow'))
+
 /* O cartão de uma conquista no meio do ecrã (design-handoff/2026-10-12-
    conquistas-animadas). Ganha: vira e cresce, raios na cor da raridade a
    rodar, a medalha a flutuar, confetis nas raras/épicas/lendárias; os lados
    espreitam e desliza-se entre as ganhas. Por ganhar: a cinzento, sem
    confetis nem lados, «Fechar». Fecha com o botão, tocando fora ou Esc.
 
-   items: [{ key, rarity, pct? }] (as ganhas, pela ordem a percorrer), start: o
-   índice a abrir. locked: abre uma só, por ganhar. */
+   items: [{ key, rarity, pct?, at? }] (as ganhas, pela ordem a percorrer), start:
+   o índice a abrir. locked: abre uma só, por ganhar. celebrate: a festa de
+   uma conquista nova («Partilhar» por cima e «Boa!» em contorno); sem ela,
+   numa ganha, «↗ Partilhar a conquista» e «Fechar» (UX, 16 out). */
 
 const CONFETTI_COLORS = {
   raro: ['#6CB8FF', '#C5DD01', '#fff'],
@@ -54,11 +59,12 @@ function runConfetti(canvas, rarity) {
   return () => { cancelAnimationFrame(raf); ctx.clearRect(0, 0, W, H) }
 }
 
-export default function AchievementViewer({ items, start = 0, locked = false, onClose }) {
+export default function AchievementViewer({ items, start = 0, locked = false, celebrate = false, onClose }) {
   const { t, i18n } = useTranslation()
   const [i, setI] = useState(start)
   const canvasRef = useRef(null)
   const swipeX = useRef(null)
+  const [sharing, setSharing] = useState(null)
   const n = items.length
   const a = items[i] || items[0]
   const rarity = RARITY_META[a.rarity] ? a.rarity : 'comum'
@@ -67,6 +73,7 @@ export default function AchievementViewer({ items, start = 0, locked = false, on
 
   useEffect(() => {
     const onKey = (e) => {
+      if (sharing) return
       if (e.key === 'Escape') onClose()
       else if (many && e.key === 'ArrowRight') go(1)
       else if (many && e.key === 'ArrowLeft') go(-1)
@@ -151,19 +158,30 @@ export default function AchievementViewer({ items, start = 0, locked = false, on
         <p className="text-xs text-white/60">
           {locked ? t('achievements.fx_locked_note') : t('achievements.fx_earned_note')}
         </p>
-        {/* O lima só para «Boa!»; «Fechar» (por ganhar) em contorno claro (UX, 11 out). */}
+        {/* Ganha: «Partilhar» a lima por cima e, por baixo, «Boa!» (na festa)
+            ou «Fechar», em contorno claro — um só botão lima (SPEC de partilhar
+            as conquistas, 13 out). Por ganhar: só «Fechar», sem partilhar. */}
+        {!locked && (
+          <button type="button" onClick={() => setSharing(a)}
+            className="press mt-3.5 w-full min-h-[48px] rounded-ctrl bg-lime-400 font-extrabold text-[15px] text-ink-900">
+            {celebrate ? t('achshare.share') : `↗ ${t('achshare.share_achievement')}`}
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
-          className={`press mt-3.5 w-full min-h-[48px] rounded-ctrl font-extrabold text-[15px] ${locked
-            ? 'border-2 border-white/80 text-white bg-transparent'
-            : 'bg-lime-400 text-ink-900'}`}
+          className={`press ${locked ? 'mt-3.5' : 'mt-2'} w-full min-h-[48px] rounded-ctrl border-2 border-white/80 bg-transparent font-extrabold text-[15px] text-white`}
         >
-          {locked ? t('achievements.fx_close') : t('achievements.fx_ok')}
+          {celebrate && !locked ? t('achievements.fx_ok') : t('achievements.fx_close')}
         </button>
       </div>
 
       <canvas ref={canvasRef} className="achv-confetti" aria-hidden="true" />
+      {sharing && (
+        <Suspense fallback={null}>
+          <AchievementShareFlow achievement={sharing} onClose={() => setSharing(null)} />
+        </Suspense>
+      )}
     </div>,
     document.body,
   )

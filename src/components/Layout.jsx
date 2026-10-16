@@ -982,7 +982,7 @@ export default function Layout({ children }) {
           aparece de cada vez na prática (o phone-prompt é dispensável). */}
       {trophiesShown && !trophiesDone && (
         <Suspense fallback={null}>
-          <AchievementViewer items={newTrophies} onClose={closeTrophies} />
+          <AchievementViewer items={newTrophies} celebrate onClose={closeTrophies} />
         </Suspense>
       )}
       {kudosPending && !needsPhonePrompt && (newTrophies.length === 0 || trophiesDone) && (

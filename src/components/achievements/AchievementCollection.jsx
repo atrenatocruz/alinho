@@ -50,7 +50,7 @@ export default function AchievementCollection({ catalog, mine }) {
       .filter((m) => sortOf.has(m.achievement_key))
       .slice()
       .sort((x, y) => String(y.awarded_at || '').localeCompare(String(x.awarded_at || '')))
-      .map((m) => ({ key: m.achievement_key, rarity: rarityOf(m.rarity), pct: m.rarity_pct ?? pctByKey.get(m.achievement_key) }))
+      .map((m) => ({ key: m.achievement_key, rarity: rarityOf(m.rarity), pct: m.rarity_pct ?? pctByKey.get(m.achievement_key), at: m.awarded_at }))
     const grouped = RARITY_ORDER.map((r) => {
       const list = catalog
         .filter((c) => rarityOf(c.rarity) === r)
