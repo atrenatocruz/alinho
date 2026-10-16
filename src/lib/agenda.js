@@ -458,7 +458,7 @@ export const DEFAULT_FILTERS = { show: 'all', kinds: EVENT_KINDS, orgIds: null }
 
 /** Filtros guardados antes da mudança (com onlyMine) voltam ao início. Quem
  *  tinha todos os tipos antes de haver «Horários livres» continua com todos. */
-const KINDS_BEFORE_FREE = ['mix', 'open', 'friends', 'lesson', 'tournament', 'league']
+const KINDS_BEFORE_FREE = ['mix', 'open', 'friends', 'lesson', 'tournament']
 const KINDS_BEFORE_LEAGUE = ['mix', 'open', 'free', 'friends', 'lesson', 'tournament']
 export const normalizeFilters = (f) => {
   if (!(f && SHOW_OPTIONS.includes(f.show) && Array.isArray(f.kinds) && f.kinds.length)) return DEFAULT_FILTERS

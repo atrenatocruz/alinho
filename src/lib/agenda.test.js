@@ -140,7 +140,7 @@ describe('filters and days', () => {
     expect(normalizeFilters(b)).toBe(b)
   })
   it('keeps "everything" when the saved filters predate «Horários livres»', () => {
-    const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament', 'league'], orgIds: null }
+    const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament'], orgIds: null }
     expect(normalizeFilters(before).kinds).toEqual(EVENT_KINDS)
     expect(isDefaultFilters(normalizeFilters(before))).toBe(true)
     const onlyFree = { show: 'all', kinds: ['free'], orgIds: null }
