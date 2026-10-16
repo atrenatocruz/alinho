@@ -88,7 +88,9 @@ export function leagueStandings(teams, results, rules, seed) {
       buckets.get(k).push(row)
     }
     const keys = [...buckets.keys()].sort((a, b) => b - a)
-    if (idx > 0 && keys.length > 1) for (const row of group) row.decidedBy ??= name
+    // Quando o grupo se separa neste critério, cada linha fica com ele; se
+    // um desempate posterior separar outra vez, sobrescreve com o último.
+    if (idx > 0 && keys.length > 1) for (const row of group) row.decidedBy = name
     return keys.flatMap((k) => order(buckets.get(k), idx + 1))
   }
   return order([...all.values()], 0).map((row, i) => ({ ...row, position: i + 1 }))

@@ -32,6 +32,22 @@ describe('tabela', () => {
     expect(s.every((r) => r.decidedBy === 'matches')).toBe(true)
   })
 
+  it('decidedBy mostra o critério que separou cada equipa, não o primeiro que dividiu o grupo', () => {
+    // X, Y e Z empatados em pontos (6 cada). O confronto direto separa X
+    // (ganhou a Y e Z) de Y e Z, que ficam a 0 no mini-campeonato. Y e Z
+    // só se separam pela diferença de partidas (Y +5, Z +1).
+    const s = leagueStandings(teams('X', 'Y', 'Z', 'D', 'E'), [
+      res('X', 'Y', 2, 1), res('X', 'Z', 2, 1),
+      res('Y', 'D', 3, 0), res('Y', 'E', 3, 0),
+      res('Z', 'D', 2, 1), res('Z', 'E', 2, 1),
+    ], R, 'cat')
+    expect(s.slice(0, 3).map((r) => r.teamId)).toEqual(['X', 'Y', 'Z'])
+    expect(s.slice(0, 3).map((r) => r.points)).toEqual([6, 6, 6])
+    expect(s.find((r) => r.teamId === 'X').decidedBy).toBe('h2h')
+    expect(s.find((r) => r.teamId === 'Y').decidedBy).toBe('matches')
+    expect(s.find((r) => r.teamId === 'Z').decidedBy).toBe('matches')
+  })
+
   it('falta de comparência: quem faltou leva -1 e o outro ganha todas as partidas', () => {
     const s = leagueStandings(teams('A', 'B'), [{ ...res('A', 'B', 0, 0), walkoverTeamId: 'B' }], R, 'cat')
     expect(s.find((r) => r.teamId === 'A')).toMatchObject({ points: 3, matchesFor: 3 })
