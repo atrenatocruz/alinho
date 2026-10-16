@@ -4,7 +4,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { sharePageLink } from '../lib/shareImage'
-import { ArrowLeft, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
+import { ArrowLeft, Award, Swords, ChevronDown, ChevronRight, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp, TrendingUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, ConfirmSheet } from '../components/ui'
 import { countryName } from '../lib/countries'
@@ -455,6 +455,23 @@ export default function PlayerDetails() {
         )}
 
       </div>
+
+      {/* Estatísticas da evolução do ranking (Francisco, 16 out): só quando
+          os resultados estão visíveis — escondidos, a página só mostrava o
+          cadeado, não vale a pena o desvio. */}
+      {!resultsHidden && (
+        <Link to={`/jogador/${id}/estatisticas`} state={{ name: player.name }}
+          className="press card flex items-center gap-3 !py-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl bg-surface">
+            <TrendingUp size={18} className="text-ink-700" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>
+            <span className="block truncate text-xs text-muted">{t('playerstats.card_hint_other')}</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0 text-ink-500" />
+        </Link>
+      )}
 
       {/* Sobre — lado preferido, país, género. Antes vivia no cabeçalho;
           saiu de lá para bater certo com o cabeçalho limpo do Perfil

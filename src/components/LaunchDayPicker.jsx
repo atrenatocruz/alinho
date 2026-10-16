@@ -9,6 +9,7 @@ import { Chips } from './ui'
 import {
   dayOptions, launchDate, lastPageFor, pageForDays, weekdayShort, weekdayLong, isMasculineWeekday,
 } from '../lib/launchDay'
+import TimeInput from './TimeInput'
 
 // allowNow (mix que não se repete, SPEC do mix por passos): a primeira
 // pastilha é «Já» (0 dias = abre ao publicar), os dias que já passaram não
@@ -99,8 +100,7 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
       {allowNow && days === 0 && <p className="text-sm text-muted">{t('mixwizard.opens_now_hint')}</p>}
       {!(allowNow && days === 0) && <div className="flex items-center gap-2 pt-1">
         <span className="text-sm font-medium text-gray-700">{t('launchday.at')}</span>
-        <input
-          type="time"
+        <TimeInput
           value={time}
           onChange={(e) => onTime(e.target.value)}
           className="input-field !w-auto"

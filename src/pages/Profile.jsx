@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket } from 'lucide-react'
+import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, TrendingUp } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
@@ -852,6 +852,20 @@ export default function Profile() {
             </span>
           </span>
           <ChevronRight size={18} className="shrink-0" />
+        </Link>
+
+        {/* Estatísticas da evolução do ranking (Francisco, 16 out): o cartão
+            inteiro abre a página, como o do XP. */}
+        <Link to="/perfil/estatisticas"
+          className="press flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl bg-surface">
+            <TrendingUp size={18} className="text-ink-700" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>
+            <span className="block truncate text-xs text-muted">{t('playerstats.card_hint')}</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0 text-ink-500" />
         </Link>
 
         {/* «Jogo entre amigos» com a imagem do Alino com o amigo (R0) e o

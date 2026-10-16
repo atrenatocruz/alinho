@@ -19,6 +19,7 @@ import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import ProfileXp from './pages/ProfileXp'
+import PlayerStats from './pages/PlayerStats'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -616,6 +617,24 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <ProfileXp />
+            </Guard>
+          }
+        />
+        {/* Estatísticas da evolução do ranking (Francisco, 16 out) — a
+            mesma página serve o próprio perfil e o de terceiros. */}
+        <Route
+          path="/perfil/estatisticas"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <PlayerStats />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogador/:id/estatisticas"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <PlayerStats />
             </Guard>
           }
         />

@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { maxSignupBirthday } from '../lib/age'
-import { PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
+import { BackBar, PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
@@ -121,17 +120,12 @@ export default function PersonalInfo() {
 
   return (
     <div className="space-y-4 pb-6">
-      <div className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center gap-2 border-b border-line/70">
-        <button
-          type="button"
-          onClick={() => (editing ? (setEditing(false), resetForm()) : navigate('/perfil'))}
-          aria-label={t('gamedetails.back')}
-          className="w-11 h-11 -ml-2 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50"
-        >
-          <ArrowLeft size={22} />
-        </button>
-        <h2 className="text-3xl text-ink-900 min-w-0 truncate">{t('profile.personal_info_heading')}</h2>
-      </div>
+      {/* O topo das páginas sem capa: a barra de vidro com o «‹» e o título
+          grande por baixo (Renato/Francisco, 16 out — a faixa branca antiga
+          deixava um espaço vazio em cima). */}
+      <BackBar onBack={() => (editing ? (setEditing(false), resetForm()) : navigate('/perfil'))}
+        label={t('gamedetails.back')} title={t('profile.personal_info_heading')} />
+      <h1 className="text-[28px] font-extrabold leading-tight text-ink-900">{t('profile.personal_info_heading')}</h1>
 
       {saved && (
         <p className="text-sm font-extrabold text-ink-900">{t('profile.updated_success')}</p>

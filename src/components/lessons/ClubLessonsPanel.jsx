@@ -14,6 +14,7 @@ import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../../lib/lesson
 import { describeError } from '../../lib/errors'
 import { levelsText, euros } from './LessonBits'
 import ClubSeriesPanel from './ClubSeriesPanel'
+import TimeInput from '../TimeInput'
 
 const pad = (n) => String(n).padStart(2, '0')
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
@@ -321,10 +322,10 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
             {[1, 2, 3, 4, 5, 6, 7].map((wd) => (
               <div key={wd} className="flex items-center gap-2">
                 <span className="w-16 shrink-0 text-sm font-semibold text-ink-900">{t(`lessons.wd_long_${wd}`)}</span>
-                <input type="time" value={hours[wd]?.start || ''} aria-label={t('lessons.peak_start')} className={timeCls}
+                <TimeInput value={hours[wd]?.start || ''} aria-label={t('lessons.peak_start')} className={timeCls}
                   onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], start: e.target.value } }))} />
                 <span className="text-muted">–</span>
-                <input type="time" value={hours[wd]?.end || ''} aria-label={t('lessons.peak_end')} className={timeCls}
+                <TimeInput value={hours[wd]?.end || ''} aria-label={t('lessons.peak_end')} className={timeCls}
                   onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], end: e.target.value } }))} />
               </div>
             ))}
