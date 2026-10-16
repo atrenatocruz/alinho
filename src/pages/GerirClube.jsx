@@ -9,6 +9,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
+import { uploadOrgCover, removeOldCover, rememberCover, coverOf } from '../lib/orgCover'
+import CoverSheet from '../components/club/CoverSheet'
+import KindHero from '../components/KindHero'
 import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
@@ -264,6 +267,35 @@ function RequestPerson({ req, fallbackName }) {
   )
 }
 
+// Gerir › Clube (proposta A): os campos que contam para o «N alterações por
+// guardar». O contacto do robô não está aqui — saiu do ecrã.
+const CARD_BOX = 'rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
+const SECTION_KICKER = 'mb-2 mt-5 px-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
+const BARE_INPUT = 'mt-0.5 w-full bg-transparent text-[15px] text-ink-900 placeholder:text-ink-200 outline-none'
+const SETTINGS_FIELDS = ['name', 'description', 'location', 'district', 'phone', 'instagram', 'website', 'is_global', 'open_join', 'searchable']
+
+function SettingsField({ label, children }) {
+  return (
+    <label className="block border-t border-line px-4 py-3 first:border-t-0">
+      <span className="block text-xs text-muted">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function SettingsSwitch({ label, hint, checked, onChange }) {
+  return (
+    <label className="flex min-h-[56px] cursor-pointer items-center gap-3 border-t border-line px-4 py-3 first:border-t-0">
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-extrabold text-ink-900">{label}</span>
+        {hint && <span className="block text-xs text-muted">{hint}</span>}
+      </span>
+      <input type="checkbox" role="switch" checked={!!checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span aria-hidden="true" className="relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-ink-900 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2" />
+    </label>
+  )
+}
+
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
   const { slug, editId, serieId } = useParams()
@@ -383,6 +415,7 @@ export default function GerirClube() {
   const clubLogoInputRef = useRef(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
+  const [coverOpen, setCoverOpen] = useState(false)
   // Eliminar grupo (Trello #241). deleteBlocker: undefined = still asking the
   // server, null = can delete, string = the reason code it can't.
   const navigate = useNavigate()
@@ -2194,6 +2227,25 @@ export default function GerirClube() {
     } finally {
       setUploadingLogo(false)
     }
+  }
+
+  // A capa (proposta A, 16 out): grava logo, como o logótipo — não espera
+  // pelo «Guardar». A foto antiga sai do balde; as capas do alinho não são
+  // ficheiros nossos.
+  const settingsBase = loadedSettingsRef.current || {}
+  const settingsDirty = settings ? SETTINGS_FIELDS.filter((k) => settings[k] !== undefined && (settings[k] ?? '') !== (settingsBase[k] ?? '')).length : 0
+
+  const handleSaveCover = async ({ file, y, url }) => {
+    const previous = settings.cover_url
+    const cover_url = file ? await uploadOrgCover(settings.id, file, y) : (url || null)
+    const { error } = await supabase.from('organizations').update({ cover_url }).eq('id', settings.id)
+    if (error) throw error
+    if (previous && previous !== cover_url) removeOldCover(previous).catch((err) => console.error('Error removing old cover:', err))
+    rememberCover(settings.id, cover_url)
+    setSettings((s) => ({ ...s, cover_url }))
+    if (loadedSettingsRef.current) loadedSettingsRef.current = { ...loadedSettingsRef.current, cover_url }
+    setOrg((o) => ({ ...o, cover_url }))
+    refreshMemberships?.()
   }
 
   const handleRemoveLogo = async () => {
@@ -4286,229 +4338,136 @@ export default function GerirClube() {
               instead of closing an overlay. */}
           {activeTab === 'settings' && settings && (
             <div>
-              <h3 className="text-xl font-semibold text-ink-900 mb-6">
-                {t(kk('gerirclube.settings_heading'))}
-              </h3>
-
-              <form onSubmit={handleUpdateSettings} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}
+              {/* A identidade: capa, logótipo e nome — como na Comunidade. */}
+              <div className={`overflow-hidden ${CARD_BOX}`}>
+                <KindHero kind="club" src={coverOf(settings)} className="relative h-32">
+                  {settings.cover_url !== undefined && (
+                    <button type="button" onClick={() => setCoverOpen(true)}
+                      className="absolute right-3 top-3 inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-white/95 px-3 text-xs font-extrabold text-ink-900 shadow-card">
+                      <Camera size={14} /> {t('cover.change')}
+                    </button>
+                  )}
+                </KindHero>
+                <div className="px-4 pb-4">
+                  <span className={`relative -mt-8 inline-block bg-white p-[3px] ${isGroupOrg ? 'rounded-full' : 'rounded-[28%]'}`}>
+                    <Avatar name={settings.name} url={settings.group_logo_url} size="w-16 h-16 text-xl" shape={isGroupOrg ? 'round' : 'square'} colorClass="bg-ink-900 text-lime-400" />
+                    <button type="button" onClick={() => clubLogoInputRef.current?.click()} disabled={uploadingLogo}
+                      aria-label={t(kk('gerirclube.change_logo_aria'))}
+                      className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-white ring-2 ring-white disabled:opacity-50">
+                      {uploadingLogo ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Camera size={14} />}
+                    </button>
+                    <input ref={clubLogoInputRef} type="file" accept="image/*" onChange={handleLogoSelect} className="hidden" />
+                  </span>
+                  <label className="mt-2 block">
+                    <span className="sr-only">{t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}</span>
+                    <input type="text" value={settings.name} required form="club-settings-form"
+                      onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+                      className="w-full rounded-ctrl bg-transparent font-display text-xl font-extrabold text-ink-900 outline-none focus:bg-surface focus:px-2" />
                   </label>
-                  <input
-                    type="text"
-                    value={settings.name}
-                    onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-                    className="input-field"
-                    required
-                  />
                   <OrgNameTakenHint taken={settingsNameTaken} />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.robot_contact_label')}
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.robot_contact}
-                    onChange={(e) => setSettings({ ...settings, robot_contact: e.target.value })}
-                    className="input-field"
-                    placeholder={t('gerirclube.phone_placeholder')}
-                  />
-                  <p className="text-sm text-gray-500 mt-2">
-                    {t('gerirclube.robot_contact_help')}
+                  <p className="text-xs text-muted">
+                    {[t(isGroupOrg ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), settings.location, planName(settings.plan_tier)].filter(Boolean).join(' · ')}
                   </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t(kk('gerirclube.club_logo_label'))}
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-16 h-16 shrink-0">
-                      <Avatar name={settings.name} url={settings.group_logo_url} size="w-16 h-16 text-xl" />
-                      <button
-                        type="button"
-                        onClick={() => clubLogoInputRef.current?.click()}
-                        disabled={uploadingLogo}
-                        aria-label={t(kk('gerirclube.change_logo_aria'))}
-                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
-                                   ring-2 ring-canvas hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
-                      >
-                        {uploadingLogo ? (
-                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <Camera size={14} />
-                        )}
-                      </button>
-                      <input
-                        ref={clubLogoInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoSelect}
-                        className="hidden"
-                      />
-                    </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                    <Link to={`/clube/${settings.slug}`} className="inline-flex min-h-[32px] items-center gap-1 rounded-full bg-surface px-3 text-xs font-extrabold text-ink-700">
+                      {t('cover.see_as_player')} <ChevronRight size={14} />
+                    </Link>
                     {settings.group_logo_url && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        disabled={uploadingLogo}
-                        className="text-danger text-sm font-extrabold hover:underline disabled:opacity-50"
-                      >
+                      <button type="button" onClick={handleRemoveLogo} disabled={uploadingLogo} className="text-xs font-extrabold text-muted underline-offset-2 hover:underline disabled:opacity-50">
                         {t('gerirclube.remove_logo_button')}
                       </button>
                     )}
                   </div>
-                  {logoError && (
-                    <p className="text-danger text-sm font-extrabold mt-2">{logoError}</p>
-                  )}
+                  {logoError && <p className="mt-2 text-sm font-extrabold text-danger">{logoError}</p>}
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.description_label')}
-                  </label>
-                  <textarea
-                    value={settings.description || ''}
-                    onChange={(e) => setSettings({ ...settings, description: e.target.value })}
-                    className="input-field resize-none"
-                    rows={4}
-                    placeholder={t(kk('gerirclube.description_placeholder'))}
-                  />
-                </div>
-
-                {/* Localização + contactos are club-only: ClubProfile.jsx hides
-                    them entirely for groups, so offering them here would let a
-                    group admin save data that's never displayed anywhere. */}
-                {org?.kind !== 'group' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.location_field_label')}
-                      </label>
-                      <input
-                        ref={clubLocationInputRef}
-                        type="text"
-                        value={settings.location || ''}
+              <form id="club-settings-form" onSubmit={handleUpdateSettings}>
+                <p className={SECTION_KICKER}>{t(isGroupOrg ? 'cover.section_about_group' : 'cover.section_about_club')}</p>
+                <div className={CARD_BOX}>
+                  <SettingsField label={t('gerirclube.description_label')}>
+                    <textarea value={settings.description || ''} rows={3}
+                      onChange={(e) => setSettings({ ...settings, description: e.target.value })}
+                      className={`${BARE_INPUT} resize-none`} placeholder={t(kk('gerirclube.description_placeholder'))} />
+                  </SettingsField>
+                  {/* Local + contactos só nos clubes: ClubProfile.jsx esconde-os
+                      nos grupos — guardar aqui seria guardar o que ninguém vê. */}
+                  {org?.kind !== 'group' && (
+                    <SettingsField label={t('gerirclube.location_field_label')}>
+                      <input ref={clubLocationInputRef} type="text" value={settings.location || ''}
                         // Ver a nota no campo equivalente do mix.
                         onChange={(e) => setSettings({ ...settings, location: e.target.value, latitude: null, longitude: null })}
-                        className="input-field"
-                        placeholder={t(kk('gerirclube.address_placeholder'))}
-                      />
+                        className={BARE_INPUT} placeholder={t(kk('gerirclube.address_placeholder'))} />
                       <PlacesUnavailableHint />
-                    </div>
-
-                    {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1). */}
-                    {settings.district !== undefined && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerirclube.district_label')}</label>
+                    </SettingsField>
+                  )}
+                  {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1). */}
+                  {org?.kind !== 'group' && settings.district !== undefined && (
+                    <SettingsField label={t('gerirclube.district_label')}>
+                      <div className="mt-1">
                         <Select value={settings.district || ''} onChange={(v) => setSettings({ ...settings, district: v })}
                           options={districtOptions(t('gerirclube.district_none'))} />
                       </div>
-                    )}
+                    </SettingsField>
+                  )}
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.phone_label')}
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.phone || ''}
-                          onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                          className="input-field"
-                          placeholder={t('gerirclube.phone_placeholder')}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.instagram_label')}
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.instagram || ''}
-                          onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
-                          className="input-field"
-                          placeholder={t(kk('gerirclube.instagram_placeholder'))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.website_label')}
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.website || ''}
-                          onChange={(e) => setSettings({ ...settings, website: e.target.value })}
-                          className="input-field"
-                          placeholder={t(kk('gerirclube.website_placeholder'))}
-                        />
-                      </div>
+                {org?.kind !== 'group' && (
+                  <>
+                    <p className={SECTION_KICKER}>{t('cover.section_contacts')}</p>
+                    <div className={CARD_BOX}>
+                      <SettingsField label={t('gerirclube.phone_label')}>
+                        <input type="tel" value={settings.phone || ''} onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                          className={BARE_INPUT} placeholder={t('gerirclube.phone_placeholder')} />
+                      </SettingsField>
+                      <SettingsField label={t('gerirclube.instagram_label')}>
+                        <input type="text" value={settings.instagram || ''} onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
+                          className={BARE_INPUT} placeholder={t(kk('gerirclube.instagram_placeholder'))} />
+                      </SettingsField>
+                      <SettingsField label={t('gerirclube.website_label')}>
+                        <input type="text" value={settings.website || ''} onChange={(e) => setSettings({ ...settings, website: e.target.value })}
+                          className={BARE_INPUT} placeholder={t(kk('gerirclube.website_placeholder'))} />
+                      </SettingsField>
                     </div>
                   </>
                 )}
 
-                {/* Visibilidade (Trello #272). Dois interruptores, decisão do
-                    Francisco (16 set): ser encontrado na pesquisa não obriga a
-                    mostrar a agenda a desconhecidos. Agora também para grupos
-                    criados na Comunidade: cada grupo escolhe. `searchable` só
-                    existe depois de correr migration_searchable_orgs.sql. */}
-                <div className="pt-2 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                    {t('gerirclube.public_visibility_heading')}
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">
-                    {t(kk('gerirclube.public_visibility_description'))}
-                  </p>
+                {/* Visibilidade (Trello #272): ser encontrado na pesquisa não
+                    obriga a mostrar a agenda a desconhecidos (Francisco, 16 set).
+                    `searchable` só existe depois de migration_searchable_orgs.sql. */}
+                <p className={SECTION_KICKER}>{t('gerirclube.public_visibility_heading')}</p>
+                <div className={CARD_BOX}>
                   {settings.searchable !== undefined && (
-                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
-                      <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.searchable_label')}</p>
-                        <p className="text-[11px] text-muted">{t(kk('gerirclube.searchable_hint'))}</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={settings.searchable}
-                        onChange={(e) => setSettings({ ...settings, searchable: e.target.checked })}
-                        className="w-5 h-5 shrink-0"
-                      />
-                    </label>
+                    <SettingsSwitch label={t('gerirclube.searchable_label')} hint={t(kk('gerirclube.searchable_hint'))}
+                      checked={settings.searchable} onChange={(v) => setSettings({ ...settings, searchable: v })} />
                   )}
-                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
-                    <div>
-                      <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.public_club_label')}</p>
-                      <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.is_global}
-                      onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
-                      className="w-5 h-5 shrink-0"
-                    />
-                  </label>
+                  <SettingsSwitch label={t('gerirclube.public_club_label')} hint={t('gerirclube.appears_in_community_hint')}
+                    checked={settings.is_global} onChange={(v) => setSettings({ ...settings, is_global: v })} />
                   {(settings.is_global || settings.searchable) && (
-                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
-                      <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.open_join_label')}</p>
-                        <p className="text-[11px] text-muted">{t('gerirclube.open_join_hint')}</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={settings.open_join}
-                        onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
-                        className="w-5 h-5 shrink-0"
-                      />
-                    </label>
+                    <SettingsSwitch label={t('gerirclube.open_join_label')} hint={t('gerirclube.open_join_hint')}
+                      checked={settings.open_join} onChange={(v) => setSettings({ ...settings, open_join: v })} />
                   )}
                 </div>
+                <p className="mt-2 px-0.5 text-xs text-muted">{t(kk('gerirclube.public_visibility_description'))}</p>
 
-                {settingsError && <p role="alert" className="text-sm font-extrabold text-danger">{settingsError}</p>}
-                <button type="submit" className="btn-primary w-full">
-                  {t('gerirclube.save_settings_button')}
-                </button>
+                {settingsError && <p role="alert" className="mt-4 text-sm font-extrabold text-danger">{settingsError}</p>}
+                {settingsDirty > 0 && (
+                  <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+96px)] z-10 mt-4 flex items-center gap-2 rounded-card bg-ink-900 py-2.5 pl-4 pr-2.5 text-white shadow-lift animate-fade-in">
+                    <span className="min-w-0 flex-1 text-sm">{t('cover.unsaved', { count: settingsDirty })}</span>
+                    <button type="button" onClick={() => setSettings({ ...settingsBase })}
+                      className="min-h-[40px] shrink-0 rounded-ctrl px-3 text-sm font-extrabold text-white/70 hover:text-white">
+                      {t('cover.discard')}
+                    </button>
+                    <button type="submit" className="min-h-[40px] shrink-0 rounded-ctrl bg-lime-400 px-4 text-sm font-extrabold text-ink-900 hover:bg-lime-600">
+                      {t('cover.save')}
+                    </button>
+                  </div>
+                )}
               </form>
+
+              {coverOpen && (
+                <CoverSheet org={settings} onSave={handleSaveCover} onRemove={() => handleSaveCover({ url: null })} onClose={() => setCoverOpen(false)} />
+              )}
 
               {/* Plano — depois da identidade e de quem ve (ordem do desenho
                   de 23 set; antes vinha primeiro). O admin ve o que

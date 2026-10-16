@@ -18,6 +18,7 @@ import AppFeaturesPanel from '../components/AppFeaturesPanel'
 import OrgFinder from '../components/gerir/OrgFinder'
 import KindHero from '../components/KindHero'
 import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
+import { coverOf } from '../lib/orgCover'
 
 
 export default function Gerir() {
@@ -431,7 +432,7 @@ export default function Gerir() {
                 to={pendingCount > 0 ? `/gerir/${org.slug}?tab=members` : `/gerir/${org.slug}`}
                 className="press block overflow-hidden rounded-[22px] bg-white shadow-card"
               >
-                <KindHero kind={group ? 'group' : 'club'} src={group ? GROUP_HERO : CLUB_HERO} className="h-[110px]" />
+                <KindHero kind={group ? 'group' : 'club'} src={coverOf(org)} className="h-[110px]" />
                 <div className="px-4 pb-4">
                   {/* Clube quadrado (cantos de 28%), grupo redondo (regra de 18 set). */}
                   <span className={`relative -mt-8 inline-block bg-white p-[3px] ${group ? 'rounded-full' : 'rounded-[28%]'}`}>

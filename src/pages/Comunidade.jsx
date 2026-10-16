@@ -16,6 +16,7 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
 import KindHero from '../components/KindHero'
 import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
+import { coverOf, useOrgCovers } from '../lib/orgCover'
 import { Realce } from '../components/SearchField'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
@@ -82,6 +83,8 @@ export default function Comunidade() {
   const timeoutRef = useRef(null)
 
   const [teachers, setTeachers] = useState([])
+  // As capas escolhidas no Gerir (as listas da Comunidade não as trazem).
+  const covers = useOrgCovers(organizations.map((o) => o.id))
   const [teachersLoading, setTeachersLoading] = useState(true)
   const trimmed = query.trim()
 
@@ -254,7 +257,7 @@ export default function Comunidade() {
     ].filter(Boolean).join(' · ')
     return (
       <Link key={org.id} to={`/clube/${org.slug}`} className="block overflow-hidden rounded-[22px] bg-white shadow-card press">
-        <KindHero kind="club" src={group ? GROUP_HERO : CLUB_HERO} className="relative h-[104px]">
+        <KindHero kind="club" src={coverOf(org, covers[org.id])} className="relative h-[104px]">
           {org.open_join === false && (
             <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-xs font-extrabold text-white backdrop-blur-sm" title={t('comunidade.closed_aria')}>
               <Lock size={12} /> {t('comunidade.by_request')}
