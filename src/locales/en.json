@@ -1484,6 +1484,7 @@
   "gamedetails.court_number": "Court {{number}}",
   "gamedetails.vs": "vs",
   "gamedetails.share_duplas_title": "Share Duplas",
+  "gamedetails.share_duplas_button": "Share the pairs",
   "gamedetails.group_standings_title": "Standings — group stage",
   "gamedetails.pool_label": "Group {{number}}",
   "gamedetails.pool_standings_title": "Standings — Group {{number}}",

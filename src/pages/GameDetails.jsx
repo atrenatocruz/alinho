@@ -12,7 +12,7 @@ import OrganizerBox from '../components/event/OrganizerBox'
 import { isMixLive } from '../lib/mixLive'
 import { SkeletonGate } from '../components/Skeleton'
 import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
-import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2 } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -3285,7 +3285,7 @@ export default function GameDetails() {
                   conta ou não (Trello #339). Num mix que roda parceiros a dupla
                   desfazia-se na ronda seguinte, por isso não aparece lá. */}
               {!game.rotate_partners && game.allow_pair_signup && (
-                <PrimaryButton variant="ghost" onClick={withGender(() => setPartnerSheet(true))} disabled={joining} className="w-full !bg-white !border-ink-900">
+                <PrimaryButton variant="ghost" onClick={withGender(() => setPartnerSheet(true))} disabled={joining} className="w-full">
                   <Users size={20} /> {t('gamedetails.join_with_partner')}
                 </PrimaryButton>
               )}
@@ -3295,7 +3295,7 @@ export default function GameDetails() {
             // quem organiza aceitar.
             <div className="space-y-2">
               <p className="rounded-card bg-[#F4F5F1] px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
-              <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full !bg-white !border-ink-900">
+              <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full">
                 {t('mixrequest.cancel')}
               </PrimaryButton>
             </div>
@@ -3304,11 +3304,9 @@ export default function GameDetails() {
             // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
             // refazem-se as duplas primeiro.
             <div className="space-y-1.5">
-              {/* R3: já dentro, a caixa verde-clara por cima do «Sair» (protótipo). */}
-              <p className="flex min-h-[52px] items-center justify-center rounded-ctrl bg-lime-100 px-4 font-display text-[15px] font-extrabold text-[#3F6212]">
-                ✓ {t('home.next_in')}
-              </p>
-              <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
+              {/* «Estás dentro» diz-se só na faixa de cima; aqui fica o «Sair»
+                  (revisão do Renato, Francisco 16 out: aparecia duas vezes). */}
+              <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full">
                 {t(isOpenGame(game) ? 'openday.leave' : 'gamedetails.leave_mix')}
               </PrimaryButton>
               {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
@@ -3787,6 +3785,23 @@ export default function GameDetails() {
           </div>
           {editingPairs ? renderPairsEditor() : renderDuplasList()}
           <p className="mt-2 text-xs text-muted">{t('eventactions.drawn_everyone_sees')}</p>
+          {/* Partilhar as duplas logo que estão feitas, não só depois de
+              começar (revisão do Renato, Francisco 16 out). */}
+          {!editingPairs && (
+            <button type="button" onClick={() => setShowDuplasShare(true)}
+              className="press mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-[#CFD2D7] bg-white px-4 font-display text-[14.5px] font-extrabold text-ink-900">
+              <Share2 size={16} /> {t('gamedetails.share_duplas_button')}
+            </button>
+          )}
+          {showDuplasShare && !mixStarted && (
+            <ShareModal
+              title={t('gamedetails.share_duplas_title')}
+              message={buildDuplasShareMessage()}
+              url={shareUrl}
+              onClose={() => setShowDuplasShare(false)}
+              imageCard={{ variant: 'duplas', game, duplas: teams, formattedDate: formatDate(game.date) }}
+            />
+          )}
           {/* Voltar aos inscritos, sem duplas (Francisco, 15 out). A cor
               segue a da pergunta (UX): preto sem jogos; vermelho com a
               Ronda 1 nos campos, porque os jogos saem. */}

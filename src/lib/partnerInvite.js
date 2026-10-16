@@ -37,7 +37,8 @@ export function partnerEmailError(email) {
 
 export const inviteLink = (token, origin) => `${origin}/convite/${token}`
 
-export const whatsappShare = (text) => `https://wa.me/?text=${encodeURIComponent(text)}`
+// api.whatsapp.com/send e não wa.me: pelo wa.me os emojis chegavam como «�» (16 out).
+export const whatsappShare = (text) => `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
 
 export async function joinWithNamedPartner({ gameId, name, email }) {
   const { data, error } = await supabase.functions.invoke('join-with-named-partner', {

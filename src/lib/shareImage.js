@@ -90,5 +90,5 @@ export function sharePageLink({ title = '', text = '', url }) {
     navigator.share({ title, text: text || title, url }).catch(() => {})
     return
   }
-  window.open(`https://wa.me/?text=${encodeURIComponent([text || title, url].filter(Boolean).join(' '))}`, '_blank')
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent([text || title, url].filter(Boolean).join(' '))}`, '_blank')
 }

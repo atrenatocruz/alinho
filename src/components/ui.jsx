@@ -891,7 +891,9 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
         // O esbatido acaba na cor de fundo da barra (--bar-bg): branco no topo
         // da Home, o cinzento da página na StickyTop (R12b).
         style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0), var(--bar-bg, #fff) 45%)' }}
-        className="absolute inset-y-0 -right-4 hidden w-[34px] items-center justify-end pr-2 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
+        // A seta fica para dentro dos cantos redondos da barra (revisão do
+        // Renato, 16 out: na Home saía do contentor curvo).
+        className="absolute inset-y-0 -right-4 hidden w-[54px] items-center justify-end pr-6 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
         ›
       </button>
     )}
@@ -1988,7 +1990,9 @@ export function ShareModal({ title, message, url, onClose, imageCard }) {
   }
 
   const handleWhatsApp = () => {
-    window.open(`https://wa.me/?text=${encodeURIComponent(fullText)}`, '_blank', 'noopener,noreferrer')
+    // api.whatsapp.com/send e não wa.me: pelo wa.me os emojis (🎾, 🔗)
+    // chegavam ao WhatsApp como «�» (revisão do Renato, 16 out).
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(fullText)}`, '_blank', 'noopener,noreferrer')
   }
 
   const handleNativeShare = async () => {

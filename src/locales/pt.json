@@ -1488,6 +1488,7 @@
   "gamedetails.court_number": "Campo {{number}}",
   "gamedetails.vs": "vs",
   "gamedetails.share_duplas_title": "Partilhar Duplas",
+  "gamedetails.share_duplas_button": "Partilhar as duplas",
   "gamedetails.group_standings_title": "Classificação — fase de grupo",
   "gamedetails.pool_label": "Grupo {{number}}",
   "gamedetails.pool_standings_title": "Classificação — Grupo {{number}}",
