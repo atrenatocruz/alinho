@@ -10,7 +10,10 @@ import { COVER_PRESETS, coverOf } from '../../lib/orgCover'
    Em cima, a capa como vai ficar, com o logótipo por cima; por baixo, as
    capas do alinho e «Carregar». Uma foto carregada ajusta-se na vertical
    (o recorte é panorâmico, 3:1) antes de gravar — nunca fica cortada no
-   sítio errado. Nada grava até «Usar esta capa». */
+   sítio errado. Nada grava até «Usar esta capa».
+   O KindHero já é `relative`: para o pôr a toda a área, vai dentro de uma
+   caixa `absolute` (com as duas classes juntas ganhava o relative e a capa
+   ficava com altura zero — as pré-visualizações apareciam vazias). */
 
 export default function CoverSheet({ org, onSave, onRemove, onClose }) {
   const { t } = useTranslation()
@@ -76,7 +79,7 @@ export default function CoverSheet({ org, onSave, onRemove, onClose }) {
           <div className="relative aspect-[3/1]">
             {fileUrl
               ? <img src={fileUrl} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `50% ${y}%` }} />
-              : <KindHero kind="club" src={shown} className="absolute inset-0" />}
+              : <div className="absolute inset-0"><KindHero kind="club" src={shown} className="h-full w-full" /></div>}
             {fileUrl && <span className="pointer-events-none absolute inset-2 rounded-ctrl border-2 border-dashed border-white/85" aria-hidden="true" />}
           </div>
           <div className="relative h-8 bg-white">
@@ -102,7 +105,7 @@ export default function CoverSheet({ org, onSave, onRemove, onClose }) {
             return (
               <button key={p.key} type="button" onClick={() => pickPreset(p.url)} aria-pressed={on}
                 className={`relative h-16 overflow-hidden rounded-ctrl ring-offset-2 ${on ? 'ring-2 ring-ink-900' : ''}`}>
-                <KindHero kind="club" src={p.url} className="absolute inset-0" />
+                <div className="absolute inset-0"><KindHero kind="club" src={p.url} className="h-full w-full" /></div>
                 <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-left text-[11px] font-extrabold text-white">{t(p.labelKey)}</span>
                 {on && <Check size={14} className="absolute right-1.5 top-1.5 rounded-full bg-white p-0.5 text-ink-900" />}
               </button>

@@ -119,17 +119,15 @@ const covers = {
 
   // Bola: a bola em grande, a sair pela direita, com as linhas do efeito.
   'capa-bola': `
-    <rect width="${W}" height="${H}" fill="#C5DD01"/>
-    <g fill="#04040414">${Array.from({ length: 12 }, (_, r) => Array.from({ length: 30 }, (_, c) => `<circle cx="${c * 42 + (r % 2) * 21}" cy="${r * 42}" r="3.5"/>`).join('')).join('')}</g>
-    <g fill="none" stroke="#040404" stroke-width="10" stroke-linecap="round">
-      <path d="M260,330 Q520,150 760,180"/>
-      <path d="M330,400 Q560,260 780,270" opacity=".6"/>
-      <path d="M420,450 Q620,350 800,350" opacity=".3"/>
+    <rect width="${W}" height="${H}" fill="#0b1220"/>
+    <g fill="#C5DD01" opacity=".14">${Array.from({ length: 12 }, (_, r) => Array.from({ length: 30 }, (_, c) => `<circle cx="${c * 42 + (r % 2) * 21}" cy="${r * 42}" r="3.5"/>`).join('')).join('')}</g>
+    <g fill="none" stroke="#C5DD01" stroke-width="10" stroke-linecap="round">
+      <path d="M200,330 Q460,150 700,180"/>
+      <path d="M270,400 Q500,260 720,270" opacity=".6"/>
+      <path d="M360,450 Q560,350 740,350" opacity=".3"/>
     </g>
-    <circle cx="1000" cy="230" r="250" fill="#040404"/>
-    <circle cx="1000" cy="230" r="232" fill="#d7ec2a"/>
-    <path d="M790,120 C920,180 920,320 820,400" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/>
-    <path d="M1210,120 C1080,180 1080,320 1180,400" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round"/>`,
+    <circle cx="1000" cy="230" r="250" fill="#1F2937"/>
+    <circle cx="1000" cy="230" r="250" fill="none" stroke="#C5DD01" stroke-width="10" opacity=".7"/>`,
 
   // Campo: o court visto de cima, inclinado, com a rede e uma bola no saque.
   'capa-campo': `
@@ -149,11 +147,47 @@ const covers = {
     ${ball(840, 300, 22)}`,
 }
 
+// O Alino de cada capa (bonecos 3D com fundo transparente, public/alino):
+// pose, se vira, e onde fica. Como no topo do clube, o Alino grande à
+// direita, cortado pelo peito, e o cenário desfocado por trás.
+const ALINO = {
+  'capa-noite': { pose: 'pronto', flip: false },
+  'capa-rede': { pose: 'ola', flip: false },
+  'capa-vidro': { pose: 'a-pensar', flip: false },
+  'capa-poente': { pose: 'festa', flip: false },
+  'capa-bola': { pose: 'ola', flip: true },
+  'capa-campo': { pose: 'pronto', flip: true },
+}
+const OW = 900
+const OH = 360
+
 ;(async () => {
   for (const [name, body] of Object.entries(covers)) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`
+    // O cenário: desfocado (profundidade de campo), como uma foto atrás do boneco.
+    const scene = await sharp(Buffer.from(svg)).resize(OW, OH).blur(5).toBuffer()
+    // À esquerda funde para o azul-noite dos topos do clube — é onde entra o logótipo.
+    const fade = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}"><defs><linearGradient id="f" x1="0" x2="1"><stop offset="0" stop-color="#1F2937" stop-opacity=".97"/><stop offset=".32" stop-color="#1F2937" stop-opacity=".9"/><stop offset=".55" stop-color="#1F2937" stop-opacity=".25"/><stop offset=".7" stop-color="#1F2937" stop-opacity="0"/></linearGradient></defs><rect width="${OW}" height="${OH}" fill="url(#f)"/></svg>`)
+    const { pose, flip } = ALINO[name]
+    let alino = sharp(path.join(__dirname, '..', 'public', 'alino', `alino-${pose}.webp`)).resize({ height: 470, kernel: 'lanczos3' })
+    if (flip) alino = alino.flop()
+    // O sharp só sobrepõe o que cabe: corta o boneco pelo fundo da capa.
+    const full = await alino.toBuffer()
+    const fm = await sharp(full).metadata()
+    const alinoBuf = await sharp(full).extract({ left: 0, top: 0, width: fm.width, height: Math.min(fm.height, OH - 34) }).toBuffer()
+    const meta = await sharp(alinoBuf).metadata()
+    // Sombra suave no chão por baixo do boneco.
+    const shadow = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${OW}" height="${OH}"><ellipse cx="${OW - 160}" cy="${OH - 8}" rx="170" ry="26" fill="#000" opacity=".28"/></svg>`)
+    const shadowBlur = await sharp(shadow).blur(12).toBuffer()
     const file = path.join(OUT, `${name}.webp`)
-    await sharp(Buffer.from(svg)).webp({ quality: 82 }).toFile(file)
+    await sharp(scene)
+      .composite([
+        { input: fade },
+        { input: shadowBlur },
+        { input: alinoBuf, left: Math.round(OW - meta.width - 40), top: 34 },
+      ])
+      .webp({ quality: 84 })
+      .toFile(file)
     console.log('ok', file)
   }
 })()
