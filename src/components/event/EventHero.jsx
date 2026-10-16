@@ -118,16 +118,25 @@ export default function EventHero({
             {timeAside && <span className="text-lg text-ink-500">{timeAside}</span>}
           </p>
         )}
+        {/* A data e «Adicionar ao calendário»: o «·» anda com o botão e some
+            quando a linha parte (Francisco, 16 out: ficava «19 de outubro ·»
+            sozinho no fim). O «·» vai à frente do botão, em 14 px; a fila
+            recua 14 px e corta o que sai, por isso, quando o botão começa a
+            linha, o «·» fica de fora. */}
         {(dateLine || onAddToCalendar) && (
-          <p className="mt-1.5 text-sm text-ink-700">
-            {dateLine}
-            {dateLine && onAddToCalendar && ' · '}
-            {onAddToCalendar && (
-              <button type="button" onClick={onAddToCalendar} className="min-h-[32px] font-extrabold text-ink-900 underline underline-offset-2">
-                {t('gamedetails.add_to_calendar')}
-              </button>
-            )}
-          </p>
+          <div className="mt-1.5 overflow-hidden">
+            <p className="-ml-[14px] flex flex-wrap items-baseline text-sm text-ink-700">
+              {dateLine && <span className="pl-[14px]">{dateLine}</span>}
+              {onAddToCalendar && (
+                <span className="inline-flex items-baseline">
+                  <span aria-hidden="true" className="w-[14px] text-center">·</span>
+                  <button type="button" onClick={onAddToCalendar} className="min-h-[32px] font-extrabold text-ink-900 underline underline-offset-2">
+                    {t('gamedetails.add_to_calendar')}
+                  </button>
+                </span>
+              )}
+            </p>
+          </div>
         )}
         {nextStep && <div className="mt-3 empty:hidden">{nextStep}</div>}
         {status && <StatusBand kind={kind} status={status} />}
