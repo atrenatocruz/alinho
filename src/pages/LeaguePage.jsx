@@ -22,26 +22,28 @@ export default function LeaguePage() {
   const [catId, setCatId] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
-  // undefined = a carregar · null = não existe · 'error' = falhou a ligação.
+  // page: undefined = a carregar · null = não existe · objeto = a liga. A falha de ligação vai em loadError.
   const load = (isCancelled = () => false) => getLeaguePage(slug).then((p) => {
     if (isCancelled()) return
+    setLoadError(false)
     setPage(p || null)
     setCatId((cur) => (p?.categories.some((c) => c.id === cur) ? cur : p?.categories[0]?.id || null))
-  }).catch(() => { if (!isCancelled()) setPage('error') })
+  }).catch(() => { if (!isCancelled()) setLoadError(true) })
   useEffect(() => {
     let cancelled = false
-    setPage(undefined); setCatId(null); setTab('table'); setError('')
+    setPage(undefined); setCatId(null); setTab('table'); setError(''); setBusy(false); setLoadError(false)
     load(() => cancelled)
     return () => { cancelled = true }
   }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = useMemo(() => (page && catId ? categoryRows(page, catId) : []), [page, catId])
-  if (page === undefined) return null
-  if (page === 'error') {
+  const rows = useMemo(() => (page && typeof page === 'object' && catId ? categoryRows(page, catId) : []), [page, catId])
+  if (loadError) {
     return <LoadErrorState title={t('app.load_error_title')} subtitle={t('app.load_error_body')}
-      onRetry={() => { setPage(undefined); load() }} />
+      onRetry={() => { setLoadError(false); setPage(undefined); load() }} />
   }
+  if (page === undefined) return null
   if (page === null) return <EmptyState title={t('league.not_found_title')} subtitle={t('league.not_found_text')} />
 
   const { league, viewer } = page

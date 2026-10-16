@@ -6027,7 +6027,7 @@
   "league.categories_count_other": "{{count}} categories",
   "league.category_label": "Category",
   "league.walkover": "Walkover",
-  "league.walkover_long": "Walkover",
+  "league.walkover_long": "Walkover (no-show)",
   "league.not_found_title": "This league does not exist",
   "league.not_found_text": "The link may be wrong or the league was deleted.",
   "league.apply": "Enter the club",
