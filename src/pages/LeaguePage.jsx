@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EventHero from '../components/event/EventHero'
-import { Tabs, Chips, PrimaryButton, EmptyState } from '../components/ui'
+import { Tabs, Chips, PrimaryButton, EmptyState, LoadErrorState } from '../components/ui'
 import StandingsTable from '../components/league/StandingsTable'
 import EncounterRow from '../components/league/EncounterRow'
 import { getLeaguePage, applyToLeague, leagueErrorMessage } from '../lib/leagueApi'
-import { categoryRows, encounterState, isMine } from '../lib/leagueView'
+import { categoryRows, encounterState, isMine, canClubApply } from '../lib/leagueView'
 import { categoryCode } from '../lib/tournaments'
 import { toDayKey } from '../lib/agenda'
 
@@ -23,15 +23,26 @@ export default function LeaguePage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const load = () => getLeaguePage(slug).then((p) => {
-    setPage(p)
-    if (p) setCatId((cur) => cur || p.categories[0]?.id || null)
-  }).catch(() => setPage(null))
-  useEffect(() => { load() }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
+  // undefined = a carregar · null = não existe · 'error' = falhou a ligação.
+  const load = (isCancelled = () => false) => getLeaguePage(slug).then((p) => {
+    if (isCancelled()) return
+    setPage(p || null)
+    setCatId((cur) => (p?.categories.some((c) => c.id === cur) ? cur : p?.categories[0]?.id || null))
+  }).catch(() => { if (!isCancelled()) setPage('error') })
+  useEffect(() => {
+    let cancelled = false
+    setPage(undefined); setCatId(null); setTab('table'); setError('')
+    load(() => cancelled)
+    return () => { cancelled = true }
+  }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => (page && catId ? categoryRows(page, catId) : []), [page, catId])
   if (page === undefined) return null
-  if (page === null) return <EmptyState title={t('league.empty_rounds_title')} subtitle="" />
+  if (page === 'error') {
+    return <LoadErrorState title={t('app.load_error_title')} subtitle={t('app.load_error_body')}
+      onRetry={() => { setPage(undefined); load() }} />
+  }
+  if (page === null) return <EmptyState title={t('league.not_found_title')} subtitle={t('league.not_found_text')} />
 
   const { league, viewer } = page
   const myTeamIds = viewer.team_ids || []
@@ -43,7 +54,7 @@ export default function LeaguePage() {
   const currentRound = catRounds.filter((r) => r.window_start <= today).pop()
 
   // Inscrever: um admin de clube, inscrições abertas, o clube ainda sem pedido nesta categoria.
-  const applyClub = viewer.admin_clubs?.find((c) => !page.teams.some((x) => x.category_id === catId && x.organization_id === c.id))
+  const applyClub = viewer.admin_clubs?.find((c) => canClubApply(page, catId, c))
   const canApply = league.status === 'inscricoes' && cat?.status === 'inscricoes' && applyClub
 
   const apply = async () => {

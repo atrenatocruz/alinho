@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { categoryRows, encounterState, isMine } from './leagueView'
+import { categoryRows, encounterState, isMine, canClubApply } from './leagueView'
 
 const page = {
   categories: [{ id: 'c1', matches_per_encounter: 1, points_win: 3, points_draw: 1, points_loss: 0, points_walkover: -1 }],
@@ -22,5 +22,13 @@ describe('vista da liga', () => {
   it('é meu se uma das equipas é minha', () => {
     expect(isMine({ home_team_id: 'A', away_team_id: 'B' }, ['B'])).toBe(true)
     expect(isMine({ home_team_id: 'A', away_team_id: 'B' }, [])).toBe(false)
+  })
+  it('o clube só volta a pedir se o pedido anterior foi rejeitado ou retirado', () => {
+    const mk = (status) => ({ teams: [{ category_id: 'c1', organization_id: 'o1', status }] })
+    const club = { id: 'o1' }
+    for (const st of ['pendente', 'aprovada', 'suplente']) expect(canClubApply(mk(st), 'c1', club)).toBe(false)
+    for (const st of ['rejeitada', 'retirada']) expect(canClubApply(mk(st), 'c1', club)).toBe(true)
+    expect(canClubApply(mk('aprovada'), 'c2', club)).toBe(true)
+    expect(canClubApply(mk('aprovada'), 'c1', undefined)).toBe(false)
   })
 })

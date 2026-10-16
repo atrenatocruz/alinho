@@ -21,3 +21,10 @@ export function encounterState(encounter, todayKey, roundEnd) {
 
 export const isMine = (encounter, teamIds = []) =>
   teamIds.includes(encounter.home_team_id) || teamIds.includes(encounter.away_team_id)
+
+const FREED = new Set(['rejeitada', 'retirada'])
+
+/** Pode este clube pedir lugar nesta categoria? Um pedido pendente, aprovado
+ *  ou suplente bloqueia; rejeitado ou retirado deixa voltar a pedir. */
+export const canClubApply = (page, categoryId, club) =>
+  !!club && !page.teams.some((x) => x.category_id === categoryId && x.organization_id === club.id && !FREED.has(x.status))

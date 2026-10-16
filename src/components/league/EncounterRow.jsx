@@ -23,14 +23,14 @@ export default function EncounterRow({ encounter: e, state, home, away, mine, to
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 font-display text-[15px] font-extrabold leading-tight">
         <span className="truncate">{home?.name}</span>
         <span className="min-w-[52px] text-center text-[22px] tracking-[-.02em]">
-          {e.walkover_team_id ? 'FC' : totals ? `${totals.homeMatches}–${totals.awayMatches}` : <span className="text-sm text-ink-500">vs</span>}
+          {e.walkover_team_id ? t('league.walkover') : totals ? `${totals.homeMatches}–${totals.awayMatches}` : <span className="text-sm text-ink-500">vs</span>}
         </span>
         <span className="truncate text-right">{away?.name}</span>
       </div>
-      {state !== 'oficial' && (
+      {(state !== 'oficial' || e.walkover_team_id) && (
         <p className="mt-2 flex items-center gap-1.5 font-display text-[13px] font-bold" style={{ color: TONE[state] }}>
           <i className="h-[7px] w-[7px] rounded-full" style={{ background: TONE[state] }} />
-          {t(state === 'late' ? 'league.enc_late' : `league.enc_${state}`)}
+          {t(e.walkover_team_id && state === 'oficial' ? 'league.walkover_long' : state === 'late' ? 'league.enc_late' : `league.enc_${state}`)}
         </p>
       )}
     </Link>
