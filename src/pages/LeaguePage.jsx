@@ -9,14 +9,14 @@ import { Tabs, Chips, PrimaryButton, EmptyState, LoadErrorState } from '../compo
 import StandingsTable from '../components/league/StandingsTable'
 import EncounterRow from '../components/league/EncounterRow'
 import { getLeaguePage, applyToLeague, leagueErrorMessage } from '../lib/leagueApi'
-import { categoryRows, encounterState, isMine, canClubApply } from '../lib/leagueView'
+import { categoryRows, encounterState, isMine, canClubApply, formatWindow } from '../lib/leagueView'
 import { categoryCode } from '../lib/tournaments'
 import { toDayKey } from '../lib/agenda'
 
 export default function LeaguePage() {
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [page, setPage] = useState(undefined)
   const [tab, setTab] = useState('table')
   const [catId, setCatId] = useState(null)
@@ -103,7 +103,7 @@ export default function LeaguePage() {
             <section key={r.id} className="space-y-2.5">
               <div className="flex items-baseline gap-2 px-0.5 pt-1">
                 <b className="font-display text-[20px] font-black tracking-[-.02em]">{t('league.round', { n: r.number })}</b>
-                <span className="font-display text-sm font-semibold text-[#5B6068]">{r.window_start} – {r.window_end}</span>
+                <span className="font-display text-sm font-semibold text-[#5B6068]">{formatWindow(r.window_start, r.window_end, i18n.language)}</span>
               </div>
               {page.encounters.filter((e) => e.round_id === r.id).map((e) => (
                 <EncounterRow key={e.id} encounter={e} state={encounterState(e, today, r.window_end)}

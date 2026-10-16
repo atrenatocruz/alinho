@@ -36,10 +36,17 @@ export function leagueForYouItems(agenda, t, lang = 'pt-PT') {
       to: `/liga/${e.league_slug}/encontro/${e.id}`, cta: t('league.confirm_result'),
     })
   }
+  // Quem administra vários clubes vê a liga uma só vez, com os nomes dos clubes juntos.
+  const open = new Map()
   for (const l of agenda?.open_leagues || []) {
+    const cur = open.get(l.slug)
+    if (!cur) open.set(l.slug, { ...l, clubs: [l.my_club_name].filter(Boolean) })
+    else if (l.my_club_name && !cur.clubs.includes(l.my_club_name)) cur.clubs.push(l.my_club_name)
+  }
+  for (const l of open.values()) {
     items.push({
       key: `league-open:${l.slug}`, icon: '🏆', bg: KIND_COLORS.league.light,
-      title: t('league.foryou_open', { name: l.name }), sub: l.my_club_name,
+      title: t('league.foryou_open', { name: l.name }), sub: l.clubs.join(', '),
       to: `/liga/${l.slug}`, cta: t('league.apply'),
     })
   }

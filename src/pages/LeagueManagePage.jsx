@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar, Tabs, Chips, PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
-import { getLeaguePage, decideApplication, saveSchedule, finishCategory, addOrganizer, removeOrganizer, leagueErrorMessage } from '../lib/leagueApi'
+import { getLeaguePage, decideApplication, publishLeague, saveSchedule, finishCategory, addOrganizer, removeOrganizer, leagueErrorMessage } from '../lib/leagueApi'
 import { roundRobin } from '../lib/leagueSchedule'
 import { needsRescheduleConfirm } from '../lib/leagueDistricts'
 import { categoryCode } from '../lib/tournaments'
@@ -96,6 +96,9 @@ export default function LeagueManagePage() {
         <Chips label={t('league.category_label')} value={catId} onChange={setCatId} options={page.categories.map((c) => ({ value: c.id, label: categoryCode(c.gender, c.level) }))} />
       )}
       {error && <p role="alert" className="text-sm font-semibold text-danger">{error}</p>}
+      {page.league.status === 'rascunho' && (
+        <PrimaryButton variant="ink" className="w-full" onClick={() => run(() => publishLeague(page.league.id))}>{t('league.publish')}</PrimaryButton>
+      )}
 
       {tab === 'requests' && (pending.length === 0
         ? <EmptyState pose={null} title={t('league.requests_empty')} />

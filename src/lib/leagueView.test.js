@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { categoryRows, encounterState, isMine, canClubApply } from './leagueView'
+import { categoryRows, encounterState, isMine, canClubApply, formatWindow } from './leagueView'
 
 const page = {
   categories: [{ id: 'c1', matches_per_encounter: 1, points_win: 3, points_draw: 1, points_loss: 0, points_walkover: -1 }],
@@ -30,5 +30,17 @@ describe('vista da liga', () => {
     for (const st of ['rejeitada', 'retirada']) expect(canClubApply(mk(st), 'c1', club)).toBe(true)
     expect(canClubApply(mk('aprovada'), 'c2', club)).toBe(true)
     expect(canClubApply(mk('aprovada'), 'c1', undefined)).toBe(false)
+  })
+})
+
+describe('formatWindow', () => {
+  it('uma jornada no mesmo mês', () => {
+    expect(formatWindow('2026-11-03', '2026-11-16', 'pt')).toBe('3 a 16 nov')
+  })
+  it('uma jornada que passa de mês', () => {
+    expect(formatWindow('2026-10-28', '2026-11-10', 'pt')).toBe('28 out a 10 nov')
+  })
+  it('sem datas, vazio', () => {
+    expect(formatWindow(null, null, 'pt')).toBe('')
   })
 })

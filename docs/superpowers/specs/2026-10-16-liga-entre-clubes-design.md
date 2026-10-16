@@ -252,4 +252,5 @@ A classificação por clube soma pontos por posição final de cada dupla. Nada 
   - retirar o pedido fecha o plantel do clube e avisa quem organiza;
   - todas as funções com `SET search_path = public, pg_temp`;
   - a nota da decisão e a lista de organizadores só aparecem a quem está dentro / organiza.
+  - limite conhecido da Fase 1: fazer o calendário de uma categoria põe a liga toda a `a_decorrer`, e as outras categorias deixam de aceitar pedidos (a interface só cria uma categoria).
 - As perguntas ao Francisco continuam abertas; a implementação usa os valores por omissão acima (todos configuráveis por categoria).

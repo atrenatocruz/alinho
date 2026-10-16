@@ -27,4 +27,14 @@ describe('liga na Home', () => {
     expect(items.map((i) => i.key)).toEqual(['league-confirm:e1', 'league-open:liga-lx'])
     expect(items[0].to).toBe('/liga/liga-porto/encontro/e1')
   })
+  it('«Para ti»: quem administra vários clubes vê a liga uma só vez', () => {
+    const t = (k) => k
+    const items = leagueForYouItems({ encounters: [], open_leagues: [
+      { slug: 'liga-lx', name: 'Liga Alinho Lisboa', my_club_name: 'Maré Alta Padel' },
+      { slug: 'liga-lx', name: 'Liga Alinho Lisboa', my_club_name: 'Serra Azul Padel' },
+      { slug: 'liga-lx', name: 'Liga Alinho Lisboa', my_club_name: 'Serra Azul Padel' },
+    ] }, t)
+    expect(items).toHaveLength(1)
+    expect(items[0].sub).toBe('Maré Alta Padel, Serra Azul Padel')
+  })
 })
