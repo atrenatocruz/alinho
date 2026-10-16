@@ -118,7 +118,7 @@ RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 DECLARE
   v_e league_encounters; v_home_org UUID; v_away_org UUID; mt league_matches; pl RECORD; slotrec RECORD;
   v_snap JSONB := '[]'::jsonb; v_deltas JSONB; v_points JSONB; v_won JSONB; v_org JSONB;
-  v_rules JSONB; v_is_won BOOLEAN; v_pts INTEGER; v_when TIMESTAMPTZ;
+  v_rules JSONB; v_is_won BOOLEAN; v_pts INTEGER; v_when TIMESTAMPTZ; v_n INTEGER; v_xp INTEGER;
 BEGIN
   SELECT * INTO v_e FROM league_encounters WHERE id = p_encounter_id;
   IF v_e.ranked_applied OR v_e.walkover_team_id IS NOT NULL OR v_e.status <> 'oficial' THEN RETURN; END IF;
@@ -150,13 +150,22 @@ BEGIN
       v_points := v_points || jsonb_build_object(slotrec.pid::text, v_pts);
       v_won := v_won || jsonb_build_object(slotrec.pid::text, v_is_won);
       v_org := v_org || jsonb_build_object(slotrec.pid::text, slotrec.org);
-      -- XP: 10 por partida, +5 a quem ganha (como o jogo entre amigos).
+      -- XP: 10 por partida, +5 a quem ganha (como o jogo entre amigos). Só o que
+      -- foi realmente inserido entra em profiles.xp (um reaplicar não repete).
+      v_xp := 0;
       INSERT INTO xp_events (user_id, organization_id, kind, source_league_match_id, amount, occurred_at)
       VALUES (slotrec.pid, slotrec.org, 'league_match', mt.id, 10, v_when) ON CONFLICT DO NOTHING;
+      GET DIAGNOSTICS v_n = ROW_COUNT;
+      IF v_n > 0 THEN v_xp := v_xp + 10; END IF;
       IF v_is_won THEN
         INSERT INTO xp_events (user_id, organization_id, kind, source_league_match_id, amount, occurred_at)
         VALUES (slotrec.pid, slotrec.org, 'league_win', mt.id, 5, v_when) ON CONFLICT DO NOTHING;
+        GET DIAGNOSTICS v_n = ROW_COUNT;
+        IF v_n > 0 THEN v_xp := v_xp + 5; END IF;
       END IF;
+      UPDATE profiles
+         SET xp = xp + v_xp, last_played_at = GREATEST(COALESCE(last_played_at, v_when), v_when)
+       WHERE id = slotrec.pid;
     END LOOP;
     v_snap := v_snap || jsonb_build_array(jsonb_build_object('slot', mt.slot, 'deltas', v_deltas, 'points', v_points, 'won', v_won, 'org', v_org));
   END LOOP;
@@ -272,6 +281,8 @@ BEGIN
   SELECT * INTO v_e FROM league_encounters WHERE id = p_encounter_id FOR UPDATE;
   IF v_e.id IS NULL THEN RAISE EXCEPTION 'encounter_not_found'; END IF;
   IF NOT can_manage_league(v_e.league_id) THEN RAISE EXCEPTION 'not_league_manager'; END IF;
+  -- Quem representa uma das equipas não decide o próprio encontro: resolve um organizador neutro.
+  IF league_side(v_e) IS NOT NULL THEN RAISE EXCEPTION 'conflict_of_interest'; END IF;
   IF v_e.status = 'cancelado' THEN RAISE EXCEPTION 'encounter_locked'; END IF;
   IF length(trim(COALESCE(p_note, ''))) NOT BETWEEN 3 AND 500 THEN RAISE EXCEPTION 'note_required'; END IF;
   IF p_walkover_team_id IS NOT NULL AND p_walkover_team_id NOT IN (v_e.home_team_id, v_e.away_team_id) THEN
