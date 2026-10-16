@@ -132,17 +132,6 @@ export default function PersonalInfo() {
       )}
 
       <div className="card">
-        {!editing && (
-          <div className="flex justify-end -mt-1 mb-3">
-            <button
-              onClick={() => setEditing(true)}
-              className="text-ink-700 font-extrabold text-sm min-h-[44px] px-2"
-            >
-              {t('profile.edit_button')}
-            </button>
-          </div>
-        )}
-
         {editing ? (
           <form onSubmit={handleSave} className="space-y-4 animate-fade-up">
             <div>
@@ -312,7 +301,17 @@ export default function PersonalInfo() {
         ) : (
           <div className="space-y-4">
             <div>
-              <p className={fieldLabel}>{t('profile.name_label')}</p>
+              {/* «Editar» na linha do «NOME», à direita, sublinhado como os
+                  outros links de ação: o cartão já não começa com uma linha
+                  vazia (Renato/Francisco, 16 out). Toque de 44 px sem mexer
+                  na altura da linha. */}
+              <div className="flex items-baseline justify-between gap-3">
+                <p className={fieldLabel}>{t('profile.name_label')}</p>
+                <button type="button" onClick={() => setEditing(true)}
+                  className="-my-3 -mr-2 inline-flex min-h-[44px] items-center px-2 text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                  {t('profile.edit_button')}
+                </button>
+              </div>
               <p className={fieldValue}>{profile?.name}</p>
             </div>
 
