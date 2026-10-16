@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, TrendingUp } from 'lucide-react'
+import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
@@ -21,6 +21,7 @@ import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
+import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory, useAllPlayed, playedTotals, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
 import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
@@ -858,34 +859,27 @@ export default function Profile() {
           <ChevronRight size={18} className="shrink-0" />
         </Link>
 
-        {/* Estatísticas da evolução do ranking (Francisco, 16 out): o cartão
-            inteiro abre a página, como o do XP. */}
-        <Link to="/perfil/estatisticas"
-          className="press flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl bg-surface">
-            <TrendingUp size={18} className="text-ink-700" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>
-            <span className="block truncate text-xs text-muted">{t('playerstats.card_hint')}</span>
-          </span>
-          <ChevronRight size={18} className="shrink-0 text-ink-500" />
-        </Link>
+        {/* Estatísticas com um gráfico pequeno (proposta A, Renato, 16 out):
+            o cartão inteiro abre a página. */}
+        <StatsPreviewCard userId={profile?.id} />
 
-        {/* «Jogo entre amigos» com a imagem do Alino com o amigo (R0) e o
-            botão preto a toda a largura. Desligado no Gerir → não aparece. */}
+        {/* «Jogo entre amigos» numa linha só (proposta A, 16 out): o cartão
+            grande com a imagem ocupava muito para o que fazia. A miniatura do
+            Alino fica; a linha inteira abre os jogos entre amigos. Desligado
+            no Gerir → não aparece. */}
         {isPrivateMatchesEnabled && (
-          <div className="overflow-hidden rounded-card border border-line bg-white">
-            <img src="/topo/topo-amigos.webp" alt="" className="block h-32 w-full object-cover bg-ink-900"
-              onError={(e) => { e.currentTarget.style.display = 'none' }} />
-            <div className="p-3.5">
-              <p className="font-display text-lg font-extrabold text-ink-900">{t('home.friendly_match')}</p>
-              <p className="mt-0.5 text-sm text-muted">{friendInvitesOn ? t('friends.profile_button_line') : t('profile.r7_friends_line')}</p>
-              <Link to="/jogos-privados" className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 font-extrabold text-white">
-                {t('profile.r7_friends_cta')}
-              </Link>
-            </div>
-          </div>
+          <Link to="/jogos-privados"
+            className="press flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+            <img src="/topo/topo-amigos.webp" alt="" className="h-11 w-11 shrink-0 rounded-ctrl bg-ink-900 object-cover object-[75%_50%]"
+              onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+            <span className="min-w-0 flex-1">
+              <span className="block font-extrabold leading-tight text-ink-900">{t('home.friendly_match')}</span>
+              <span className="block truncate text-xs text-muted">{friendInvitesOn ? t('friends.profile_button_line') : t('profile.r7_friends_line')}</span>
+            </span>
+            <span className="shrink-0 rounded-full border-[1.5px] border-line bg-white px-3.5 py-2 text-[13px] font-extrabold text-ink-900">
+              {t('profile.friends_create_short')}
+            </span>
+          </Link>
         )}
 
       {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
