@@ -6058,6 +6058,7 @@
   "league.captains": "Capitães",
   "league.add_player": "Adicionar jogador",
   "league.remove_player": "Tirar",
+  "league.make_captain": "Tornar capitão",
   "league.level_at_entry": "O nível conta no dia em que o jogador entra. Se subir durante a liga, continua a poder jogar.",
   "league.roster_locked": "O plantel fechou na jornada {{n}}.",
   "league.create": "Criar liga",

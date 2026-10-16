@@ -79,6 +79,7 @@ const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
 const LeaguePage = lazyPage(() => import('./pages/LeaguePage'))
 const LeagueEncounterPage = lazyPage(() => import('./pages/LeagueEncounterPage'))
+const LeagueTeamPage = lazyPage(() => import('./pages/LeagueTeamPage'))
 const LeagueResultPage = lazyPage(() => import('./pages/LeagueResultPage'))
 const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
@@ -545,6 +546,7 @@ function AppRoutes() {
         {/* Liga entre Clubes (Fase 1): pública, como o torneio. */}
         <Route path="/liga/:slug" element={<Guard require="public" showSplash={showSplash}><LeaguePage /></Guard>} />
         <Route path="/liga/:slug/encontro/:id" element={<Guard require="public" showSplash={showSplash}><LeagueEncounterPage /></Guard>} />
+        <Route path="/liga/:slug/equipa/:teamId" element={<Guard require="protected" showSplash={showSplash}><LeagueTeamPage /></Guard>} />
         <Route path="/liga/:slug/encontro/:id/resultado" element={<Guard require="protected" showSplash={showSplash}><LeagueResultPage /></Guard>} />
         <Route
           path="/torneio/:id"

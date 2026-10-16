@@ -6043,6 +6043,7 @@
   "league.captains": "Captains",
   "league.add_player": "Add player",
   "league.remove_player": "Remove",
+  "league.make_captain": "Make captain",
   "league.level_at_entry": "The level counts on the day the player joins. If it goes up during the league, they can still play.",
   "league.roster_locked": "The roster locked in round {{n}}.",
   "league.create": "Create league",
