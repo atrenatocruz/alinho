@@ -6299,10 +6299,10 @@
   "personal.section_account": "Conta",
   "personal.section_who_sees": "Quem vê o quê",
   "personal.name_required": "O nome não pode ficar vazio.",
-  "cover.preset_night": "Noite de jogo",
-  "cover.preset_net": "Rede",
-  "cover.preset_glass": "Vidro",
-  "cover.preset_sunset": "Pôr do sol",
-  "cover.preset_ball": "Bola",
-  "cover.preset_court": "Campo"
+  "cover.preset_blue": "Campo azul",
+  "cover.preset_trophy": "Troféu",
+  "cover.preset_podium": "Pódio",
+  "cover.preset_clay": "Terra",
+  "cover.preset_practice": "Treino",
+  "cover.preset_pair": "Dupla"
 }

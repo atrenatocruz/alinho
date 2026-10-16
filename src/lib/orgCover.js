@@ -9,16 +9,18 @@ import { CLUB_HERO, GROUP_HERO } from './kindColors'
 
 const BUCKET = 'club-logos'
 
-/** As capas do alinho para escolher (Renato, 16 out): seis desenhos do mundo
- *  do padel, sem ligação a um tipo de clube ou de evento — geradas por
- *  scripts/gerar-capas.cjs. Sem escolha, fica a imagem do Alino do tipo. */
+/** As capas do alinho para escolher: os renders 3D do Alino que a app já
+ *  tem (os topos dos eventos), com nomes do que se vê — não do tipo de
+ *  evento. As capas desenhadas/compostas à mão ficavam sem qualidade (Renato,
+ *  16 out); capas próprias de clube, quando o designer as fizer, entram aqui.
+ *  Sem escolha, fica a imagem do Alino do tipo. */
 export const COVER_PRESETS = [
-  { key: 'noite', url: '/topo/capa-noite.webp', labelKey: 'cover.preset_night' },
-  { key: 'rede', url: '/topo/capa-rede.webp', labelKey: 'cover.preset_net' },
-  { key: 'vidro', url: '/topo/capa-vidro.webp', labelKey: 'cover.preset_glass' },
-  { key: 'poente', url: '/topo/capa-poente.webp', labelKey: 'cover.preset_sunset' },
-  { key: 'bola', url: '/topo/capa-bola.webp', labelKey: 'cover.preset_ball' },
-  { key: 'campo', url: '/topo/capa-campo.webp', labelKey: 'cover.preset_court' },
+  { key: 'azul', url: '/topo/topo-mix.webp', labelKey: 'cover.preset_blue' },
+  { key: 'trofeu', url: '/topo/topo-torneio.webp', labelKey: 'cover.preset_trophy' },
+  { key: 'podio', url: '/topo/topo-liga.webp', labelKey: 'cover.preset_podium' },
+  { key: 'terra', url: '/topo/topo-aberto.webp', labelKey: 'cover.preset_clay' },
+  { key: 'treino', url: '/topo/topo-aula.webp', labelKey: 'cover.preset_practice' },
+  { key: 'dupla', url: '/topo/topo-amigos.webp', labelKey: 'cover.preset_pair' },
 ]
 
 /** A capa a mostrar: a escolhida, ou a do Alino do tipo. */

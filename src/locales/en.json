@@ -6284,10 +6284,10 @@
   "personal.section_account": "Account",
   "personal.section_who_sees": "Who sees what",
   "personal.name_required": "Your name can’t be empty.",
-  "cover.preset_night": "Game night",
-  "cover.preset_net": "Net",
-  "cover.preset_glass": "Glass",
-  "cover.preset_sunset": "Sunset",
-  "cover.preset_ball": "Ball",
-  "cover.preset_court": "Court"
+  "cover.preset_blue": "Blue court",
+  "cover.preset_trophy": "Trophy",
+  "cover.preset_podium": "Podium",
+  "cover.preset_clay": "Clay",
+  "cover.preset_practice": "Practice",
+  "cover.preset_pair": "Pair"
 }
