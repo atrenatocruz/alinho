@@ -126,6 +126,19 @@ describe('filters and days', () => {
     const ok = { show: 'open', kinds: ['mix'], orgIds: null }
     expect(normalizeFilters(ok)).toBe(ok)
   })
+  it('upgrades «all kinds» saved before the league existed', () => {
+    const old = { show: 'all', kinds: ['mix', 'open', 'free', 'friends', 'lesson', 'tournament'], orgIds: null }
+    const n = normalizeFilters(old)
+    expect(n.kinds).toContain('league')
+    expect(n.kinds).toEqual(EVENT_KINDS)
+    expect(isDefaultFilters(n)).toBe(true)
+  })
+  it('leaves partial filters alone around the league', () => {
+    const a = { show: 'all', kinds: ['mix', 'league'], orgIds: null }
+    expect(normalizeFilters(a)).toBe(a)
+    const b = { show: 'all', kinds: ['mix', 'open', 'free', 'lesson', 'tournament'], orgIds: null }
+    expect(normalizeFilters(b)).toBe(b)
+  })
   it('keeps "everything" when the saved filters predate «Horários livres»', () => {
     const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament', 'league'], orgIds: null }
     expect(normalizeFilters(before).kinds).toEqual(EVENT_KINDS)
