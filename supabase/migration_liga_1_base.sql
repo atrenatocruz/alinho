@@ -213,7 +213,9 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, p
     SELECT 1 FROM league_teams t
      WHERE t.id = p_team_id
        AND (is_org_admin(t.organization_id)
-         OR EXISTS (SELECT 1 FROM league_captains c WHERE c.team_id = t.id AND c.user_id = auth.uid())));
+         OR EXISTS (SELECT 1 FROM league_captains c
+                     WHERE c.team_id = t.id AND c.user_id = auth.uid()
+                       AND EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = t.organization_id AND m.user_id = c.user_id AND NOT m.is_guest))));
 $$;
 
 -- O nível público (1 a 6, 7 = Iniciante) de um ranking — mostra-se isto,

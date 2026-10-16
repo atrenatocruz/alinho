@@ -32,7 +32,9 @@ RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
   SELECT m.user_id FROM league_teams t JOIN memberships m ON m.organization_id = t.organization_id AND m.is_admin
    WHERE t.id = p_team_id
   UNION
-  SELECT c.user_id FROM league_captains c WHERE c.team_id = p_team_id;
+  SELECT c.user_id FROM league_captains c JOIN league_teams t ON t.id = c.team_id
+   WHERE c.team_id = p_team_id
+     AND EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = t.organization_id AND m.user_id = c.user_id AND NOT m.is_guest);
 $$;
 
 -- Quem organiza: os donos (admins do clube dono, ou da plataforma na Liga

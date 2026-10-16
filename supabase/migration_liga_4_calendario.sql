@@ -126,7 +126,7 @@ BEGIN
   PERFORM league_log(v_e.league_id, v_e.id, 'time_proposed', jsonb_build_object('when', p_when, 'team_id', v_team));
   PERFORM league_notify(ARRAY(SELECT league_team_rep_ids(v_other)), 'league_time_proposed',
     jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id),
-                       'encounter_id', v_e.id, 'when', p_when));
+                       'encounter_id', v_e.id, 'when', p_when, 'league_name', (SELECT name FROM leagues WHERE id = v_e.league_id)));
 END;
 $$;
 
@@ -146,7 +146,7 @@ BEGIN
   PERFORM league_log(v_e.league_id, v_e.id, 'time_accepted', jsonb_build_object('when', v_e.scheduled_at));
   PERFORM league_notify(ARRAY(SELECT league_team_rep_ids(v_e.proposed_by_team_id)), 'league_time_accepted',
     jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id),
-                       'encounter_id', v_e.id, 'when', v_e.scheduled_at));
+                       'encounter_id', v_e.id, 'when', v_e.scheduled_at, 'league_name', (SELECT name FROM leagues WHERE id = v_e.league_id)));
 END;
 $$;
 
@@ -165,7 +165,7 @@ BEGIN
   PERFORM league_log(v_e.league_id, v_e.id, 'time_set_by_organizer', jsonb_build_object('when', p_when));
   PERFORM league_notify(ARRAY(SELECT league_team_rep_ids(v_e.home_team_id) UNION SELECT league_team_rep_ids(v_e.away_team_id)),
     'league_time_accepted', jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id),
-                                               'encounter_id', v_e.id, 'when', p_when));
+                                               'encounter_id', v_e.id, 'when', p_when, 'league_name', (SELECT name FROM leagues WHERE id = v_e.league_id)));
 END;
 $$;
 

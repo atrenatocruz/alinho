@@ -252,7 +252,7 @@ BEGIN
   PERFORM apply_league_encounter_ranking(v_e.id);
   PERFORM league_log(v_e.league_id, v_e.id, 'result_confirmed');
   PERFORM league_notify(ARRAY(SELECT league_team_rep_ids(v_e.submitted_by_team_id)), 'league_result_confirmed',
-    jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id), 'encounter_id', v_e.id));
+    jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id), 'encounter_id', v_e.id, 'league_name', (SELECT name FROM leagues WHERE id = v_e.league_id)));
 END;
 $$;
 
@@ -269,7 +269,7 @@ BEGIN
   PERFORM league_log(v_e.league_id, v_e.id, 'result_contested', jsonb_build_object('reason', trim(p_reason)));
   PERFORM league_notify(ARRAY(SELECT league_manager_ids(v_e.league_id)), 'league_result_contested',
     jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id),
-                       'encounter_id', v_e.id, 'reason', trim(p_reason)));
+                       'encounter_id', v_e.id, 'reason', trim(p_reason), 'league_name', (SELECT name FROM leagues WHERE id = v_e.league_id)));
 END;
 $$;
 
@@ -303,7 +303,7 @@ BEGIN
     jsonb_build_object('before', v_before, 'matches', p_matches, 'walkover_team_id', p_walkover_team_id, 'note', trim(p_note)));
   PERFORM league_notify(ARRAY(SELECT league_team_rep_ids(v_e.home_team_id) UNION SELECT league_team_rep_ids(v_e.away_team_id)),
     'league_result_resolved', jsonb_build_object('league_id', v_e.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_e.league_id),
-                                                 'encounter_id', v_e.id, 'note', trim(p_note)));
+                                                 'encounter_id', v_e.id, 'note', trim(p_note), 'league_name', (SELECT name FROM leagues WHERE id = v_e.league_id)));
 END;
 $$;
 
@@ -326,7 +326,7 @@ BEGIN
   PERFORM league_log(v_c.league_id, NULL, 'category_finished', jsonb_build_object('category_id', v_c.id));
   PERFORM league_notify(ARRAY(SELECT league_team_rep_ids(t.id) FROM league_teams t WHERE t.category_id = v_c.id AND t.status = 'aprovada'),
     'league_finished', jsonb_build_object('league_id', v_c.league_id, 'league_slug', (SELECT slug FROM leagues WHERE id = v_c.league_id),
-                                          'category_id', v_c.id));
+                                          'category_id', v_c.id, 'league_name', (SELECT name FROM leagues WHERE id = v_c.league_id)));
 END;
 $$;
 
