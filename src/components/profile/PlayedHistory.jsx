@@ -130,6 +130,49 @@ export function usePlayedHistory({ query, kind, enabled = true }) {
   return { rows, total, state, hasMore, loadMore, loadUntil, months, kinds }
 }
 
+/** Todo o histórico, sem filtros (todas as páginas) — para os totais do
+ *  cartão do Perfil. null = as funções ainda não existem. */
+export function useAllPlayed(enabled) {
+  const [rows, setRows] = useState(undefined)
+  useEffect(() => {
+    if (!enabled) return
+    let alive = true
+    ;(async () => {
+      let list = []
+      for (let i = 0; i < 20; i++) {
+        const before = list.length ? list[list.length - 1].starts_at : null
+        const { data, error } = await supabase.rpc('get_my_played_history', { p_before: before, p_limit: 100 })
+        if (!alive) return
+        if (error) {
+          if (errorKind(error) !== 'not_ready') console.error('Error loading played totals:', error)
+          setRows(list.length ? list : null)
+          return
+        }
+        const page = data?.rows || []
+        list = [...list, ...page]
+        if (page.length < 100) break
+      }
+      setRows(list)
+    })()
+    return () => { alive = false }
+  }, [enabled])
+  return rows
+}
+
+/** Jogos e vitórias de todos os tipos (rondas, nos amigos); sem os
+ *  amigáveis ainda por enviar. */
+export function playedTotals(rows) {
+  if (!Array.isArray(rows)) return null
+  let games = 0
+  let wins = 0
+  for (const r of rows) {
+    if (r.kind === 'friends' && r.status === 'pending') continue
+    games += Number(r.games) || 0
+    wins += Number(r.wins) || 0
+  }
+  return { games, wins }
+}
+
 /** A barra presa em cima (R4): 🔍 · «📅 Outubro 2026 ⌄» | Tudo · Mixes · … */
 export function PlayedBar({ query, setQuery, kind, setKind, visibleMonth, onOpenMonths, kinds }) {
   const { t, i18n } = useTranslation()

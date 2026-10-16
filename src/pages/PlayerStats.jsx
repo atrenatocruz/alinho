@@ -32,7 +32,7 @@ const KIND_LABEL_KEY = { mix: 'agenda.kind_mix', open: 'agenda.kind_open', tourn
 
 // Convenção dos pontos (monthRanking.js): positivos a escuro, zero e
 // negativos a cinzento — nunca a vermelho. Menos tipográfico.
-const deltaText = (d) => (d > 0 ? `+${Math.round(d)}` : `−${Math.abs(Math.round(d))}`)
+const deltaText = (d) => (Math.round(d) > 0 ? `+${Math.round(d)}` : Math.round(d) < 0 ? `−${Math.abs(Math.round(d))}` : '0')
 const deltaClass = (d) => (d > 0 ? 'text-ink-900' : 'text-muted')
 
 const kicker = 'mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
@@ -136,7 +136,7 @@ export default function PlayerStats() {
           {r.org_name ? ` · ${r.org_name}` : ''}
         </span>
       </span>
-      <span className={`shrink-0 font-display text-[17px] font-black tabular-nums ${deltaClass(r.rating_delta)}`}>
+      <span className={`shrink-0 font-display text-[17px] font-extrabold tabular-nums ${deltaClass(r.rating_delta)}`}>
         {deltaText(r.rating_delta)}
       </span>
     </li>
@@ -149,7 +149,7 @@ export default function PlayerStats() {
         <span className="block truncate text-[14px] font-extrabold text-ink-900">{firstLastName(p.name)}</span>
         <span className="block text-[12px] text-muted">{t('playerstats.record', { wins: p.wins, losses: p.losses })}</span>
       </span>
-      <span className="shrink-0 font-display text-[17px] font-black tabular-nums text-ink-900">
+      <span className="shrink-0 font-display text-[17px] font-extrabold tabular-nums text-ink-900">
         {winRatePct(p.wins, p.total)}%
       </span>
     </li>
@@ -166,11 +166,11 @@ export default function PlayerStats() {
       {/* Números rápidos. */}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <p className="font-display text-[22px] font-black leading-none text-ink-900 tabular-nums">{best != null ? Math.round(best) : '—'}</p>
+          <p className="font-display text-[22px] font-extrabold leading-none text-ink-900 tabular-nums">{best != null ? Math.round(best) : '—'}</p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">{t('playerstats.best')}</p>
         </div>
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <p className="flex items-center gap-1 font-display text-[22px] font-black leading-none text-ink-900 tabular-nums">
+          <p className="flex items-center gap-1 font-display text-[22px] font-extrabold leading-none text-ink-900 tabular-nums">
             {streak ? <>{streak.won && <Flame size={18} className="text-[#4D7C0F]" />}{streak.length}</> : '—'}
           </p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">
@@ -178,11 +178,11 @@ export default function PlayerStats() {
           </p>
         </div>
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <p className="font-display text-[22px] font-black leading-none text-ink-900 tabular-nums">{month.games}</p>
+          <p className="font-display text-[22px] font-extrabold leading-none text-ink-900 tabular-nums">{month.games}</p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">{t('playerstats.games_month')}</p>
         </div>
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <p className={`font-display text-[22px] font-black leading-none tabular-nums ${deltaClass(month.points)}`}>
+          <p className={`font-display text-[22px] font-extrabold leading-none tabular-nums ${deltaClass(month.points)}`}>
             {month.events > 0 ? deltaText(month.points) : '—'}
           </p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">{t('playerstats.points_month')}</p>
@@ -194,7 +194,7 @@ export default function PlayerStats() {
         <p className={kicker}>{t('playerstats.evolution_title')}</p>
         <div className="card">
           <div className="mb-3 flex items-baseline justify-between gap-2">
-            <p className="font-display text-[26px] font-black leading-none text-ink-900 tabular-nums">{current != null ? Math.round(current) : '—'}</p>
+            <p className="font-display text-[26px] font-extrabold leading-none text-ink-900 tabular-nums">{current != null ? Math.round(current) : '—'}</p>
             <p className="text-[12px] text-muted">{t('playerstats.current')}</p>
           </div>
           <Chips
@@ -209,7 +209,7 @@ export default function PlayerStats() {
             className="mb-3"
           />
           {filtered.filter((r) => r.rating_after != null).length >= 2 ? (
-            <RatingChart rows={filtered} />
+            <RatingChart rows={filtered} eventName={eventName} />
           ) : (
             <EmptyState pose={null} title={t('playerstats.few_title')} subtitle={t('playerstats.few_body')} />
           )}
@@ -237,7 +237,7 @@ export default function PlayerStats() {
                 <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${KIND_DOT[k.key] || 'bg-ink-200'}`} />
                 <span className="min-w-0 flex-1 truncate text-[14px] font-extrabold text-ink-900">{t(KIND_LABEL_KEY[k.key] || 'playerstats.friends_event')}</span>
                 <span className="text-[12px] text-muted">{t('playerstats.events', { count: k.events })}</span>
-                <span className={`w-14 shrink-0 text-right font-display text-[16px] font-black tabular-nums ${deltaClass(k.points)}`}>{deltaText(k.points)}</span>
+                <span className={`w-14 shrink-0 text-right font-display text-[16px] font-extrabold tabular-nums ${deltaClass(k.points)}`}>{deltaText(k.points)}</span>
               </li>
             ))}
           </ul>
@@ -248,7 +248,7 @@ export default function PlayerStats() {
                 {byOrg.map((o) => (
                   <li key={o.key} className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate text-[13.5px] font-extrabold text-ink-900">{o.key}</span>
-                    <span className={`shrink-0 font-display text-[15px] font-black tabular-nums ${deltaClass(o.points)}`}>{deltaText(o.points)}</span>
+                    <span className={`shrink-0 font-display text-[15px] font-extrabold tabular-nums ${deltaClass(o.points)}`}>{deltaText(o.points)}</span>
                   </li>
                 ))}
               </ul>

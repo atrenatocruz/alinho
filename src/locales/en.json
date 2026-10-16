@@ -6182,6 +6182,8 @@
   "league.venue_optional": "Where (optional)",
   "league.publish": "Publish",
   "playerstats.title": "Statistics",
+  "playerstats.chart_aria": "Points over time, one point per event",
+  "playerstats.chart_hint": "Tap or drag on the chart to see each event.",
   "playerstats.card_hint": "How your ranking has been moving",
   "playerstats.card_hint_other": "Progress, opponents and partners",
   "playerstats.private": "This person chose not to show their results.",
