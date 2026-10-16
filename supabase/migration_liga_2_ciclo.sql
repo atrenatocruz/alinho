@@ -12,14 +12,14 @@
 
 -- ── Internas (sem EXECUTE para ninguém) ────────────────────────────────
 CREATE OR REPLACE FUNCTION league_log(p_league_id UUID, p_encounter_id UUID, p_kind TEXT, p_payload JSONB DEFAULT '{}'::jsonb)
-RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
   INSERT INTO league_events (league_id, encounter_id, actor_id, kind, payload)
   VALUES (p_league_id, p_encounter_id, auth.uid(), p_kind, COALESCE(p_payload, '{}'::jsonb));
 $$;
 
 -- Avisos no sino. Nunca a quem fez a ação; sem repetidos.
 CREATE OR REPLACE FUNCTION league_notify(p_user_ids UUID[], p_kind TEXT, p_data JSONB)
-RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
   INSERT INTO notifications (user_id, kind, actor_id, data)
   SELECT DISTINCT u, p_kind, auth.uid(), p_data
     FROM unnest(p_user_ids) AS u
@@ -28,7 +28,7 @@ $$;
 
 -- Quem fala por uma equipa: os admins do clube e os capitães.
 CREATE OR REPLACE FUNCTION league_team_rep_ids(p_team_id UUID)
-RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT m.user_id FROM league_teams t JOIN memberships m ON m.organization_id = t.organization_id AND m.is_admin
    WHERE t.id = p_team_id
   UNION
@@ -38,7 +38,7 @@ $$;
 -- Quem organiza: os donos (admins do clube dono, ou da plataforma na Liga
 -- Alinho) e os co-organizadores.
 CREATE OR REPLACE FUNCTION league_manager_ids(p_league_id UUID)
-RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS SETOF UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT m.user_id FROM leagues l JOIN memberships m ON m.organization_id = l.owner_org_id AND m.is_admin
    WHERE l.id = p_league_id AND l.kind = 'comunitaria'
   UNION
@@ -59,7 +59,7 @@ $$;
 CREATE OR REPLACE FUNCTION create_league(
   p_kind TEXT, p_owner_org_id UUID, p_name TEXT, p_scope TEXT, p_district TEXT,
   p_season_label TEXT, p_description TEXT, p_applications_close_at TIMESTAMPTZ, p_max_teams INTEGER)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_me UUID := auth.uid();
   v_org organizations;
@@ -98,7 +98,7 @@ $$;
 CREATE OR REPLACE FUNCTION update_league(
   p_league_id UUID, p_name TEXT, p_scope TEXT, p_district TEXT, p_season_label TEXT,
   p_description TEXT, p_applications_close_at TIMESTAMPTZ, p_max_teams INTEGER)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_l leagues;
 BEGIN
   SELECT * INTO v_l FROM leagues WHERE id = p_league_id FOR UPDATE;
@@ -118,7 +118,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION publish_league(p_league_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_l leagues;
 BEGIN
   SELECT * INTO v_l FROM leagues WHERE id = p_league_id FOR UPDATE;
@@ -134,7 +134,7 @@ $$;
 -- Cancelar: só o dono. Encontros por jogar ficam cancelados; o que já é
 -- oficial fica no histórico.
 CREATE OR REPLACE FUNCTION cancel_league(p_league_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF NOT league_is_owner(p_league_id) THEN RAISE EXCEPTION 'not_league_owner'; END IF;
   UPDATE leagues SET status = 'cancelada' WHERE id = p_league_id AND status NOT IN ('terminada', 'cancelada');
@@ -150,7 +150,7 @@ $$;
 
 -- Apagar: só o dono, e só antes de haver encontros (depois, cancelar).
 CREATE OR REPLACE FUNCTION delete_league(p_league_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF NOT league_is_owner(p_league_id) THEN RAISE EXCEPTION 'not_league_owner'; END IF;
   IF EXISTS (SELECT 1 FROM league_encounters WHERE league_id = p_league_id) THEN RAISE EXCEPTION 'league_has_encounters'; END IF;
@@ -165,7 +165,7 @@ CREATE OR REPLACE FUNCTION upsert_league_category(
   p_league_id UUID, p_category_id UUID, p_gender TEXT, p_level INTEGER, p_rating_tolerance INTEGER,
   p_matches_per_encounter INTEGER, p_home_away BOOLEAN, p_points_win INTEGER, p_points_draw INTEGER,
   p_points_loss INTEGER, p_points_walkover INTEGER, p_roster_max INTEGER, p_roster_locks_at_round INTEGER)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_l leagues; v_c league_categories; v_id UUID;
 BEGIN
   SELECT * INTO v_l FROM leagues WHERE id = p_league_id;
@@ -214,7 +214,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION delete_league_category(p_category_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_c league_categories;
 BEGIN
   SELECT * INTO v_c FROM league_categories WHERE id = p_category_id FOR UPDATE;
@@ -232,7 +232,7 @@ $$;
 -- Só o dono nomeia. Um co-organizador nunca se promove (não há RPC para
 -- isso) e só se pode tirar a si próprio.
 CREATE OR REPLACE FUNCTION add_league_organizer(p_league_id UUID, p_user_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF NOT league_is_owner(p_league_id) THEN RAISE EXCEPTION 'not_league_owner'; END IF;
   IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN RAISE EXCEPTION 'user_not_found'; END IF;
@@ -246,7 +246,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION remove_league_organizer(p_league_id UUID, p_user_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF NOT (league_is_owner(p_league_id) OR p_user_id = auth.uid()) THEN RAISE EXCEPTION 'not_league_owner'; END IF;
   DELETE FROM league_organizers WHERE league_id = p_league_id AND user_id = p_user_id;

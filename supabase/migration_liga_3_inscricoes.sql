@@ -11,14 +11,14 @@
 
 -- O plantel fecha quando começa a jornada N da categoria (N = roster_locks_at_round).
 CREATE OR REPLACE FUNCTION league_roster_locked(p_category_id UUID)
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM league_rounds r JOIN league_categories c ON c.id = r.category_id
      WHERE r.category_id = p_category_id AND r.number = c.roster_locks_at_round AND r.window_start <= CURRENT_DATE);
 $$;
 
 CREATE OR REPLACE FUNCTION apply_to_league(p_category_id UUID, p_organization_id UUID)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_c league_categories; v_l leagues; v_org organizations; v_t league_teams; v_id UUID;
 BEGIN
   SELECT * INTO v_c FROM league_categories WHERE id = p_category_id;
@@ -54,7 +54,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION withdraw_application(p_team_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_t league_teams; v_c league_categories; v_l leagues;
 BEGIN
   SELECT * INTO v_t FROM league_teams WHERE id = p_team_id FOR UPDATE;
@@ -76,7 +76,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION decide_application(p_team_id UUID, p_decision TEXT, p_reason TEXT)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_t league_teams; v_c league_categories; v_l leagues; v_count INTEGER;
 BEGIN
   SELECT * INTO v_t FROM league_teams WHERE id = p_team_id;
@@ -110,7 +110,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION set_league_captain(p_team_id UUID, p_user_id UUID, p_on BOOLEAN)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_t league_teams;
 BEGIN
   SELECT * INTO v_t FROM league_teams WHERE id = p_team_id;
@@ -132,7 +132,7 @@ $$;
 
 -- Os mesmos critérios de src/lib/leagueEligibility.js (playerProblem).
 CREATE OR REPLACE FUNCTION add_to_roster(p_team_id UUID, p_user_id UUID)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_t league_teams; v_c league_categories; v_p profiles; v_ceiling NUMERIC; v_count INTEGER; v_id UUID;
 BEGIN
   SELECT * INTO v_t FROM league_teams WHERE id = p_team_id FOR UPDATE;
@@ -169,7 +169,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION remove_from_roster(p_roster_id UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_r league_roster;
 BEGIN
   SELECT * INTO v_r FROM league_roster WHERE id = p_roster_id FOR UPDATE;

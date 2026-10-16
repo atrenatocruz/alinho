@@ -64,6 +64,20 @@ DO $$ BEGIN PERFORM propose_encounter_time((SELECT e.id FROM league_encounters e
   INSERT INTO _r VALUES (false, 'aceitou data fora da janela');
 EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM LIKE '%outside_window%', 'recusa data fora da janela'); END $$;
 
+-- Sem data não há proposta.
+DO $$ BEGIN PERFORM propose_encounter_time((SELECT e.id FROM league_encounters e, _ctx c WHERE e.home_team_id = c.ta AND e.away_team_id = c.tb), NULL, NULL);
+  INSERT INTO _r VALUES (false, 'aceitou proposta sem data');
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM LIKE '%schedule_dates%', 'recusa proposta sem data'); END $$;
+-- Sem casa e fora: A–B numa jornada e B–A noutra é o mesmo par duas vezes.
+SELECT pg_temp.as_user(owner) FROM _ctx;
+DO $$ DECLARE c _ctx; BEGIN SELECT * INTO c FROM _ctx;
+  PERFORM save_league_schedule(c.cat, jsonb_build_array(
+    jsonb_build_array(jsonb_build_object('home', c.ta, 'away', c.tb)),
+    jsonb_build_array(jsonb_build_object('home', c.tb, 'away', c.ta)),
+    jsonb_build_array(jsonb_build_object('home', c.tc, 'away', c.ta))), CURRENT_DATE, 14);
+  INSERT INTO _r VALUES (false, 'aceitou A–B e B–A sem casa e fora');
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM LIKE '%schedule_pairs%', 'recusa A–B e B–A sem casa e fora'); END $$;
+
 RESET ROLE;
 SELECT CASE WHEN ok THEN 'OK    ' ELSE 'ERRO  ' END || label AS resultado FROM _r;
 ROLLBACK;

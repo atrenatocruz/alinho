@@ -186,13 +186,13 @@ CREATE INDEX IF NOT EXISTS idx_league_events_league ON league_events (league_id,
 -- Próprias da liga (não dependem de is_platform_admin_me das aulas, que pode
 -- não estar corrida no mesmo ambiente).
 CREATE OR REPLACE FUNCTION league_is_platform_admin()
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT COALESCE((SELECT is_platform_admin FROM profiles WHERE id = auth.uid()), FALSE);
 $$;
 
 -- Dono: Liga Alinho → admins da plataforma; comunitária → admins do clube dono.
 CREATE OR REPLACE FUNCTION league_is_owner(p_league_id UUID)
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM leagues l
      WHERE l.id = p_league_id
@@ -201,14 +201,14 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 CREATE OR REPLACE FUNCTION can_manage_league(p_league_id UUID)
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT league_is_owner(p_league_id)
       OR EXISTS (SELECT 1 FROM league_organizers o WHERE o.league_id = p_league_id AND o.user_id = auth.uid());
 $$;
 
 -- Representante de uma equipa: admin do clube ou capitão nomeado.
 CREATE OR REPLACE FUNCTION represents_league_team(p_team_id UUID)
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM league_teams t
      WHERE t.id = p_team_id
