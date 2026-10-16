@@ -2,12 +2,12 @@
 // resultado»): o botão lima preso em baixo (PrimaryButton do StepPage),
 // «‹» como texto junto ao título do passo (BackBar do StepPage).
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import StepPage from '../components/steps/StepPage'
-import { EmptyState, LoadErrorState } from '../components/ui'
-import { getLeagueEncounter, submitResult, leagueErrorMessage } from '../lib/leagueApi'
-import { emptyDraft, draftToMatches, draftProblem } from '../lib/leagueResultDraft'
+import { ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
+import { getLeagueEncounter, submitResult, resolveEncounter, leagueErrorMessage } from '../lib/leagueApi'
+import { emptyDraft, draftFromMatches, draftToMatches, draftProblem } from '../lib/leagueResultDraft'
 
 function PlayerSelect({ value, options, onChange, label }) {
   return (
@@ -23,6 +23,10 @@ export default function LeagueResultPage() {
   const { slug, id } = useParams()
   const navigate = useNavigate()
   const { t } = useTranslation()
+  // ?resolver=1: quem organiza (e não fala por nenhum dos clubes) decide o resultado em vez de o enviar.
+  const resolver = useSearchParams()[0].get('resolver') === '1'
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [note, setNote] = useState('')
   // data: undefined = a carregar · null = não existe / sem permissão · objeto.
   const [data, setData] = useState(undefined)
   const [loadError, setLoadError] = useState(false)
@@ -35,7 +39,7 @@ export default function LeagueResultPage() {
     if (isCancelled()) return
     setLoadError(false)
     setData(d || null)
-    if (d) setDraft(emptyDraft(d.category.matches_per_encounter))
+    if (d) setDraft(resolver ? draftFromMatches(d.matches, d.category.matches_per_encounter) : emptyDraft(d.category.matches_per_encounter))
   }).catch(() => { if (!isCancelled()) setLoadError(true) })
   useEffect(() => {
     let cancelled = false
@@ -49,7 +53,8 @@ export default function LeagueResultPage() {
       onRetry={() => { setLoadError(false); setData(undefined); load() }} />
   }
   if (data === undefined) return null
-  if (data === null || !data.viewer?.can_submit || !data.rosters) {
+  const allowed = resolver ? data?.viewer?.can_manage && data.viewer.side == null : data?.viewer?.can_submit
+  if (data === null || !allowed || !data.rosters) {
     return <EmptyState title={t('league.not_found_title')} subtitle={t('league.not_found_text')} />
   }
   if (!draft.length) return null
@@ -63,6 +68,7 @@ export default function LeagueResultPage() {
 
   const next = async () => {
     if (!last) { setStep(step + 1); return }
+    if (resolver) { setNoteOpen(true); return }
     setBusy(true); setError('')
     try { await submitResult(id, draftToMatches(draft)); navigate(`/liga/${slug}/encontro/${id}`, { replace: true }) }
     catch (e) { setError(leagueErrorMessage(t, e)) } finally { setBusy(false) }
@@ -75,7 +81,7 @@ export default function LeagueResultPage() {
       step={step + 1} total={total}
       stepLabel={data.category.matches_per_encounter > 1 ? t('league.match_n', { n: step + 1, total }) : undefined}
       onBack={step > 0 ? () => setStep(step - 1) : () => navigate(-1)}
-      onNext={next} nextLabel={last ? t('league.send_for_confirmation') : t('league.next_match')}
+      onNext={next} nextLabel={last ? t(resolver ? 'league.decide_result' : 'league.send_for_confirmation') : t('league.next_match')}
       nextDisabled={!!problem} nextHint={problem ? t(`league.error_${problem}`) : null}
       error={error} busy={busy}
     >
@@ -98,6 +104,15 @@ export default function LeagueResultPage() {
           </div>
         </div>
       ))}
+      <ConfirmSheet open={noteOpen} title={t('league.decide_title')} message={t('league.decide_message')}
+        confirmLabel={t('league.decide_result')} cancelLabel={t('league.not_yet')} confirmDisabled={note.trim().length < 3}
+        onClose={() => setNoteOpen(false)} errorOf={(err) => leagueErrorMessage(t, err)}
+        onConfirm={async () => { await resolveEncounter(id, draftToMatches(draft), null, note.trim()); navigate(`/liga/${slug}/encontro/${id}`, { replace: true }) }}>
+        <label className="mt-3 block text-sm font-bold">{t('league.decide_note')}
+          <textarea value={note} onChange={(ev) => setNote(ev.target.value)} maxLength={500} rows={3}
+            className="mt-1.5 w-full rounded-ctrl border border-line bg-white p-3 text-base" />
+        </label>
+      </ConfirmSheet>
     </StepPage>
   )
 }

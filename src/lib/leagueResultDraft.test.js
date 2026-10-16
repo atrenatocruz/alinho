@@ -1,6 +1,6 @@
 // src/lib/leagueResultDraft.test.js
 import { describe, it, expect } from 'vitest'
-import { emptyDraft, draftToMatches, draftProblem } from './leagueResultDraft'
+import { emptyDraft, draftToMatches, draftProblem, draftFromMatches } from './leagueResultDraft'
 
 const cat = { gender: 'masculino', matches_per_encounter: 1 }
 const rosters = {
@@ -24,5 +24,19 @@ describe('rascunho do resultado', () => {
     expect(draftProblem(d, cat, rosters)).toBe('incomplete')
     d[0] = { slot: 1, home: ['h1', 'h2'], away: ['a1', 'a2'], sets: [[6, 5], [6, 3], [null, null]] }
     expect(draftProblem(d, cat, rosters)).toBe('set_invalid')
+  })
+})
+
+describe('draftFromMatches', () => {
+  it('traz as partidas guardadas e deixa vazias as que faltam', () => {
+    const saved = [{ slot: 1, sets: [[6, 4], [6, 3]], home: [{ id: 'h1' }, { id: 'h2' }], away: [{ id: 'a1' }, { id: 'a2' }] }]
+    const d = draftFromMatches(saved, 2)
+    expect(d[0]).toEqual({ slot: 1, home: ['h1', 'h2'], away: ['a1', 'a2'], sets: [[6, 4], [6, 3], [null, null]] })
+    expect(d[1]).toEqual(emptyDraft(2)[1])
+    expect(draftToMatches(d)[0].sets).toEqual([[6, 4], [6, 3]])
+  })
+  it('sem partidas guardadas dá o rascunho vazio', () => {
+    expect(draftFromMatches([], 3)).toEqual(emptyDraft(3))
+    expect(draftFromMatches(null, 1)).toEqual(emptyDraft(1))
   })
 })

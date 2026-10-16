@@ -10,11 +10,12 @@ import { ChevronRight } from 'lucide-react'
 import { KIND_COLORS, KIND_HERO } from '../../lib/kindColors'
 
 // O tipo do Gerir → a chave das cores e das imagens (R0).
-const KIND_OF = { mix: 'mix', aberto: 'open', torneio: 'tournament', turma: 'lesson', amigos: 'friends' }
+const KIND_OF = { mix: 'mix', aberto: 'open', torneio: 'tournament', liga: 'league', turma: 'lesson', amigos: 'friends' }
 const LABEL = {
   mix: 'gerirclube.event_label_mix',
   aberto: 'gerirclube.create_kind_open',
   torneio: 'gerirclube.event_label_tournament',
+  liga: 'agenda.kind_league',
   turma: 'gerirclube.event_label_series',
   amigos: 'gerirclube.create_kind_friends',
 }

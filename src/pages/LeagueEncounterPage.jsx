@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EventHero from '../components/event/EventHero'
-import { PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
-import { getLeagueEncounter, confirmResult, contestResult, acceptTime, leagueErrorMessage } from '../lib/leagueApi'
+import { PrimaryButton, ConfirmSheet, Chips, EmptyState, LoadErrorState } from '../components/ui'
+import { getLeagueEncounter, confirmResult, contestResult, acceptTime, resolveEncounter, leagueErrorMessage } from '../lib/leagueApi'
 import { encounterTotals } from '../lib/leagueResult'
 import { formatDate, formatTime } from '../lib/formatDate'
 import { categoryCode } from '../lib/tournaments'
@@ -20,6 +20,9 @@ export default function LeagueEncounterPage() {
   const [loadError, setLoadError] = useState(false)
   const [contestOpen, setContestOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const [walkoverOpen, setWalkoverOpen] = useState(false)
+  const [walkoverTeam, setWalkoverTeam] = useState(null)
+  const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const load = (isCancelled = () => false) => getLeagueEncounter(id).then((d) => {
     if (isCancelled()) return
@@ -27,7 +30,7 @@ export default function LeagueEncounterPage() {
   }).catch(() => { if (!isCancelled()) setLoadError(true) })
   useEffect(() => {
     let cancelled = false
-    setData(undefined); setLoadError(false); setError(''); setContestOpen(false); setReason('')
+    setData(undefined); setLoadError(false); setError(''); setContestOpen(false); setReason(''); setWalkoverOpen(false); setWalkoverTeam(null); setNote('')
     load(() => cancelled)
     return () => { cancelled = true }
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -45,6 +48,8 @@ export default function LeagueEncounterPage() {
   const walkover = e.status === 'oficial' && e.walkover_team_id
   const when = e.scheduled_at ? new Date(e.scheduled_at) : null
   const run = async (fn) => { setError(''); try { await fn(); await load() } catch (err) { setError(leagueErrorMessage(t, err)) } }
+  // Quem organiza decide o que está contestado; só quem não fala por nenhum dos clubes (o servidor recusa com conflict_of_interest).
+  const canResolve = viewer.can_manage && viewer.side == null && ['contestado', 'submetido', 'oficial'].includes(e.status)
   const submitter = e.submitted_by_team_id === home.id ? home : away
 
   return (
@@ -88,6 +93,10 @@ export default function LeagueEncounterPage() {
           <PrimaryButton className="w-full" onClick={() => navigate(`/liga/${slug}/encontro/${id}/resultado`)}>{t('league.submit_result')}</PrimaryButton>
         )}
         {viewer.can_accept && <PrimaryButton variant="ghost" className="w-full" onClick={() => run(() => acceptTime(id))}>{t('league.accept_time')}</PrimaryButton>}
+        {canResolve && (
+          <PrimaryButton variant="ink" className="w-full" onClick={() => navigate(`/liga/${slug}/encontro/${id}/resultado?resolver=1`)}>{t('league.decide_result')}</PrimaryButton>
+        )}
+        {canResolve && <PrimaryButton variant="ink" className="w-full" onClick={() => setWalkoverOpen(true)}>{t('league.walkover_long')}</PrimaryButton>}
         {error && <p className="text-sm font-semibold text-danger">{error}</p>}
       </EventHero>
 
@@ -99,6 +108,19 @@ export default function LeagueEncounterPage() {
           <textarea value={reason} onChange={(ev) => setReason(ev.target.value)} maxLength={500} rows={3}
             className="mt-1.5 w-full rounded-ctrl border border-line bg-white p-3 text-base" />
         </label>
+      </ConfirmSheet>
+      <ConfirmSheet open={walkoverOpen} title={t('league.walkover_title')} message={t('league.walkover_message')}
+        confirmLabel={t('league.walkover_confirm')} cancelLabel={t('league.not_yet')} confirmDisabled={!walkoverTeam || note.trim().length < 3}
+        onClose={() => setWalkoverOpen(false)} errorOf={(err) => leagueErrorMessage(t, err)}
+        onConfirm={async () => { await resolveEncounter(id, null, walkoverTeam, note.trim()); setNote(''); setWalkoverTeam(null); await load() }}>
+        <div className="mt-3 space-y-3">
+          <Chips label={t('league.walkover_who')} value={walkoverTeam} onChange={setWalkoverTeam}
+            options={[home, away].map((x) => ({ value: x.id, label: x.name }))} />
+          <label className="block text-sm font-bold">{t('league.decide_note')}
+            <textarea value={note} onChange={(ev) => setNote(ev.target.value)} maxLength={500} rows={3}
+              className="mt-1.5 w-full rounded-ctrl border border-line bg-white p-3 text-base" />
+          </label>
+        </div>
       </ConfirmSheet>
     </div>
   )

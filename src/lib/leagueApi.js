@@ -62,3 +62,10 @@ export const resolveEncounter = (id, matches, walkoverTeamId, note) => rpc('reso
   p_encounter_id: id, p_matches: matches, p_walkover_team_id: walkoverTeamId, p_note: note,
 })
 export const finishCategory = (id) => rpc('finish_league_category', { p_category_id: id })
+
+/** Os co-organizadores da liga (a política deixa ler a quem organiza). */
+export async function listOrganizers(leagueId) {
+  const { data, error } = await supabase.from('league_organizers').select('user_id, profile:profiles(name)').eq('league_id', leagueId)
+  if (error) throw error
+  return (data || []).map((r) => ({ user_id: r.user_id, name: r.profile?.name || '' }))
+}

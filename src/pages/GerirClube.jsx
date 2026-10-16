@@ -56,6 +56,7 @@ import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { weekdayShort, weekdayLong, isMasculineWeekday, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
+import { districtOptions } from '../lib/leagueDistricts'
 import { Realce } from '../components/SearchField'
 import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
 import { semAcentos } from '../lib/semAcentos'
@@ -1032,6 +1033,8 @@ export default function GerirClube() {
     if (tipo === 'torneio') { navigate(`/gerir/${slug}/criar/torneio`); return }
     // A turma também, em 3 passos (#342, versão final de 26 set).
     if (tipo === 'turma') { navigate(`/gerir/${slug}/criar/turma`); return }
+    // A liga entre clubes: criar por passos (Liga, Fase 1).
+    if (tipo === 'liga') { navigate(`/gerir/${slug}/criar/liga`); return }
     setShowCreateGame(false)
   }
 
@@ -2291,6 +2294,8 @@ export default function GerirClube() {
           name: settings.name,
           description: settings.description,
           location: settings.location,
+          // Só existe depois de migration_liga_1_base.sql — não enviar antes.
+          ...(settings.district !== undefined ? { district: settings.district || null } : {}),
           latitude: settings.latitude ?? null,
           longitude: settings.longitude ?? null,
           phone: settings.phone,
@@ -3009,6 +3014,8 @@ export default function GerirClube() {
                   ['aberto', canPlanEvents && !isGroupOrg],
                   ['amigos', isGroupOrg],
                   ['torneio', canPlanEvents && tournamentsReady],
+                  // A liga é entre clubes: só um clube a cria (não um grupo).
+                  ['liga', org?.kind === 'club'],
                   ['turma', !isGroupOrg && lessonsReady],
                 ].filter(([, mostra]) => mostra).map(([tipo]) => tipo)
                 return (
@@ -4379,6 +4386,15 @@ export default function GerirClube() {
                       />
                       <PlacesUnavailableHint />
                     </div>
+
+                    {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1). */}
+                    {settings.district !== undefined && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerirclube.district_label')}</label>
+                        <Select value={settings.district || ''} onChange={(v) => setSettings({ ...settings, district: v })}
+                          options={districtOptions(t('gerirclube.district_none'))} />
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
