@@ -6291,5 +6291,18 @@
   "cover.unsaved_one": "{{count}} alteração por guardar",
   "cover.unsaved_other": "{{count}} alterações por guardar",
   "cover.discard": "Desfazer",
-  "cover.save": "Guardar"
+  "cover.save": "Guardar",
+  "people.role_owner": "Dono · admin",
+  "people.role_admin": "Admin",
+  "people.role_member": "Membro",
+  "people.actions_aria": "Ações de {{name}}",
+  "people.show_all": "Ver os {{count}}",
+  "people.show_less": "Mostrar menos",
+  "people.view_profile": "Ver perfil",
+  "people.remove": "Remover",
+  "personal.section_about": "Sobre ti",
+  "personal.section_court": "No campo",
+  "personal.section_account": "Conta",
+  "personal.section_who_sees": "Quem vê o quê",
+  "personal.name_required": "O nome não pode ficar vazio."
 }

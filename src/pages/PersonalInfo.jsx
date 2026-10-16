@@ -1,31 +1,70 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { maxSignupBirthday } from '../lib/age'
-import { BackBar, PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
+import { BackBar, DateField, Select, RatingBadge, Avatar, Chips } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
-import { countryOptions, countryName } from '../lib/countries'
+import { countryOptions } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
-import { formatDate as formatDateLib } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 
-const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
-const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
-const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
-
 // Informação pessoal em página própria (Francisco, 21 set 2026). Estava a
 // abrir dentro do Perfil e empurrava o resto para baixo; em página há seta
-// para voltar e um "cancelar" que se percebe. É também onde passa a viver a
-// alteração de password. O "Apagar a minha conta" fica onde estava, no fundo
-// do Perfil: a lei pede que seja tão fácil de encontrar como criar a conta,
-// e a Política de Privacidade aponta para lá por escrito.
+// para voltar. É também onde vive a alteração de password. O "Apagar a minha
+// conta" fica onde estava, no fundo do Perfil: a lei pede que seja tão fácil
+// de encontrar como criar a conta, e a Política de Privacidade aponta para lá.
+//
+// Proposta A (Renato, 16 out), a linguagem do Gerir › Clube: sem modo
+// «Editar» — os campos editam-se ali mesmo, em blocos (Sobre ti, No campo,
+// Conta, Privacidade), e o «Guardar» só aparece, preso em baixo, quando há
+// alterações.
+
+const CARD = 'rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
+const KICKER = 'mb-2 mt-5 px-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
+
+function Row({ label, hint, children }) {
+  return (
+    <div className="border-t border-line px-4 py-3 first:border-t-0">
+      <span className="block text-xs text-muted">{label}</span>
+      {children}
+      {hint && <span className="mt-1.5 block text-xs text-muted">{hint}</span>}
+    </div>
+  )
+}
+
+const fromProfile = (p) => ({
+  name: p?.name || '',
+  preferred_side: p?.preferred_side || 'both',
+  nationality: p?.nationality || '',
+  dominant_hand: p?.dominant_hand || '',
+  birthday: p?.birthday || '',
+  gender: p?.gender || '',
+  language: p?.language || 'pt',
+  activity_visibility: p?.activity_visibility || 'public',
+  results_visibility: p?.results_visibility || 'public',
+  clubs_visibility: p?.clubs_visibility || 'public',
+  // «Aulas (onde e com quem treinas)» (Francisco, 27 set): Privado por omissão.
+  lessons_visibility: p?.lessons_visibility || 'private',
+  is_private: p?.is_private || false,
+})
+
 export default function PersonalInfo() {
   const { t, i18n } = useTranslation()
   const { profile, updateProfile } = useAuth()
   const navigate = useNavigate()
+
+  const [form, setForm] = useState(() => fromProfile(profile))
+  const [loading, setLoading] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }))
+
+  const base = fromProfile(profile)
+  const dirty = Object.keys(form).filter((k) => form[k] !== base[k]).length
 
   const VISIBILITY_OPTIONS = [
     { value: 'public', label: t('profile.visibility_public') },
@@ -33,81 +72,42 @@ export default function PersonalInfo() {
     { value: 'private', label: t('profile.visibility_private') },
   ]
 
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(profile?.name || '')
-  const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
-  const [nationality, setNationality] = useState(profile?.nationality || '')
-  const [dominantHand, setDominantHand] = useState(profile?.dominant_hand || '')
-  const [birthday, setBirthday] = useState(profile?.birthday || '')
-  const [gender, setGender] = useState(profile?.gender || '')
-  const [language, setLanguage] = useState(profile?.language || 'pt')
-  const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
-  const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
-  const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
-  // «Aulas (onde e com quem treinas)» (Francisco, 27 set): Privado por omissão.
-  const [lessonsVisibility, setLessonsVisibility] = useState(profile?.lessons_visibility || 'private')
-  const [isPrivate, setIsPrivate] = useState(profile?.is_private || false)
-  const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState(false)
-  // Erro ao guardar, junto ao botão (janelas → peças da app, 2 out).
-  const [saveError, setSaveError] = useState('')
-
-  const inputLabel = 'block text-sm font-extrabold text-ink-900 mb-2'
-  const fieldLabel = 'text-[11px] font-extrabold uppercase tracking-widest text-muted'
-  const fieldValue = 'text-base text-ink-900 mt-0.5'
-
-  const resetForm = () => {
-    setName(profile?.name || '')
-    setPreferredSide(profile?.preferred_side || 'both')
-    setNationality(profile?.nationality || '')
-    setDominantHand(profile?.dominant_hand || '')
-    setBirthday(profile?.birthday || '')
-    setGender(profile?.gender || '')
-    setLanguage(profile?.language || 'pt')
-    setActivityVisibility(profile?.activity_visibility || 'public')
-    setResultsVisibility(profile?.results_visibility || 'public')
-    setClubsVisibility(profile?.clubs_visibility || 'public')
-    setLessonsVisibility(profile?.lessons_visibility || 'private')
-    setIsPrivate(profile?.is_private || false)
-  }
-
-  const handleSave = async (e) => {
-    e.preventDefault()
+  // Sem <form> à volta: a página tem outras peças com botões e formulários
+  // próprios (telemóvel, password), e um form dentro de outro não vale.
+  const handleSave = async () => {
     setSaveError('')
+    if (!form.name.trim()) { setSaveError(t('personal.name_required')); return }
     setLoading(true)
     try {
       const updates = {
-        name,
-        preferred_side: preferredSide,
-        nationality: nationality || null,
-        birthday: birthday || null,
-        // Obrigatório (29 set): um Select sem opção vazia não deixa limpar,
-        // mas um perfil antigo sem género não pode ficar a gravar ''.
-        ...(gender ? { gender } : {}),
-        language,
-        activity_visibility: activityVisibility,
-        results_visibility: resultsVisibility,
-        clubs_visibility: clubsVisibility,
+        name: form.name,
+        preferred_side: form.preferred_side,
+        nationality: form.nationality || null,
+        birthday: form.birthday || null,
+        // Obrigatório (29 set): um perfil antigo sem género não pode gravar ''.
+        ...(form.gender ? { gender: form.gender } : {}),
+        language: form.language,
+        activity_visibility: form.activity_visibility,
+        results_visibility: form.results_visibility,
+        clubs_visibility: form.clubs_visibility,
         // Só depois da migration_lessons_14 (sem a coluna, gravar o resto não falha).
-        ...(profile && 'lessons_visibility' in profile ? { lessons_visibility: lessonsVisibility } : {}),
-        is_private: isPrivate,
+        ...(profile && 'lessons_visibility' in profile ? { lessons_visibility: form.lessons_visibility } : {}),
+        is_private: form.is_private,
       }
-      // Só entra no UPDATE quando muda — ver a nota original no Perfil:
-      // quem não mexe no campo continua a gravar mesmo que a migração da
-      // mão dominante ainda não tenha sido corrida.
-      if ((dominantHand || null) !== (profile?.dominant_hand || null)) {
-        updates.dominant_hand = dominantHand || null
+      // Só entra no UPDATE quando muda: quem não mexe no campo continua a
+      // gravar mesmo que a migração da mão dominante ainda não tenha corrido.
+      if ((form.dominant_hand || null) !== (profile?.dominant_hand || null)) {
+        updates.dominant_hand = form.dominant_hand || null
       }
       const { error: profileError } = await updateProfile(updates)
       if (profileError) throw profileError
 
-      i18n.changeLanguage(language)
+      i18n.changeLanguage(form.language)
       try {
-        localStorage.setItem('preferredLanguage', language)
+        localStorage.setItem('preferredLanguage', form.language)
       } catch {
         // ignore — best-effort
       }
-      setEditing(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
@@ -118,281 +118,146 @@ export default function PersonalInfo() {
     }
   }
 
+  const ageKey = AGE_LABEL_KEY[ageCategory(form.birthday)]
+
   return (
-    <div className="space-y-4 pb-6">
-      {/* O topo das páginas sem capa: a barra de vidro com o «‹» e o título
-          grande por baixo (Renato/Francisco, 16 out — a faixa branca antiga
-          deixava um espaço vazio em cima). */}
-      <BackBar onBack={() => (editing ? (setEditing(false), resetForm()) : navigate('/perfil'))}
-        label={t('gamedetails.back')} title={t('profile.personal_info_heading')} />
+    <div className="pb-6">
+      <BackBar onBack={() => navigate('/perfil')} label={t('gamedetails.back')} title={t('profile.personal_info_heading')} />
       <h1 className="text-[28px] font-extrabold leading-tight text-ink-900">{t('profile.personal_info_heading')}</h1>
 
-      {saved && (
-        <p className="text-sm font-extrabold text-ink-900">{t('profile.updated_success')}</p>
-      )}
-
-      <div className="card">
-        {editing ? (
-          <form onSubmit={handleSave} className="space-y-4 animate-fade-up">
-            <div>
-              <label className={inputLabel}>{t('profile.name_label')}</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="input-field"
-                required
-              />
-            </div>
-
-            <div>
-              <label className={inputLabel}>{t('profile.birthday_label')}</label>
-              <DateField
-                value={birthday}
-                onChange={setBirthday}
-                max={maxSignupBirthday()}
-                hideToday
-              />
-            </div>
-
-            <div>
-              <label className={inputLabel}>{t('profile.gender_label')}</label>
-              <Select
-                value={gender}
-                onChange={setGender}
-                placeholder={t('login.gender_placeholder')}
-                options={[
-                  { value: 'masculino', label: t('login.gender_male') },
-                  { value: 'feminino', label: t('login.gender_female') },
-                ]}
-              />
-            </div>
-
-
-            <div>
-              <label className={inputLabel}>{t('profile.preferred_side_label')}</label>
-              <Select
-                value={preferredSide}
-                onChange={setPreferredSide}
-                options={[
-                  { value: 'left', label: t('gamedetails.side_left') },
-                  { value: 'right', label: t('gamedetails.side_right') },
-                  { value: 'both', label: t('gamedetails.side_both') },
-                ]}
-              />
-              <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
-            </div>
-
-            <div>
-              <label className={inputLabel}>{t('profile.dominant_hand_label')}</label>
-              <Select
-                value={dominantHand}
-                onChange={setDominantHand}
-                placeholder={t('profile.dominant_hand_label')}
-                options={[
-                  { value: '', label: t('profile.not_set') },
-                  { value: 'right', label: t('profile.dominant_hand_right') },
-                  { value: 'left', label: t('profile.dominant_hand_left') },
-                ]}
-              />
-            </div>
-
-            <div>
-              <label className={inputLabel}>{t('profile.nationality_label')}</label>
-              <Select
-                value={nationality}
-                onChange={setNationality}
-                placeholder={t('profile.nationality_placeholder')}
-                searchable
-                options={[
-                  { value: '', label: t('profile.nationality_none') },
-                  ...countryOptions(i18n.language),
-                ]}
-              />
-            </div>
-
-            <div>
-              <label className={inputLabel}>{t('profile.language_label')}</label>
-              <Select
-                value={language}
-                onChange={setLanguage}
-                options={[
-                  { value: 'pt', label: t('profile.language_portuguese') },
-                  { value: 'en', label: t('profile.language_english') },
-                ]}
-              />
-            </div>
-
-            <div className="pt-2 border-t border-line">
-              <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">{t('profile.privacy_heading')}</h4>
-              <p className="text-xs text-muted mb-2">{t('profile.privacy_description')}</p>
-              <p className="text-xs text-ink-700 bg-ink-50 rounded-ctrl px-3 py-2 mb-3">
-                {t('profile.privacy_always_public')}
-              </p>
-              <div className="mb-4">
-                <label className="flex items-center justify-between gap-3">
-                  <span>
-                    <span className={inputLabel}>{t('profile.privacy_is_private_label')}</span>
-                    <span className="block text-xs text-muted -mt-1">{t('profile.privacy_is_private_hint')}</span>
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isPrivate}
-                    onClick={() => setIsPrivate((v) => !v)}
-                    className={`shrink-0 w-11 h-6 rounded-full transition-colors duration-fast relative ${isPrivate ? 'bg-lime-400' : 'bg-ink-200'}`}
-                  >
-                    <span className={`absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-fast ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                  </button>
-                </label>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className={inputLabel}>
-                    {t('profile.visibility_activity_label')}
-                    <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_activity_hint')}</span>
-                  </label>
-                  <Select value={activityVisibility} onChange={setActivityVisibility} options={VISIBILITY_OPTIONS} />
-                </div>
-                <div>
-                  <label className={inputLabel}>
-                    {t('profile.visibility_results_label')}
-                    <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_results_hint')}</span>
-                  </label>
-                  <Select value={resultsVisibility} onChange={setResultsVisibility} options={VISIBILITY_OPTIONS} />
-                </div>
-                <div>
-                  <label className={inputLabel}>
-                    {t('profile.visibility_clubs_label')}
-                    <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_clubs_hint')}</span>
-                  </label>
-                  <Select value={clubsVisibility} onChange={setClubsVisibility} options={VISIBILITY_OPTIONS} />
-                </div>
-                {profile && 'lessons_visibility' in profile && (
-                  <div>
-                    <label className={inputLabel}>
-                      {t('profile.visibility_lessons_label')}
-                      <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_lessons_hint')}</span>
-                    </label>
-                    <Select value={lessonsVisibility} onChange={setLessonsVisibility} options={VISIBILITY_OPTIONS} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {saveError && <p role="alert" className="text-xs font-extrabold text-danger">{saveError}</p>}
-            <div className="flex gap-3 pt-2">
-              <PrimaryButton type="submit" disabled={loading} className="flex-1">
-                {loading ? t('layout.saving') : t('layout.save')}
-              </PrimaryButton>
-              <PrimaryButton
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setEditing(false)
-                  resetForm()
-                }}
-                className="flex-1"
-              >
-                {t('gamedetails.cancel')}
-              </PrimaryButton>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              {/* «Editar» na linha do «NOME», à direita, sublinhado como os
-                  outros links de ação: o cartão já não começa com uma linha
-                  vazia (Renato/Francisco, 16 out). Toque de 44 px sem mexer
-                  na altura da linha. */}
-              <div className="flex items-baseline justify-between gap-3">
-                <p className={fieldLabel}>{t('profile.name_label')}</p>
-                <button type="button" onClick={() => setEditing(true)}
-                  className="-my-3 -mr-2 inline-flex min-h-[44px] items-center px-2 text-sm font-extrabold text-ink-900 underline underline-offset-2">
-                  {t('profile.edit_button')}
-                </button>
-              </div>
-              <p className={fieldValue}>{profile?.name}</p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.email_label')}</p>
-              <p className={fieldValue}>{profile?.email}</p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.birthday_label')}</p>
-              <p className={fieldValue}>
-                {profile?.birthday ? formatDateLib(profile.birthday, i18n.language) : t('profile.not_set')}
-                {AGE_LABEL_KEY[ageCategory(profile?.birthday)] && (
-                  <span className="text-muted"> · {t(AGE_LABEL_KEY[ageCategory(profile.birthday)])}</span>
-                )}
-              </p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.gender_label')}</p>
-              <p className={fieldValue}>
-                {profile?.gender
-                  ? (GENDER_LABEL_KEY[profile.gender] ? t(GENDER_LABEL_KEY[profile.gender]) : profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1))
-                  : t('profile.not_set')}
-              </p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.phone_label')}</p>
-              <p className={fieldValue}>
-                {profile?.phone_hash
-                  ? profile?.phone_verified_at
-                    ? t('profile.phone_linked')
-                    : t('profile.phone_pending_confirm')
-                  : t('profile.phone_not_linked')}
-              </p>
-              <div className="mt-2">
-                <ConfirmPhoneCard compact />
-              </div>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.rating_label')}</p>
-              <div className="flex items-center gap-2">
-                <p className={fieldValue}>
-                  {profile?.rating != null ? `${formatRating(profile.rating)} ${t('rankings.points_label')}` : t('profile.no_rating_yet')}
-                </p>
-                <RatingBadge rating={profile?.rating} gender={profile?.gender} />
-              </div>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.preferred_side_label')}</p>
-              <p className={fieldValue}>{t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both)}</p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.dominant_hand_label')}</p>
-              <p className={fieldValue}>
-                {HAND_LABEL_KEY[profile?.dominant_hand] ? t(HAND_LABEL_KEY[profile.dominant_hand]) : t('profile.not_set')}
-              </p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.nationality_label')}</p>
-              <p className={fieldValue}>
-                {profile?.nationality ? countryName(profile.nationality, i18n.language) : t('profile.nationality_none')}
-              </p>
-            </div>
-
-            <div>
-              <p className={fieldLabel}>{t('profile.language_label')}</p>
-              <p className={fieldValue}>
-                {profile?.language === 'en' ? t('profile.language_english') : t('profile.language_portuguese')}
-              </p>
-            </div>
-          </div>
-        )}
+      {/* Quem és: a foto, o nome (editável ali, com o lápis colado) e os pontos. */}
+      <div className={`${CARD} mt-4 flex flex-col items-center px-4 pb-4 pt-5 text-center`}>
+        <Avatar name={form.name || profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-2xl" />
+        <label className="group mt-3 flex max-w-full items-center gap-1.5 rounded-ctrl focus-within:bg-surface focus-within:px-2">
+          <span className="sr-only">{t('profile.name_label')}</span>
+          <span className="inline-grid min-w-0 font-display text-xl font-extrabold">
+            <span aria-hidden="true" className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre">{form.name || ' '}</span>
+            <input type="text" value={form.name} onChange={(e) => set('name')(e.target.value)} size={1}
+              className="col-start-1 row-start-1 w-full min-w-[2ch] bg-transparent text-center text-ink-900 outline-none" />
+          </span>
+          <Pencil size={15} aria-hidden="true" className="shrink-0 text-ink-500 group-focus-within:text-ink-900" />
+        </label>
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+          <span>{profile?.rating != null ? `${formatRating(profile.rating)} ${t('rankings.points_label')}` : t('profile.no_rating_yet')}</span>
+          <RatingBadge rating={profile?.rating} gender={profile?.gender} />
+        </div>
       </div>
 
-      {!editing && <ChangePasswordSection />}
+      {saved && <p className="mt-3 text-sm font-extrabold text-ink-900" role="status">{t('profile.updated_success')}</p>}
+
+      <p className={KICKER}>{t('personal.section_about')}</p>
+      <div className={CARD}>
+        <Row label={t('profile.birthday_label')} hint={ageKey ? t(ageKey) : null}>
+          <div className="mt-1">
+            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday()} hideToday />
+          </div>
+        </Row>
+        <Row label={t('profile.gender_label')}>
+          <div className="mt-1">
+            <Select value={form.gender} onChange={set('gender')} placeholder={t('login.gender_placeholder')}
+              options={[
+                { value: 'masculino', label: t('login.gender_male') },
+                { value: 'feminino', label: t('login.gender_female') },
+              ]} />
+          </div>
+        </Row>
+        <Row label={t('profile.nationality_label')}>
+          <div className="mt-1">
+            <Select value={form.nationality} onChange={set('nationality')} placeholder={t('profile.nationality_placeholder')} searchable
+              options={[{ value: '', label: t('profile.nationality_none') }, ...countryOptions(i18n.language)]} />
+          </div>
+        </Row>
+      </div>
+
+      <p className={KICKER}>{t('personal.section_court')}</p>
+      <div className={CARD}>
+        <Row label={t('profile.preferred_side_label')} hint={t('profile.preferred_side_hint')}>
+          <Chips className="mt-1" label={t('profile.preferred_side_label')} value={form.preferred_side} onChange={set('preferred_side')}
+            options={[
+              { value: 'left', label: t('gamedetails.side_left') },
+              { value: 'right', label: t('gamedetails.side_right') },
+              { value: 'both', label: t('gamedetails.side_both') },
+            ]} />
+        </Row>
+        <Row label={t('profile.dominant_hand_label')}>
+          <Chips className="mt-1" label={t('profile.dominant_hand_label')} value={form.dominant_hand} onChange={set('dominant_hand')}
+            options={[
+              { value: 'right', label: t('profile.dominant_hand_right') },
+              { value: 'left', label: t('profile.dominant_hand_left') },
+              { value: '', label: t('profile.not_set') },
+            ]} />
+        </Row>
+      </div>
+
+      <p className={KICKER}>{t('personal.section_account')}</p>
+      <div className={CARD}>
+        <Row label={t('profile.email_label')}>
+          <p className="mt-0.5 truncate text-[15px] text-ink-900">{profile?.email}</p>
+        </Row>
+        <Row label={t('profile.phone_label')}>
+          <p className={`mt-0.5 text-[15px] ${profile?.phone_verified_at ? 'font-extrabold text-ok' : 'text-ink-900'}`}>
+            {profile?.phone_hash
+              ? profile?.phone_verified_at ? t('profile.phone_linked') : t('profile.phone_pending_confirm')
+              : t('profile.phone_not_linked')}
+          </p>
+          <div className="mt-2"><ConfirmPhoneCard compact /></div>
+        </Row>
+        <Row label={t('profile.language_label')}>
+          <Chips className="mt-1" label={t('profile.language_label')} value={form.language} onChange={set('language')}
+            options={[
+              { value: 'pt', label: t('profile.language_portuguese') },
+              { value: 'en', label: t('profile.language_english') },
+            ]} />
+        </Row>
+      </div>
+
+      <p className={KICKER}>{t('profile.privacy_heading')}</p>
+      <div className={CARD}>
+        <label className="flex min-h-[56px] cursor-pointer items-center gap-3 px-4 py-3">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-extrabold text-ink-900">{t('profile.privacy_is_private_label')}</span>
+            <span className="block text-xs text-muted">{t('profile.privacy_is_private_hint')}</span>
+          </span>
+          <input type="checkbox" role="switch" checked={form.is_private} onChange={(e) => set('is_private')(e.target.checked)} className="peer sr-only" />
+          <span aria-hidden="true" className="relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-ink-900 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2" />
+        </label>
+      </div>
+
+      <p className={KICKER}>{t('personal.section_who_sees')}</p>
+      <div className={CARD}>
+        {[
+          ['results_visibility', 'profile.visibility_results_label', 'profile.visibility_results_hint'],
+          ['clubs_visibility', 'profile.visibility_clubs_label', 'profile.visibility_clubs_hint'],
+          ['activity_visibility', 'profile.visibility_activity_label', 'profile.visibility_activity_hint'],
+          ...(profile && 'lessons_visibility' in profile ? [['lessons_visibility', 'profile.visibility_lessons_label', 'profile.visibility_lessons_hint']] : []),
+        ].map(([key, labelKey, hintKey]) => (
+          <div key={key} className="border-t border-line px-4 py-3 first:border-t-0">
+            <span className="block text-sm font-extrabold text-ink-900">{t(labelKey)}</span>
+            <span className="block text-xs text-muted">{t(hintKey)}</span>
+            <Chips className="mt-1" label={t(labelKey)} value={form[key]} onChange={set(key)} options={VISIBILITY_OPTIONS} />
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 px-0.5 text-xs text-muted">{t('profile.privacy_always_public')}</p>
+
+      {saveError && <p role="alert" className="mt-4 text-sm font-extrabold text-danger">{saveError}</p>}
+      {dirty > 0 && (
+        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+96px)] z-10 mt-4 flex items-center gap-2 rounded-card bg-ink-900 py-2.5 pl-4 pr-2.5 text-white shadow-lift animate-fade-in">
+          <span className="min-w-0 flex-1 text-sm">{t('cover.unsaved', { count: dirty })}</span>
+          <button type="button" onClick={() => { setForm(base); setSaveError('') }}
+            className="min-h-[40px] shrink-0 rounded-ctrl px-3 text-sm font-extrabold text-white/70 hover:text-white">
+            {t('cover.discard')}
+          </button>
+          <button type="button" onClick={handleSave} disabled={loading}
+            className="min-h-[40px] shrink-0 rounded-ctrl bg-lime-400 px-4 text-sm font-extrabold text-ink-900 hover:bg-lime-600 disabled:opacity-50">
+            {loading ? t('layout.saving') : t('cover.save')}
+          </button>
+        </div>
+      )}
+
+      <div className="mt-6">
+        <ChangePasswordSection />
+      </div>
     </div>
   )
 }
