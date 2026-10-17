@@ -19,7 +19,6 @@ describe('rotatingWinners (pares quebrados)', () => {
     expect(w.rows[0].name).toMatch(/Bruno.*Carla/)
     expect(w.rows[1].name).toMatch(/Teste Xico 1.*mulher/)
     expect(w.rows[2].name).toMatch(/superadmin.*Ana/)
-    expect(w.rows[2].short).toBeNull()
     expect(w.winner).toBe(w.rows[0].name)
   })
 

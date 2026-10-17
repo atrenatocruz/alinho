@@ -4,7 +4,6 @@
 // com o clube ou grupo por baixo do logótipo). Só contas: nada de ecrã aqui.
 import { shortName, shortDate } from '../components/tournament/shareData'
 
-const SHORT_TITLES = ['mixwinners.short_1', 'mixwinners.short_2', 'mixwinners.short_3']
 const TITLES = ['tshare.title_1', 'tshare.title_2', 'tshare.title_3']
 
 const pairOf = (team) => [team?.player1?.name, team?.player2?.name].filter(Boolean).map(shortName).join(' / ')
@@ -20,7 +19,7 @@ const partnerOf = (team, id) => {
  *  Mix de duplas fixas: `teams` já pela ordem final, o vencedor em 1.º. */
 export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
   if (!teams?.length) return null
-  const rows = teams.slice(0, 3).map((team, i) => ({ place: i + 1, name: pairOf(team), short: t(SHORT_TITLES[i]), mine: hasPlayer(team, myId) }))
+  const rows = teams.slice(0, 3).map((team, i) => ({ place: i + 1, name: pairOf(team), mine: hasPlayer(team, myId) }))
   const myIndex = teams.findIndex((team) => hasPlayer(team, myId))
   const place = myIndex >= 0 ? myIndex + 1 : null
   return {
@@ -55,7 +54,7 @@ export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
 export function americanoWinners({ standings, firsts, myId, game, org, t, lang }) {
   if (!standings?.length) return null
   const placeOf = (r) => standings.findIndex((x) => x.points === r.points && x.diff === r.diff) + 1
-  const rows = standings.slice(0, 3).map((r) => ({ place: placeOf(r), name: r.player.name, short: t(SHORT_TITLES[placeOf(r) - 1]), mine: r.player.id === myId }))
+  const rows = standings.slice(0, 3).map((r) => ({ place: placeOf(r), name: r.player.name, mine: r.player.id === myId }))
   const me = standings.find((r) => r.player.id === myId)
   const place = me ? placeOf(me) : null
   const record = me ? { won: me.wins || 0, played: me.played ?? null } : null
@@ -100,7 +99,7 @@ export function rotatingWinners({ placar, myId, game, org, t, lang }) {
   const names = (g) => g.people.map((s) => shortName(s.player.name)).join(' / ')
   const hasMe = (g) => !!myId && g.people.some((s) => s.player.id === myId)
   const titleOf = (place, list) => (place <= 3 ? t(list[place - 1]) : null)
-  const rows = groups.slice(0, 3).map((g) => ({ place: g.place, name: names(g), short: titleOf(g.place, SHORT_TITLES), mine: hasMe(g) }))
+  const rows = groups.slice(0, 3).map((g) => ({ place: g.place, name: names(g), mine: hasMe(g) }))
   const mine = groups.find(hasMe)
   const meRow = mine?.people.find((s) => s.player.id === myId)
   const place = mine ? mine.place : null

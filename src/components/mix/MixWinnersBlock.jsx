@@ -1,6 +1,6 @@
 // «TERMINADO · VENCEDORES» em cima da página do mix acabado (#622, design-
 // handoff/2026-10-11-vencedores-em-todos-os-jogos, aprovado pelo Francisco a
-// 11 out): o vencedor, o pódio com os títulos curtos e, por baixo, «↗
+// 11 out): o vencedor, o pódio e, por baixo, «↗
 // Partilhar os vencedores» (lima) para quem jogou e tem conta, e para quem
 // organizou. `extra`: o que já vivia no cartão do vencedor (o voucher).
 import { useTranslation } from 'react-i18next'
@@ -16,11 +16,12 @@ export default function MixWinnersBlock({ winner, rows, note = null, extra = nul
         {extra}
         <div className="mt-3 border-t border-white/10">
           {rows.map((r, i) => (
-            <div key={`${r.place}-${i}`} className="flex items-center justify-between gap-3 border-b border-white/10 py-2 last:border-0">
+            // Sem os títulos curtos (Lendário/Master/Bronze) ao lado: não diziam
+            // nada a quem jogou (Renato, 17 out).
+            <div key={`${r.place}-${i}`} className="border-b border-white/10 py-2 last:border-0">
               {/* Sem lugar (jogo em aberto, um jogo só): só as duplas, a
                   vencedora a lima (UX, 11 out). */}
               <p className={`min-w-0 truncate text-sm ${r.mine ? 'font-extrabold text-lime-400' : 'text-white'}`}>{r.place != null ? `${r.place}.º ` : ''}{r.name}</p>
-              <span className={`shrink-0 text-sm font-extrabold ${(r.top ?? r.place === 1) ? 'text-lime-400' : 'text-white'}`}>{r.short}</span>
             </div>
           ))}
         </div>
