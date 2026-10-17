@@ -382,7 +382,7 @@ export default function Rankings() {
           <span className="inline-flex items-center gap-2">
             {t('rankings.title')}
             {/* R6 (13 out): o «?» redondo abre o «Como funciona» do separador. */}
-            <Link to={mode === 'xp' ? '/instrucoes#xp' : '/instrucoes#ranking'} aria-label={t('rankings.help_aria')}
+            <Link to={mode === 'xp' ? '/ajuda#xp' : '/ajuda#ranking'} aria-label={t('rankings.help_aria')}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-ink-700 hover:text-ink-900">
               <HelpCircle size={17} />
             </Link>

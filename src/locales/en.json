@@ -6310,5 +6310,14 @@
   "gerirplans.your_plan": "Your plan",
   "gerirplans.ask_plan": "Ask for this plan",
   "gerirplans.whatsapp_text_org": "Hi! I’d like to move {{name}} to the {{plan}} plan.",
-  "gerirplans.whatsapp_text": "Hi! I’d like to know more about the {{plan}} plan."
+  "gerirplans.whatsapp_text": "Hi! I’d like to know more about the {{plan}} plan.",
+  "help.nav_aria": "Help sections",
+  "help.nav_start": "Getting started",
+  "help.nav_ranking": "Ranking",
+  "help.nav_xp": "XP",
+  "help.nav_organize": "Organising",
+  "help.nav_whatsapp": "WhatsApp",
+  "help.nav_faq": "Questions",
+  "help.section_start": "First steps",
+  "help.section_essentials": "The essentials"
 }

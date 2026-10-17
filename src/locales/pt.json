@@ -6325,5 +6325,14 @@
   "gerirplans.your_plan": "O teu plano",
   "gerirplans.ask_plan": "Pedir este plano",
   "gerirplans.whatsapp_text_org": "Olá! Quero passar o {{name}} para o plano {{plan}}.",
-  "gerirplans.whatsapp_text": "Olá! Quero saber mais sobre o plano {{plan}}."
+  "gerirplans.whatsapp_text": "Olá! Quero saber mais sobre o plano {{plan}}.",
+  "help.nav_aria": "Partes da ajuda",
+  "help.nav_start": "Começar",
+  "help.nav_ranking": "Ranking",
+  "help.nav_xp": "XP",
+  "help.nav_organize": "Organizar",
+  "help.nav_whatsapp": "WhatsApp",
+  "help.nav_faq": "Perguntas",
+  "help.section_start": "Primeiros passos",
+  "help.section_essentials": "O essencial"
 }
