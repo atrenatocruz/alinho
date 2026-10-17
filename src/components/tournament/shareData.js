@@ -73,11 +73,6 @@ export function bigScore(match, side) {
 // A fase com o artigo certo, para o texto (MARKETING.md, notas).
 const PHASE_WON = { R32: 'tshare.phase_won_R32', R16: 'tshare.phase_won_R16', QF: 'tshare.phase_won_QF', SF: 'tshare.phase_won_SF' }
 const PHASE_LOST = { R32: 'tshare.phase_lost_R32', R16: 'tshare.phase_lost_R16', QF: 'tshare.phase_lost_QF', SF: 'tshare.phase_lost_SF' }
-const TITLES = ['tshare.title_1', 'tshare.title_2', 'tshare.title_3']
-
-/** O título pelo lugar (só no pódio): Padelista Lendário, Master do Padel,
- *  Muralha de Bronze. Do 4.º para baixo, nenhum. */
-export const placeTitleKey = (place) => TITLES[place - 1] || null
 
 /** O texto sugerido (editável) — MARKETING.md, «Torneio — texto sugerido». */
 export function suggestedText(kind, ctx, t) {
@@ -151,7 +146,7 @@ export function podiumShare({ tournament, results, myName, hidingIds = [], t, la
   const hides = new Set(hidingIds)
   const teams = [c.champion, c.runner_up, c.third].map((team) => (team && hides.has(team.entry_id) ? { ...team, hides_results: true } : team))
   const rows = place <= 3
-    ? teams.map((team, i) => (team ? { place: i + 1, pair: pairShort(team, `${t('tshare.pair_hidden')} ${c.code}`), title: t(placeTitleKey(i + 1)), mine: i + 1 === place || hasMe(team) } : null)).filter(Boolean)
+    ? teams.map((team, i) => (team ? { place: i + 1, pair: pairShort(team, `${t('tshare.pair_hidden')} ${c.code}`), mine: i + 1 === place || hasMe(team) } : null)).filter(Boolean)
     : []
   const record = { won: my.matches_won || 0, played: my.matches || 0 }
   const myTeam = teams[place - 1]

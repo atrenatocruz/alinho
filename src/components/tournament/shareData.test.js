@@ -47,8 +47,9 @@ describe('pódio', () => {
       my: { category_code: 'MX4', final_position: 3, matches: 4, matches_won: 2 },
     }
     const built = podiumShare({ tournament: { name: 'Smash Cup' }, results, myName: 'Ana Moreira', t, lang: 'pt' })
+    // Sem títulos por lugar (Renato, 17 out): só o lugar e quem é.
     expect(built.data.rows.map((r) => [r.place, r.title, r.mine])).toEqual([
-      [1, 'tshare.title_1|', false], [2, 'tshare.title_2|', false], [3, 'tshare.title_3|', true],
+      [1, undefined, false], [2, undefined, false], [3, undefined, true],
     ])
     expect(built.data.rows[2].pair).toBe('Nuno R. / Ana M.')
   })

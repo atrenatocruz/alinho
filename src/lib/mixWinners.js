@@ -4,7 +4,7 @@
 // com o clube ou grupo por baixo do logótipo). Só contas: nada de ecrã aqui.
 import { shortName, shortDate } from '../components/tournament/shareData'
 
-const TITLES = ['tshare.title_1', 'tshare.title_2', 'tshare.title_3']
+// Sem títulos por lugar (Padelista Lendário…) no pódio nem na imagem (Renato, 17 out).
 
 const pairOf = (team) => [team?.player1?.name, team?.player2?.name].filter(Boolean).map(shortName).join(' / ')
 const hasPlayer = (team, id) => !!id && (team?.player1?.id === id || team?.player2?.id === id)
@@ -35,8 +35,8 @@ export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
         // Do 4.º para baixo: o pódio à vista (nenhum a lima) e, por baixo, a
         // dupla de quem partilha com o lugar e a moldura lima (UX, 11 out).
         rows: !place || place <= 3
-          ? teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), title: t(TITLES[i]), mine: hasPlayer(team, myId) }))
-          : [...teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), title: t(TITLES[i]), mine: false })),
+          ? teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), mine: hasPlayer(team, myId) }))
+          : [...teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), mine: false })),
             { place, pair: pairOf(teams[myIndex]), title: null, mine: true }],
         // Com 0 vitórias, a pastilha não aparece (UX, 11 out).
         record: record && record.won > 0 ? t('mixwinners.record_mix', { won: record.won, played: record.played }) : null,
@@ -69,7 +69,7 @@ export function americanoWinners({ standings, firsts, myId, game, org, t, lang }
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
         rows: [
-          ...standings.slice(0, 3).map((r) => ({ place: placeOf(r), pair: r.player.id === myId ? r.player.name : shortName(r.player.name), title: t(TITLES[placeOf(r) - 1]), score: r.points, mine: r.player.id === myId })),
+          ...standings.slice(0, 3).map((r) => ({ place: placeOf(r), pair: r.player.id === myId ? r.player.name : shortName(r.player.name), score: r.points, mine: r.player.id === myId })),
           // Do 4.º para baixo, a minha linha por baixo do pódio (UX, 11 out).
           ...(place > 3 ? [{ place, pair: me.player.name, title: null, score: me.points, mine: true }] : []),
         ],
@@ -98,7 +98,6 @@ export function rotatingWinners({ placar, myId, game, org, t, lang }) {
   })
   const names = (g) => g.people.map((s) => shortName(s.player.name)).join(' / ')
   const hasMe = (g) => !!myId && g.people.some((s) => s.player.id === myId)
-  const titleOf = (place, list) => (place <= 3 ? t(list[place - 1]) : null)
   const rows = groups.slice(0, 3).map((g) => ({ place: g.place, name: names(g), mine: hasMe(g) }))
   const mine = groups.find(hasMe)
   const meRow = mine?.people.find((s) => s.player.id === myId)
@@ -117,7 +116,7 @@ export function rotatingWinners({ placar, myId, game, org, t, lang }) {
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
         rows: [
-          ...groups.slice(0, 3).map((g) => ({ place: g.place, pair: names(g), title: titleOf(g.place, TITLES), mine: hasMe(g) && place <= 3 })),
+          ...groups.slice(0, 3).map((g) => ({ place: g.place, pair: names(g), mine: hasMe(g) && place <= 3 })),
           ...(place > 3 ? [{ place, pair: names(mine), title: null, mine: true }] : []),
         ],
         record: record && record.won > 0 ? t('mixwinners.record_mix', { won: record.won, played: record.played }) : null,
