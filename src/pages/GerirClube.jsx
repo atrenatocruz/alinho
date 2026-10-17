@@ -4467,7 +4467,13 @@ export default function GerirClube() {
                     )}
                   </div>
                 ) : (
-                  <p className="mt-3 text-[11px] text-muted">{t('gerirclube.plan_contact_hint')}</p>
+                  <>
+                    <p className="mt-3 text-[11px] text-muted">{t('gerirclube.plan_contact_hint')}</p>
+                    {/* Os planos dentro da app, com o deste clube marcado (17 out). */}
+                    <Link to={`/gerir/planos?org=${settings.slug}`} className="mt-1 inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                      {t('gerir.create_group_blocked_plans')}
+                    </Link>
+                  </>
                 )}
               </div>
 

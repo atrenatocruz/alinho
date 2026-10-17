@@ -78,6 +78,7 @@ const EditOpenSlots = lazyPage(() => import('./pages/EditOpenSlots'))
 const CreateSeries = lazyPage(() => import('./pages/CreateSeries'))
 const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
+const GerirPlanos = lazyPage(() => import('./pages/GerirPlanos'))
 const LeaguePage = lazyPage(() => import('./pages/LeaguePage'))
 const LeagueEncounterPage = lazyPage(() => import('./pages/LeagueEncounterPage'))
 const LeagueTeamPage = lazyPage(() => import('./pages/LeagueTeamPage'))
@@ -727,6 +728,16 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <Gerir />
+            </Guard>
+          }
+        />
+        {/* Os planos dentro da app (17 out): o «Ver os planos» do Gerir já não
+            sai para a página pública /planos. */}
+        <Route
+          path="/gerir/planos"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <GerirPlanos />
             </Guard>
           }
         />

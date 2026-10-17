@@ -6319,5 +6319,11 @@
   "playerdetails.r13_no_trophies": "{{name}} ainda não tem conquistas.",
   "playerdetails.r13_clubs": "Clubes e grupos · {{count}}",
   "playerdetails.r13_club": "Clube",
-  "playerdetails.r13_group": "Grupo"
+  "playerdetails.r13_group": "Grupo",
+  "gerirplans.title": "Planos",
+  "gerirplans.current_line": "O {{name}} está no plano {{plan}}.",
+  "gerirplans.your_plan": "O teu plano",
+  "gerirplans.ask_plan": "Pedir este plano",
+  "gerirplans.whatsapp_text_org": "Olá! Quero passar o {{name}} para o plano {{plan}}.",
+  "gerirplans.whatsapp_text": "Olá! Quero saber mais sobre o plano {{plan}}."
 }

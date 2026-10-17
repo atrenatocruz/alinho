@@ -155,7 +155,7 @@ export default function Gerir() {
             {t('gerir.create_group_blocked', { name: blockingGroup.name, plan: planName(blockingGroup.plan_tier) })}
           </p>
           {/* O caminho: passar o grupo grátis a um plano pago (PO, 12 out). */}
-          <Link to="/planos" className="mt-1 inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+          <Link to={`/gerir/planos?org=${blockingGroup.slug}`} className="mt-1 inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
             {t('gerir.create_group_blocked_plans')}
           </Link>
         </div>

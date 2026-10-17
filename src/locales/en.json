@@ -6304,5 +6304,11 @@
   "playerdetails.r13_no_trophies": "{{name}} has no achievements yet.",
   "playerdetails.r13_clubs": "Clubs and groups · {{count}}",
   "playerdetails.r13_club": "Club",
-  "playerdetails.r13_group": "Group"
+  "playerdetails.r13_group": "Group",
+  "gerirplans.title": "Plans",
+  "gerirplans.current_line": "{{name}} is on the {{plan}} plan.",
+  "gerirplans.your_plan": "Your plan",
+  "gerirplans.ask_plan": "Ask for this plan",
+  "gerirplans.whatsapp_text_org": "Hi! I’d like to move {{name}} to the {{plan}} plan.",
+  "gerirplans.whatsapp_text": "Hi! I’d like to know more about the {{plan}} plan."
 }
