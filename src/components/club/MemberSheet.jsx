@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { User, Star, StarOff, Crown, UserX } from 'lucide-react'
 import { Avatar, RatingBadge } from '../ui'
+import { useSheetDrag } from '../../lib/useSheetDrag'
 
 /* Gerir › Pessoas, proposta A (Renato, 16 out): tudo o que se faz a um
    membro numa folha — ver o perfil, dar ou tirar admin, passar a dono,
@@ -12,6 +13,7 @@ import { Avatar, RatingBadge } from '../ui'
 
 export default function MemberSheet({ member, isSelf, canTransfer, onClose, onToggleAdmin, onTransfer, onRemove }) {
   const { t } = useTranslation()
+  const drag = useSheetDrag(onClose)
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -24,6 +26,7 @@ export default function MemberSheet({ member, isSelf, canTransfer, onClose, onTo
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="member-sheet-name" onClick={(e) => e.stopPropagation()}
+        {...drag.bind} style={drag.style}
         className="w-full rounded-t-card bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] shadow-lift animate-pop sm:max-w-md sm:rounded-card">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
         <div className="flex items-center gap-3 pb-3">
