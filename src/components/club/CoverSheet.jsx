@@ -70,10 +70,10 @@ export default function CoverSheet({ org, onSave, onRemove, onClose }) {
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 animate-fade-in sm:items-center sm:p-4"
+    <div ref={drag.backdropRef} className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 animate-fade-in sm:items-center sm:p-4"
       onClick={() => { if (!busy) onClose() }}>
       <div role="dialog" aria-modal="true" aria-labelledby="cover-sheet-title" onClick={(e) => e.stopPropagation()}
-        {...drag.bind} style={drag.style}
+        ref={drag.panelRef} style={drag.style}
         className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto overscroll-contain rounded-t-card sm:rounded-card bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] shadow-lift animate-pop">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
         <h3 id="cover-sheet-title" className="font-display text-lg font-extrabold text-ink-900">{t(group ? 'cover.title_group' : 'cover.title_club')}</h3>
