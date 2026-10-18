@@ -3010,6 +3010,18 @@ export default function GameDetails() {
   // Quem jogou e tem conta, e quem organizou (SPEC, ponto 5).
   const canShareWinners = !!winnersInfo?.share && (isAdmin || game?.created_by === user?.id
     || (!!statsByUser[user?.id] && !profile?.is_guest))
+  // /jogo/:id?partilhar=1 (o «↗» de cada jogo no Perfil › Jogos, #636): com o
+  // mix terminado e tudo carregado (as estatísticas chegam antes do fim do
+  // loading), abre o cartão dos vencedores a quem o pode partilhar e, aos
+  // outros, a partilha do link. Uma vez só, como no FriendSession.
+  const autoShareDone = useRef(false)
+  const wantsShare = new URLSearchParams(location.search).has('partilhar')
+  useEffect(() => {
+    if (!wantsShare || autoShareDone.current || loading || game?.status !== 'finished') return
+    autoShareDone.current = true
+    if (canShareWinners) openWinnersShare()
+    else setShowShare(true)
+  })
   const personById = Object.fromEntries(people.map((p) => [p.id, p]))
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
