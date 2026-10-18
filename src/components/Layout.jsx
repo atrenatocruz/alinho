@@ -468,7 +468,8 @@ export default function Layout({ children }) {
     if (notice.kind === 'mix_request_declined') return t('layout.mix_request_declined', vars)
     // Tirado por quem organiza (o aviso guarda o nome dele): diz-se quem tirou,
     // e não «Saíste» (UX, 8 out).
-    if (notice.kind === 'mix_removed') return t(d.actor_name ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
+    // Sem nome mas com quem fez (o superadmin escondido, 18 out): também foi tirado.
+    if (notice.kind === 'mix_removed') return t(d.actor_name || d.actor_id ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
     // «O Mix de terça de 27 out mudou: preço 10,00 €, formato Sobe e desce.»
     if (notice.kind === 'mix_changed') return t('layout.mix_changed', { ...vars, changes: changesText(t, d.changes, i18n.language) })
@@ -489,7 +490,8 @@ export default function Layout({ children }) {
     if (notice.kind === 'mix_not_finished') return t('layout.mix_not_finished', vars)
     const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
     // Quem inscreveu (Trello #534): o aviso guarda o nome do admin.
-    const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : 'layout.mix_notice_joined'
+    // Sem nome mas com quem fez (o superadmin escondido, 18 out): «Quem organiza inscreveu-te».
+    const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : d.actor_id ? 'layout.mix_notice_added_by_organizer' : 'layout.mix_notice_joined'
     return notice.kind === 'mix_joined'
       ? `${t(joinedKey, { ...vars, actor: d.actor_name })} ${partnerLine}`
       : `${t('layout.mix_notice_partner_changed', vars)} ${partnerLine}`
