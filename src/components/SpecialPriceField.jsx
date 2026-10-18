@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PlusCircle, Search, X } from 'lucide-react'
-import { Avatar } from './ui'
+import { Avatar, switchTrack, switchKnob } from './ui'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
 import { eurosText, specialPriceAvailable } from '../lib/specialPrice'
@@ -71,8 +71,8 @@ export default function SpecialPriceField({ value, onChange, normalPrice, orgId,
         </div>
         <button type="button" role="switch" aria-checked={on} aria-label={t('special_price.title')}
           onClick={() => onChange(on ? null : { price: '0', audience: 'members', people: [] })}
-          className={`relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors duration-fast ${on ? 'bg-ink-900' : 'bg-ink-200'}`}>
-          <span className={`absolute top-1 h-4 w-4 rounded-full transition-all duration-fast ${on ? 'right-1 bg-lime-400' : 'left-1 bg-white'}`} />
+          className={`mt-0.5 ${switchTrack(on)}`}>
+          <span aria-hidden className={switchKnob(on)} />
         </button>
       </div>
 

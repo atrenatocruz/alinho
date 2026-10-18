@@ -1836,8 +1836,13 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
 // baixo a 16 px e a sombra leve dos cartões — sem a linha fina por baixo.
 // A calha dos interruptores (input type="checkbox" role="switch" com
 // className="peer sr-only" logo antes): lima quando ligado, cinzenta quando
-// desligado — a mesma em todo o lado (UX, 15 e 18 out).
-export const SWITCH_TRACK = 'relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-lime-400 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2'
+// desligado (#D4D6D1, para se ver numa folha branca) — a mesma em todo o
+// lado (UX, 15 e 18 out).
+export const SWITCH_TRACK = 'relative h-[26px] w-11 shrink-0 rounded-full bg-[#D4D6D1] transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-lime-400 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2'
+// O mesmo interruptor feito com um <button role="switch">: a calha e a bola
+// pelo estado (lima ligado, cinzento desligado, bola branca — UX, 18 out).
+export const switchTrack = (on) => `relative h-[26px] w-11 shrink-0 rounded-full transition-colors duration-fast disabled:opacity-50 ${on ? 'bg-lime-400' : 'bg-[#D4D6D1]'}`
+export const switchKnob = (on) => `absolute left-[3px] top-[3px] h-5 w-5 rounded-full bg-white shadow transition-transform duration-fast ${on ? 'translate-x-[18px]' : ''}`
 
 export const TOP_EDGE = 'rounded-b-[16px] shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
 export function PageHeader({ title, children, sticky = true }) {
