@@ -6,6 +6,11 @@
 @import '@fontsource/outfit/500.css';
 @import '@fontsource/outfit/600.css';
 @import '@fontsource/outfit/700.css';
+/* 800 e 900: as horas grandes, os títulos e os vazios do redesign (R0–R16)
+   pedem-nos; sem eles o browser engrossava o 700 à mão (DESIGN.md, Known
+   gaps, 16 out). */
+@import '@fontsource/outfit/800.css';
+@import '@fontsource/outfit/900.css';
 @import '@fontsource/geist-sans/400.css';
 @import '@fontsource/geist-sans/500.css';
 @import '@fontsource/geist-sans/700.css';
@@ -87,7 +92,7 @@
 
   /* Type scale (reference):
      xs=12 sm=14 base=16 lg=18 xl=20 2xl=24 3xl=30 4xl=36 —
-     Geist Sans 400/500/700 (body), Outfit 500/600/700 (headings) */
+     Geist Sans 400/500/700 (body), Outfit 500/600/700/800/900 (headings) */
 }
 
 @layer base {
