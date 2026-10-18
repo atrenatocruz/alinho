@@ -10,7 +10,7 @@ import RealWeekCalendar from './lessons/RealWeekCalendar'
 import DaySheet from './lessons/DaySheet'
 import CloseDaysSheet from './lessons/CloseDaysSheet'
 import { getTeacherBooking, getTeacherBusyRange, listMyTeacherClosures, listMyTeacherRequests, openTeacherDays } from '../lib/lessonsApi'
-import { Avatar, ConfirmSheet } from './ui'
+import { Avatar, ConfirmSheet, switchTrack, switchKnob } from './ui'
 import { describeError } from '../lib/errors'
 import { setHideFromRankings } from '../lib/rankingVisibility'
 import { contemTexto } from '../lib/semAcentos'
@@ -344,9 +344,9 @@ export default function TeacherSection() {
               aria-labelledby="hide-rankings-label"
               disabled={hideBusy}
               onClick={toggleHideFromRankings}
-              className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-fast disabled:opacity-50 ${hideFromRankings ? 'bg-ink-900' : 'bg-ink-200'}`}
+              className={`mt-0.5 ${switchTrack(hideFromRankings)}`}
             >
-              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-card transition-transform duration-fast ${hideFromRankings ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+              <span aria-hidden className={switchKnob(hideFromRankings)} />
             </button>
           </div>
           {/* Por baixo: o outro caminho (horário ou as minhas aulas) e o perfil público. */}

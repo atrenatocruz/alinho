@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sheet } from '../agenda/AgendaControls'
+import { switchTrack, switchKnob } from '../ui'
 
 export const HOME_SECTIONS = ['mine', 'live', 'foryou']
 const LABEL = {
@@ -40,8 +41,8 @@ export function useHomeSections(userId) {
 function Switch({ on, label, onClick }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick}
-      className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors ${on ? 'bg-ink-900' : 'bg-[#D1D5DB]'}`}>
-      <span aria-hidden className={`absolute top-[3px] h-5 w-5 rounded-full transition-[left] duration-200 ${on ? 'left-[21px] bg-lime-400' : 'left-[3px] bg-white'}`} />
+      className={switchTrack(on)}>
+      <span aria-hidden className={switchKnob(on)} />
     </button>
   )
 }
