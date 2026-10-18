@@ -3466,7 +3466,7 @@
   "privacy.summary_3": "Your photo, name, level and preferred side are always visible. You choose the rest, in Profile › Privacy.",
   "privacy.summary_4": "Anyone who joins only through WhatsApp, without an account, has their number deleted two days after the mix.",
   "privacy.summary_5": "You can ask to see, correct or delete your data whenever you want.",
-  "privacy.summary_6": "Your data is kept by services that work for us (Supabase, Vercel, Resend, Cloudflare, Google and the bot's server at Amazon). We don't sell it and there are no ads.",
+  "privacy.summary_6": "Your data is kept by services that work for us (Supabase, Vercel, Resend, Cloudflare, Google and the bot's server on Amazon). We don't sell it. Partners' ads are shown by alinho itself, and partners don't receive your data.",
   "privacy.section_intro_title": "Introduction",
   "privacy.section_intro_body": "This Privacy Policy explains what personal data alinho collects, why, and what your rights are. alinho is run by the people listed in \"Who is responsible for your data\".",
   "privacy.section_data_collected_title": "What data we collect",
