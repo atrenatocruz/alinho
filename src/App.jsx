@@ -8,6 +8,7 @@ import { PrimaryButton, EmptyState } from './components/ui'
 import Alino from './components/Alino'
 import Layout, { Wordmark } from './components/Layout'
 import { captureAccountOrigin } from './lib/accountOrigin'
+import { POLICY_VERSION } from './lib/contacts'
 import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
@@ -262,7 +263,11 @@ const Guard = ({ require, showSplash, children }) => {
   // self-selected rating) gets written before consent is on file. Desde o
   // #360 (10 out) também as contas que já existiam passam por aqui uma vez:
   // a migração do Dev 3 deixa de as dar como aceites.
-  if (user && profile && profile.consent_accepted_at === null) {
+  // Aceitar outra vez (Dev 3, 19 out): quem aceitou uma versão mais antiga
+  // vê a caixa uma vez. Sem o campo (migração por correr: undefined), não
+  // se pergunta outra vez.
+  if (user && profile && (profile.consent_accepted_at === null
+    || (typeof profile.consent_policy_version === 'string' && profile.consent_policy_version < POLICY_VERSION))) {
     return <ConsentGate />
   }
 
