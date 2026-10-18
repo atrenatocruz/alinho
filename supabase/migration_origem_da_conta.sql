@@ -27,6 +27,8 @@
 --     primeira sessão. false = não gravou (conta antiga, já gravada, nada
 --     válido); nunca dá erro por isso.
 --   Origem: letras minúsculas, números, - e _, até 60 (o resto ignora-se).
+--   p_ref_code: o código pessoal, ou o id do perfil (QR das conquistas).
+--   Um ref desconhecido ignora-se; a origem grava-se na mesma.
 --
 -- ORDEM. Produção no main de 23 out, com a Política nova (PO). Precisa da
 -- migration_superadmin_modo.sql (is_platform_admin_me), que já correu.
@@ -104,6 +106,10 @@ BEGIN
   IF EXISTS (SELECT 1 FROM account_origins WHERE user_id = auth.uid()) THEN RETURN FALSE; END IF;
   IF v_origin IS NOT NULL AND v_origin !~ '^[a-z0-9_-]{1,60}$' THEN v_origin := NULL; END IF;
   SELECT c.user_id INTO v_ref FROM user_invite_codes c WHERE c.code = upper(btrim(p_ref_code));
+  -- Os QR das conquistas (desde 16 out) levam o id do perfil em vez do código.
+  IF v_ref IS NULL AND btrim(p_ref_code) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    SELECT p.id INTO v_ref FROM profiles p WHERE p.id = btrim(p_ref_code)::uuid;
+  END IF;
   IF v_ref = auth.uid() THEN v_ref := NULL; END IF;
   IF v_origin IS NULL AND v_ref IS NULL THEN RETURN FALSE; END IF;
   INSERT INTO account_origins (user_id, origin, ref_user_id) VALUES (auth.uid(), v_origin, v_ref)
