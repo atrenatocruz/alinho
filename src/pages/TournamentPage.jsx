@@ -287,6 +287,10 @@ export default function TournamentPage() {
     publicView,
   }
   // kind: num grupo, o preço especial diz «Membros do grupo» (QA, 11 out).
+  // O clube ou grupo no topo abre a página dele, como no mix (QA, 19 out). O
+  // endereço vem do get_tournament_page (club_slug, Dev 3); até lá, só quem é
+  // membro o tem, pelas suas organizações.
+  const clubSlug = tour.club_slug || memberships?.find((m) => m.organization_id === tour.organization_id)?.organization?.slug || null
   const clubForForm = { id: tour.organization_id, name: tour.club_name, location: tour.location, kind: tour.club_kind }
 
   const openAdmin = async (modo) => {
@@ -423,7 +427,7 @@ export default function TournamentPage() {
           imageUrl={tour.poster_url || null}
           poster
           chip={[t('tournament.label'), categories.length ? t('tournament.hero_categories', { count: categories.length }) : null].filter(Boolean).join(' · ')}
-          org={tour.club_name ? { name: tour.club_name, kindLabel: t(tour.club_kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'), logo: tour.club_logo_url } : null}
+          org={tour.club_name ? { name: tour.club_name, kindLabel: t(tour.club_kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'), logo: tour.club_logo_url, onOpen: clubSlug ? () => navigate(`/clube/${clubSlug}`) : null } : null}
           title={tour.name}
           time={heroTime}
           timeAside={heroAside}
