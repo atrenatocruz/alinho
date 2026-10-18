@@ -217,6 +217,13 @@ export default function Login() {
 
   const [googleLoading, setGoogleLoading] = useState(false)
   const [googleError, setGoogleError] = useState('')
+  // De volta do Google sem entrar (cancelar, «voltar»), a página pode vir da
+  // cache do browser com o botão ainda em «A entrar…»: volta ao normal.
+  useEffect(() => {
+    const onShow = (e) => { if (e.persisted) setGoogleLoading(false) }
+    window.addEventListener('pageshow', onShow)
+    return () => window.removeEventListener('pageshow', onShow)
+  }, [])
   const handleGoogleLogin = async () => {
     setGoogleLoading(true)
     setGoogleError('')
