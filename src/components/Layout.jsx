@@ -457,6 +457,11 @@ export default function Layout({ children }) {
 
   const mixNoticeText = (notice) => {
     const d = notice.data || {}
+    // Quem fez, quando não é a própria pessoa: o actor_id é coluna do aviso
+    // (não vem no data). Sem nome (o superadmin escondido) → «Quem organiza».
+    const actorId = d.actor_id ?? notice.actor_id
+    // actor_hidden (Dev 3, 18 out): o superadmin fora do grupo fica sem actor_id.
+    const byOther = !!notice.actor_hidden || (!!actorId && actorId !== profile?.id)
     const vars = {
       title: d.game_title || d.title || t('layout.mix_notice_fallback_title'),
       when: (d.game_date || d.date) ? formatDate(d.game_date || d.date, i18n.language, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
@@ -469,7 +474,7 @@ export default function Layout({ children }) {
     // Tirado por quem organiza (o aviso guarda o nome dele): diz-se quem tirou,
     // e não «Saíste» (UX, 8 out).
     // Sem nome mas com quem fez (o superadmin escondido, 18 out): também foi tirado.
-    if (notice.kind === 'mix_removed') return t(d.actor_name || d.actor_id ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
+    if (notice.kind === 'mix_removed') return t(d.actor_name || byOther ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
     // «O Mix de terça de 27 out mudou: preço 10,00 €, formato Sobe e desce.»
     if (notice.kind === 'mix_changed') return t('layout.mix_changed', { ...vars, changes: changesText(t, d.changes, i18n.language) })
@@ -491,7 +496,7 @@ export default function Layout({ children }) {
     const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
     // Quem inscreveu (Trello #534): o aviso guarda o nome do admin.
     // Sem nome mas com quem fez (o superadmin escondido, 18 out): «Quem organiza inscreveu-te».
-    const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : d.actor_id ? 'layout.mix_notice_added_by_organizer' : 'layout.mix_notice_joined'
+    const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : byOther ? 'layout.mix_notice_added_by_organizer' : 'layout.mix_notice_joined'
     return notice.kind === 'mix_joined'
       ? `${t(joinedKey, { ...vars, actor: d.actor_name })} ${partnerLine}`
       : `${t('layout.mix_notice_partner_changed', vars)} ${partnerLine}`

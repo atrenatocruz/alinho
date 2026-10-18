@@ -130,7 +130,22 @@ export default function GameDetails() {
   // mixs from every club a player belongs to, so "current org" is not
   // necessarily this mix's club.
   const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
-  const isAdmin = gameMembership?.is_admin ?? false
+  // O superadmin escondido (18 out) já não tem inscrição nos grupos onde só
+  // gere: conta como quem organiza pela marca do perfil (com o botão do modo,
+  // o AuthContext passa-a a «superadmin com o modo ligado»). A base de dados
+  // já o deixa (is_org_admin).
+  const isAdmin = (gameMembership?.is_admin ?? false) || isPlatformAdmin
+  // Sem inscrição (o superadmin escondido), o clube ou grupo do mix vem da
+  // tabela das organizações: o endereço para o «Editar», o logótipo e o nome.
+  const [gameOrgRow, setGameOrgRow] = useState(null)
+  useEffect(() => {
+    if (!game?.organization_id || gameMembership?.organization || !isPlatformAdmin) return undefined
+    let alive = true
+    supabase.from('organizations').select('id, slug, name, kind, group_logo_url, plan_tier').eq('id', game.organization_id).maybeSingle()
+      .then(({ data }) => { if (alive) setGameOrgRow(data || null) })
+    return () => { alive = false }
+  }, [game?.organization_id, gameMembership?.organization, isPlatformAdmin])
+  const gameOrg = gameMembership?.organization || gameOrgRow
   // Preço especial (7 out): o preço de cada inscrito, só para quem organiza.
   const specialPriceText = useSpecialPriceLine(game?.origin === 'open_slot' ? 'open_slot' : 'mix', game?.price_per_player > 0 ? game.id : null)
   const [scorekeeperIds, setScorekeeperIds] = useState([])
@@ -299,7 +314,7 @@ export default function GameDetails() {
     return () => { cancelled = true }
   }, [wantsOverall, user?.id])
   const [orgLogoBaked, setOrgLogoBaked] = useState(null)
-  const orgLogoUrl = gameMembership?.organization?.group_logo_url || null
+  const orgLogoUrl = gameOrg?.group_logo_url || null
   useEffect(() => {
     if (!winnersShareOpen || !orgLogoUrl) return undefined
     let alive = true
@@ -2434,7 +2449,7 @@ export default function GameDetails() {
       const { data, error } = await supabase
         .from('participant_events')
         .select(`
-          id, action, source, partner_id, created_at, user_id, actor_id,
+          *,
           user:profiles!participant_events_user_id_fkey (id, name),
           actor:profiles!participant_events_actor_id_fkey (id, name),
           partner:profiles!participant_events_partner_id_fkey (id, name)
@@ -2703,7 +2718,7 @@ export default function GameDetails() {
   const lastMinuteEditable = isAdmin && canEditBeforeRound1(game, round1Pending ? 0 : matches.length)
   const addBeforeStart = isAdmin && canAddBeforeStart(game, teams.length)
   const unpaired = lastMinuteEditable ? unpairedPeople(people, teams) : []
-  const planMaxCourts = limitsFor(gameMembership?.organization?.plan_tier).courts
+  const planMaxCourts = limitsFor(gameOrg?.plan_tier).courts
   // A full game counts as closed even if the stored status lagged behind
   // (e.g. players who joined before the auto-close trigger existed)
   const isFull = peopleCount >= capacity
@@ -2859,11 +2874,11 @@ export default function GameDetails() {
   // Nomes de quem joga e do clube/grupo (os membros só se leem para quem organiza).
   const nameById = Object.fromEntries([...clubMembers, ...people].map((p) => [p.id, p.name]))
   const avatarById = Object.fromEntries([...clubMembers, ...people].map((p) => [p.id, p.avatar_url]))
-  const orgKindOfGame = gameMembership?.organization?.kind || 'group'
+  const orgKindOfGame = gameOrg?.kind || 'group'
   // «Carlos N.»: o nome e a inicial do último.
   const myTeamIds = new Set(teams.filter((tm) => tm.player1_id === user.id || tm.player2_id === user.id).map((tm) => tm.id))
   const myMatch = currentRoundMatches.find((m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) || null
-  const orgSlug = gameMembership?.organization?.slug
+  const orgSlug = gameOrg?.slug
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
@@ -2946,10 +2961,10 @@ export default function GameDetails() {
   const statsByUser = Object.fromEntries(mixStats.map((s) => [s.user_id, s]))
   // Os vencedores (#622). Mix de duplas: o vencedor em 1.º e as outras pela
   // ordem da classificação. Americano: por pessoa, com o desempate.
-  const winnersOrg = gameMembership?.organization ? {
-    name: gameMembership.organization.name,
+  const winnersOrg = gameOrg ? {
+    name: gameOrg.name,
     logo: orgLogoBaked,
-    initials: (gameMembership.organization.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
+    initials: (gameOrg.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
     // Jogo em aberto (#622): «Jogo em aberto · 19:30».
     sub: game && isOpenGame(game)
       ? [t('gerirclube.event_label_open'), hhmm(game.date, i18n.language)].join(' · ')
@@ -3157,7 +3172,7 @@ export default function GameDetails() {
           kind === 'mix' && lvl ? `${lvl.scale}${lvl.num}` : isOpenGame(game) ? t('gamedetails.court_count', { count: numCourts }) : null,
           isDraftMix(game) ? t('mixdraft.draft') : game.recurrence_id ? t('ui.recurring').toLowerCase() : null,
         ].filter(Boolean).join(' · ')
-        const org = gameMembership?.organization
+        const org = gameOrg
         const ends = game.court_time_minutes ? new Date(new Date(game.date).getTime() + game.court_time_minutes * 60000) : null
         const free = Math.max(0, capacity - peopleCount)
         const toClose = (4 - (peopleCount % 4)) % 4
@@ -3449,7 +3464,7 @@ export default function GameDetails() {
         userId={user?.id}
         onPublished={() => loadGameDetails()}
         onClose={() => setPublishOpen(false)}
-        errorOf={(error) => (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', gameMembership?.organization?.plan_tier))
+        errorOf={(error) => (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', gameOrg?.plan_tier))
           || describeError(t, error, 'mixdraft.publish_error')}
       />
 
@@ -4773,7 +4788,8 @@ export default function GameDetails() {
                             mexeu na inscrição de outra pessoa. */}
                         {/* Sem nome (o superadmin, que deixou de se ver nos
                             grupos onde não joga — 18 out): «por quem organiza». */}
-                        {event.actor_id && event.actor_id !== event.user_id && (
+                        {/* actor_hidden (Dev 3, 18 out): o superadmin fora do grupo fica sem actor_id. */}
+                        {(event.actor_hidden || (event.actor_id && event.actor_id !== event.user_id)) && (
                           <> · {event.actor?.name
                             ? t('gamedetails.history_by_actor', { name: event.actor.name })
                             : t('gamedetails.history_by_organizer')}</>
@@ -4920,7 +4936,7 @@ export default function GameDetails() {
       />
       {addScorekeeperOpen && (
         <AddScorekeeperSheet
-          orgName={gameMembership?.organization?.name}
+          orgName={gameOrg?.name}
           orgKind={orgKindOfGame}
           inMix={people.filter((p, i, arr) => !p.no_account && arr.findIndex((x) => x.id === p.id) === i
             && p.id !== game.created_by && !scorekeeperIds.includes(p.id))}

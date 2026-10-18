@@ -34,7 +34,9 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_not_finis
 export async function listMyUnreadNotifications(limit = 20) {
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, kind, game_id, data, created_at')
+    // '*': o actor_id e, com a migration_superadmin_acoes_sem_nome, o actor_hidden
+    // (sem a migração, a coluna não existe e uma lista fixa partia o sino).
+    .select('*')
     .is('read_at', null)
     .order('created_at', { ascending: false })
     .limit(limit)

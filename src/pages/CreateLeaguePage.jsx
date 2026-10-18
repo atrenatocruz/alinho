@@ -3,12 +3,13 @@
 // plataforma escolhe «Liga Alinho» aqui). Passo 2: categoria (com os valores
 // por omissão). No fim: criar, gravar a categoria e publicar. O servidor
 // valida tudo outra vez; aqui é para dizer o que falta antes de tentar.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import StepPage from '../components/steps/StepPage'
 import { Chips, PrimaryButton, Select } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { createLeague, saveCategory, publishLeague, leagueErrorMessage } from '../lib/leagueApi'
 import { CATEGORY_DEFAULTS, categoryProblem } from '../lib/leagueConfig'
 import { emptyCreateProgress, nextCreateStep } from '../lib/leagueCreate'
@@ -22,7 +23,18 @@ export default function CreateLeaguePage() {
   const { t } = useTranslation()
   const { profile, memberships } = useAuth()
   // Cada membership traz a organização em `organization` (AuthContext).
-  const org = memberships?.find((m) => m.organization?.slug === slug)?.organization
+  const memberOrg = memberships?.find((m) => m.organization?.slug === slug)?.organization
+  // O superadmin escondido (18 out) já não tem inscrição nos grupos onde só
+  // gere: o clube vem da tabela das organizações.
+  const [adminOrg, setAdminOrg] = useState(null)
+  useEffect(() => {
+    if (memberOrg || !profile?.is_platform_admin || !slug) return undefined
+    let alive = true
+    supabase.from('organizations').select('*').eq('slug', slug).maybeSingle()
+      .then(({ data }) => { if (alive) setAdminOrg(data || null) })
+    return () => { alive = false }
+  }, [memberOrg, profile?.is_platform_admin, slug])
+  const org = memberOrg || adminOrg
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
