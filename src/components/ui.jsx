@@ -244,7 +244,7 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-5 animate-pop"
+            className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-5 animate-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
