@@ -601,6 +601,27 @@ export default function Layout({ children }) {
     navItems.push({ path: '/gerir', icon: ClipboardList, label: t('layout.nav_manage') })
   }
 
+  // A pastilha do item escolhido tem, no mínimo, a largura do texto mais
+  // 14 px de cada lado; nunca menos do que uma parte igual (no computador,
+  // mais estreita do que as outras parecia encolhida). Os outros repartem o
+  // resto. Com cinco partes iguais, «Comunidade» ficava justo (UX, 18 out). Medem-se logo os textos todos
+  // (os escondidos também têm largura), para a mudança ser um movimento só;
+  // e outra vez quando a letra acaba de carregar.
+  const labelRefs = useRef({})
+  const [pillW, setPillW] = useState({})
+  const labelsKey = navItems.map((n) => n.label).join('|')
+  useLayoutEffect(() => {
+    const measure = () => {
+      const next = {}
+      for (const [path, el] of Object.entries(labelRefs.current)) {
+        if (el) next[path] = Math.max(64, Math.ceil(el.scrollWidth) + 28)
+      }
+      setPillW(next)
+    }
+    measure()
+    document.fonts?.ready?.then(measure)
+  }, [labelsKey])
+
   // Notificações — só o que sobra do antigo header escuro (o «Sair» passou
   // para o fim do Perfil a 13 out; o
   // logótipo, o nível e a ajuda saíram de vez). Definidos aqui porque é onde
@@ -885,9 +906,9 @@ export default function Layout({ children }) {
         className="app-nav absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
-        {/* A ilha ocupa a largura do ecrã (até ~480 px num ecrã largo), e os
-            cinco botões repartem o espaço por igual (Francisco, 13 out —
-            design-handoff/2026-10-13-menu-largura-toda). */}
+        {/* A ilha ocupa a largura do ecrã (até ~480 px num ecrã largo)
+            (Francisco, 13 out — design-handoff/2026-10-13-menu-largura-toda).
+            O escolhido tem a largura do texto; os outros repartem o resto. */}
         <div
           className="pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
@@ -913,8 +934,9 @@ export default function Layout({ children }) {
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={label}
-                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center h-11 rounded-full
-                            transition-colors duration-base ${
+                style={{ flex: '1 1 0px', minWidth: isActive ? (pillW[path] || 64) : 44 }}
+                className={`relative flex flex-col items-center justify-center h-12 rounded-full
+                            transition-[min-width,background-color,color] duration-200 motion-reduce:transition-none ${
                   isActive
                     ? 'bg-white/15 text-lime-400'
                     : 'text-ink-200 hover:text-white'
@@ -940,8 +962,9 @@ export default function Layout({ children }) {
                 )}
                 {/* label morphs in below the icon on the active item — island style */}
                 <span
-                  className={`text-[10px] font-extrabold leading-none whitespace-nowrap overflow-hidden transition-all duration-base ${
-                    isActive ? 'max-h-3 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                  ref={(el) => { labelRefs.current[path] = el }}
+                  className={`text-[10.5px] font-extrabold leading-none whitespace-nowrap overflow-hidden transition-all duration-base motion-reduce:transition-none ${
+                    isActive ? 'max-h-3 opacity-100 mt-[3px]' : 'max-h-0 opacity-0'
                   }`}
                 >
                   {label}
