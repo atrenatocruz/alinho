@@ -1,192 +1,145 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, ChevronDown, Shuffle, Trophy } from 'lucide-react'
-import { Nav, Footer, useLoginHref, usePageTop, PRIMARY_CTA } from './Landing'
-import { whatsappContactLink } from '../lib/contacts'
-import { MedalGrid, SITE_DARK } from '../components/site/MedalShowcase'
+import { SiteHeader, SiteFooter, useLoginHref, usePageTop, HELP_PATH } from '../components/site/SiteChrome'
+import { SITE_EYEBROW, SITE_H2, SITE_LEAD, SITE_ILL } from '../components/site/SiteWays'
+import { SITE_DARK } from '../components/site/MedalShowcase'
 
-/* alinho.pt/como-funciona (Trello #619) — design-handoff/2026-10-10-site-
-   como-funciona, aprovado pelo Francisco a 10 out. Textos do Marketing
-   (TEXTOS.md, aprovados). Telemóvel primeiro, com o aspeto da landing de 24
-   set: topo branco quente, uma secção por tipo com a cor do tipo, quem
-   organiza em branco, perguntas frequentes e o fim em preto.
+/* alinho.pt/como-funciona — o site arrumado (design-handoff/2026-10-14-site-
+   arrumado, computador/como-funciona.html; aprovado pelo Francisco a 17 out).
+   Lê-se de cima para baixo: sem os botões que saltavam para o meio e sem as
+   perguntas frequentes (vivem na Ajuda). No computador, cada secção em duas
+   colunas, o texto e o telemóvel, com os lados a alternar; no telemóvel,
+   uma coluna. Os textos aprovados a 10 e 12 out não mudam.
 
    Só o que está na app; nada de números, pessoas ou clubes reais. As imagens
-   são da conta de exemplo do modo de teste, com «Imagem ilustrativa». */
+   são da conta de exemplo (Rita Figueira, Maré Alta), com «Imagem
+   ilustrativa». */
 
 // **In** → In a negrito (o que se escreve no WhatsApp).
-const bold = (text) => text.split('**').map((part, i) => (i % 2 ? <b key={i} className="font-extrabold text-ink-900">{part}</b> : part))
+const bold = (text, dark) => text.split('**').map((part, i) => (i % 2 ? <b key={i} className={`font-extrabold ${dark ? 'text-white' : 'text-ink-900'}`}>{part}</b> : part))
 
-function Points({ prefix, n }) {
-  const { t } = useTranslation()
+function Point({ title, body, dark = false, dot = null }) {
   return (
-    <div className="mt-5 space-y-5">
-      {Array.from({ length: n }, (_, i) => i + 1).map((i) => (
-        <div key={i}>
-          <h3 className="text-lg text-ink-900">{t(`${prefix}_p${i}_t`)}</h3>
-          <p className="mt-1 text-ink-700 leading-relaxed">{bold(t(`${prefix}_p${i}_b`))}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// A imagem num telemóvel escuro, cortada em baixo, com «Imagem ilustrativa».
-function Phone({ src }) {
-  const { t } = useTranslation()
-  return (
-    <div className="mt-8">
-      <div className="mx-auto w-[220px] h-[330px] overflow-hidden">
-        <div className="rounded-[34px] bg-ink-900 p-[8px] shadow-[0_24px_48px_-18px_rgba(4,4,4,0.45)]">
-          <img src={src} alt="" width="540" height="1169" loading="lazy" className="block w-full rounded-[27px]" />
-        </div>
-      </div>
-      <p className="text-center text-[11px] text-muted py-2">{t('hiw.illustrative')}</p>
-    </div>
-  )
-}
-
-function Section({ id, bg, eyebrowClass, prefix, n, back, image, children }) {
-  const { t } = useTranslation()
-  return (
-    <section id={id} className={`relative overflow-hidden scroll-mt-16 ${bg}`}>
-      {back && <div aria-hidden="true" className="pointer-events-none absolute -right-4 top-6 select-none leading-none">{back}</div>}
-      <div className="relative max-w-2xl mx-auto px-5 py-14">
-        <p className={`font-mono text-[12px] font-bold uppercase tracking-widest ${eyebrowClass}`}>{t(`${prefix}_eyebrow`)}</p>
-        <h2 className="text-3xl lg:text-4xl text-ink-900 mt-2">{t(`${prefix}_title`)}</h2>
-        <Points prefix={prefix} n={n} />
-        {image && <Phone src={image} />}
-        {children}
-      </div>
-    </section>
-  )
-}
-
-// Ranking e conquistas (12 out): secção própria, escura como na página de
-// entrada, no lugar da do nível. Os 4 pontos do Marketing, com a fila das
-// medalhas entre «Mais de 100 conquistas» e «XP e níveis».
-function RankingSection() {
-  const { t } = useTranslation()
-  const point = (title, body) => (
     <div>
-      <h3 className="text-lg text-white">{title}</h3>
-      <p className="mt-1 text-white/75 leading-relaxed">{body}</p>
+      <h3 className={`flex items-center gap-2.5 font-display text-[18px] font-extrabold leading-[1.25] lg:text-[19px] ${dark ? 'text-white' : 'text-ink-900'}`}>
+        {dot && <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dot }} />}
+        {title}
+      </h3>
+      <p className={`mt-1.5 max-w-[46ch] text-[16px] leading-[1.6] ${dark ? 'text-[#AEB3BB]' : 'text-[#5B6068]'}`}>{bold(body, dark)}</p>
     </div>
   )
+}
+
+// A imagem num telemóvel escuro, com «Imagem ilustrativa». No telemóvel fica
+// cortada em baixo; no computador inteira, com 340 px (300 no Gerir).
+function Phone({ src, small = false, dark = false }) {
+  const { t } = useTranslation()
   return (
-    <section className={`relative overflow-hidden ${SITE_DARK}`}>
-      <div className="relative max-w-2xl mx-auto px-5 py-14">
-        <p className="font-mono text-[12px] font-bold uppercase tracking-widest text-lime-400">{t('hiw.rank_eyebrow')}</p>
-        <h2 className="text-3xl lg:text-4xl text-white mt-2">{t('hiw.rank_title')}</h2>
-        <div className="mt-5 flex items-center gap-3 rounded-card bg-white px-4 py-3">
-          <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-lg font-extrabold text-lime-400">F3</span>
-          <span>
-            <b className="block text-sm text-ink-900">{t('landing.level_chip_title')}</b>
-            <span className="block text-xs text-muted">{t('landing.level_chip_text')}</span>
-          </span>
+    <div>
+      <div className={`mx-auto ${small ? 'w-[240px] lg:w-[300px]' : 'w-[240px] lg:w-[340px]'}`}>
+        <div className="h-[360px] overflow-hidden lg:h-auto">
+          <div className="rounded-[38px] bg-[#0B0C0E] p-2 shadow-[0_30px_60px_-30px_rgba(17,17,17,0.45)] lg:rounded-[48px] lg:p-3">
+            <img src={src} alt="" width="540" height="1169" loading="lazy" decoding="async" className="block w-full rounded-[30px] lg:rounded-[37px]" />
+          </div>
         </div>
-        <div className="mt-6 space-y-5">
-          {point(t('hiw.level_p1_t'), t('hiw.level_p1_b'))}
-          {point(t('hiw.level_p3_t'), t('hiw.level_p3_b'))}
-          {point(t('hiw.rank_p2_t'), t('hiw.rank_p2_b'))}
+      </div>
+      <p className={`${SITE_ILL} ${dark ? '!text-[#7B818C]' : ''}`}>{t('hiw.illustrative')}</p>
+    </div>
+  )
+}
+
+/** Uma secção: o texto e o telemóvel lado a lado no computador (`rev`: o
+ *  telemóvel à esquerda), um por baixo do outro no telemóvel. */
+function Section({ bg, style, eyebrow, eyebrowColor, title, image, rev = false, small = false, dark = false, wide = false, children }) {
+  return (
+    <section className={`py-16 lg:py-[110px] ${bg || ''}`} style={style}>
+      <div className={`mx-auto grid max-w-[1200px] items-center gap-10 px-5 lg:gap-20 lg:px-10 ${wide ? 'lg:grid-cols-[1.25fr_.75fr]' : 'lg:grid-cols-2'}`}>
+        <div className={rev ? 'lg:order-2' : ''}>
+          <p className={SITE_EYEBROW} style={{ color: eyebrowColor }}>{eyebrow}</p>
+          <h2 className={`${SITE_H2} mt-3 ${dark ? '!text-white' : ''}`}>{title}</h2>
+          {children}
         </div>
-        <MedalGrid className="my-7" />
-        <div className="space-y-5">
-          {point(t('hiw.rank_p3_t'), t('hiw.rank_p3_b'))}
-          {point(t('hiw.rank_p4_t'), t('hiw.rank_p4_b'))}
-        </div>
+        <Phone src={image} small={small} dark={dark} />
       </div>
     </section>
   )
 }
 
-function Faq() {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(1)
-  return (
-    <section className="bg-white">
-      <div className="max-w-2xl mx-auto px-5 pb-14">
-        <h2 className="text-3xl text-ink-900">{t('hiw.faq_title')}</h2>
-        <div className="mt-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="border-b border-line">
-              <button type="button" onClick={() => setOpen(open === i ? 0 : i)} aria-expanded={open === i}
-                className="flex w-full min-h-[52px] items-center justify-between gap-3 py-3 text-left font-extrabold text-ink-900">
-                {t(`hiw.faq_q${i}`)}
-                <ChevronDown size={18} className={`shrink-0 text-ink-700 transition-transform duration-fast ${open === i ? 'rotate-180' : ''}`} />
-              </button>
-              {open === i && (
-                <div className="pb-4 text-ink-700 leading-relaxed">
-                  <p>{bold(t(`hiw.faq_a${i}`))}</p>
-                  {i === 5 && (
-                    <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer"
-                      className="mt-2 inline-flex min-h-[44px] items-center font-extrabold text-ink-900 underline underline-offset-2">
-                      {t('hiw.faq_whatsapp')}
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
+const FEATS = 'mt-8 grid gap-[22px] lg:mt-[34px]'
+const GRID2 = 'mt-8 grid gap-[22px] lg:mt-9 lg:grid-cols-2 lg:gap-x-10 lg:gap-y-[26px]'
 
 export default function HowItWorks() {
   usePageTop()
   const { t } = useTranslation()
   const loginHref = useLoginHref()
-  const jump = 'flex w-full min-h-[52px] items-center justify-between rounded-ctrl border border-ink-200 bg-white px-4 font-extrabold text-ink-900 hover:bg-ink-50'
+  const p = (prefix, i, extra = {}) => <Point key={i} title={t(`${prefix}_p${i}_t`)} body={t(`${prefix}_p${i}_b`)} {...extra} />
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
-      <Nav />
-      <section className="bg-[#F7F7F4]">
-        <div className="max-w-2xl mx-auto px-5 pt-24 pb-12">
-          <h1 className="text-[40px] sm:text-5xl text-ink-900 leading-[1.05]">{t('hiw.title')}</h1>
-          <p className="text-ink-700 text-lg mt-4">{t('hiw.intro')}</p>
-          {/* Dois saltos empilhados, a toda a largura (SPEC, ponto 2). */}
-          <div className="mt-7 flex flex-col gap-3">
-            <a href="#para-quem-joga" className={jump}>{t('hiw.jump_play')} <ArrowDown size={18} /></a>
-            <a href="#para-quem-organiza" className={jump}>{t('hiw.jump_org')} <ArrowDown size={18} /></a>
-          </div>
+      <SiteHeader />
+      <section className="bg-[#F7F7F4] pb-12 pt-10 lg:pb-20 lg:pt-[90px]">
+        <div className="mx-auto max-w-[1200px] px-5 lg:px-10">
+          <h1 className="max-w-[14ch] font-display text-[40px] font-black leading-[1.02] tracking-[-.035em] text-ink-900 [text-wrap:balance] sm:text-[56px] lg:text-[76px] lg:leading-none">
+            {t('hiw.title')}
+          </h1>
+          <p className={`${SITE_LEAD} lg:!max-w-[40ch]`}>{t('hiw.intro')}</p>
         </div>
       </section>
 
-      <Section id="para-quem-joga" bg="bg-kind-mix-light" eyebrowClass="text-kind-mix-dark" prefix="hiw.mix" n={3}
-        back={<Shuffle size={150} strokeWidth={1.2} className="text-kind-mix-dark/10" />} image="/como-funciona/mix.webp" />
-      <RankingSection />
-      <Section bg="bg-white" eyebrowClass="text-ink-500" prefix="hiw.others" n={2} image="/como-funciona/home.webp" />
-      <Section bg="bg-kind-tournament-light" eyebrowClass="text-kind-tournament-dark" prefix="hiw.tour" n={1}
-        back={<Trophy size={150} strokeWidth={1.2} className="text-kind-tournament-dark/10" />} />
-      <Section id="para-quem-organiza" bg="bg-white" eyebrowClass="text-ink-500" prefix="hiw.org" n={6} image="/como-funciona/gerir.webp">
-        <div className="mt-8">
-          <h3 className="text-lg text-ink-900">{t('hiw.org_p7_t')}</h3>
-          <p className="mt-1 text-ink-700 leading-relaxed">{t('hiw.org_p7_b')}</p>
-          <Link to="/planos" className="mt-1 inline-flex min-h-[44px] items-center font-extrabold text-ink-900 underline underline-offset-2">
-            {t('hiw.org_plans_link')}
-          </Link>
+      <Section style={{ background: '#EEF3FF' }} eyebrow={t('hiw.mix_eyebrow')} eyebrowColor="#1D4ED8" title={t('hiw.mix_title')} image="/como-funciona/mix-exemplo.webp">
+        <div className={FEATS}>{[1, 2, 3].map((i) => p('hiw.mix', i))}</div>
+      </Section>
+
+      {/* Ranking e conquistas: escura, como na página de entrada. */}
+      <Section bg={SITE_DARK} dark rev eyebrow={t('hiw.rank_eyebrow')} eyebrowColor="#C5DD01" title={t('hiw.rank_title')} image="/como-funciona/perfil-exemplo.webp">
+        <div className={GRID2}>
+          <Point dark title={t('hiw.level_p1_t')} body={t('hiw.level_p1_b')} />
+          <Point dark title={t('hiw.level_p3_t')} body={t('hiw.level_p3_b')} />
+          <Point dark title={t('hiw.rank_p2_t')} body={t('hiw.rank_p2_b')} />
+          <Point dark title={t('hiw.rank_p3_t')} body={t('hiw.rank_p3_b')} />
+          <Point dark title={t('hiw.rank_p4_t')} body={t('hiw.rank_p4_b')} />
         </div>
       </Section>
 
-      <Faq />
+      <Section bg="bg-white" eyebrow={t('hiw.others_eyebrow')} eyebrowColor="#5B6068" title={t('hiw.others_title')} image="/como-funciona/clube-exemplo.webp">
+        <div className={FEATS}>
+          {p('hiw.others', 1)}
+          {p('hiw.others', 2, { dot: '#374151' })}
+          {p('hiw.others', 3, { dot: '#C2410C' })}
+        </div>
+      </Section>
 
-      {/* Fim preto: uma só ação lima, os botões empilhados. */}
-      <section className="bg-ink-900 pt-14 pb-10 px-5">
-        <div className="max-w-md mx-auto flex flex-col gap-3">
-          <h2 className="text-3xl text-white mb-3">{t('hiw.end_title')}</h2>
-          <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex items-center justify-center`}>{t('landing.signup_link')}</Link>
-          <Link to={loginHref()} className="inline-flex min-h-[48px] items-center justify-center rounded-ctrl border border-white/30 px-6 font-extrabold text-white hover:bg-white/10">
-            {t('landing.already_account_link')}
-          </Link>
-          <Link to="/novidades" className="mt-1 inline-flex min-h-[44px] items-center justify-center font-extrabold text-lime-400 underline underline-offset-2">
-            {t('hiw.end_news')}
-          </Link>
+      <Section style={{ background: '#F3EEFF' }} rev eyebrow={t('hiw.tour_eyebrow')} eyebrowColor="#5B21B6" title={t('hiw.tour_title')} image="/como-funciona/torneio-exemplo.webp">
+        <div className={FEATS}>{[1, 2].map((i) => p('hiw.tour', i))}</div>
+      </Section>
+
+      <Section bg="bg-white" wide small eyebrow={t('hiw.org_eyebrow')} eyebrowColor="#5B6068" title={t('hiw.org_title')} image="/como-funciona/gerir-exemplo.webp">
+        <div className={GRID2}>{[1, 2, 3, 4, 5, 6].map((i) => p('hiw.org', i))}</div>
+        <p className="mt-8 text-[14px] text-[#5B6068]">
+          {t('hiw.org_start')}{' '}
+          <Link to="/planos" className="font-bold text-ink-900">{t('hiw.org_plans_link')}</Link>
+        </p>
+      </Section>
+
+      {/* Fim preto: uma só ação lima, os botões empilhados; as dúvidas vão
+          para a Ajuda. */}
+      <section className="bg-ink-900 px-5 pb-16 pt-16 text-center lg:pb-[90px] lg:pt-[110px]">
+        <div className="mx-auto max-w-[1200px]">
+          <h2 className={`${SITE_H2} !text-white`}>{t('hiw.end_title')}</h2>
+          <div className="mx-auto mt-8 flex max-w-[380px] flex-col gap-3">
+            <Link to={loginHref('signup')} className="inline-flex w-full items-center justify-center rounded-[16px] bg-lime-400 px-4 py-[18px] font-display text-[17px] font-extrabold leading-none text-ink-900">
+              {t('landing.signup_link')}
+            </Link>
+            <Link to={loginHref()} className="inline-flex w-full items-center justify-center rounded-[16px] border-[1.5px] border-[#3A3D42] px-4 py-[18px] font-display text-[17px] font-extrabold leading-none text-white">
+              {t('landing.already_account_link')}
+            </Link>
+          </div>
+          <p className="mt-6 text-[16px] text-[#C4C8CF]">
+            {t('hiw.end_help')}{' '}
+            <Link to={HELP_PATH} className="font-bold text-lime-400">{t('hiw.end_help_link')}</Link>
+          </p>
         </div>
       </section>
-      <Footer />
+      <SiteFooter />
     </div>
   )
 }

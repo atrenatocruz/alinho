@@ -1,10 +1,9 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
-import { Link, useSearchParams, useNavigationType, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Trophy, Shuffle, ChevronRight, Mail, MessageCircle } from 'lucide-react'
-import { Wordmark } from '../components/Layout'
+import { CheckCircle2, ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import { MedalGrid, Highlights, SITE_DARK } from '../components/site/MedalShowcase'
-import i18n from '../lib/i18n'
+import { SiteHeader, SiteFooter, useLoginHref, usePageTop } from '../components/site/SiteChrome'
+import { WaysSection, BotSection, SITE_EYEBROW, SITE_H2, SITE_LEAD, SITE_ILL } from '../components/site/SiteWays'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
 /* alinho.pt antes de entrar (Trello #327) — desenho APROVADO pelo Francisco
@@ -19,315 +18,116 @@ import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/con
    reais. O telemóvel mostra a conta de EXEMPLO do modo de teste, com
    «Imagem ilustrativa» (decisão do Francisco, 25 set). */
 
-// Same pattern as Layout.jsx's header toggle, minus the profile persistence
-// (there's no profile yet on this pre-auth page) — just the instant UI flip
-// plus a localStorage write so the choice survives a reload and carries
-// forward into the account once the visitor signs in (see AuthContext's
-// loadProfile reconciliation).
-function toggleLanguage() {
-  const next = i18n.language === 'en' ? 'pt' : 'en'
-  i18n.changeLanguage(next)
-  try {
-    localStorage.setItem('preferredLanguage', next)
-  } catch {
-    // ignore — best-effort persistence
-  }
-}
+// O «Entrar» e os links do site vivem no cabeçalho comum (SiteChrome).
+export { useLoginHref }
 
-function LanguageToggle({ className = '' }) {
-  const { t } = useTranslation()
-  return (
-    <button
-      type="button"
-      onClick={toggleLanguage}
-      title={t('layout.toggle_language')}
-      className={`inline-flex items-center justify-center min-h-[44px] min-w-[44px] font-extrabold text-xs transition-colors duration-fast ${className}`}
-    >
-      {i18n.language === 'en' ? 'PT' : 'EN'}
-    </button>
-  )
-}
-
-// Builds the /login href, preserving ?org=<slug> from the current URL (the
-// invite-link mechanism — see Home.jsx / Login.jsx) so landing-page CTAs
-// don't silently drop it for logged-out visitors landing on `/?org=...`.
-/* Estas páginas vivem fora do Layout, que é quem põe as outras no topo.
-   Sem isto, «Ver os planos» abria a página Planos lá em baixo, onde estava o
-   dedo — parecia que os planos não existiam (Francisco, 26 set). Ao voltar
-   atrás, o browser devolve a posição de antes. */
-export function usePageTop() {
-  const navigationType = useNavigationType()
-  useLayoutEffect(() => {
-    if (navigationType !== 'POP') window.scrollTo(0, 0)
-  }, [navigationType])
-}
+export { usePageTop }
 
 /* O lima escuro é o «passar o rato». Num telemóvel fica preso no botão que
    estava debaixo do dedo e parecia desativado (Francisco, 26 set). Sem rato,
    fica o lima de sempre. */
 export const PRIMARY_CTA = 'btn-primary [@media(hover:none)]:hover:bg-lime-400'
 
-export function useLoginHref() {
-  const [params] = useSearchParams()
-  const org = params.get('org')
-  return (mode) => {
-    const q = new URLSearchParams()
-    if (mode) q.set('mode', mode)
-    if (org) q.set('org', org)
-    const s = q.toString()
-    return s ? `/login?${s}` : '/login'
-  }
-}
+// O cabeçalho e o rodapé comuns do site (site arrumado, 17 out): os nomes
+// antigos ficam, para as páginas que os importam daqui.
+export const Nav = SiteHeader
+export const Footer = SiteFooter
 
-// O menu por cima do topo branco: transparente em cima, branco ao descer.
-// O «Planos» leva à página própria (antes saltava para #planos).
-export function Nav() {
-  const { t } = useTranslation()
-  const [scrolled, setScrolled] = useState(false)
-  const loginHref = useLoginHref()
-  const { pathname } = useLocation()
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  const link = 'inline-flex items-center min-h-[44px] sm:px-1 whitespace-nowrap text-ink-700 hover:text-ink-900 font-extrabold text-[13px] sm:text-sm transition-colors duration-fast'
+// Um telemóvel com uma imagem da app da conta de EXEMPLO (Jogador Alinho,
+// Maré Alta) — nunca uma conta real, nem com nomes desfocados (Francisco,
+// 25 set). No computador, 340 px (site arrumado, 17 out).
+function Phone({ src, alt, w, h, small = false, cut = false }) {
   return (
-    <header
-      className={`fixed top-0 inset-x-0 z-20 transition-colors duration-base ${
-        scrolled ? 'bg-[#F7F7F4]/95 backdrop-blur-xl border-b border-line' : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-5xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2">
-        <Link to="/" className="leading-none shrink-0">
-          <Wordmark variant="light" className="!h-[22px] sm:!h-6" />
-        </Link>
-        <div className="flex items-center gap-1.5 sm:gap-4">
-          <LanguageToggle className="text-ink-700 hover:text-ink-900" />
-          {/* «Como funciona» ao lado de «Planos» (#619, 10 out); sublinhado
-              na própria página. */}
-          <Link to="/como-funciona" className={`${link} ${pathname === '/como-funciona' ? 'underline underline-offset-4 text-ink-900' : ''}`}
-            onClick={() => { if (pathname === '/como-funciona') window.scrollTo(0, 0) }}>{t('hiw.nav_link')}</Link>
-          <Link to="/planos" className={link} onClick={() => { if (window.location.pathname === '/planos') window.scrollTo(0, 0) }}>{t('landing.pricing_nav_link')}</Link>
-          <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
-        </div>
-      </div>
-    </header>
-  )
-}
-
-// O telemóvel do topo, cortado em baixo pela secção seguinte: a Home da
-// conta de EXEMPLO (Jogador Alinho, Clube Exemplo) — nunca uma conta real,
-// nem com nomes desfocados (Francisco, 25 set).
-function PhoneShot() {
-  const { t } = useTranslation()
-  return (
-    <div className="relative mx-auto w-[280px] sm:w-[300px]">
-      <div className="h-[440px] sm:h-[480px] overflow-hidden">
-        <div className="relative rounded-[46px] bg-ink-900 p-[10px] shadow-[0_30px_60px_-20px_rgba(4,4,4,0.45)]">
-          <div className="overflow-hidden rounded-[36px] bg-white">
-            {/* Barra de estado: a ilha fica por cima dela e não tapa a Home
-                (o print de exemplo não tem barra de estado). */}
-            <div className="relative flex h-[40px] items-center justify-between px-6 text-[12px] font-extrabold text-ink-900" aria-hidden="true">
-              <span>9:41</span>
-              <span className="absolute left-1/2 top-[8px] h-[24px] w-[88px] -translate-x-1/2 rounded-full bg-ink-900" />
-              <span className="tracking-widest">•••</span>
-            </div>
-            <img
-              src="/landing/home-exemplo.webp"
-              alt={t('landing.phone_alt')}
-              width="640"
-              height="1386"
-              className="block w-full"
-            />
-          </div>
+    <div className={`relative mx-auto ${small ? 'w-[260px] lg:w-[300px]' : 'w-[280px] lg:w-[340px]'}`}>
+      <div className={cut ? 'h-[440px] overflow-hidden lg:h-auto' : ''}>
+        <div className="rounded-[46px] bg-[#0B0C0E] p-[10px] shadow-[0_30px_60px_-30px_rgba(17,17,17,0.45)] lg:rounded-[48px] lg:p-3">
+          <img src={src} alt={alt} width={w} height={h} loading="lazy" decoding="async" className="block w-full rounded-[36px] lg:rounded-[37px]" />
         </div>
       </div>
     </div>
   )
 }
 
+// Os botões do site: empilhados, nunca lado a lado; 380 px no computador.
+const BTN = 'inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-4 py-[18px] font-display text-[17px] font-extrabold leading-none transition-transform duration-fast active:scale-[0.98]'
+
 function Hero() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
-    <section className="bg-[#F7F7F4] overflow-hidden">
-      <div className="max-w-5xl mx-auto px-5 pt-24 lg:pt-32 lg:flex lg:items-end lg:gap-12">
-        <div className="lg:flex-1 lg:pb-24 animate-fade-up">
-          <h1 className="text-[40px] sm:text-5xl lg:text-6xl text-ink-900 leading-[1.05] max-w-xl">
+    <section className="overflow-hidden bg-[#F7F7F4] pb-12 pt-10 lg:pb-[100px] lg:pt-20">
+      <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-5 lg:grid-cols-2 lg:gap-20 lg:px-10">
+        <div className="animate-fade-up">
+          <h1 className="font-display text-[40px] font-black leading-[1.02] tracking-[-.035em] text-ink-900 [text-wrap:balance] sm:text-[56px] lg:text-[76px] lg:leading-none">
             {t('landing.hero_title')}
           </h1>
-          <p className="text-ink-700 text-lg mt-5 max-w-md">{t('landing.hero_description')}</p>
-          <div className="flex flex-col sm:flex-row gap-3 mt-8 max-w-md">
-            {/* inline-flex + centragem: num <a>, min-h e padding não fazem nada
-                sem eles. «Criar conta» é a única coisa lima do ecrã. */}
-            <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex items-center justify-center sm:flex-1`}>
-              {t('landing.signup_link')}
-            </Link>
-            <Link
-              to={loginHref()}
-              className="inline-flex items-center justify-center font-extrabold py-3.5 px-6 rounded-ctrl min-h-[48px] text-base
-                         border border-ink-200 bg-white text-ink-900 hover:bg-ink-50 sm:flex-1
-                         transition-all duration-fast active:scale-[0.98]"
-            >
-              {t('landing.already_account_link')}
-            </Link>
+          <p className={SITE_LEAD}>{t('landing.hero_description')}</p>
+          {/* «Criar conta» é a única coisa lima do ecrã. */}
+          <div className="mt-8 flex max-w-[380px] flex-col gap-3">
+            <Link to={loginHref('signup')} className={`${BTN} bg-lime-400 text-ink-900`}>{t('landing.signup_link')}</Link>
+            <Link to={loginHref()} className={`${BTN} border-[1.5px] border-[#CFD2D7] bg-white text-ink-900`}>{t('landing.already_account_link')}</Link>
           </div>
-          <p className="text-sm text-muted mt-3 max-w-md text-center sm:text-left">{t('landing.free_google')}</p>
+          <p className="mt-3 max-w-[380px] text-center text-sm text-[#5B6068]">{t('landing.free_google')}</p>
         </div>
-        <div className="mt-10 lg:mt-0 lg:flex-1 animate-fade-up">
-          <PhoneShot />
-          <p className="text-center text-[11px] text-muted py-2">{t('landing.illustrative')}</p>
+        <div className="animate-fade-up">
+          <Phone src="/landing/home-exemplo.webp" alt={t('landing.phone_alt')} w={640} h={1385} cut />
+          <p className={SITE_ILL}>{t('landing.illustrative')}</p>
         </div>
-      </div>
-    </section>
-  )
-}
-
-// Uma secção por ponto, com a cor do tipo como na app e uma letra grande a
-// espreitar ao fundo (SPEC, «Aspeto»).
-function Point({ bg, eyebrowClass, eyebrow, title, text, back, children }) {
-  return (
-    <section className={`relative overflow-hidden ${bg}`}>
-      {back && (
-        <div aria-hidden="true" className="pointer-events-none absolute -right-4 bottom-0 select-none leading-none">
-          {back}
-        </div>
-      )}
-      <div className="relative max-w-5xl mx-auto px-5 py-14 lg:py-20 lg:flex lg:items-center lg:gap-12">
-        <div className="lg:flex-1">
-          <p className={`font-mono text-[12px] font-bold uppercase tracking-widest ${eyebrowClass}`}>{eyebrow}</p>
-          <h2 className="text-3xl lg:text-4xl text-ink-900 mt-2 max-w-md">{title}</h2>
-          <p className="text-ink-700 mt-3 max-w-md">{text}</p>
-        </div>
-        <div className="mt-6 lg:mt-0 lg:flex-1 max-w-sm">{children}</div>
       </div>
     </section>
   )
 }
 
 // Ranking e conquistas (12 out): o primeiro bloco a seguir ao topo, escuro
-// como os cartões das conquistas na app, para as medalhas brilharem. É o único
-// bloco escuro antes do fim. Sem botões (só há um lima por ecrã).
+// como os cartões das conquistas na app, para as medalhas brilharem. Sem
+// botões (só há um lima por ecrã).
 function RankingPoint() {
   const { t } = useTranslation()
   return (
-    <section className={`relative overflow-hidden ${SITE_DARK}`}>
-      <div className="relative max-w-5xl mx-auto px-5 py-14 lg:py-20 lg:flex lg:items-center lg:gap-12">
-        <div className="lg:flex-1">
-          <p className="font-mono text-[12px] font-bold uppercase tracking-widest text-lime-400">{t('landing.rank_eyebrow')}</p>
-          <h2 className="text-3xl lg:text-4xl text-white mt-2 max-w-md">{t('landing.rank_title')}</h2>
-          <p className="text-white/75 mt-3 max-w-md">{t('landing.rank_text')}</p>
+    <section className={`relative overflow-hidden ${SITE_DARK} py-16 lg:py-[110px]`}>
+      <div className="relative mx-auto grid max-w-[1200px] items-center gap-10 px-5 lg:grid-cols-2 lg:gap-20 lg:px-10">
+        <div>
+          <p className={`${SITE_EYEBROW} text-lime-400`}>{t('landing.rank_eyebrow')}</p>
+          <h2 className={`${SITE_H2} mt-3 !text-white`}>{t('landing.rank_title')}</h2>
+          <p className={`${SITE_LEAD} !text-[#C9CDD3]`}>{t('landing.rank_text')}</p>
           <MedalGrid className="mt-8 lg:hidden" />
-          <div className="mt-7 max-w-md"><Highlights /></div>
+          <div className="mt-8 max-w-[460px]"><Highlights /></div>
         </div>
-        <MedalGrid className="hidden lg:block lg:flex-1 max-w-sm" />
+        <MedalGrid className="hidden w-full max-w-[520px] lg:ml-auto lg:block" />
       </div>
     </section>
   )
 }
 
-function TournamentPoint() {
-  const { t } = useTranslation()
-  return (
-    <Point
-      bg="bg-kind-tournament-light"
-      eyebrowClass="text-kind-tournament-dark"
-      eyebrow={t('landing.tour_eyebrow')}
-      title={t('landing.tour_title')}
-      text={t('landing.tour_text')}
-      back={<Trophy size={170} strokeWidth={1.2} className="text-kind-tournament-dark/10" />}
-    >
-      <div className="rounded-card border-2 border-kind-tournament-line bg-kind-tournament-light p-4 shadow-card">
-        <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-kind-tournament-dark">
-            <Trophy size={13} /> {t('agenda.kind_tournament')}
-          </span>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-kind-tournament-dark">{t('landing.tour_card_state')}</span>
-        </div>
-        <p className="mt-2 font-display text-lg font-extrabold text-ink-900">{t('landing.tour_card_title')}</p>
-        <p className="text-xs text-muted">{t('landing.tour_card_sub')}</p>
-      </div>
-    </Point>
-  )
-}
-
-function MixPoint() {
-  const { t } = useTranslation()
-  return (
-    <Point
-      bg="bg-kind-mix-light"
-      eyebrowClass="text-kind-mix-dark"
-      eyebrow={t('landing.mix_eyebrow')}
-      title={t('landing.mix_title')}
-      text={t('landing.mix_text')}
-      back={<Shuffle size={170} strokeWidth={1.2} className="text-kind-mix-dark/10" />}
-    >
-      {/* A conversa no grupo — o mecanismo mostrado, não descrito. */}
-      <div className="space-y-2" aria-hidden="true">
-        <div className="max-w-[80%] rounded-ctrl rounded-bl-sm bg-white px-3 py-2 text-sm text-ink-900 shadow-card">
-          {t('landing.whatsapp_demo_prompt')}
-        </div>
-        <div className="ml-auto max-w-[40%] rounded-ctrl rounded-br-sm bg-[#25D366] px-3 py-2 text-center text-sm font-extrabold text-ink-900">
-          {t('landing.whatsapp_demo_reply')}
-        </div>
-        <p className="flex items-center justify-end gap-1.5 text-xs font-extrabold text-ok">
-          <CheckCircle2 size={13} /> {t('landing.whatsapp_demo_confirmation')}
-        </p>
-      </div>
-    </Point>
-  )
-}
-
-/* A faixa de quem organiza, com o contacto (reparos de 26 set, aprovados
-   pelo Francisco): os planos e o WhatsApp, e o Email ao lado quando a caixa
-   existir (#572). Os contactos vêm do contacts.js, como na página Planos. */
-// «O que é o alinho», em frases declarativas (SEO, 29 set): é o parágrafo
-// que um resumo do Google consegue citar — o slogan do topo não serve.
-// O mesmo texto vai no index.html estático e no JSON-LD da Organization.
-function About() {
-  const { t } = useTranslation()
-  return (
-    <section id="sobre" className="bg-canvas py-12 px-5">
-      <div className="max-w-2xl mx-auto">
-        <h2 className="text-2xl text-ink-900 mb-3">{t('landing.about_heading')}</h2>
-        <p className="text-ink-700 leading-relaxed">{t('landing.about_text')}</p>
-        <p className="mt-3">
-          <Link to="/instrucoes#faq" className="text-sm font-extrabold text-ink-900 underline underline-offset-4">
-            {t('instructions.faq_title')} →
-          </Link>
-        </p>
-      </div>
-    </section>
-  )
-}
-
+/* Quem organiza: o texto e os botões de um lado, o Gerir do outro. Os
+   planos não se repetem (vivem em /planos): fica só «Ver os planos ›». Os
+   contactos vêm do contacts.js, como na página Planos. */
 function OrganizersBar() {
   const { t } = useTranslation()
-  const contact = 'inline-flex w-full items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold border border-ink-900 bg-white text-ink-900 hover:bg-ink-50'
   return (
-    <section className="bg-white border-y border-line">
-      <div className="max-w-5xl mx-auto px-5 py-8">
-        <div className="max-w-md">
-          <h2 className="text-2xl text-ink-900">{t('landing.organizers_text')}</h2>
-          <p className="text-ink-700 mt-1">{t('landing.organizers_contact_text')}</p>
-          {/* Empilhados, a toda a largura, e iguais aos dos Planos (UX, 8 out). */}
-          <div className="mt-4 flex flex-col gap-3">
-            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={contact}>
+    <section className="bg-white py-16 lg:py-[110px]">
+      <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-5 lg:grid-cols-2 lg:gap-20 lg:px-10">
+        <div>
+          <p className={`${SITE_EYEBROW} text-[#5B6068]`}>{t('landing.organizers_eyebrow')}</p>
+          <h2 className={`${SITE_H2} mt-3`}>{t('landing.organizers_text')}</h2>
+          <p className={SITE_LEAD}>{t('landing.organizers_lead')}</p>
+          <div className="mt-8 flex max-w-[380px] flex-col gap-3">
+            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={`${BTN} bg-ink-900 text-white`}>
               <MessageCircle size={18} /> {t('landing.organizers_whatsapp')}
             </a>
             {SUPPORT_EMAIL_READY && (
-              <a href={mailtoLink(t('plans.email_subject'))} className={contact}>
+              <a href={mailtoLink(t('plans.email_subject'))} className={`${BTN} border-[1.5px] border-[#CFD2D7] bg-white text-ink-900`}>
                 <Mail size={18} /> {t('plans.email')}
               </a>
             )}
           </div>
-          <Link to="/planos" className="mt-3 inline-flex items-center gap-1 min-h-[44px] text-sm font-extrabold text-ink-900 hover:underline">
+          <Link to="/planos" className="mt-3 inline-flex min-h-[44px] items-center gap-1 text-sm font-bold text-ink-900">
             {t('landing.organizers_link')} <ChevronRight size={16} />
           </Link>
+        </div>
+        <div>
+          <Phone src="/landing/gerir-exemplo.webp" alt={t('landing.gerir_alt')} w={540} h={1169} small />
+          <p className={SITE_ILL}>{t('landing.illustrative')}</p>
         </div>
       </div>
     </section>
@@ -425,40 +225,15 @@ function ClosingCta() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
-    <section className="bg-ink-900 pt-16 pb-12 px-5 text-center">
-      <div className="max-w-lg mx-auto">
-        <h2 className="text-3xl text-white mb-6">{t('landing.closing_cta_heading')}</h2>
-        <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex w-full sm:w-auto items-center justify-center`}>
-          {t('landing.signup_link')}
-        </Link>
-        <p className="text-sm text-ink-200 mt-3">{t('landing.free_google')}</p>
+    <section className="bg-ink-900 px-5 pb-16 pt-16 text-center lg:pb-[90px] lg:pt-[110px]">
+      <div className="mx-auto max-w-[1200px]">
+        <h2 className={`${SITE_H2} !text-white`}>{t('landing.closing_cta_heading')}</h2>
+        <div className="mx-auto mt-8 flex max-w-[380px] flex-col">
+          <Link to={loginHref('signup')} className={`${BTN} bg-lime-400 text-ink-900`}>{t('landing.signup_link')}</Link>
+        </div>
+        <p className="mt-3 text-sm text-[#AEB3BB]">{t('landing.free_google')}</p>
       </div>
     </section>
-  )
-}
-
-// Rodapé em preto, colado ao fim (Night Court).
-export function Footer() {
-  const { t } = useTranslation()
-  const year = new Date().getFullYear()
-  const loginHref = useLoginHref()
-  const link = 'inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm'
-  return (
-    <footer className="bg-ink-900 border-t border-white/10 py-6 px-5">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center justify-center gap-x-5">
-          {/* Rodapé das páginas públicas (#619, 10 out): Como funciona · Planos
-              · Instruções · Novidades · Privacidade (+ Termos). */}
-          <Link to="/como-funciona" className={link}>{t('hiw.nav_link')}</Link>
-          <Link to="/planos" className={link}>{t('landing.pricing_nav_link')}</Link>
-          <Link to="/instrucoes" className={link}>{t('landing.instructions_link')}</Link>
-          <Link to="/novidades" className={link}>{t('nov.footer_link')}</Link>
-          <Link to="/privacidade" className={link}>{t('landing.privacy_link')}</Link>
-          <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
-        </div>
-        <p className="text-white/50 text-xs">&copy; {year} alinho.pt</p>
-      </div>
-    </footer>
   )
 }
 
@@ -469,9 +244,8 @@ export default function Landing() {
       <Nav />
       <Hero />
       <RankingPoint />
-      <TournamentPoint />
-      <MixPoint />
-      <About />
+      <WaysSection />
+      <BotSection />
       {/* Espaço guardado (SPEC, ponto 5): «Já se joga na alinho», só com
           clubes e só com autorização escrita de cada um. Não aparece até lá. */}
       <OrganizersBar />

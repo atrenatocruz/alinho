@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, us
 import { useTranslation } from 'react-i18next'
 import { Compass } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { SiteHeader, SiteFooter } from './components/site/SiteChrome'
 import { PrimaryButton, EmptyState } from './components/ui'
 import Alino from './components/Alino'
 import Layout, { Wordmark } from './components/Layout'
@@ -170,19 +171,16 @@ const LoadErrorScreen = ({ onRetry }) => {
 // Moldura de quem chega sem conta (torneio, Trello #361): o link do torneio
 // anda no WhatsApp e em cartazes, por isso a página abre a toda a gente.
 // Sem sessão não há barra de navegação — só o logótipo e a porta de entrada.
+// O cabeçalho e o rodapé são os do site (site arrumado, 17 out): sai a barra
+// preta só com o logótipo e «Entrar».
 function PublicShell({ children }) {
-  const { t } = useTranslation()
   return (
     <div className="min-h-screen flex flex-col bg-canvas">
-      <header className="bg-ink-900">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/" className="leading-none"><Wordmark /></Link>
-          <Link to="/login" className="text-white font-extrabold text-sm hover:underline">{t('landing.login_link')}</Link>
-        </div>
-      </header>
+      <SiteHeader sticky={false} />
       <main className="flex-1">
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 animate-fade-up">{children}</div>
       </main>
+      <SiteFooter />
     </div>
   )
 }

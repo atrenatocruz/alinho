@@ -17,7 +17,7 @@ export default function Novidades() {
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
       <section className="bg-[#F7F7F4]">
-        <div className="max-w-2xl mx-auto px-5 pt-24 pb-14">
+        <div className="max-w-2xl mx-auto px-5 pt-8 pb-14">
           <h1 className="text-[40px] sm:text-5xl text-ink-900 leading-[1.05]">{t('nov.title')}</h1>
           <p className="text-ink-700 text-lg mt-4">{t('nov.intro')}</p>
           <div className="mt-8 space-y-4">

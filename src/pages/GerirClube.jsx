@@ -62,7 +62,7 @@ import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
 import { districtOptions } from '../lib/leagueDistricts'
 import { Realce } from '../components/SearchField'
-import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
+import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
 import { semAcentos } from '../lib/semAcentos'
 import { cancelMixDate } from '../lib/mixCancel'
 
@@ -2980,8 +2980,9 @@ export default function GerirClube() {
           os cantos de baixo e a sombra vão só aqui, no último. */}
       <div className={`!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2 ${TOP_EDGE}`}>
         <span className={`h-14 w-14 shrink-0 overflow-hidden ${isGroupOrg ? 'rounded-full' : 'rounded-[14px]'}`} aria-hidden="true">
-          <img src={org.group_logo_url || (isGroupOrg ? GROUP_HERO : CLUB_HERO)} alt="" loading="lazy"
-            className={`h-full w-full object-cover ${org.group_logo_url ? '' : 'object-[70%_30%]'}`} />
+          {/* Sem foto, a imagem própria do símbolo (14 out). */}
+          <img src={org.group_logo_url || (isGroupOrg ? GROUP_AVATAR : CLUB_AVATAR)} alt="" loading="lazy"
+            className="h-full w-full object-cover" />
         </span>
         <div className="min-w-0 flex-1">
         {/* "Gerir" as a small label above, so the title is the group's name

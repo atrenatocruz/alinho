@@ -80,7 +80,16 @@ function useScrollArea(anchorRef) {
     // página — a dos jogos entre amigos é mais estreita (QA, 15 out) — e nada
     // depende da barra de deslizar.
     const measure = () => {
-      if (!area) { setBox({ left: 0, width: document.documentElement.clientWidth, colLeft: 0, colWidth: document.documentElement.clientWidth }); return }
+      // Sem área própria (a página desliza a janela: o torneio e os convites
+      // sem sessão), os botões alinham-se na mesma com a capa — antes ficavam
+      // nas pontas da janela, no computador (Dev 1, 18 out).
+      if (!area) {
+        const w = document.documentElement.clientWidth
+        const col = anchorRef.current?.getBoundingClientRect()
+        const next = { left: 0, width: w, colLeft: col ? col.left : 0, colWidth: col ? col.width : w }
+        setBox((b) => (b && b.left === next.left && b.width === next.width && b.colLeft === next.colLeft && b.colWidth === next.colWidth ? b : next))
+        return
+      }
       const r = area.getBoundingClientRect()
       const col = (anchorRef.current || area.firstElementChild || area).getBoundingClientRect()
       const next = { left: r.left, width: r.width, colLeft: col.left - r.left, colWidth: col.width }
@@ -88,11 +97,11 @@ function useScrollArea(anchorRef) {
     }
     measure()
     window.addEventListener('resize', measure)
-    const ro = area && typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
-    ro?.observe(area)
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
+    if (area) ro?.observe(area)
     // A barra de deslizar aparece quando o conteúdo cresce, sem mudar o
     // tamanho da área por fora: vigia-se também o conteúdo.
-    if (ro && area.firstElementChild) ro.observe(area.firstElementChild)
+    if (ro && area?.firstElementChild) ro.observe(area.firstElementChild)
     if (ro && anchorRef.current) ro.observe(anchorRef.current)
     // E ao deslizar, por garantia (medir é barato e só muda se mudou).
     area?.addEventListener('scroll', measure, { passive: true })
@@ -157,7 +166,9 @@ export default function GlassBar({ anchorRef, rowRef = null, show = true, filled
       className={`pointer-events-none fixed z-30 transition-opacity duration-fast ${show ? 'opacity-100' : 'opacity-0'}`}
       // No site de testes, logo por baixo da faixa laranja (--tb-h, index.css);
       // no alinho.pt não há faixa e fica colada em cima (UX, 15 out).
-      style={{ top: 'var(--tb-h, 0px)', left: box.left, width: box.width }}>
+      // Por baixo do cabeçalho do site enquanto ele se vê (eventos sem
+      // sessão, --site-bottom, SiteChrome; Dev 1, 18 out).
+      style={{ top: 'max(var(--tb-h, 0px), var(--site-bottom, 0px))', left: box.left, width: box.width }}>
       <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-fast ${filled ? 'opacity-100' : 'opacity-0'}`}
         style={{ ...GLASS_BG, height: `calc(${GLASS_BAR_H} + ${FADE}px)` }} />
       <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-fast ${strip && !filled ? 'opacity-100' : 'opacity-0'}`}

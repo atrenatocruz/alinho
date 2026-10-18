@@ -15,7 +15,7 @@ import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
 import KindHero from '../components/KindHero'
-import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
+import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
 import { coverOf, useOrgCovers } from '../lib/orgCover'
 import { Realce } from '../components/SearchField'
 
@@ -437,8 +437,9 @@ export default function Comunidade() {
               <div className="no-scrollbar -mx-4 flex gap-3.5 overflow-x-auto px-4 pb-1 pt-1.5">
                 {myOrgs.map((org) => (
                   <Link key={org.id} to={`/clube/${org.slug}`} className="w-[84px] shrink-0 flex flex-col items-center gap-1.5 text-center">
-                    {/* A mesma imagem do cartão, com o anel lima (protótipo, UX 13 out). */}
-                    <img src={org.group_logo_url || (org.kind === 'group' ? GROUP_HERO : CLUB_HERO)} alt="" loading="lazy"
+                    {/* Sem foto, a imagem própria do círculo (centrada nas caras,
+                        14 out), com o anel lima (protótipo, UX 13 out). */}
+                    <img src={org.group_logo_url || (org.kind === 'group' ? GROUP_AVATAR : CLUB_AVATAR)} alt="" loading="lazy"
                       className="h-[62px] w-[62px] rounded-full object-cover shadow-[0_0_0_2px_#fff,0_0_0_4px_#C8DC00]" />
                     <span className="text-[13px] font-extrabold text-ink-900 leading-tight line-clamp-2 break-words">{org.name}</span>
                   </Link>
