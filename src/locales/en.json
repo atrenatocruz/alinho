@@ -6398,5 +6398,6 @@
   "login2.forgot_title": "Forgot your password?",
   "login2.forgot_lead": "It happens. We will send you a link to choose another one.",
   "login2.forgot_sent": "<0>Sent.</0> Check your email and tap the link. If you don't see it, look in spam.",
-  "login2.name_placeholder": "Your first and last name"
+  "login2.name_placeholder": "Your first and last name",
+  "login2.or_email": "or with email"
 }

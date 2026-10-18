@@ -6413,5 +6413,6 @@
   "login2.forgot_title": "Esqueceste-te da password?",
   "login2.forgot_lead": "Acontece. Mandamos-te um link para escolheres outra.",
   "login2.forgot_sent": "<0>Enviado.</0> Vê o teu email e carrega no link. Se não o vires, espreita o spam.",
-  "login2.name_placeholder": "O teu nome e apelido"
+  "login2.name_placeholder": "O teu nome e apelido",
+  "login2.or_email": "ou com o email"
 }
