@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useGoBack } from '../lib/useGoBack'
+import { SiteHeader, SiteFooter, usePageTop } from '../components/site/SiteChrome'
 import { useTranslation, Trans } from 'react-i18next'
-import { ArrowLeft, Users, Calendar, Trophy, Settings, TrendingUp, Shield, MessageCircle, ChevronDown, ClipboardList, HelpCircle } from 'lucide-react'
+import { Users, Calendar, Trophy, Settings, TrendingUp, Shield, MessageCircle, ChevronDown, ClipboardList } from 'lucide-react'
 import { XP_TIERS, formatXp } from '../lib/xp'
 
 const FAQ_COUNT = 6
@@ -255,23 +255,18 @@ export function HelpContent() {
 /** A página pública (/instrucoes): para quem ainda não tem conta (Login,
  *  página inicial, Google). Mesmo conteúdo, com um topo próprio. */
 export default function Instructions() {
-  const goBack = useGoBack('/')
+  usePageTop()
   const { t } = useTranslation()
+  // O cabeçalho e o rodapé comuns do site (site arrumado, 17 out): sai a
+  // barra própria com «←» e o título. A Ajuda nova vem a seguir.
   return (
     <div className="min-h-screen bg-ground">
-      <header className="sticky top-0 z-10 rounded-b-[16px] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <button type="button" onClick={goBack} aria-label={t('common.back')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-card">
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="truncate font-display text-xl font-extrabold text-ink-900">{t('instructions.title')}</h1>
-          <HelpCircle size={18} aria-hidden="true" className="ml-auto shrink-0 text-ink-200" />
-        </div>
-      </header>
-      <main className="mx-auto max-w-2xl px-4 pb-16 pt-5">
+      <SiteHeader />
+      <main className="mx-auto max-w-2xl px-4 pb-16 pt-6">
+        <h1 className="mb-4 font-display text-[32px] font-extrabold leading-tight text-ink-900">{t('instructions.title')}</h1>
         <HelpContent />
       </main>
+      <SiteFooter />
     </div>
   )
 }

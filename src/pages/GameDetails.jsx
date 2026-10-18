@@ -2434,7 +2434,7 @@ export default function GameDetails() {
       const { data, error } = await supabase
         .from('participant_events')
         .select(`
-          id, action, source, partner_id, created_at,
+          id, action, source, partner_id, created_at, user_id, actor_id,
           user:profiles!participant_events_user_id_fkey (id, name),
           actor:profiles!participant_events_actor_id_fkey (id, name),
           partner:profiles!participant_events_partner_id_fkey (id, name)
@@ -4771,8 +4771,12 @@ export default function GameDetails() {
                         {/* Só vale a pena dizer "por X" quando o autor não é
                             o próprio jogador — ou seja, quando um admin
                             mexeu na inscrição de outra pessoa. */}
-                        {event.actor?.name && event.actor.id !== event.user?.id && (
-                          <> · {t('gamedetails.history_by_actor', { name: event.actor.name })}</>
+                        {/* Sem nome (o superadmin, que deixou de se ver nos
+                            grupos onde não joga — 18 out): «por quem organiza». */}
+                        {event.actor_id && event.actor_id !== event.user_id && (
+                          <> · {event.actor?.name
+                            ? t('gamedetails.history_by_actor', { name: event.actor.name })
+                            : t('gamedetails.history_by_organizer')}</>
                         )}
                       </p>
                     </li>

@@ -257,7 +257,9 @@ export default function ClubProfile() {
     // R5 (protótipo): por baixo da foto, a página é toda branca — os blocos
     // cinzento-claros («Pessoas», «Quem organiza», «Sobre») só se leem sobre
     // o branco, não sobre o fundo novo da app (R12).
-    <div className="-mx-4 -mb-28 min-h-full space-y-5 bg-white px-4 pb-28">
+    // No computador, a capa e a folha à largura dos cartões, como no mix
+    // (Dev 2, 15 out): antes a folha branca saía 16 px para cada lado.
+    <div className="-mx-4 -mb-28 min-h-full space-y-5 bg-white px-4 pb-28 sm:mx-0">
       {/* R5: o «‹» e o partilhar passam para o topo novo, no ClubHeader. */}
       {linkCopied && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-[70] mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white animate-fade-up">

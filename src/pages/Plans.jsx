@@ -20,7 +20,7 @@ export default function Plans() {
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
-      <main className="max-w-5xl mx-auto px-5 pt-24 pb-16">
+      <main className="max-w-5xl mx-auto px-5 pt-8 pb-16">
         <h1 className="text-4xl lg:text-5xl text-ink-900 max-w-xl">{t('plans.title')}</h1>
         <p className="text-ink-700 text-lg mt-3 max-w-md">{t('plans.subtitle')}</p>
 

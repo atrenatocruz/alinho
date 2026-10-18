@@ -14,20 +14,20 @@ const BUCKET = 'club-logos'
  *  evento. As capas desenhadas/compostas à mão ficavam sem qualidade (Renato,
  *  16 out); capas próprias de clube, quando o designer as fizer, entram aqui.
  *  Sem escolha, fica a imagem do Alino do tipo. */
-export const COVER_PRESETS = [
-  { key: 'azul', url: '/topo/topo-mix.webp', labelKey: 'cover.preset_blue' },
-  { key: 'trofeu', url: '/topo/topo-torneio.webp', labelKey: 'cover.preset_trophy' },
-  { key: 'podio', url: '/topo/topo-liga.webp', labelKey: 'cover.preset_podium' },
-  { key: 'terra', url: '/topo/topo-aberto.webp', labelKey: 'cover.preset_clay' },
-  { key: 'treino', url: '/topo/topo-aula.webp', labelKey: 'cover.preset_practice' },
-  { key: 'dupla', url: '/topo/topo-amigos.webp', labelKey: 'cover.preset_pair' },
-]
+// As nove capas próprias de clube e grupo (design-handoff/2026-10-17-capas-
+// clube-grupo, aprovado pelo Francisco a 17–18 out): as seis de cima eram as
+// imagens dos tipos de jogo e um grupo com «Dupla» confundia-se com os jogos
+// entre amigos. O Dev 3 troca as que já estavam escolhidas (SQL, depois disto
+// estar no main).
+export const COVER_PRESETS = ['bancada', 'esplanada', 'balneario', 'entrada', 'malta', 'vitrine', 'jantar', 'rececao', 'manha']
+  .map((key) => ({ key, url: `/capas/capa-${key}.webp`, labelKey: `cover.preset_${key}` }))
 
 /** A capa a mostrar: a escolhida, ou a do Alino do tipo. */
 export const coverOf = (org, cover = org?.cover_url) =>
   cover || (org?.kind === 'group' ? GROUP_HERO : CLUB_HERO)
 
-export const isPresetCover = (url) => !!url && url.startsWith('/topo/')
+// /topo/ fica até o SQL do Dev 3 trocar as capas de tipo antigas.
+export const isPresetCover = (url) => !!url && (url.startsWith('/capas/') || url.startsWith('/topo/'))
 
 /**
  * Recorta a foto em panorâmico 3:1 (a posição vertical `y`, 0 = topo,
