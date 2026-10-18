@@ -56,6 +56,8 @@
 BEGIN;
 
 -- ── 1. O superadmin entra nos grupos por ser superadmin ────────────────
+-- «(SELECT is_platform_admin_me())»: calcula-se uma vez por consulta, e não
+-- linha a linha (SI, 18 out).
 DO $$
 DECLARE
   t TEXT;
@@ -65,16 +67,16 @@ BEGIN
                            'organization_invites', 'participant_events', 'group_matches'] LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Superadmin" ON %I', t);
     EXECUTE format('CREATE POLICY "Superadmin" ON %I FOR ALL TO authenticated
-                      USING (is_platform_admin_me()) WITH CHECK (is_platform_admin_me())', t);
+                      USING ((SELECT is_platform_admin_me())) WITH CHECK ((SELECT is_platform_admin_me()))', t);
   END LOOP;
 END $$;
 DROP POLICY IF EXISTS "Superadmin (ler)" ON organizations;
-CREATE POLICY "Superadmin (ler)" ON organizations FOR SELECT TO authenticated USING (is_platform_admin_me());
+CREATE POLICY "Superadmin (ler)" ON organizations FOR SELECT TO authenticated USING ((SELECT is_platform_admin_me()));
 DROP POLICY IF EXISTS "Superadmin (mudar)" ON organizations;
 CREATE POLICY "Superadmin (mudar)" ON organizations FOR UPDATE TO authenticated
-  USING (is_platform_admin_me()) WITH CHECK (is_platform_admin_me());
+  USING ((SELECT is_platform_admin_me())) WITH CHECK ((SELECT is_platform_admin_me()));
 DROP POLICY IF EXISTS "Superadmin (ler)" ON profiles;
-CREATE POLICY "Superadmin (ler)" ON profiles FOR SELECT TO authenticated USING (is_platform_admin_me());
+CREATE POLICY "Superadmin (ler)" ON profiles FOR SELECT TO authenticated USING ((SELECT is_platform_admin_me()));
 
 DO $$
 DECLARE
