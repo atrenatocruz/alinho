@@ -75,6 +75,23 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
+// Modo escuro (design-handoff/2026-10-18-email-modo-escuro, aprovado pelo
+// Francisco a 19 out): o Gmail troca as cores do email mas não mexe nas
+// imagens. Por isso o cabeçalho e o botão são imagens (o alt diz o mesmo), e
+// as metas color-scheme ajudam o Apple Mail e o Outlook. Cada texto de botão
+// tem a sua imagem; um botão sem imagem fica como antes, em HTML.
+const ASSETS = 'https://www.alinho.pt'
+const BUTTON_IMAGES: Record<string, string> = {
+  'Abrir o alinho.pt': 'email-botao-abrir.png',
+  'Open alinho.pt': 'email-botao-abrir-en.png',
+  'Ver convite': 'email-botao-ver-convite.png',
+  'See invite': 'email-botao-ver-convite-en.png',
+  'Ver pedido': 'email-botao-ver-pedido.png',
+  'See request': 'email-botao-ver-pedido-en.png',
+  'Ver a aula': 'email-botao-ver-aula.png',
+  'See lesson': 'email-botao-ver-aula-en.png',
+}
+
 // Same look as supabase/templates/*.pt.html, so Auth emails and these read
 // as one product. `paragraphs` and `footnote` are trusted HTML — escape any
 // user-provided value (names, club names) before it gets in here.
@@ -85,36 +102,42 @@ function renderLayout(opts: {
   ctaUrl: string
   footnote: string
 }): string {
+  const image = BUTTON_IMAGES[opts.ctaLabel]
+  const button = image
+    ? `<a href="${opts.ctaUrl}" style="display:inline-block;text-decoration:none;"><img src="${ASSETS}/${image}" width="220" height="52" alt="${escapeHtml(opts.ctaLabel)}" style="display:block;border:0;outline:none;width:220px;height:52px;"></a>`
+    : `<table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-radius:12px;background:#C5DD01;">
+                  <a href="${opts.ctaUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#040404;text-decoration:none;">${opts.ctaLabel}</a>
+                </td>
+              </tr>
+            </table>`
   const paragraphs = opts.paragraphs
     .map((p) => `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#1F2937;">${p}</p>`)
     .join('')
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head><body style="margin:0;padding:0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <tr>
     <td align="center" style="padding:32px 16px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFFFF;border-radius:16px;overflow:hidden;">
         <tr>
-          <td style="background:#040404;padding:28px 32px;">
-            <img src="https://www.alinho.pt/email-logo.png" width="140" height="35" alt="alinho" style="display:block;border:0;outline:none;text-decoration:none;width:140px;height:35px;">
+          <td style="background:#040404;padding:0;">
+            <img src="${ASSETS}/email-cabecalho.png" width="480" height="90" alt="alinho.pt" style="display:block;border:0;outline:none;text-decoration:none;width:100%;max-width:480px;height:auto;">
           </td>
         </tr>
         <tr>
           <td style="padding:32px;">
             <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#040404;">${opts.heading}</h1>
             ${paragraphs}
-            <table role="presentation" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="border-radius:12px;background:#C5DD01;">
-                  <a href="${opts.ctaUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#040404;text-decoration:none;">${opts.ctaLabel}</a>
-                </td>
-              </tr>
-            </table>
+            ${button}
             <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#4B5563;">${opts.footnote}</p>
           </td>
         </tr>
       </table>
     </td>
   </tr>
-</table>`
+</table>
+</body></html>`
 }
 
 type Outgoing = { to: string; subject: string; html: string }
@@ -249,30 +272,30 @@ const welcome: Handler = async ({ admin, callerId, appUrl }) => {
   const email: Outgoing = en
     ? {
         to,
-        subject: 'Welcome to alinho',
+        subject: 'Welcome to alinho.pt',
         html: renderLayout({
           heading: greeting('Hi'),
           paragraphs: [
-            `Your alinho account is ready. This is where your club's games live: see what's coming up, join with one tap, and follow the results and rankings.`,
-            `If your club already uses alinho, ask an admin for the invite link — it puts you straight into the club. If you can't find a game yet, the games on the app tab <strong>Comunidade</strong> are open to everyone.`,
+            `Your alinho.pt account is ready. This is where your club's games live: see what's coming up, join with one tap, and follow the results and rankings.`,
+            `If your club already uses alinho.pt, ask the organiser for the invite link. It puts you straight into the club. If you can't find a game yet, the games in <strong>Community</strong> are open to everyone.`,
           ],
-          ctaLabel: 'Open alinho',
+          ctaLabel: 'Open alinho.pt',
           ctaUrl: appUrl,
-          footnote: `You're getting this email because you just created an alinho account. This mailbox isn't monitored — there's no need to reply.`,
+          footnote: `You're getting this email because you just created an alinho.pt account. This mailbox isn't monitored, there's no need to reply.`,
         }),
       }
     : {
         to,
-        subject: 'Bem-vindo ao alinho',
+        subject: 'Bem-vindo ao alinho.pt',
         html: renderLayout({
           heading: greeting('Olá'),
           paragraphs: [
-            `A tua conta no alinho está pronta. É aqui que vivem os jogos do teu clube: vês o que vem aí, entras com um toque e acompanhas os resultados e o ranking.`,
-            `Se o teu clube já usa o alinho, pede o link de convite a um admin — leva-te direto para o clube. Se ainda não encontras jogos, os da aba <strong>Comunidade</strong> estão abertos a toda a gente.`,
+            `A tua conta no alinho.pt está pronta. É aqui que vivem os jogos do teu clube: vês o que vem aí, entras com um toque e acompanhas os resultados e o ranking.`,
+            `Se o teu clube já usa o alinho.pt, pede o link de convite a quem organiza. Leva-te direto para o clube. Se ainda não encontras jogos, os da <strong>Comunidade</strong> estão abertos a toda a gente.`,
           ],
-          ctaLabel: 'Abrir o alinho',
+          ctaLabel: 'Abrir o alinho.pt',
           ctaUrl: appUrl,
-          footnote: `Recebes este email porque acabaste de criar conta no alinho. Este endereço não é lido — não é preciso responder.`,
+          footnote: `Recebes este email porque acabaste de criar conta no alinho.pt. Este endereço não é lido, não é preciso responder.`,
         }),
       }
 
@@ -389,7 +412,7 @@ const lessonRequestStudent: Handler = async ({ admin, callerId, appUrl, body }) 
       paragraphs: [`${when}${club}`, accepted
         ? (en ? 'The coach books the court with the club. You don’t need to.' : 'O campo é marcado pelo professor com o clube: não precisas de reservar.')
         : (en ? 'You can ask for another time.' : 'Podes pedir outra hora.')],
-      ctaLabel: accepted ? (en ? 'See lesson' : 'Ver a aula') : (en ? 'Open alinho' : 'Abrir o alinho'),
+      ctaLabel: accepted ? (en ? 'See lesson' : 'Ver a aula') : (en ? 'Open alinho.pt' : 'Abrir o alinho.pt'),
       ctaUrl: accepted && req.lesson_id ? `${appUrl}/aula/${req.lesson_id}` : appUrl,
       footnote: en
         ? 'You get this email because you asked for a lesson on alinho and chose to be contacted by email.'
