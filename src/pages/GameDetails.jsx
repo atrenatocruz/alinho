@@ -2579,6 +2579,15 @@ export default function GameDetails() {
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
   const buildShareMessage = () => {
+    // Mix terminado sem vencedores calculados (o americano, ou sem dupla
+    // vencedora): a imagem diz «RESULTADOS DO MIX», por isso o texto também,
+    // sem o «Junta-te ao mix!» (UX, 18 out).
+    if (game?.status === 'finished' && !(game.winner_team_id && teamById[game.winner_team_id])) {
+      const day = new Date(game.date).toLocaleDateString(i18n.language === 'en' ? 'en-GB' : 'pt-PT', { day: 'numeric', month: 'long' })
+      const club = winnersOrg?.name || game.location
+      const mix = String(game.title || t('gamedetails.share_default_title')).trim()
+      return `${t(club ? 'gamedetails.share_finished_results' : 'gamedetails.share_finished_results_noplace', { mix, day, club })} ${t('gamedetails.share_signature')}`
+    }
     const lines = [`🎾 ${game?.title || t('gamedetails.share_default_title')}`, `📅 ${game ? formatDate(game.date) : ''}`]
     if (game?.location) lines.push(`📍 ${game.location}`)
     if (game?.status === 'finished' && game.winner_team_id) {
@@ -3010,6 +3019,28 @@ export default function GameDetails() {
   // Quem jogou e tem conta, e quem organizou (SPEC, ponto 5).
   const canShareWinners = !!winnersInfo?.share && (isAdmin || game?.created_by === user?.id
     || (!!statsByUser[user?.id] && !profile?.is_guest))
+  // Num mix terminado partilha-se sempre o resultado, nunca o «Vem jogar»
+  // (UX, 18 out): quem jogou, o cartão com o lugar dele; quem não jogou, o
+  // pódio sem lugar em destaque e «🏆 … ganharam o …!» (buildWinners sem
+  // estatísticas da pessoa dá essa versão).
+  const shareResult = canShareWinners || (game?.status === 'finished' && !!winnersInfo?.share)
+  // /jogo/:id?partilhar=1 (o «↗» de cada jogo no Perfil › Jogos, #636): com o
+  // mix terminado e tudo carregado (as estatísticas chegam antes do fim do
+  // loading), abre o cartão dos vencedores a quem o pode partilhar e, aos
+  // outros, a partilha do link. Uma vez só, como no FriendSession.
+  const autoShareDone = useRef(false)
+  const wantsShare = new URLSearchParams(location.search).has('partilhar')
+  useEffect(() => {
+    if (!wantsShare || autoShareDone.current || loading || game?.status !== 'finished') return
+    autoShareDone.current = true
+    // Tira o «?partilhar=1» do endereço: o link partilhado é o desta página,
+    // e quem o abrisse via a partilha abrir sozinha (QA, 18 out).
+    const params = new URLSearchParams(location.search)
+    params.delete('partilhar')
+    navigate({ pathname: location.pathname, search: params.toString() ? `?${params}` : '', hash: location.hash }, { replace: true, state: location.state })
+    if (shareResult) openWinnersShare()
+    else setShowShare(true)
+  })
   const personById = Object.fromEntries(people.map((p) => [p.id, p]))
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
@@ -3170,7 +3201,7 @@ export default function GameDetails() {
             onAddToCalendar={!['finished', 'completed', 'cancelled'].includes(game.status)
               ? () => window.open(`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`, '_blank', 'noopener') : null}
             onBack={goBack}
-            onShare={isDraftMix(game) ? null : () => (canShareWinners ? openWinnersShare() : setShowShare(true))}
+            onShare={isDraftMix(game) ? null : () => (shareResult ? openWinnersShare() : setShowShare(true))}
             // R3b (13 out, opção A + B da UX): a caixa de quem organiza logo
             // depois da data — a etiqueta, o próximo passo e «Editar e mais
             // opções». Com o passo mais abaixo (duplas ou rondas), fica lá e a

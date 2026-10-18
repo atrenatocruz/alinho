@@ -2,7 +2,8 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { BackBar, StickyTop, Tabs } from '../components/ui'
+import { BackBar, Tabs } from '../components/ui'
+import { GlassPinned } from '../components/GlassBar'
 import { sharePageLink } from '../lib/shareImage'
 import { Award, ChevronRight, UserPlus, UserCheck, Clock, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -405,9 +406,11 @@ export default function PlayerDetails() {
         cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
         onConfirm={() => handleRemoveFollow()} onClose={() => setAskUnfollow(false)} />
 
-      <StickyTop>
+      {/* Presos por baixo da barra de vidro, no mesmo vidro, como no mix
+          (QA, 18 out: com o StickyTop ficavam escondidos atrás da barra). */}
+      <GlassPinned>
         <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
-      </StickyTop>
+      </GlassPinned>
 
       {tab === 'perfil' && (
         <>
