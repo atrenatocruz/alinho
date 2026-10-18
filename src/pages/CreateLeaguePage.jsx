@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import StepPage from '../components/steps/StepPage'
-import { Chips, PrimaryButton, Select } from '../components/ui'
+import { Chips, DateTimeField, PrimaryButton, Select } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { createLeague, saveCategory, publishLeague, leagueErrorMessage } from '../lib/leagueApi'
@@ -88,9 +88,12 @@ export default function CreateLeaguePage() {
           <span className="mb-2 block">{t('gerirclube.district_label')}</span>
           <Select value={league.district} onChange={(v) => setLeague({ ...league, district: v })} options={districtOptions(t('gerirclube.district_none'))} />
         </label>
-        <label className="block text-sm font-bold">{t('league.create_apps_until')}
-          <input type="datetime-local" className={`${field} mt-2`} value={league.applicationsCloseAt} onChange={(e) => setLeague({ ...league, applicationsCloseAt: e.target.value })} />
-        </label>
+        {/* A escolha de data e hora da app, em 24 h: o datetime-local do
+            browser seguia a língua do computador (AM/PM em inglês). */}
+        <div className="block text-sm font-bold">
+          <span className="mb-2 block">{t('league.create_apps_until')}</span>
+          <DateTimeField value={league.applicationsCloseAt} onChange={(v) => setLeague({ ...league, applicationsCloseAt: v })} />
+        </div>
         <label className="block text-sm font-bold">{t('league.create_max_clubs')}
           <input inputMode="numeric" className={`${field} mt-2`} value={league.maxTeams ?? ''}
             onChange={(e) => setLeague({ ...league, maxTeams: e.target.value ? Number(e.target.value.replace(/\D/g, '')) : null })} />
