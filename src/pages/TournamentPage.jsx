@@ -258,7 +258,10 @@ export default function TournamentPage() {
   // isso mesmo que o admin precisa de ver.
   const publicView = params.get('ver') === 'publico'
   const adminMode = params.get('admin')   // 'editar' | 'sorteio' | 'horario'
-  const canManage = !!memberships?.find((m) => m.organization_id === tour.organization_id)?.is_admin
+  // O superadmin organiza sem ser membro (os superadmins escondidos, 18 out:
+  // deixou de ficar inscrito nos grupos onde não joga) — conta como quem
+  // organiza, como no mix.
+  const canManage = !!memberships?.find((m) => m.organization_id === tour.organization_id)?.is_admin || profile?.is_platform_admin === true
   const isAdmin = canManage && !publicView
   const Panel = TOURNAMENT_PANELS[tab]
   const TopSlot = TOURNAMENT_PANELS.top

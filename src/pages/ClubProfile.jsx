@@ -31,7 +31,7 @@ export default function ClubProfile() {
   const { slug } = useParams()
   const [linkCopied, setLinkCopied] = useState(false)
   const goBack = useGoBack('/comunidade')
-  const { user, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
+  const { user, profile, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -82,7 +82,9 @@ export default function ClubProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  const isAdmin = !!club && memberships.some((m) => m.organization_id === club.id && m.is_admin)
+  // O superadmin conta como quem organiza, mesmo sem ser membro (superadmins
+  // escondidos, 18 out).
+  const isAdmin = !!club && (memberships.some((m) => m.organization_id === club.id && m.is_admin) || profile?.is_platform_admin === true)
   const isFavorite = club ? memberships.find((m) => m.organization_id === club.id)?.is_favorite === true : false
 
   // Pessoas: a lista de membros vem logo (antes só abria ao tocar no
