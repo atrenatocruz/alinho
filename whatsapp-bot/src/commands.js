@@ -461,6 +461,36 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     return null
   }
 
+  /** A linha de game_guests de quem escreve sem conta, neste jogo (upsert pelo
+   *  número, como no «In» sozinho). Devolve o id. */
+  async function upsertMyGuest(gameId, identity) {
+    const { data: g, error } = await supabase
+      .from('game_guests')
+      .upsert(
+        { game_id: gameId, name: identity.name, phone_hash: identity.phoneHash, whatsapp_jid: identity.jid },
+        { onConflict: 'game_id,phone_hash' }
+      )
+      .select('id')
+      .single()
+    if (error) throw new Error(`Failed to upsert game guest: ${error.message}`)
+    return g.id
+  }
+
+  /** «In com X» de quem não tem conta (Francisco, 18 out): a dupla entra na
+   *  mesma, com quem escreveu como convidado (guest_id/partner_guest_id) —
+   *  antes recusava com «precisas de conta». Com conta, user_id/partner_id. */
+  async function ownerFields(gameId, profile) {
+    return profile.guest ? { guest_id: await upsertMyGuest(gameId, profile) } : { user_id: profile.id }
+  }
+  async function asPartnerFields(gameId, profile) {
+    return profile.guest ? { partner_guest_id: await upsertMyGuest(gameId, profile) } : { partner_id: profile.id }
+  }
+  /** Depois de um erro: a minha linha-convidado sai se ficou sem uso. */
+  async function cleanupMyGuest(fields) {
+    const gid = fields.guest_id || fields.partner_guest_id
+    if (gid) await deleteGuestIfOrphan(gid)
+  }
+
   /** Apaga uma linha de game_guests só se nada a referencia — o upsert
    *  pode ter REUTILIZADO uma linha existente (mesmo número), e apagá-la
    *  às cegas no caminho de erro levava atrás inscrições de outros
@@ -732,12 +762,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
    * apaga a `freeRow` (com a dupla já a ocupar os dois lugares). Devolve o
    * erro de vagas, se houver.
    */
-  async function joinSoloRows(keepRow, freeRow, partnerId) {
+  async function joinSoloRows(keepRow, freeRow, partnerFields) {
     const { error: freeError } = await supabase.from('participants').update({ status: 'cancelled' }).eq('id', freeRow.id)
     if (freeError) throw new Error(`Failed to free solo row: ${freeError.message}`)
     const { error: joinError } = await supabase
       .from('participants')
-      .update({ partner_id: partnerId, joined_alone: false })
+      .update({ ...partnerFields, joined_alone: false })
       .eq('id', keepRow.id)
     if (joinError) {
       await supabase.from('participants').update({ status: 'confirmed' }).eq('id', freeRow.id)
@@ -769,12 +799,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     const adding = Boolean(pending.addToRowId)
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
-    // Quem não tem conta não inicia duplas (o pedido/aceitação e a gestão
-    // na app precisam de conta) — entra sozinho ou o parceiro escreve ele.
-    if (profile.guest) {
-      await reply('guest_pair_need_account', { appUrl: config.appUrl })
-      return
-    }
     const own = adding ? rows.find((row) => row.id === pending.addToRowId) : null
     if (adding) {
       // A inscrição sozinha tem de continuar lá, ser desta pessoa (por
@@ -808,6 +832,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     // não há adoção automática (não temos o número dela) — o admin troca na
     // app se for preciso.
     let guestId
+    let owner = {}
     try {
       guestId = await createNamedGameGuest(game.id, pending.name)
     } catch (err) {
@@ -822,9 +847,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
           .eq('id', pending.addToRowId)
       : await supabase
           .from('participants')
-          .insert([{ game_id: game.id, user_id: profile.id, partner_guest_id: guestId, status: 'confirmed', joined_alone: false }])
+          .insert([{ game_id: game.id, ...(owner = await ownerFields(game.id, profile)), partner_guest_id: guestId, status: 'confirmed', joined_alone: false }])
     if (pairError) {
       await supabase.from('game_guests').delete().eq('id', guestId)
+      await cleanupMyGuest(owner)
       if (isGameFull(pairError)) {
         await reply(adding ? 'mix_full_add_partner' : 'mix_full_pair')
         return
@@ -890,7 +916,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     // X (Francisco, 8 out — antes o X tinha de responder «Sim»).
     const partnerSolo = existingRows.find((r) => r.status === 'confirmed' && r.user_id === partner.id && !r.partner_id && !r.partner_guest_id)
     if (partnerSolo) {
-      const fullError = await joinSoloRows(partnerSolo, row, profile.id)
+      const fullError = await joinSoloRows(partnerSolo, row, row.guest_id ? { partner_guest_id: row.guest_id } : { partner_id: profile.id })
       timer.mark('gravar')
       if (fullError) {
         await reply('mix_full_add_partner')
@@ -952,10 +978,14 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       .select('id')
       .single()
     if (guestError) throw new Error(`Failed to upsert guest partner: ${guestError.message}`)
+    const owner = await ownerFields(gameId, profile)
     const { error } = await supabase
       .from('participants')
-      .insert([{ game_id: gameId, user_id: profile.id, partner_guest_id: g.id, status: 'confirmed', joined_alone: false }])
-    if (error) await deleteGuestIfOrphan(g.id)
+      .insert([{ game_id: gameId, ...owner, partner_guest_id: g.id, status: 'confirmed', joined_alone: false }])
+    if (error) {
+      await deleteGuestIfOrphan(g.id)
+      await cleanupMyGuest(owner)
+    }
     return error
   }
 
@@ -1032,12 +1062,14 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       // O X sozinho: quem escreveu entra logo na inscrição dele e ficam em
       // dupla, sem o X ter de responder «Sim» (Francisco, 8 out). Só precisa
       // de 1 vaga (a de cima já o garante); mix cheio → suplente com «In».
+      const me = await asPartnerFields(game.id, profile)
       const { error } = await supabase
         .from('participants')
-        .update({ partner_id: profile.id, joined_alone: false })
+        .update({ ...me, joined_alone: false })
         .eq('id', partnerRow.id)
       timer.mark('gravar')
       if (error) {
+        await cleanupMyGuest(me)
         if (isGameFull(error)) {
           await reply('mix_full_pair')
           return
@@ -1045,7 +1077,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
         throw new Error(`Failed to join the partner's row: ${error.message}`)
       }
       repostHooks.requestRepostForGame(organizationId, game.id)
-      if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+      if (isNewGuest) await reply('guest_pair_joined', { partner: partner.name, appUrl: config.appUrl })
       return
     }
     if (existingRows.some((row) => row.user_id === partner.id || row.partner_id === partner.id)) {
@@ -1056,10 +1088,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       await reply('mix_one_spot_pair')
       return
     }
+    const owner = await ownerFields(game.id, profile)
     const { error: insertError } = await supabase
       .from('participants')
-      .insert([{ game_id: game.id, user_id: profile.id, partner_id: partner.id, status: 'confirmed', joined_alone: false }])
+      .insert([{ game_id: game.id, ...owner, partner_id: partner.id, status: 'confirmed', joined_alone: false }])
     if (insertError) {
+      await cleanupMyGuest(owner)
       if (insertError.code === '23505') {
         await reply('already_joined')
         return
@@ -1076,7 +1110,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     if (partnerIsNewGuest) {
       await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
     } else if (isNewGuest) {
-      await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+      await reply('guest_pair_joined', { partner: partner.name, appUrl: config.appUrl })
     }
   }
 
@@ -1264,12 +1298,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     const asPartnerRow = existingRows.find((row) => rowPartnerIsMine(profile, myHash, row))
 
     if (action === 'in') {
-      // Sem conta não se iniciam duplas (o pedido/aceitação precisa de
-      // conta) — entra sozinho, ou o parceiro escreve ele próprio.
-      if (profile.guest && partnerRequest) {
-        await reply('guest_pair_need_account', { appUrl: config.appUrl })
-        return
-      }
       // #554: já inscrito sozinho e agora «In com …» → junta o parceiro à
       // inscrição que já tem, em vez de «Já estás inscrito».
       if (ownConfirmedRow && !ownConfirmedRow.partner_id && !ownConfirmedRow.partner_guest_id && partnerRequest) {

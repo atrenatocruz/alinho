@@ -120,6 +120,8 @@ Para veres esta lista:
   partner_offer_declined: '🤖 Ok, não inscrevi a dupla. Podes tentar *In com* e o nome como está na app, ou *In @parceiro* se ele estiver no grupo.',
   pair_partner_invite_created: '🤖 🤝 Dupla inscrita com *{{partner}}*! Envia-lhe este link para ele ficar com o lugar e ter o histórico e o ranking:\n{{link}}',
   pair_partner_guest_created: '🤖 🤝 Dupla inscrita! *{{partner}}* entra como convidado deste mix, sem conta — para ter ranking e histórico, pode registar-se em {{appUrl}}.',
+  // Quem não tem conta deu «In com X» (Francisco/UX, 18 out): diz com quem ficou.
+  guest_pair_joined: '🤖 🤝 Dupla inscrita com *{{partner}}*! Entraste como *convidado* deste mix — podes jogar assim, mas sem conta não tens ranking nem histórico. Para isso, regista-te em {{appUrl}}.',
   guest_pair_need_account: '🤖 Para te inscreveres em dupla precisas de conta — regista-te em {{appUrl}}. Entretanto podes entrar sozinho com *In*, ou o teu parceiro escreve *In* por ele.',
 }
 
@@ -225,6 +227,7 @@ To see this list:
   partner_offer_declined: "🤖 Ok, I didn't sign up the pair. Try *In com* and the name as it appears in the app, or *In @partner* if they're in the group.",
   pair_partner_invite_created: '🤖 🤝 Pair signed up with *{{partner}}*! Send them this link so they claim the spot and keep their history and ranking:\n{{link}}',
   pair_partner_guest_created: '🤖 🤝 Pair signed up! *{{partner}}* joins as a guest of this mix, no account — for ranking and history they can sign up at {{appUrl}}.',
+  guest_pair_joined: "🤖 🤝 Pair signed up with *{{partner}}*! You've joined as a *guest* of this mix — you can play like this, but without an account there's no ranking or history. For that, sign up at {{appUrl}}.",
   guest_pair_need_account: '🤖 To sign up as a pair you need an account — register at {{appUrl}}. Meanwhile you can join solo with *In*, or your partner writes *In* themselves.',
 }
 

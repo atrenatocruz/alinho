@@ -84,7 +84,7 @@ export default function FriendGameRow({ id, facts, line = null, pending = 0, cre
           <div className="divide-y divide-line overflow-hidden rounded-card border border-line">
             <Link to={`/jogos-privados/sessao/${id}/editar`} className={row}><Pencil size={16} /> {t('friends.edit_game')}</Link>
             {pending > 0 && (
-              <button type="button" className={row} onClick={() => { setMenu(null); shareWithMissing(t('friends.share_text', {
+              <button type="button" className={row} onClick={() => { setMenu(null); shareWithMissing(t(facts.ranked ? 'friends.share_text' : 'friends.share_text_friendly', {
                 name: creatorName, day: facts.date ? dayText(facts.date, i18n.language) : '', link: sessionLink(id) })) }}>
                 <Share2 size={16} /> {t('friends.share_missing')}
               </button>

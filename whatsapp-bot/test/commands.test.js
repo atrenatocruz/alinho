@@ -573,10 +573,45 @@ test('«In» com conta quando já existe a minha linha-convidado no jogo → ado
   assert.equal(db.participants[0].guest_id, guestId, 'a linha-convidado fica (a adoção é na confirmação do número)')
 })
 
-test('convidado sem conta não inicia duplas', async () => {
+// Francisco, 18 out (M5 A2N): «In com X» de quem não tem conta inscreve a
+// dupla na mesma — quem escreveu entra como convidado (pelo número), o
+// parceiro com conta ou como convidado. Antes recusava com «precisas de conta».
+test('convidado sem conta + parceiro com conta → dupla inscrita', async () => {
   const out = await say('in com afonso dias', '351955555555')
-  assert.match(out, /precisas de conta/)
-  assert.equal(db.participants.length, 0)
+  assert.doesNotMatch(out, /precisas de conta/)
+  const guest = db.game_guests.find((g) => g.phone_hash === hash('955555555'))
+  assert.ok(guest, 'quem escreveu ganha a linha-convidado deste jogo')
+  assert.deepEqual(db.participants.map((p) => [p.user_id ?? null, p.guest_id ?? null, p.partner_id ?? null, p.partner_guest_id ?? null, p.status]),
+    [[null, guest.id, 'b', null, 'confirmed']])
+  assert.match(out, /Dupla inscrita com \*Afonso Dias\*! Entraste como \*convidado\*/)
+  assert.doesNotMatch(out, /Olá/)
+  assert.equal(db.profiles.length, 2, 'não se cria conta nenhuma')
+})
+
+test('convidado sem conta + parceiro que já está sozinho → entra na inscrição dele', async () => {
+  db.participants.push({ id: 'p-b', game_id: 'm', user_id: 'b', status: 'confirmed', joined_alone: true })
+  await say('in com afonso dias', '351955555555')
+  const guest = db.game_guests.find((g) => g.phone_hash === hash('955555555'))
+  assert.deepEqual(db.participants.map((p) => [p.user_id ?? null, p.partner_id ?? null, p.partner_guest_id ?? null]),
+    [['b', null, guest.id]])
+})
+
+test('convidado sem conta + parceiro que não está na app → «Sim» inscreve os dois como convidados', async () => {
+  const ask = await say('in com Zé Ninguém', '351955555555')
+  assert.match(ask, /Zé Ninguém/)
+  await say('sim', '351955555555')
+  const me = db.game_guests.find((g) => g.phone_hash === hash('955555555'))
+  const partner = db.game_guests.find((g) => g.name === 'Zé Ninguém')
+  assert.ok(me && partner)
+  assert.deepEqual(db.participants.map((p) => [p.user_id ?? null, p.guest_id ?? null, p.partner_guest_id ?? null]),
+    [[null, me.id, partner.id]])
+})
+
+test('convidado já inscrito sozinho junta o parceiro com «In com X»', async () => {
+  await say('in', '351955555555')
+  await say('in com afonso dias', '351955555555')
+  assert.equal(db.participants.length, 1)
+  assert.equal(db.participants[0].partner_id, 'b')
 })
 
 test('«Confirmar 482917» no grupo valida o número pelo robô, sem mensagens', async () => {

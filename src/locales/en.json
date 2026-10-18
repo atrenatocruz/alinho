@@ -2654,7 +2654,8 @@
   "friends.form_teams": "Form the teams",
   "friends.share_missing": "Share with who's missing",
   "friends.share_missing_hint": "Opens WhatsApp, Instagram… with the link to confirm",
-  "friends.share_text": "{{name}} recorded the games of {{day}} on alinho. Confirm so they count for the ranking: {{link}}",
+  "friends.share_text": "{{name}} recorded the games of {{day}} on alinho.pt. Confirm so they count for the ranking: {{link}}",
+  "friends.share_text_friendly": "{{name}} recorded the games of {{day}} on alinho.pt. These games don't count for the ranking. Confirm the result here: {{link}}",
   "friends.games_recorded_one": "{{count}} game recorded",
   "friends.games_recorded_other": "{{count}} games recorded",
   "friends.counts_when": "Counts for the ranking when these confirm: {{names}}",
@@ -2677,7 +2678,7 @@
   "friends.invite_card_line": "{{name}} added you to a friends' game",
   "friends.invite_card_results_one": "It already has 1 result with you.",
   "friends.invite_card_results_other": "It already has {{count}} results with you.",
-  "friends.invite_card_confirm": "Confirm so the games count for the ranking.",
+  "friends.invite_card_confirm": "Confirm the games of {{day}}.",
   "friends.see_and_confirm": "See and confirm",
   "friends.invite_card_note": "If you say you didn't play, the games you're in stay recorded but don't count for anyone's ranking.",
   "friends.game_minutes_label": "Each game lasts",
@@ -6398,5 +6399,6 @@
   "login2.forgot_title": "Forgot your password?",
   "login2.forgot_lead": "It happens. We will send you a link to choose another one.",
   "login2.forgot_sent": "<0>Sent.</0> Check your email and tap the link. If you don't see it, look in spam.",
-  "login2.name_placeholder": "Your first and last name"
+  "login2.name_placeholder": "Your first and last name",
+  "login2.or_email": "or with email"
 }

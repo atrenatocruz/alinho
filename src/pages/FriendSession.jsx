@@ -313,7 +313,7 @@ export default function FriendSession() {
           iSent && { key: 'correct', label: t('friends.correct_the_result'), onClick: () => setCorrecting(true) },
         ] : [
           { key: 'edit', label: t('friends.edit_game'), hint: t('eventactions.edit_hint'), onClick: () => navigate(`/jogos-privados/sessao/${match.id}/editar`, { state: { fromSession: true } }) },
-          pending > 0 && { key: 'share', label: t('friends.share_missing'), onClick: () => shareWithMissing(t('friends.share_text', {
+          pending > 0 && { key: 'share', label: t('friends.share_missing'), onClick: () => shareWithMissing(t(match.ranked_intent === false ? 'friends.share_text_friendly' : 'friends.share_text', {
             name: creator?.name || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id) })) },
           canLeave && { key: 'leave', label: t('friends.leave_game'), onClick: () => setAskLeave(true) },
           { key: 'cancel', danger: true, label: t('friends.cancel_game'), onClick: () => setAskCancel(true) },
@@ -487,7 +487,8 @@ export default function FriendSession() {
                   <span className="mt-0.5 block text-xs text-muted">{t(hint, { name: creator?.name || '' })}</span>
                 </button>
               ))}
-              {games.length > 0 && <p className="text-xs text-muted">{t('friends.invite_card_note')}</p>}
+              {/* A nota fala do ranking: só num jogo que conta. */}
+              {games.length > 0 && match.ranked_intent !== false && <p className="text-xs text-muted">{t('friends.invite_card_note')}</p>}
             </div>
           )}
           </EventHero>
