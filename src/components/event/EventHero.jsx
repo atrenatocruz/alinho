@@ -64,7 +64,7 @@ function StatusBand({ kind, status }) {
 export default function EventHero({
   kind, imageUrl = null, chip = null, org = null, title, time = null, timeAside = null, dateLine = null,
   onAddToCalendar = null, onBack = null, onShare = null, status = null, children = null,
-  manage = null, nextStep = null, roundBottom = false, barTitle = null,
+  manage = null, nextStep = null, roundBottom = false, barTitle = null, poster = false,
 }) {
   const { t } = useTranslation()
   const coverRef = useRef(null)
@@ -88,7 +88,8 @@ export default function EventHero({
         left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
         right={onShare ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button> : null} />
       <div ref={coverRef}>
-      <KindHero kind={kind} src={imageUrl} className="relative h-[210px]" imgClassName={imageUrl ? "" : "object-[center_22%]"}>
+      {/* poster: o cartaz do torneio inteiro, sobre ele próprio desfocado (UX, 16 out). */}
+      <KindHero kind={kind} src={imageUrl} poster={poster && !!imageUrl} className="relative h-[210px]" imgClassName={imageUrl ? "" : "object-[center_22%]"}>
         {chip && (
           <span className="absolute bottom-8 left-4 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs font-extrabold text-white backdrop-blur-sm">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-white" /> {chip}

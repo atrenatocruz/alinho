@@ -109,7 +109,8 @@ export default function CoverSheet({ org, onSave, onRemove, onClose }) {
             return (
               <button key={p.key} type="button" onClick={() => pickPreset(p.url)} aria-pressed={on}
                 className={`relative h-16 overflow-hidden rounded-ctrl ring-offset-2 ${on ? 'ring-2 ring-ink-900' : ''}`}>
-                <div className="absolute inset-0"><KindHero kind="club" src={p.url} className="h-full w-full" /></div>
+                {/* O quadrado mostra a parte direita da capa, onde está o Alino (SPEC). */}
+                <div className="absolute inset-0"><KindHero kind="club" src={p.url} className="h-full w-full" imgClassName="object-[72%_40%]" /></div>
                 <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-left text-[11px] font-extrabold text-white">{t(p.labelKey)}</span>
                 {on && <Check size={14} className="absolute right-1.5 top-1.5 rounded-full bg-white p-0.5 text-ink-900" />}
               </button>
@@ -126,7 +127,8 @@ export default function CoverSheet({ org, onSave, onRemove, onClose }) {
 
         <div className="mt-4 space-y-2">
           <button type="button" onClick={save} disabled={busy || !changed}
-            className="w-full min-h-[52px] rounded-ctrl bg-lime-400 px-4 text-[15px] font-extrabold text-ink-900 hover:bg-lime-600 disabled:opacity-40">
+            // Ação de quem organiza: a preto, não a lima (SPEC das capas; UX, 18 out).
+            className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
             {busy ? t('cover.saving') : t('cover.use')}
           </button>
           {org.cover_url && !file && (

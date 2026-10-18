@@ -36,7 +36,7 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-white">
       <Nav />
       <header className="bg-[#F7F7F4]">
-        <div className="mx-auto max-w-[760px] px-5 pt-24 pb-10 sm:pt-28 sm:pb-14">
+        <div className="mx-auto max-w-[760px] px-5 pt-8 pb-10 sm:pt-12 sm:pb-14">
           <p className={kicker}>{t('terms.updated_kicker', { date })}</p>
           <h1 className="mt-2.5 text-[40px] font-black leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-[56px]">{t('terms.title')}</h1>
           <p className="mt-2.5 text-[17px] leading-normal text-ink-700">{t('terms.lead')}</p>

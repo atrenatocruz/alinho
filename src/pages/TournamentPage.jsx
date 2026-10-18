@@ -408,7 +408,9 @@ export default function TournamentPage() {
           14 out — como no protótipo): sobre o fundo novo da app, os quadrados
           e a morada #F4F5F1 ficavam apagados. A categoria e os separadores
           ficam depois, no cinzento. */}
-      <div className="-mx-4 space-y-4 rounded-b-[16px] bg-white px-4 pb-5">
+      {/* No computador, a capa e a folha à largura dos cartões de baixo,
+          como no mix (Dev 2, 15 out) — saíam 16 px para cada lado. */}
+      <div className="-mx-4 space-y-4 rounded-b-[16px] bg-white px-4 pb-5 sm:mx-0">
         {/* R3 — o topo novo (design-handoff/2026-10-13-redesign/R3): a capa com
             o cartaz ou o Alino do torneio, o cartão branco por cima, a hora
             grande, a faixa de estado e, logo por baixo, os botões da inscrição.
@@ -416,6 +418,7 @@ export default function TournamentPage() {
         <EventHero
           kind="tournament"
           imageUrl={tour.poster_url || null}
+          poster
           chip={[t('tournament.label'), categories.length ? t('tournament.hero_categories', { count: categories.length }) : null].filter(Boolean).join(' · ')}
           org={tour.club_name ? { name: tour.club_name, kindLabel: t(tour.club_kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'), logo: tour.club_logo_url } : null}
           title={tour.name}
@@ -460,8 +463,9 @@ export default function TournamentPage() {
               ? t('tournament.hero_pairs_of', { n: teamsIn ?? tour.entry_count ?? 0, total: totalSlots })
               : t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }),
             // As por validar à parte (a conta grande são os lugares): «0/16
-            // DUPLAS · 1 POR VALIDAR» (UX, 14 out).
-            pendingPairs > 0 ? t('tournament.hero_pending', { count: pendingPairs }) : null,
+            // DUPLAS · 1 POR VALIDAR» (UX, 14 out). Só a quem organiza: é
+            // informação dele, não de quem vê o torneio (PO/UX, 18 out).
+            isAdmin && pendingPairs > 0 ? t('tournament.hero_pending', { count: pendingPairs }) : null,
             isToday ? t('ui.today') : null].filter(Boolean).join(' · '),
           }}
         >

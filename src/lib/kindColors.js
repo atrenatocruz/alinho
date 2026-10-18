@@ -44,3 +44,8 @@ export const KIND_HERO = {
 // 920×400: o clube ou o grupo sem foto (R5, R8, R9).
 export const CLUB_HERO = '/topo/topo-clube-alino.webp'
 export const GROUP_HERO = '/topo/topo-grupo-alino.webp'
+// 384×384: o círculo do clube ou do grupo sem foto — uma imagem própria,
+// centrada nas caras, em vez de cortar a do topo (Francisco, 14 out, clube
+// «A»; design-handoff/2026-10-14-avatares-clube-grupo).
+export const CLUB_AVATAR = '/topo/avatar-clube.webp'
+export const GROUP_AVATAR = '/topo/avatar-grupo.webp'
