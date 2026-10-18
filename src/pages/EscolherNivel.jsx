@@ -148,7 +148,7 @@ export default function EscolherNivel() {
             <label className="block text-sm font-extrabold text-ink-900 mb-2">
               {t('login.birthday_label')}
             </label>
-            <DateField value={birthday} onChange={setBirthday} max={maxSignupBirthday()} hideToday />
+            <DateField value={birthday} onChange={setBirthday} max={maxSignupBirthday()} hideToday birthday />
             {birthdayTooYoung && (
               <p className="text-xs text-danger mt-1.5">{t('login.error_under_age', { age: MIN_SIGNUP_AGE })}</p>
             )}

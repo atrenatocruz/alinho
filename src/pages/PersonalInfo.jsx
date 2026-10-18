@@ -149,7 +149,7 @@ export default function PersonalInfo() {
       <div className={CARD}>
         <Row label={t('profile.birthday_label')} hint={ageKey ? t(ageKey) : null}>
           <div className="mt-1">
-            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday()} hideToday />
+            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday()} hideToday birthday />
           </div>
         </Row>
         <Row label={t('profile.gender_label')}>
