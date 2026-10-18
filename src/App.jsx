@@ -21,6 +21,7 @@ import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import ProfileXp from './pages/ProfileXp'
+import PartnerPage from './pages/PartnerPage'
 import PlayerStats from './pages/PlayerStats'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
@@ -431,6 +432,8 @@ function AppRoutes() {
         <Route path="/instrucoes" element={<Instructions />} />
         <Route path="/privacidade" element={<PrivacyPolicy />} />
         <Route path="/termos" element={<TermsOfService />} />
+        {/* A página de um parceiro (18 out): sem sessão vai ao login e volta (PO). */}
+        <Route path="/parceiro/:slug" element={<Guard require="protected" showSplash={showSplash}><PartnerPage /></Guard>} />
         {/* Página pública dos planos (Trello #327). */}
         <Route path="/planos" element={<Plans />} />
         {/* Páginas do site (#619): «Como funciona» e «Novidades». */}

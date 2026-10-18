@@ -22,6 +22,7 @@ import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
+import ReceptionPass from '../components/vouchers/ReceptionPass'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory, useAllPlayed, playedTotals, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
 import { dayText } from '../components/friends/dayText'
@@ -223,8 +224,15 @@ export default function Profile() {
       // Anulados não se usam (migration_vouchers_so_com_conta.sql e
       // juntar_convidado em migration_vouchers_para_todos.sql): ficam fora.
       const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))'
-      let { data, error } = await supabase.from('vouchers').select(`${select}, contact_shared_at`)
+      // Os vouchers dos parceiros (18 out, Dev 3): o parceiro, o lugar, o mês,
+      // a zona, o desconto, o código e a validade. Sem as colunas, como antes.
+      const partnerCols = ', partner_id, prize_place, prize_month, prize_district, discount_pct, code, valid_until, partner:partners (name, slug, logo_url)'
+      let { data, error } = await supabase.from('vouchers').select(`${select}, contact_shared_at${partnerCols}`)
         .eq('user_id', profile.id).neq('status', 'anulado').order('created_at', { ascending: false })
+      if (error && (['42703', 'PGRST200'].includes(error.code) || /partner|prize_|discount_pct|valid_until|code/.test(error.message || ''))) {
+        ;({ data, error } = await supabase.from('vouchers').select(`${select}, contact_shared_at`)
+          .eq('user_id', profile.id).neq('status', 'anulado').order('created_at', { ascending: false }))
+      }
       let consent = true
       if (error && (error.code === '42703' || /contact_shared_at/.test(error.message || ''))) {
         consent = false
@@ -271,8 +279,13 @@ export default function Profile() {
   // never calls this for a usado one (its onClick is undefined in that
   // state), but this stays honest about the precondition rather than
   // relying solely on the caller.
+  const [receptionVoucher, setReceptionVoucher] = useState(null)
+  // Os vouchers dos parceiros só com o interruptor «parceiros» ligado (PO, 18 out).
+  const partnersFlag = useFeatureFlag('parceiros')
   const handleShowVoucherQR = (v) => {
     if (v.status !== 'por_usar') return
+    // Voucher de parceiro: «Mostrar na receção» em vez do QR (18 out).
+    if (v.partner_id) { setReceptionVoucher(v); return }
     setQrVoucher({ id: v.id, gameTitle: v.game?.title || '', organizationName: v.game?.organization?.name || '' })
   }
 
@@ -1128,23 +1141,27 @@ export default function Profile() {
             />
           ) : (
             <div className="space-y-3">
-              {sortVouchersForWallet(vouchers).map((v, i, all) => (
+              {sortVouchersForWallet(vouchers.filter((v) => !v.partner_id || partnersFlag.on)).map((v, i, all) => (
                 <div key={v.id}>
                 {/* «Já usados» por cima do primeiro usado (R7). */}
                 {v.status === 'usado' && all[i - 1]?.status !== 'usado' && (
                   <p className="mb-2 mt-4 font-mono text-[11px] font-bold uppercase tracking-widest text-muted">{t('vouchers.r7_used_heading')}</p>
                 )}
                 <VoucherTicket
-                  prizeText={v.game?.prize || ''}
+                  {...(v.partner_id ? {
+                    fromText: v.prize_place ? t('reception.ticket_from', { place: v.prize_place, month: v.prize_month ? new Date(`${String(v.prize_month).slice(0, 10)}T12:00:00`).toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT', { month: 'long' }) : '' }) : null,
+                    showLabel: t('reception.title'),
+                  } : {})}
+                  prizeText={v.partner_id ? t('reception.ticket_prize', { pct: v.discount_pct, partner: v.partner?.name || '' }) : (v.game?.prize || '')}
                   gameTitle={v.game?.title || ''}
                   gameDate={v.game?.date ? shortDay(v.game.date) : ''}
-                  organizationName={v.game?.organization?.name || ''}
+                  organizationName={v.partner_id ? (v.partner?.name || '') : (v.game?.organization?.name || '')}
                   status={v.status}
                   usedAtLabel={v.used_at ? shortDay(v.used_at) : ''}
                   onMarkUsed={() => handleMarkVoucherUsed(v.id)}
                   onShowQR={() => handleShowVoucherQR(v)}
-                  needsConsent={voucherConsent && v.status === 'por_usar' && !v.contact_shared_at}
-                  shared={voucherConsent && !!v.contact_shared_at}
+                  needsConsent={voucherConsent && !v.partner_id && v.status === 'por_usar' && !v.contact_shared_at}
+                  shared={voucherConsent && !v.partner_id && !!v.contact_shared_at}
                   onAccept={() => setShareFor(v)}
                   onUnshare={() => setUnshareFor(v)}
                 />
@@ -1181,6 +1198,10 @@ export default function Profile() {
         onClose={() => setUnshareFor(null)}
       />
 
+      {receptionVoucher && (
+        <ReceptionPass voucher={receptionVoucher} person={profile} onClose={() => setReceptionVoucher(null)}
+          onMarkUsed={() => { setReceptionVoucher(null); handleMarkVoucherUsed(receptionVoucher.id) }} />
+      )}
       {qrVoucher && (
         <VoucherQRModal voucher={qrVoucher} onClose={() => setQrVoucher(null)} />
       )}
