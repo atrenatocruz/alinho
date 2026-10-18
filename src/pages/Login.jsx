@@ -613,7 +613,9 @@ export default function Login() {
               {/* Com erro, o campo leva a borda vermelha e o fundo rosa, como a password (UX). */}
               <div className={aboutErr.birthday ? BAD : ''}>
                 <label className={label}>{t('login.birthday_label')}</label>
-                <DateField value={signupBirthday} onChange={(v) => { setSignupBirthday(v); setAboutErr((x) => ({ ...x, birthday: null })) }} max={maxSignupBirthday()} hideToday required />
+                <DateField value={signupBirthday} onChange={(v) => { setSignupBirthday(v); setAboutErr((x) => ({ ...x, birthday: null })) }} max={maxSignupBirthday()} hideToday required birthday />
+                {/* A regra dos 13 anos, à vista (UX, 18 out). */}
+                {!aboutErr.birthday && <p className="mt-1.5 text-xs text-muted">{t('login.birthday_min_age', { age: MIN_SIGNUP_AGE })}</p>}
                 <FieldError id="signup-birthday-erro">{aboutErr.birthday}</FieldError>
               </div>
               <div className={aboutErr.gender ? BAD : ''}>
