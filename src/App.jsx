@@ -7,6 +7,7 @@ import { SiteHeader, SiteFooter } from './components/site/SiteChrome'
 import { PrimaryButton, EmptyState } from './components/ui'
 import Alino from './components/Alino'
 import Layout, { Wordmark } from './components/Layout'
+import { captureAccountOrigin } from './lib/accountOrigin'
 import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
@@ -398,6 +399,10 @@ function useRouteHead() {
 
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
+  // A origem da conta (?origem=, ?ref= e os links de convite): guarda-se ao
+  // abrir qualquer página, para entregar depois da primeira sessão (19 out).
+  const routeLocation = useLocation()
+  useEffect(() => { captureAccountOrigin(routeLocation.pathname, routeLocation.search) }, [routeLocation.pathname, routeLocation.search])
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
   useRouteHead()
 
