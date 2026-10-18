@@ -17,7 +17,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge, SWITCH_TRACK } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -312,7 +312,7 @@ function SettingsSwitch({ label, hint, checked, onChange }) {
         {hint && <span className="block text-xs text-muted">{hint}</span>}
       </span>
       <input type="checkbox" role="switch" checked={!!checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span aria-hidden="true" className="relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-ink-900 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2" />
+      <span aria-hidden="true" className={SWITCH_TRACK} />
     </label>
   )
 }
@@ -1129,11 +1129,10 @@ export default function GerirClube() {
       return
     }
 
+    // O superadmin que é membro a sério aparece como membro normal; onde só
+    // tinha o acesso já não tem inscrição (migration_superadmin_escondido,
+    // Dev 3) — por isso o filtro de 23 set saiu (Francisco, 18 out).
     const merged = (data || [])
-      // Super admins da plataforma não aparecem na lista nem na contagem de
-      // membros (decisão do Renato, 23 set) — só outro super admin os vê.
-      // O limite do plano já não os conta (migration_platform_admins_invisible.sql).
-      .filter((m) => !m.profile?.is_platform_admin || currentUser?.is_platform_admin)
       .map((m) => ({
         id: m.user_id,
         name: m.profile?.name || t('gerirclube.fallback_player_name'),
@@ -1161,16 +1160,16 @@ export default function GerirClube() {
     }
     setRequests(data || [])
     if ((data || []).length > 0 && limitsFor(org?.plan_tier).members != null) {
-      // Os admins da plataforma não contam para o limite (Renato, 23 set:
-      // org_max_members soma-os ao máximo) — por isso também não contam aqui.
-      // Nem os convidados do robô nem as contas de teste (#542: a base de
-      // dados já não os conta; o aviso dizia «cheio» a quem tinha lugar).
+      // Sem os convidados do robô nem as contas de teste (#542: a base de
+      // dados já não os conta; o aviso dizia «cheio» a quem tinha lugar). O
+      // superadmin que é membro a sério conta como os outros (Francisco,
+      // 18 out; migration_superadmin_membro_normal, Dev 3).
       const { data: rows } = await supabase.from('memberships')
-        .select('id, profile:profiles(is_platform_admin)')
+        .select('id')
         .eq('organization_id', currentOrganizationId)
         .not('is_guest', 'is', true)
         .not('is_test', 'is', true)
-      setMemberTotal(rows ? rows.filter((r) => !r.profile?.is_platform_admin).length : null)
+      setMemberTotal(rows ? rows.length : null)
     }
   }
 

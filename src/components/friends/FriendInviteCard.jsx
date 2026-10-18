@@ -19,7 +19,8 @@ export default function FriendInviteCard({ invite }) {
         <p className="text-sm text-ink-900">
           <b>{t('friends.invite_card_line', { name: invite.creator_name || '' })}</b>{details ? ` · ${details}.` : '.'}
           {invite.results_with_me > 0 && ` ${t('friends.invite_card_results', { count: invite.results_with_me })}`}
-          {` ${t('friends.invite_card_confirm')}`}
+          {/* Sem «para o ranking»: o convite não diz se o jogo conta (UX, 18 out). */}
+          {` ${t('friends.invite_card_confirm', { day: dayText(invite.scheduled_date, i18n.language) })}`}
         </p>
         <Link to={`/jogos-privados/sessao/${invite.match_id}`}
           className="press mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white">

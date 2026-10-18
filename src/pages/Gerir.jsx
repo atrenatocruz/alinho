@@ -19,6 +19,7 @@ import OrgFinder from '../components/gerir/OrgFinder'
 import KindHero from '../components/KindHero'
 import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 import { coverOf } from '../lib/orgCover'
+import SuperadminModeCard from '../components/gerir/SuperadminModeCard'
 
 
 export default function Gerir() {
@@ -378,6 +379,7 @@ export default function Gerir() {
           <PageHeader title={t('gerir.title')}>{headerActions}</PageHeader>
           <p className="text-muted text-sm pt-1">{t('gerir.empty_subtitle')}</p>
         </div>
+        <SuperadminModeCard />
         {createGroupPanel}
         {isPlatformAdmin && <AppFeaturesPanel />}
         {isPlatformAdmin && (
@@ -399,6 +401,9 @@ export default function Gerir() {
     <div className="space-y-5">
       {/* Só o título, sem a frase por baixo (R9, UX 13 out). */}
       <PageHeader title={t('gerir.title')}>{headerActions}</PageHeader>
+
+      {/* Antes de tudo, só para superadmins (UX, 18 out). */}
+      <SuperadminModeCard />
 
       {createdClubBanner}
 

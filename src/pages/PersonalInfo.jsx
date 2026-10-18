@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { maxSignupBirthday } from '../lib/age'
-import { BackBar, DateField, Select, RatingBadge, Avatar, Chips } from '../components/ui'
+import { BackBar, DateField, Select, RatingBadge, Avatar, Chips, SWITCH_TRACK } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
@@ -219,7 +219,7 @@ export default function PersonalInfo() {
             <span className="block text-xs text-muted">{t('profile.privacy_is_private_hint')}</span>
           </span>
           <input type="checkbox" role="switch" checked={form.is_private} onChange={(e) => set('is_private')(e.target.checked)} className="peer sr-only" />
-          <span aria-hidden="true" className="relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-ink-900 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2" />
+          <span aria-hidden="true" className={SWITCH_TRACK} />
         </label>
       </div>
 

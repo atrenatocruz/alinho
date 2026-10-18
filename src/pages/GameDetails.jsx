@@ -1745,14 +1745,17 @@ export default function GameDetails() {
   // Pontos e XP nao entram nesta conta: so sao creditados por finalize_mix
   // ("Terminar Mix"), e este botao so existe com o mix a decorrer.
   // «Recomeçar» (ações do evento, 26 set): a pergunta vem na folha da app
-  // (ConfirmSheet), já não na caixa do telemóvel. O texto é o de sempre.
+  // (ConfirmSheet), já não na caixa do telemóvel.
+  //
+  // «Recomeçar as rondas» (#639, Renato 16 out; o Francisco a 15 out só queria
+  // apagar as rondas e recomeçar): com duplas fixas o mix já não volta ao
+  // «antes de começar» — continua a decorrer e fica logo na Ronda 1, com as
+  // mesmas duplas nos campos, à espera do «Começar Ronda 1». Sem duplas
+  // fixas (americano, trocam a cada ronda) volta ao início, como antes.
   const stopMixMessage = () => {
     const duplasFixas = !isAmericano && !game?.rotate_partners
-    let msg = duplasFixas
-      ? (matches.length > 0
-          ? t('gamedetails.confirm_stop_mix_with_results')
-          : t('gamedetails.confirm_stop_mix_no_results'))
-      : t('gamedetails.confirm_stop_mix_no_fixed_duplas')
+    if (duplasFixas) return t('gamedetails.confirm_restart_rounds')
+    let msg = t('gamedetails.confirm_stop_mix_no_fixed_duplas')
     if (game?.auto_start_hours_before) msg += ' ' + t('gamedetails.confirm_stop_mix_disables_autostart')
     return msg
   }
@@ -1764,10 +1767,20 @@ export default function GameDetails() {
     const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
     if (matchesError) throw matchesError
 
-    if (!duplasFixas) {
-      const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
-      if (teamsError) throw teamsError
+    if (duplasFixas) {
+      // Continua a decorrer: limpa o relógio e o vencedor e volta a pôr as
+      // mesmas duplas nos campos da Ronda 1 (o mesmo sorteio do início).
+      const { error: resetError } = await supabase
+        .from('games')
+        .update({ winner_team_id: null, round_started_at: null, round_duration_minutes: null })
+        .eq('id', id)
+      if (resetError) throw resetError
+      await handleStartRound1({ teamsOverride: teams })
+      return
     }
+
+    const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
+    if (teamsError) throw teamsError
 
     const { error: statusError } = await supabase
       .from('games')
@@ -5379,7 +5392,8 @@ export default function GameDetails() {
           // recebe um aviso; o mix fica em rascunho no Gerir.
           ['pending', 'open', 'closed', 'in_progress'].includes(game.status)
             && { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) },
-          game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },
+          // A vermelho: apaga resultados (UX, 18 out — a cor da ação que pergunta).
+          game.status === 'in_progress' && { key: 'restart', danger: true, label: t('eventactions.restart'), hint: t(!isAmericano && !game?.rotate_partners ? 'eventactions.restart_hint' : 'eventactions.restart_hint_reset'), onClick: () => setRestartOpen(true) },
           // Sem ninguém inscrito o mix desaparece: chama-se «Eliminar o mix».
           // Jogo em aberto (ponto 3): «Cancelar este jogo», só este horário.
           isOpenGame(game)

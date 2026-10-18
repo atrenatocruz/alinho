@@ -8,7 +8,9 @@ import { dayText } from './dayText'
 
 export function ShareMissingButton({ match, creatorName }) {
   const { t, i18n } = useTranslation()
-  const text = t('friends.share_text', {
+  // Num jogo que não conta, a mensagem não fala em «contar para o ranking»
+  // (utilizador real, 18 out: dizia que contava mesmo quando não contava).
+  const text = t(match.ranked_intent === false ? 'friends.share_text_friendly' : 'friends.share_text', {
     name: creatorName || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id),
   })
   return (
