@@ -6009,6 +6009,7 @@
   "xp_page.only_up": "O XP só sobe, nunca desce, e não mexe no teu nível de jogo.",
   "xp_page.levels_title": "Os 10 níveis",
   "xp_page.you_are_here": "{{name}} · estás aqui",
+  "xp_page.here_short": "estás aqui",
   "xp_page.month_title": "Este mês · +{{xp}} XP",
   "xp_page.month_empty": "Ainda sem XP este mês. Entra num mix para começar.",
   "xp_page.friendly": "Jogo entre amigos",

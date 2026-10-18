@@ -5994,6 +5994,7 @@
   "xp_page.only_up": "XP only goes up, never down, and does not change your playing level.",
   "xp_page.levels_title": "The 10 levels",
   "xp_page.you_are_here": "{{name}} · you are here",
+  "xp_page.here_short": "you are here",
   "xp_page.month_title": "This month · +{{xp}} XP",
   "xp_page.month_empty": "No XP yet this month. Join a mix to get started.",
   "xp_page.friendly": "Friendly match",

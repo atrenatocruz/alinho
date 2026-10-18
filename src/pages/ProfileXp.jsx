@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
@@ -18,6 +18,41 @@ import { groupXpByGame } from '../lib/xpMonth'
 // Do mais baixo para o mais alto, como na lista do desenho.
 const LEVELS = [...XP_TIERS].reverse()
 const EARN = [['20 XP', 'xp_page.earn_mix'], ['5 XP', 'xp_page.earn_game'], ['+30 XP', 'xp_page.earn_win'], ['10 XP', 'xp_page.earn_friendly']]
+
+/* «Diamante · estás aqui» numa linha; quando não cabe (World Class), o
+   «estás aqui» desce para baixo do nome, mais pequeno, a verde. Nunca com
+   reticências (UX, 19 out). */
+function HereLabel({ name }) {
+  const { t } = useTranslation()
+  const boxRef = useRef(null)
+  const lineRef = useRef(null)
+  const [stacked, setStacked] = useState(false)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const line = lineRef.current
+    if (!box || !line) return
+    // A frase inteira mede-se sempre, escondida; se for mais larga do que o espaço, desce.
+    const check = () => setStacked(line.offsetWidth > box.clientWidth)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [name])
+  const full = t('xp_page.you_are_here', { name })
+  return (
+    <span ref={boxRef} className="relative min-w-0 flex-1">
+      <span ref={lineRef} aria-hidden="true" className="invisible absolute left-0 top-0 whitespace-nowrap text-[15px] font-extrabold">{full}</span>
+      {stacked ? (
+        <>
+          <span className="block text-[15px] font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere]">{name}</span>
+          <span className="block text-[12.5px] font-bold leading-tight text-[#3F6212]">{t('xp_page.here_short')}</span>
+        </>
+      ) : (
+        <span className="block whitespace-nowrap text-[15px] font-extrabold text-ink-900">{full}</span>
+      )}
+    </span>
+  )
+}
 
 export default function ProfileXp() {
   const { t, i18n } = useTranslation()
@@ -58,8 +93,8 @@ export default function ProfileXp() {
       {/* O cartão preto: o nível, o XP e a barra até ao seguinte. */}
       <div className="rounded-[22px] bg-ink-900 px-5 pt-6 pb-5 text-center text-white">
         {/* O escudo do nível (16 out); no nível 0, o do Iniciado a cinzento. */}
-        <XpShield tierKey={tier ? tier.key : 'iniciado'} size={104} dim={!tier} className="mx-auto block"
-          style={{ filter: `${tier ? '' : 'grayscale(1) '}drop-shadow(0 8px 18px rgba(0,0,0,.45))` }} />
+        {/* Sem sombra: no preto não se via e desenhava um quadrado à volta da imagem (UX, 19 out). */}
+        <XpShield tierKey={tier ? tier.key : 'iniciado'} size={104} dim={!tier} className="mx-auto block" />
         <p className="mt-3 font-display text-[26px] font-black leading-tight">
           {tier ? t('xp_page.level', { name: t(tier.labelKey), level: tier.level }) : t('profile.xp_no_shield')}
         </p>
@@ -106,9 +141,9 @@ export default function ProfileXp() {
                 </span>
                 {/* Escudos (16 out): a cores os que já tens; os outros a cinzento e meio apagados. */}
                 <XpShield tierKey={l.key} size={32} dim={future} />
-                <span className={`min-w-0 flex-1 truncate text-[15px] font-extrabold ${future ? 'text-[#6B7280]' : 'text-ink-900'}`}>
-                  {here ? t('xp_page.you_are_here', { name: t(l.labelKey) }) : t(l.labelKey)}
-                </span>
+                {here ? <HereLabel name={t(l.labelKey)} /> : (
+                  <span className={`min-w-0 flex-1 truncate text-[15px] font-extrabold ${future ? 'text-[#6B7280]' : 'text-ink-900'}`}>{t(l.labelKey)}</span>
+                )}
                 <span className={`shrink-0 font-mono text-[13px] font-medium tabular-nums ${future ? 'text-[#6B7280]' : 'text-ink-900'}`}>{formatXp(l.min)} XP</span>
               </li>
             )
