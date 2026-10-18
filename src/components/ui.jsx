@@ -1827,6 +1827,11 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
 // StickyTop (separador e filtros presos em cima, R4), quem fica é ele.
 // R12b (14 out): o topo é branco, colado em cima, com os dois cantos de
 // baixo a 16 px e a sombra leve dos cartões — sem a linha fina por baixo.
+// A calha dos interruptores (input type="checkbox" role="switch" com
+// className="peer sr-only" logo antes): lima quando ligado, cinzenta quando
+// desligado — a mesma em todo o lado (UX, 15 e 18 out).
+export const SWITCH_TRACK = 'relative h-[26px] w-11 shrink-0 rounded-full bg-line transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-lime-400 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2'
+
 export const TOP_EDGE = 'rounded-b-[16px] shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
 export function PageHeader({ title, children, sticky = true }) {
   return (
