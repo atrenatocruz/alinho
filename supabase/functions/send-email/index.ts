@@ -205,7 +205,7 @@ const organizationInvite: Handler = async ({ admin, callerId, appUrl, body }) =>
   const email: Outgoing = en
     ? {
         to,
-        subject: `${invite.invited_by_name} invited you to ${invite.organization_name} on alinho`,
+        subject: `${invite.invited_by_name} invited you to ${invite.organization_name} on alinho.pt`,
         html: renderLayout({
           heading: `You've been invited to ${club}`,
           paragraphs: [
@@ -215,12 +215,12 @@ const organizationInvite: Handler = async ({ admin, callerId, appUrl, body }) =>
           ],
           ctaLabel: 'See invite',
           ctaUrl: `${appUrl}/perfil?tab=convites`,
-          footnote: `You're getting this email because you have an alinho account and someone invited you to a club. If you don't know this club, just ignore it — nothing happens until you accept.`,
+          footnote: `You're getting this email because you have an alinho.pt account and someone invited you to a club. If you don't know this club, just ignore it — nothing happens until you accept.`,
         }),
       }
     : {
         to,
-        subject: `${invite.invited_by_name} convidou-te para ${invite.organization_name} no alinho`,
+        subject: `${invite.invited_by_name} convidou-te para ${invite.organization_name} no alinho.pt`,
         html: renderLayout({
           heading: `Tens um convite para ${club}`,
           paragraphs: [
@@ -230,7 +230,7 @@ const organizationInvite: Handler = async ({ admin, callerId, appUrl, body }) =>
           ],
           ctaLabel: 'Ver convite',
           ctaUrl: `${appUrl}/perfil?tab=convites`,
-          footnote: `Recebes este email porque tens conta no alinho e alguém te convidou para um clube. Se não conheces este clube, podes ignorar — nada acontece enquanto não aceitares.`,
+          footnote: `Recebes este email porque tens conta no alinho.pt e alguém te convidou para um clube. Se não conheces este clube, podes ignorar — nada acontece enquanto não aceitares.`,
         }),
       }
 
@@ -366,8 +366,8 @@ const lessonRequest: Handler = async ({ admin, callerId, appUrl, body }) => {
       ctaLabel: en ? 'See request' : 'Ver pedido',
       ctaUrl: `${appUrl}/perfil/aulas`,
       footnote: en
-        ? 'You get this email because you are a coach on alinho. The student chose how you contact them; the contact is deleted when the request closes.'
-        : 'Recebes este email porque és professor no alinho. O aluno escolheu como falas com ele; o contacto apaga-se quando o pedido fecha.',
+        ? 'You get this email because you are a coach on alinho.pt. The student chose how you contact them; the contact is deleted when the request closes.'
+        : 'Recebes este email porque és professor no alinho.pt. O aluno escolheu como falas com ele; o contacto apaga-se quando o pedido fecha.',
     }),
   }
   return { email, release }
@@ -415,8 +415,8 @@ const lessonRequestStudent: Handler = async ({ admin, callerId, appUrl, body }) 
       ctaLabel: accepted ? (en ? 'See lesson' : 'Ver a aula') : (en ? 'Open alinho.pt' : 'Abrir o alinho.pt'),
       ctaUrl: accepted && req.lesson_id ? `${appUrl}/aula/${req.lesson_id}` : appUrl,
       footnote: en
-        ? 'You get this email because you asked for a lesson on alinho and chose to be contacted by email.'
-        : 'Recebes este email porque pediste uma aula no alinho e escolheste ser contactado por email.',
+        ? 'You get this email because you asked for a lesson on alinho.pt and chose to be contacted by email.'
+        : 'Recebes este email porque pediste uma aula no alinho.pt e escolheste ser contactado por email.',
     }),
   }
   return { email, release }
