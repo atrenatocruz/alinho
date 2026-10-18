@@ -97,6 +97,10 @@ const BTN = 'flex w-full min-h-[52px] items-center justify-center gap-2.5 rounde
 const LIME = `${BTN} bg-lime-400 text-ink-900 hover:bg-lime-600 [@media(hover:none)]:hover:bg-lime-400`
 const DARK = `${BTN} bg-ink-900 text-white hover:bg-ink-700`
 const OUTLINE = `${BTN} border-[1.5px] border-line bg-white text-ink-900 hover:bg-ink-50`
+const STICKY_HEAD = 'sticky top-[var(--tb-h,0px)] z-20 -mx-5 flex items-center gap-3 bg-white px-5 pb-2 pt-[calc(var(--safe-top,env(safe-area-inset-top))+12px)]'
+// O botão do passo logo por baixo dos campos e, com o teclado aberto, preso
+// logo acima dele (--kb, medido pelo visualViewport; Francisco, 18 out).
+const ACTIONS = 'sticky z-10 -mx-5 bg-white px-5 pt-5 pb-5'
 const BAD = '[&_.input-field]:!border-danger [&_.input-field]:!bg-danger/5'
 const TEXT_LINK = 'font-extrabold text-ink-900 underline underline-offset-2'
 
@@ -121,9 +125,13 @@ function CreamTop({ children, compact = false }) {
 /** Cabeçalho dos passos: «‹», a barra dos passos em traços e «N DE 4». */
 function StepHead({ step, total = 4, onBack }) {
   const { t } = useTranslation()
+  // Um fragmento, e não uma caixa: o sticky só prende dentro do pai, e o pai
+  // tem de ser a coluna inteira do ecrã.
   return (
-    <div className="pt-4">
-      <div className="flex items-center gap-3">
+    <>
+      {/* Presa em cima, por baixo da faixa de testes e das horas: com o teclado
+          aberto a página sobe e o «‹» ficava cortado (Francisco, 18 out). */}
+      <div className={STICKY_HEAD}>
         <button type="button" onClick={onBack} aria-label={t('common.back')}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-card">
           <ChevronLeft size={22} />
@@ -135,12 +143,34 @@ function StepHead({ step, total = 4, onBack }) {
         </div>
       </div>
       <p className="mt-6 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted">{t('login2.step_of', { step, total })}</p>
-    </div>
+    </>
   )
+}
+
+// A altura do teclado (o que o visualViewport tapa em baixo), em --kb.
+function useKeyboardInset() {
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return undefined
+    const root = document.documentElement
+    const update = () => {
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))
+      root.style.setProperty('--kb', `${kb}px`)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      root.style.removeProperty('--kb')
+    }
+  }, [])
 }
 
 export default function Login() {
   const { t } = useTranslation()
+  useKeyboardInset()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { signUp, signIn, signInWithGoogle, signInAsAdmin } = useAuth()
@@ -417,7 +447,7 @@ export default function Login() {
     return (
       <div className="flex min-h-screen flex-col bg-white px-5">
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
-          <div className="flex items-center gap-3 pt-4">
+          <div className={STICKY_HEAD}>
             <button type="button" onClick={() => go('home')} aria-label={t('common.back')}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-card">
               <ChevronLeft size={22} />
@@ -445,7 +475,7 @@ export default function Login() {
               </div>
               <TurnstileWidget ref={captchaRef} action="login" onToken={setCaptchaToken} />
             </div>
-            <div className="mt-auto pt-8 pb-6">
+            <div className={ACTIONS} style={{ bottom: 'var(--kb, 0px)' }}>
               <button type="submit" disabled={loading} className={LIME}>{loading ? t('login.signing_in') : t('login.login_button')}</button>
               <p className="mt-4 text-center">
                 <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={`inline-flex items-center gap-2 text-[15px] ${TEXT_LINK}`}>
@@ -520,7 +550,7 @@ export default function Login() {
               <EmailField id="signup-email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)}
                 checkNow={checkSignupEmail} placeholder={t('login.email_placeholder')} autoFocus />
             </div>
-            <div className="mt-auto pt-8 pb-6">
+            <div className={ACTIONS} style={{ bottom: 'var(--kb, 0px)' }}>
               {/* «Seguinte» só acorda com o email bem escrito. */}
               <button type="submit" disabled={!!emailProblem(signupEmail)} className={LIME}>{t('login2.next')}</button>
             </div>
@@ -548,7 +578,7 @@ export default function Login() {
                 <FieldError id="signup-password2-erro">{pwMismatch && (pwTried || signupConfirmPassword.length >= signupPassword.length) ? t('login2.password_mismatch') : null}</FieldError>
               </div>
             </div>
-            <div className="mt-auto pt-8 pb-6">
+            <div className={ACTIONS} style={{ bottom: 'var(--kb, 0px)' }}>
               <button type="submit" disabled={!pwOk} className={LIME}>{t('login2.next')}</button>
             </div>
           </form>
@@ -583,7 +613,7 @@ export default function Login() {
               <TurnstileWidget ref={captchaRef} action="signup" onToken={setCaptchaToken} />
             </div>
             {formError}
-            <div className="mt-auto pt-8 pb-6">
+            <div className={ACTIONS} style={{ bottom: 'var(--kb, 0px)' }}>
               <button type="submit" disabled={loading} className={LIME}>{loading ? t('login.creating_account') : t('login.signup_button')}</button>
             </div>
           </form>
