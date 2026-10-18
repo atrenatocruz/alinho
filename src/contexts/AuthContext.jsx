@@ -405,7 +405,15 @@ export const AuthProvider = ({ children }) => {
         skipBrowserRedirect: true,
       },
     })
-    if (!error && data?.url) window.location.replace(data.url)
+    // Na app instalada no ecrã do iPhone, o Google abre por cima da app; com
+    // replace() a app ficava sem página e, ao cancelar, aparecia tudo branco
+    // (Francisco, 18 out). Aí vai com assign(), e o /login fica por baixo. No
+    // browser fica o replace() (o «voltar» não cai outra vez no login, 4 out).
+    const installed = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
+    if (!error && data?.url) {
+      if (installed) window.location.assign(data.url)
+      else window.location.replace(data.url)
+    }
     return { data, error }
   }
 

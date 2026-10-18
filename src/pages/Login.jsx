@@ -97,7 +97,8 @@ const BTN = 'flex w-full min-h-[52px] items-center justify-center gap-2.5 rounde
 const LIME = `${BTN} bg-lime-400 text-ink-900 hover:bg-lime-600 [@media(hover:none)]:hover:bg-lime-400`
 const DARK = `${BTN} bg-ink-900 text-white hover:bg-ink-700`
 const OUTLINE = `${BTN} border-[1.5px] border-line bg-white text-ink-900 hover:bg-ink-50`
-const STICKY_HEAD = 'sticky top-[var(--tb-h,0px)] z-20 -mx-5 flex items-center gap-3 bg-white px-5 pb-2 pt-[calc(var(--safe-top,env(safe-area-inset-top))+12px)]'
+// Um degradê branco por baixo, para o texto que sobe não espreitar sob a barra (QA, 18 out).
+const STICKY_HEAD = "sticky top-[var(--tb-h,0px)] z-20 -mx-5 flex items-center gap-3 bg-white px-5 pb-2 pt-[calc(var(--safe-top,env(safe-area-inset-top))+12px)] after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-gradient-to-b after:from-white after:to-white/0 after:content-['']"
 // O botão do passo logo por baixo dos campos e, com o teclado aberto, preso
 // logo acima dele (--kb, medido pelo visualViewport; Francisco, 18 out).
 const ACTIONS = 'sticky z-10 -mx-5 bg-white px-5 pt-5 pb-5'
@@ -217,6 +218,13 @@ export default function Login() {
 
   const [googleLoading, setGoogleLoading] = useState(false)
   const [googleError, setGoogleError] = useState('')
+  // De volta do Google sem entrar (cancelar, «voltar»), a página pode vir da
+  // cache do browser com o botão ainda em «A entrar…»: volta ao normal.
+  useEffect(() => {
+    const onShow = (e) => { if (e.persisted) setGoogleLoading(false) }
+    window.addEventListener('pageshow', onShow)
+    return () => window.removeEventListener('pageshow', onShow)
+  }, [])
   const handleGoogleLogin = async () => {
     setGoogleLoading(true)
     setGoogleError('')
@@ -455,6 +463,16 @@ export default function Login() {
             <h1 className="font-display text-[24px] font-black text-ink-900">{t('login.login_button')}</h1>
           </div>
           <div className="mt-6">{deletedNotice}</div>
+          {/* O Google primeiro, como no «Como queres entrar?» (Francisco/UX, 18 out). */}
+          <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={DARK}>
+            <GoogleG /> {googleLoading ? t('login.signing_in') : t('login2.continue_google')}
+          </button>
+          {googleErr}
+          <div className="my-5 flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-[13px] text-muted">{t('login2.or_email')}</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
           {/* noValidate: sem as bolhas do browser; os erros são os da app (13 out). */}
           <form onSubmit={handleLogin} noValidate className="flex flex-1 flex-col">
             <div className="space-y-4">
@@ -477,12 +495,6 @@ export default function Login() {
             </div>
             <div className={ACTIONS} style={{ bottom: 'var(--kb, 0px)' }}>
               <button type="submit" disabled={loading} className={LIME}>{loading ? t('login.signing_in') : t('login.login_button')}</button>
-              <p className="mt-4 text-center">
-                <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={`inline-flex items-center gap-2 text-[15px] ${TEXT_LINK}`}>
-                  <GoogleG size={18} /> {googleLoading ? t('login.signing_in') : t('login2.login_google')}
-                </button>
-              </p>
-              {googleErr}
               {devBypass}
             </div>
           </form>

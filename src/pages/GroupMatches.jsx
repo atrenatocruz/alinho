@@ -261,7 +261,8 @@ export default function GroupMatches() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
-  const isOrgAdmin = !!memberships.find((m) => m.organization?.slug === slug)?.is_admin
+  // O superadmin (sem inscrição desde 18 out) também conta como quem organiza.
+  const isOrgAdmin = !!memberships.find((m) => m.organization?.slug === slug)?.is_admin || !!currentUser?.is_platform_admin
 
   const load = useCallback(async () => {
     try {

@@ -1741,6 +1741,7 @@
   "gamedetails.history_load_error": "Couldn't load the history.",
   "gamedetails.history_with_partner": "with {{name}}",
   "gamedetails.history_by_actor": "by {{name}}",
+  "gamedetails.history_by_organizer": "by the organiser",
   "gamedetails.history_action_in": "Joined",
   "gamedetails.history_action_waitlisted": "Waitlist",
   "gamedetails.history_action_out": "Left",
@@ -3738,6 +3739,7 @@
   "gamedetails.badge_friendly": "Friendly",
   "layout.mix_notice_joined": "You're in {{title}} ({{when}}).",
   "layout.mix_notice_added_by": "{{actor}} signed you up for {{title}} ({{when}}).",
+  "layout.mix_notice_added_by_organizer": "The organiser signed you up for {{title}} ({{when}}).",
   "layout.mix_notice_removed": "You're out of {{title}} ({{when}}).",
   "layout.mix_notice_removed_by": "The organizer took you out of {{title}} ({{when}}). You are no longer on the list.",
   "layout.mix_notice_partner_changed": "Your pair changed in {{title}} ({{when}}).",
@@ -6396,5 +6398,6 @@
   "login2.forgot_title": "Forgot your password?",
   "login2.forgot_lead": "It happens. We will send you a link to choose another one.",
   "login2.forgot_sent": "<0>Sent.</0> Check your email and tap the link. If you don't see it, look in spam.",
-  "login2.name_placeholder": "Your first and last name"
+  "login2.name_placeholder": "Your first and last name",
+  "login2.or_email": "or with email"
 }
