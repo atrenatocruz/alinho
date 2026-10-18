@@ -14,6 +14,7 @@
 // sistema» (Francisco, 16 out). Com o dedo, as linhas têm 44 px.
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Clock } from 'lucide-react'
 
 const pad = (n) => String(n).padStart(2, '0')
 const ROWS = 6
@@ -68,7 +69,7 @@ function Part({ value, options, onPick, disabled, label, id }) {
       <button ref={btnRef} id={id} type="button" disabled={disabled} aria-label={label}
         aria-haspopup="listbox" aria-expanded={open}
         onClick={() => { if (!open) place(); setOpen((o) => !o) }}
-        className="min-h-[40px] min-w-[2.6ch] rounded-[6px] px-1 text-center text-base tabular-nums text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ink-900/30 disabled:cursor-default">
+        className="min-h-[44px] min-w-[2.6ch] rounded-[6px] px-1 text-center text-base tabular-nums text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ink-900/30 disabled:cursor-default">
         {value || '--'}
       </button>
       {open && pos && createPortal(
@@ -80,7 +81,7 @@ function Part({ value, options, onPick, disabled, label, id }) {
             return (
               <button key={o} type="button" role="option" aria-selected={sel}
                 onClick={() => { onPick(o); setOpen(false); btnRef.current?.focus() }}
-                className={`block w-full rounded-[8px] text-center text-[15px] tabular-nums ${sel ? 'bg-ink-900 font-extrabold text-white' : 'text-ink-900 hover:bg-ink-50'}`}
+                className={`block w-full rounded-[8px] pl-3 text-left text-[15px] tabular-nums ${sel ? 'bg-ink-900 font-extrabold text-white' : 'text-ink-900 hover:bg-ink-50'}`}
                 style={{ height: ROW, minHeight: ROW }}>
                 {o}
               </button>
@@ -104,12 +105,29 @@ export default function TimeInput({ value = '', onChange, step = 300, className 
   const emit = (h, m) => onChange?.({ target: { value: h && m ? `${h}:${m}` : '' } })
   const hLabel = ariaLabel ? `${ariaLabel} (horas)` : 'Horas'
   const mLabel = ariaLabel ? `${ariaLabel} (minutos)` : 'Minutos'
+  // O relógio à direita mostra que é um campo, como o antigo (UX, 16 out);
+  // tocar no espaço livre da caixa ou no relógio abre as horas. Nas caixas
+  // estreitas (as horas do torneio, 100 px) não cabe e não aparece.
+  const boxRef = useRef(null)
+  const [roomy, setRoomy] = useState(true)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el || typeof ResizeObserver !== 'function') return undefined
+    const ro = new ResizeObserver(() => setRoomy(el.clientWidth >= 120))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const openHours = (e) => {
+    if (disabled || e.target.closest('button')) return
+    e.currentTarget.querySelector('button')?.click()
+  }
   return (
-    <div role="group" aria-label={ariaLabel}
-      className={`flex items-center gap-0.5 ${className} ${disabled ? 'opacity-60' : ''}`}>
+    <div ref={boxRef} role="group" aria-label={ariaLabel} onClick={openHours}
+      className={`flex cursor-pointer items-center gap-0.5 ${className} ${disabled ? 'cursor-default opacity-60' : ''}`}>
       <Part id={id} value={hh} options={hours} label={hLabel} disabled={disabled} onPick={(h) => emit(h, mm || '00')} />
       <span aria-hidden="true" className="text-ink-500">:</span>
       <Part value={mm} options={minutes} label={mLabel} disabled={disabled} onPick={(m) => emit(hh || '00', m)} />
+      {roomy && <Clock size={18} aria-hidden="true" className="ml-auto shrink-0 text-ink-500" />}
     </div>
   )
 }
