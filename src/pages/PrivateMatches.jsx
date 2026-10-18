@@ -361,7 +361,7 @@ export default function PrivateMatches() {
           <div className="space-y-2.5">
             {noTeams.map((s) => (
               <FriendGameRow key={`nt-${s.match_id}`} id={s.match_id} to={`/jogos-privados/sessao/${s.match_id}`}
-                facts={{ date: s.scheduled_date, time: s.scheduled_time ? String(s.scheduled_time).slice(0, 5) : null, location: s.location, isCreator: s.is_creator, hasResults: false, results: [], people: s.people }}
+                facts={{ date: s.scheduled_date, time: s.scheduled_time ? String(s.scheduled_time).slice(0, 5) : null, location: s.location, isCreator: s.is_creator, hasResults: false, results: [], people: s.people, ranked: s.ranked_intent !== false }}
                 line={noTeamsLine(s)} pending={s.pending} creatorName={profile?.name || ''} onChanged={reload} />
             ))}
             {upcoming.map((g) => (

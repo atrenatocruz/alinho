@@ -81,7 +81,7 @@ function toIsoDate(d) {
    until a day is actually tapped). Month/year are also directly jumpable
    (not just +/-1 arrows) — stepping one month at a time from today back to
    a decades-old birth year is a real, reported usability problem. */
-function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max, showToday = true, onToday }) {
+function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max, showToday = true, onToday, yearSelect = {} }) {
   const { t, i18n } = useTranslation()
   const weekdayLabels = WEEKDAY_LABELS[i18n.language] || WEEKDAY_LABELS.pt
   const year = viewDate.getFullYear()
@@ -122,6 +122,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
             options={yearOptionsFor(min, max)}
             // Largura para «2026» inteiro com a seta (aparecia «20…» — UX, 16 out).
             className="w-[7.25rem] shrink-0 py-2"
+            {...yearSelect}
           />
         </div>
         <button
@@ -184,7 +185,10 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
 
 // display (opcional): como mostrar a data escolhida, quando o campo é
 // estreito (ex.: «30 set» na promoção da turma, #342).
-export function DateField({ value, onChange, max, min, placeholder, hideToday = false, display = null }) {
+// `birthday`: data de nascimento — o seletor do ano chama-se «Ano de
+// nascimento» e, sem data, abre em 1995 sem nenhum ano marcado (o 2013 do
+// limite dos 13 anos parecia a resposta; Francisco/UX, 18 out).
+export function DateField({ value, onChange, max, min, placeholder, hideToday = false, display = null, birthday = false }) {
   const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_date_placeholder')
   const [open, setOpen] = useState(false)
@@ -202,7 +206,9 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
     // nascimento com max de há 13 anos, abrir em 2026 mostrava um mês
     // inteiro desativado e obrigava a recuar 13 anos à mão.
     const hoje = new Date()
-    setViewDate(selectedDate || (maxDate && maxDate < hoje ? maxDate : hoje))
+    // Data de nascimento sem data: abre em janeiro de 1995, o mesmo ano da
+    // lista dos anos — abrir no limite (2013) parecia a resposta (UX, 18 out).
+    setViewDate(selectedDate || (birthday ? new Date(1995, 0, 1) : (maxDate && maxDate < hoje ? maxDate : hoje)))
     setOpen(true)
   }
 
@@ -267,6 +273,7 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
               max={maxDate}
               showToday={!hideToday}
               onToday={selectToday}
+              yearSelect={birthday ? { title: t('ui.birth_year_title'), ...(selectedDate ? {} : { highlight: false, startAt: 1995 }) } : undefined}
             />
           </div>
         </div>,
@@ -1827,6 +1834,16 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
 // StickyTop (separador e filtros presos em cima, R4), quem fica é ele.
 // R12b (14 out): o topo é branco, colado em cima, com os dois cantos de
 // baixo a 16 px e a sombra leve dos cartões — sem a linha fina por baixo.
+// A calha dos interruptores (input type="checkbox" role="switch" com
+// className="peer sr-only" logo antes): lima quando ligado, cinzenta quando
+// desligado (#D4D6D1, para se ver numa folha branca) — a mesma em todo o
+// lado (UX, 15 e 18 out).
+export const SWITCH_TRACK = 'relative h-[26px] w-11 shrink-0 rounded-full bg-[#D4D6D1] transition-colors duration-fast after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-fast peer-checked:bg-lime-400 peer-checked:after:translate-x-[18px] peer-focus-visible:ring-2 peer-focus-visible:ring-ink-900 peer-focus-visible:ring-offset-2'
+// O mesmo interruptor feito com um <button role="switch">: a calha e a bola
+// pelo estado (lima ligado, cinzento desligado, bola branca — UX, 18 out).
+export const switchTrack = (on) => `relative h-[26px] w-11 shrink-0 rounded-full transition-colors duration-fast disabled:opacity-50 ${on ? 'bg-lime-400' : 'bg-[#D4D6D1]'}`
+export const switchKnob = (on) => `absolute left-[3px] top-[3px] h-5 w-5 rounded-full bg-white shadow transition-transform duration-fast ${on ? 'translate-x-[18px]' : ''}`
+
 export const TOP_EDGE = 'rounded-b-[16px] shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
 export function PageHeader({ title, children, sticky = true }) {
   return (
@@ -2300,7 +2317,11 @@ export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
 // names are the main searchable list and Portuguese names are full of them.
 const stripAccents = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
-export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false }) {
+// `title`: o título da folha (por omissão, o placeholder). `highlight`: false
+// = nenhuma opção marcada (ainda não há resposta). `startAt`: a opção que
+// fica à vista ao abrir (por omissão, a escolhida). Data de nascimento: os
+// anos abrem em 1995, sem nenhum marcado (UX, 18 out).
+export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false, title = null, highlight = true, startAt = null }) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_placeholder')
   const [open, setOpen] = useState(false)
@@ -2310,6 +2331,14 @@ export function Select({ value, onChange, options, placeholder, className = '', 
     ? options.filter((o) => stripAccents(o.label).toLowerCase().includes(stripAccents(query).toLowerCase()))
     : options
   const closeSheet = () => { setOpen(false); setQuery('') }
+  const listRef = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const target = startAt ?? (highlight ? value : null)
+    if (target == null) return
+    const el = listRef.current?.querySelector(`[data-value="${String(target)}"]`)
+    el?.scrollIntoView({ block: 'center' })
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   // Com pesquisa, no telemóvel o teclado abre e tapa a metade de baixo do
   // ecrã: a folha passa para CIMA e fica com a altura do que o teclado
   // deixa à vista (visualViewport), com a pesquisa sempre visível e só a
@@ -2356,14 +2385,15 @@ export function Select({ value, onChange, options, placeholder, className = '', 
           onClick={closeSheet}
         >
           <div
-            className={`bg-surface shadow-lift w-full sm:max-w-md animate-pop ${
+            className={`bg-white shadow-lift w-full sm:max-w-md animate-pop ${
               searchable ? 'flex flex-col rounded-card overflow-hidden' : 'rounded-t-card sm:rounded-card max-h-[70vh] overflow-y-auto'
             }`}
             style={searchable ? { maxHeight: viewportH ? `${Math.max(240, viewportH - 24)}px` : '70vh' } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
-              <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
+            {/* O título fica à vista quando a lista abre a meio (ano de nascimento). */}
+            <div className="sticky top-0 z-[1] flex shrink-0 items-center justify-between bg-white px-5 pt-5 pb-3">
+              <h3 className="text-lg text-ink-900">{title || resolvedPlaceholder}</h3>
               <button
                 onClick={closeSheet}
                 aria-label={t('ui.close')}
@@ -2387,16 +2417,17 @@ export function Select({ value, onChange, options, placeholder, className = '', 
                 </div>
               </div>
             )}
-            <div className={`px-2 pb-5 ${searchable ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : ''}`}>
+            <div ref={listRef} className={`px-2 pb-5 ${searchable ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : ''}`}>
               {visibleOptions.length === 0 ? (
                 <p className="px-3.5 py-3 text-sm text-muted">{t('ui.select_search_empty')}</p>
               ) : visibleOptions.map((o) => (
                 <button
                   key={o.value}
                   type="button"
+                  data-value={String(o.value)}
                   onClick={() => { onChange(o.value); closeSheet() }}
                   className={`w-full text-left px-3.5 py-3 rounded-ctrl text-base font-extrabold transition-colors duration-fast ${
-                    o.value === value ? 'bg-lime-400/20 text-ink-900' : 'text-ink-900 hover:bg-ink-50'
+                    highlight && o.value === value ? 'bg-lime-400/20 text-ink-900' : 'text-ink-900 hover:bg-ink-50'
                   }`}
                 >
                   {o.label}

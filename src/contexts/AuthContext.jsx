@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
@@ -119,12 +119,19 @@ export const AuthProvider = ({ children }) => {
   // silently rendering as if the account had no profile/memberships (see
   // the 2026-08-24 Supabase platform incident that prompted this).
   const [profileError, setProfileError] = useState(false)
+  // Superadmin e modo (Francisco, 18 out; base do Dev 3,
+  // migration_superadmin_modo.sql): get_my_platform_admin() →
+  // { is_platform_admin, mode_on }. null = a função ainda não existe ou
+  // falhou: fica tudo como antes, pela marca do perfil, e sem interruptor.
+  const [platformMode, setPlatformMode] = useState(null)
 
   useEffect(() => {
     // Restore dev admin bypass if it was activated previously.
     if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
       setUser(MOCK_ADMIN_USER)
       setProfile(MOCK_ADMIN_PROFILE)
+      setPlatformMode(MOCK_ADMIN_PROFILE.is_platform_admin
+        ? { is_platform_admin: true, mode_on: localStorage.getItem('mockPlatformMode') !== 'off' } : null)
       setMemberships(mockAdminMemberships())
       setCurrentOrganizationId(MOCK_ADMIN_ORG_ID)
       // localStorage.mockPrivateMatchesOff = 'true' — ver a app com o
@@ -159,6 +166,7 @@ export const AuthProvider = ({ children }) => {
         loadProfile(session.user.id)
       } else {
         setProfile(null)
+        setPlatformMode(null)
         setMemberships([])
         setCurrentOrganizationId(null)
         setLoading(false)
@@ -249,6 +257,8 @@ export const AuthProvider = ({ children }) => {
         // gateway rejection.
         if (fetchError) throw fetchError
         setProfile(profileData)
+        // O modo superadmin, em paralelo com o resto (não atrasa o perfil).
+        const platformPromise = supabase.rpc('get_my_platform_admin')
         i18n.changeLanguage(profileData.language || 'pt')
 
         // Carry a pre-auth language choice (Landing/Login's toggle, stashed
@@ -303,6 +313,10 @@ export const AuthProvider = ({ children }) => {
         }
 
         setMemberships(membershipData || [])
+        {
+          const { data: pa, error: paError } = await platformPromise
+          setPlatformMode(!paError && pa && typeof pa === 'object' ? pa : null)
+        }
 
         // Keep the previously-selected org if still a member of it, otherwise
         // default to the first membership. No switcher UI yet (not needed
@@ -422,6 +436,8 @@ export const AuthProvider = ({ children }) => {
     installDevMockNetwork()
     setUser(MOCK_ADMIN_USER)
     setProfile(MOCK_ADMIN_PROFILE)
+    setPlatformMode(MOCK_ADMIN_PROFILE.is_platform_admin
+      ? { is_platform_admin: true, mode_on: localStorage.getItem('mockPlatformMode') !== 'off' } : null)
     setMemberships(mockAdminMemberships())
     setCurrentOrganizationId(MOCK_ADMIN_ORG_ID)
     setLoading(false)
@@ -432,7 +448,7 @@ export const AuthProvider = ({ children }) => {
     if (localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
       localStorage.removeItem(MOCK_ADMIN_KEY)
       setUser(null)
-      setProfile(null)
+      setProfile(null); setPlatformMode(null)
       setMemberships([])
       setCurrentOrganizationId(null)
       i18n.changeLanguage('pt')
@@ -471,7 +487,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setUser(null)
-    setProfile(null)
+    setProfile(null); setPlatformMode(null)
     setMemberships([])
     setCurrentOrganizationId(null)
     i18n.changeLanguage('pt')
@@ -617,9 +633,32 @@ export const AuthProvider = ({ children }) => {
 
   const currentMembership = memberships.find((m) => m.organization_id === currentOrganizationId) ?? null
 
+  // O perfil que os ecrãs leem: com a função do modo, is_platform_admin só é
+  // true com o modo ligado, e is_platform_admin_account diz se a conta é
+  // superadmin (para o interruptor no Gerir). Os ~15 sítios que leem
+  // profile.is_platform_admin passam a respeitar o modo sem mudar nada.
+  const shownProfile = useMemo(() => (profile && platformMode
+    ? { ...profile, is_platform_admin: platformMode.mode_on === true, is_platform_admin_account: platformMode.is_platform_admin === true }
+    : profile), [profile, platformMode])
+
+  // O interruptor «Modo superadmin». Depois de mudar, volta a ler o perfil e
+  // as inscrições (em modo normal vê só os seus grupos).
+  const setPlatformAdminMode = async (on) => {
+    if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
+      try { localStorage.setItem('mockPlatformMode', on ? 'on' : 'off') } catch { /* modo privado */ }
+      setPlatformMode((m) => (m ? { ...m, mode_on: !!on } : m))
+      return { error: null }
+    }
+    const { data, error } = await supabase.rpc('set_platform_admin_mode', { p_on: !!on })
+    if (error) return { error }
+    if (data && typeof data === 'object') setPlatformMode(data)
+    if (user) await loadProfile(user.id)
+    return { error: null }
+  }
+
   const value = {
     user,
-    profile,
+    profile: shownProfile,
     memberships,
     currentOrganizationId,
     currentOrganization: currentMembership?.organization ?? null,
@@ -635,8 +674,8 @@ export const AuthProvider = ({ children }) => {
     // O que o interruptor diz, e o que a pessoa ve: a equipa Alinho ve as
     // aulas mesmo desligadas, para as poder testar (Francisco, 24 set).
     isLessonsFlagOn,
-    isLessonsEnabled: isLessonsFlagOn || profile?.is_platform_admin === true,
-    isMixWizardEnabled: isMixWizardFlagOn || profile?.is_platform_admin === true,
+    isLessonsEnabled: isLessonsFlagOn || shownProfile?.is_platform_admin === true,
+    isMixWizardEnabled: isMixWizardFlagOn || shownProfile?.is_platform_admin === true,
     refreshFeatureFlags: loadFeatureFlags,
     signUp,
     signIn,
@@ -654,6 +693,7 @@ export const AuthProvider = ({ children }) => {
     leaveOrganization,
     refreshMemberships,
     switchOrganization,
+    setPlatformAdminMode,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

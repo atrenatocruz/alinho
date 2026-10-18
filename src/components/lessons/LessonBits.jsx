@@ -4,6 +4,7 @@
 // vêm de src/lib/kindColors.js.
 import { ratingBand } from '../../lib/elo'
 import { KIND_COLORS } from '../../lib/kindColors'
+import { switchTrack, switchKnob } from '../ui'
 
 export const TEAL = { bg: KIND_COLORS.lesson.light, border: KIND_COLORS.lesson.line, text: KIND_COLORS.lesson.strong }
 
@@ -104,9 +105,9 @@ export function Toggle({ label, checked, onChange, disabled = false }) {
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full shrink-0 transition-colors duration-fast ${checked ? 'bg-ink-900' : 'bg-ink-200'}`}
+        className={switchTrack(checked)}
       >
-        <span className={`absolute top-1 w-4 h-4 rounded-full transition-all duration-fast ${checked ? 'right-1 bg-lime-400' : 'left-1 bg-white'}`} />
+        <span aria-hidden className={switchKnob(checked)} />
       </button>
     </label>
   )

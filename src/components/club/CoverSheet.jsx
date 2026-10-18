@@ -103,14 +103,16 @@ export default function CoverSheet({ org, onSave, onRemove, onClose }) {
           <p className="mt-3 text-sm text-muted">{t('cover.hint')}</p>
         )}
 
-        <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label={t('cover.options_aria')}>
+        {/* 18 capas (2.ª leva, 18 out): a grelha desliza dentro da folha, e a
+            capa grande e os botões ficam à vista. */}
+        <div className="-mx-1 mt-3 grid max-h-[38vh] grid-cols-3 gap-2 overflow-y-auto overscroll-contain px-1 py-1" role="group" aria-label={t('cover.options_aria')}>
           {COVER_PRESETS.map((p) => {
             const on = !file && coverOf(org, choice) === p.url
             return (
               <button key={p.key} type="button" onClick={() => pickPreset(p.url)} aria-pressed={on}
                 className={`relative h-16 overflow-hidden rounded-ctrl ring-offset-2 ${on ? 'ring-2 ring-ink-900' : ''}`}>
-                {/* O quadrado mostra a parte direita da capa, onde está o Alino (SPEC). */}
-                <div className="absolute inset-0"><KindHero kind="club" src={p.url} className="h-full w-full" imgClassName="object-[72%_40%]" /></div>
+                {/* Cada quadrado centra a capa onde ela diz (o Alino, ou o sítio). */}
+                <div className="absolute inset-0"><KindHero kind="club" src={p.url} className="h-full w-full" imgClassName={p.pos} /></div>
                 <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 pb-1 pt-3 text-left text-[11px] font-extrabold text-white">{t(p.labelKey)}</span>
                 {on && <Check size={14} className="absolute right-1.5 top-1.5 rounded-full bg-white p-0.5 text-ink-900" />}
               </button>

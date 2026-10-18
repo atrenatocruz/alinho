@@ -19,8 +19,17 @@ const BUCKET = 'club-logos'
 // imagens dos tipos de jogo e um grupo com «Dupla» confundia-se com os jogos
 // entre amigos. O Dev 3 troca as que já estavam escolhidas (SQL, depois disto
 // estar no main).
-export const COVER_PRESETS = ['bancada', 'esplanada', 'balneario', 'entrada', 'malta', 'vitrine', 'jantar', 'rececao', 'manha']
-  .map((key) => ({ key, url: `/capas/capa-${key}.webp`, labelKey: `cover.preset_${key}` }))
+// A 2.ª leva (Francisco, 18 out) entra depois das nove primeiras. Cada capa
+// diz onde o quadrado da folha a centra: com o Alino, à direita; as «só o
+// sítio» (pavilhão, terraço, raquetes, vista de cima) centram de outra forma.
+// As classes estão escritas por inteiro para o Tailwind as encontrar.
+const ALINO = 'object-[72%_40%]'
+export const COVER_PRESETS = [
+  ['bancada', ALINO], ['esplanada', ALINO], ['balneario', ALINO], ['entrada', ALINO], ['malta', ALINO],
+  ['vitrine', ALINO], ['jantar', ALINO], ['rececao', ALINO], ['manha', ALINO],
+  ['sol', ALINO], ['pavilhao', 'object-[50%_50%]'], ['praia', ALINO], ['terraco', 'object-[30%_50%]'], ['quinta', ALINO],
+  ['chuva', ALINO], ['raquetes', 'object-[35%_60%]'], ['festa', ALINO], ['aereo', 'object-[60%_50%]'],
+].map(([key, pos]) => ({ key, pos, url: `/capas/capa-${key}.webp`, labelKey: `cover.preset_${key}` }))
 
 /** A capa a mostrar: a escolhida, ou a do Alino do tipo. */
 export const coverOf = (org, cover = org?.cover_url) =>

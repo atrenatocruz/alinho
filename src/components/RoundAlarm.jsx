@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Chips } from './ui'
+import { Chips, switchTrack, switchKnob } from './ui'
 import {
   WARN_OPTIONS, loadAlarmPrefs, saveAlarmPrefs, unlockRoundAlarm,
   playRoundTrack, stopRoundTrack, playingRoundKey,
@@ -177,9 +177,9 @@ export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, d
           aria-checked={prefs.on}
           aria-label={t('roundalarm.title')}
           onClick={toggle}
-          className={`relative w-10 h-6 rounded-full shrink-0 transition-colors duration-fast ${prefs.on ? 'bg-ink-900' : 'bg-ink-200'}`}
+          className={switchTrack(prefs.on)}
         >
-          <span className={`absolute top-1 w-4 h-4 rounded-full transition-all duration-fast ${prefs.on ? 'right-1 bg-lime-400' : 'left-1 bg-white'}`} />
+          <span aria-hidden className={switchKnob(prefs.on)} />
         </button>
       </div>
       {!prefs.on && <p className="mt-1 text-xs text-muted">{t('roundalarm.off_hint')}</p>}
