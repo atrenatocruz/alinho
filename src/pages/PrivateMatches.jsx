@@ -18,6 +18,7 @@ import { describeError } from '../lib/errors'
 import FriendSessionsList from '../components/friends/FriendSessionsList'
 import FriendSessionCard, { FriendsMonthLine, FriendsEmpty } from '../components/friends/FriendSessionCard'
 import { ScoreEntrySimple, ScoreEntrySets } from '../components/friends/FriendScoreEntry'
+import { withMyRef } from '../lib/myRef'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
 // name-only guest — team_a_player1 is always the creator, always a real
@@ -48,7 +49,7 @@ function InviteLinks({ match }) {
 
   const copyLink = async (slotKey) => {
     const url = `${window.location.origin}/jogos-privados/${match.id}/entrar?slot=${slotKey}`
-    await navigator.clipboard.writeText(url)
+    await navigator.clipboard.writeText(withMyRef(url)) // ?ref= (19 out)
     setCopied(slotKey)
     setTimeout(() => setCopied(''), 1500)
   }

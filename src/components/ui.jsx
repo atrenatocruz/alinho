@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { withMyRef, refInText } from '../lib/myRef'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -1925,10 +1926,12 @@ export function LoadErrorState({ title, subtitle, onRetry }) {
 /* ─── ShareModal ─────────────────────────────────────────────────────────
    Share sheet used for mixes: editable caption + link, WhatsApp + native
    share (when the device supports it) + copy-link fallback. */
-export function ShareModal({ title, message, url, onClose, imageCard }) {
+export function ShareModal({ title, message, url: rawUrl, onClose, imageCard }) {
   const { t } = useTranslation()
+  // O ?ref= de quem partilha (origem da conta, 19 out).
+  const url = withMyRef(rawUrl)
   const resolvedTitle = title ?? t('ui.share_default_title')
-  const [caption, setCaption] = useState(message)
+  const [caption, setCaption] = useState(() => refInText(message))
   const [editingCaption, setEditingCaption] = useState(false)
   const [copied, setCopied] = useState(false)
   const shareCardRef = useRef(null)

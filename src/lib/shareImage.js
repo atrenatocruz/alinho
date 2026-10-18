@@ -1,3 +1,4 @@
+import { withMyRef, refInText } from './myRef'
 // A base para partilhar nas redes os jogos do torneio (pedido do Francisco,
 // antes do Smash Cup; o aspeto dos cartões é do designer). Três peças, sem
 // nada de fora da app:
@@ -67,7 +68,10 @@ export function shareFilename(...parts) {
 /** Partilhar só um link (partilhar-link, 12 out): a partilha do telemóvel
  *  com a frase (que já leva o link); sem ela, copia o link e devolve
  *  'copied' para quem chama mostrar «✓ Link copiado». */
-export async function shareLinkOrCopy({ title = '', text, url }) {
+export async function shareLinkOrCopy({ title = '', text: rawText, url: rawUrl }) {
+  // O ?ref= de quem partilha em todos os nossos links (origem da conta, 19 out).
+  const url = withMyRef(rawUrl)
+  const text = refInText(rawText)
   if (typeof navigator !== 'undefined' && navigator.share) {
     try { await navigator.share({ title, text }) } catch { /* fechou a folha */ }
     return 'shared'
@@ -85,7 +89,9 @@ export async function shareLinkOrCopy({ title = '', text, url }) {
   return 'copied'
 }
 
-export function sharePageLink({ title = '', text = '', url }) {
+export function sharePageLink({ title = '', text: rawText = '', url: rawUrl }) {
+  const url = withMyRef(rawUrl)
+  const text = refInText(rawText)
   if (typeof navigator !== 'undefined' && navigator.share) {
     navigator.share({ title, text: text || title, url }).catch(() => {})
     return

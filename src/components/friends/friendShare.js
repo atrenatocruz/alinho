@@ -1,10 +1,12 @@
+import { refInText } from '../../lib/myRef'
 import { whatsappShare } from '../../lib/partnerInvite'
 import { shortPersonName } from '../../lib/mixLogic'
 
 // «↗ Partilhar com quem falta» (amigos sem bloquear, 27 set): abre a folha de
 // partilha do telemóvel — escolhe-se um grupo ou uma pessoa (Francisco). Sem
 // ela (computador), abre o WhatsApp com o texto.
-export async function shareWithMissing(text) {
+export async function shareWithMissing(rawText) {
+  const text = refInText(rawText) // o ?ref= de quem partilha (19 out)
   if (typeof navigator !== 'undefined' && navigator.share) {
     try { await navigator.share({ text }); return } catch (err) {
       if (err?.name === 'AbortError') return

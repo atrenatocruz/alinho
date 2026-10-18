@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { pendingAccountOrigin, clearAccountOrigin } from '../lib/accountOrigin'
+import { loadMyRef } from '../lib/myRef'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
 
@@ -298,6 +299,7 @@ export const AuthProvider = ({ children }) => {
         // has usually landed by the time the function reads profiles.language.
         sendWelcomeEmail(profileData)
         deliverAccountOrigin()
+        loadMyRef()
         await loadFeatureFlags()
 
         let { data: membershipData, error: membershipError } = await supabase
