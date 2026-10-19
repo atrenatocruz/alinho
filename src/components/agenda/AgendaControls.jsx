@@ -98,7 +98,7 @@ export function Sheet({ title, onClose, children }) {
       onClick={onClose}
     >
       <div
-        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90%] overflow-y-auto p-5 animate-pop"
+        className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90%] overflow-y-auto p-5 animate-pop"
         onClick={(e) => e.stopPropagation()}
         onFocus={keepFocusedInView}
       >

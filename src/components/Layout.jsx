@@ -49,7 +49,7 @@ function CelebrationModal({ items, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={onClose}>
-      <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-extrabold text-ink-900 text-center mb-1">🎉 {t('layout.celebrations_title')}</h2>
         <p className="text-sm text-muted text-center mb-4">{t('layout.celebrations_subtitle')}</p>
 
@@ -987,7 +987,7 @@ export default function Layout({ children }) {
           definitivo — o lembrete da Home continua lá). */}
       {needsPhonePrompt && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={dismissPhonePrompt}>
-          <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative space-y-3" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative space-y-3" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={dismissPhonePrompt}
               aria-label={t('layout.close')}
