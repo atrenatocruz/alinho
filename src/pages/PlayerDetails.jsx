@@ -21,6 +21,7 @@ import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import { describeError } from '../lib/errors'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory } from '../components/profile/PlayedHistory'
+import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 
 const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
 const AchievementViewer = lazy(() => import('../components/achievements/AchievementViewer'))
@@ -544,7 +545,7 @@ export default function PlayerDetails() {
               <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
                 {player.clubs.map((c) => {
                   const group = c.kind === 'group'
-                  const fallback = group ? '/topo/topo-grupo-alino.webp' : '/topo/topo-clube-alino.webp'
+                  const fallback = group ? GROUP_HERO : CLUB_HERO
                   return (
                     <Link key={c.id} to={`/clube/${c.slug}`} className={`press w-[150px] shrink-0 overflow-hidden ${CARD}`}>
                       <img src={c.logo_url || c.avatar_url || (group ? '/topo/avatar-grupo.webp' : '/topo/avatar-clube.webp')} alt=""

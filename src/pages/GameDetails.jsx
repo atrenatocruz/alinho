@@ -5133,7 +5133,7 @@ export default function GameDetails() {
               onClick={() => setBirthdayPrompt(false)}
             >
               <div
-                className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-5 animate-pop space-y-4"
+                className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-5 animate-pop space-y-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between">

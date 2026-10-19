@@ -700,7 +700,7 @@ export default function Profile() {
                     onClick={() => setPhotoMenuOpen(false)}
                   >
                     <div
-                      className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-xs p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-pop"
+                      className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-xs p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-pop"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-between px-3 py-2.5">
