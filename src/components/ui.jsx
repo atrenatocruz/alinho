@@ -363,7 +363,7 @@ export function DateTimeField({ value, onChange, placeholder, min = null }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-5 animate-pop"
+            className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-5 animate-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -591,7 +591,7 @@ export function TimeField({ value, onChange, hint, min = null, from = '07:00', t
               role="dialog"
               aria-modal="true"
               aria-label={title}
-              className="flex max-h-[60vh] w-full flex-col overflow-hidden rounded-t-card bg-surface shadow-lift animate-pop"
+              className="flex max-h-[60vh] w-full flex-col overflow-hidden rounded-t-card bg-white shadow-lift animate-pop"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-5">
@@ -1605,7 +1605,7 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
       onClick={onClose}
     >
       <div
-        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-sm max-h-[75vh] flex flex-col animate-pop"
+        className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-sm max-h-[75vh] flex flex-col animate-pop"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
@@ -2037,7 +2037,7 @@ export function ShareModal({ title, message, url, onClose, imageCard }) {
       onClick={onClose}
     >
       <div
-        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto animate-pop"
+        className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto animate-pop"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
