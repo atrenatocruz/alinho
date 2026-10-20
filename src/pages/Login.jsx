@@ -14,6 +14,7 @@ import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 import EmailField from '../components/EmailField'
 import { emailProblem } from '../lib/emailCheck'
 import { supabase } from '../lib/supabase'
+import { App } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { IS_NATIVE } from '../lib/native'
 
@@ -227,12 +228,15 @@ export default function Login() {
     window.addEventListener('pageshow', onShow)
     return () => window.removeEventListener('pageshow', onShow)
   }, [])
-  // Na app das lojas, o Google abre no browser do telemóvel: fechá-lo sem
-  // entrar também volta o botão ao normal.
+  // Na app das lojas, o Google abre no browser do telemóvel: voltar à app sem
+  // entrar também volta o botão ao normal. O Android nem sempre avisa que o
+  // browser fechou (browserFinished), por isso conta também o regresso da
+  // app ao primeiro plano; se a pessoa entrou, a página muda na mesma.
   useEffect(() => {
     if (!IS_NATIVE) return undefined
-    const sub = Browser.addListener('browserFinished', () => setGoogleLoading(false))
-    return () => { sub.then((s) => s.remove()) }
+    const reset = () => setGoogleLoading(false)
+    const subs = [Browser.addListener('browserFinished', reset), App.addListener('resume', reset)]
+    return () => { subs.forEach((p) => p.then((s) => s.remove())) }
   }, [])
   const handleGoogleLogin = async () => {
     setGoogleLoading(true)
