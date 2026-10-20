@@ -175,6 +175,48 @@ const rowPartnerIsMine = (identity, myHash, row) =>
 const rowIsMine = (identity, myHash, row) =>
   rowOwnerIsMine(identity, myHash, row) || rowPartnerIsMine(identity, myHash, row)
 
+// O mesmo, para o parceiro pedido no «In com X»: o X com conta (pelo id, ou
+// pela linha-convidado de antes da conta, com o mesmo número) ou convidado
+// sem conta (pela linha de convidado deste jogo, ou pelo número).
+const samePhone = (partner, hash) => partner.phoneHash != null && hash === partner.phoneHash
+const partnerOwnsRow = (partner, row) => (partner.guestId
+  ? row.guest_id === partner.guestId
+  : isMine(partner, row.user_id) || samePhone(partner, row.guestPhoneHash))
+const partnerIsRowPartner = (partner, row) => (partner.guestId
+  ? row.partner_guest_id === partner.guestId
+  : isMine(partner, row.partner_id) || samePhone(partner, row.partnerGuestPhoneHash))
+
+/** Os convidados sem conta deste jogo com este nome (um por convidado). */
+function guestsNamed(rows, name) {
+  const query = stripAccents(name.toLowerCase()).replace(/\s+/g, ' ').trim()
+  const found = new Map()
+  for (const r of rows) {
+    if (r.guest_id && r.guestName) found.set(r.guest_id, { id: r.guest_id, name: r.guestName, phoneHash: r.guestPhoneHash })
+    if (r.partner_guest_id && r.partnerGuestName) found.set(r.partner_guest_id, { id: r.partner_guest_id, name: r.partnerGuestName, phoneHash: r.partnerGuestPhoneHash })
+  }
+  const all = [...found.values()]
+  const exact = all.filter((g) => stripAccents(g.name.toLowerCase()) === query)
+  return (exact.length === 1 ? exact : all.filter((g) => nameMatches(g.name, query)))
+    .map((g) => ({ guest: true, id: null, guestId: g.id, name: g.name, phoneHash: g.phoneHash ?? null }))
+}
+
+/** O X já está inscrito (confirmado)? Devolve a linha e se está sozinho nela. */
+function partnerRowOf(rows, partner) {
+  const row = rows.find((r) => r.status === 'confirmed' && (partnerOwnsRow(partner, r) || partnerIsRowPartner(partner, r)))
+  if (!row) return null
+  const owner = partnerOwnsRow(partner, row)
+  return { row, owner, solo: owner && !row.partner_id && !row.partner_guest_id }
+}
+
+/** O X está em alguma linha do jogo (também como suplente)? */
+const isPartnerListed = (rows, partner) => rows.some((r) => partnerOwnsRow(partner, r) || partnerIsRowPartner(partner, r))
+
+/** Com quem está o X na dupla dele (o nome, como na lista). */
+function otherInPair(people, { row, owner }) {
+  const otherId = owner ? (row.partner_id ?? row.partner_guest_id) : (row.user_id ?? row.guest_id)
+  return people.find((p) => p.id === otherId)?.name || '?'
+}
+
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
 // `fresh` (mensagens novas, 1 out): «01 · Mix M4 · Ter 22h30», sem a morada.
@@ -692,7 +734,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     return exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
   }
 
-  async function resolvePartner(profile, game = null, { addToRowId = null } = {}) {
+  async function resolvePartner(profile, game = null, { addToRowId = null, rows = [] } = {}) {
     if ((partnerRequest.mentionedPns || []).length > 1) {
       await reply('partner_one_mention')
       return null
@@ -700,13 +742,15 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     const pn = (partnerRequest.mentionedPns || [])[0]
     if (pn) {
       const found = await resolveProfileByPhoneJid(pn, organizationId)
+      // O número também, para reconhecer a linha-convidado de antes da conta.
+      const phoneHash = hashPhone(pn.split('@')[0])
       if (found?.notMember) {
         // #537: o parceiro tem conta (número confirmado) mas não é deste
         // clube — passa a membro, como quem escreve (requireProfileOrCreateGuest).
         await ensureMembership(found.id, organizationId)
-        return { partner: { ...found, notMember: false }, isNewGuest: false }
+        return { partner: { ...found, notMember: false, phoneHash }, isNewGuest: false }
       }
-      if (found) return { partner: found, isNewGuest: false }
+      if (found) return { partner: { ...found, phoneHash }, isNewGuest: false }
       // Número sem conta: o parceiro entra como convidado sem conta
       // (game_guests), com o número — o «Out» dele funciona e, se criar
       // conta e confirmar o número, a inscrição é adotada. O nome: o
@@ -728,6 +772,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     const matches = await membersNamed(profile, partnerRequest.name)
     if (matches.length === 1) return { partner: matches[0], isNewGuest: false }
     if (matches.length === 0) {
+      // Um convidado sem conta que já está neste mix (M4 A2N, 20 out): é ele,
+      // não se cria outro com o mesmo nome.
+      const inGame = guestsNamed(rows, partnerRequest.name).filter((g) => g.phoneHash == null || g.phoneHash !== myHash)
+      if (inGame.length === 1) return { partner: inGame[0], isNewGuest: false }
       // Pode ser alguém que não está na app nem no grupo (não dá para o
       // mencionar). Em vez de parar aqui, pergunta-se — «Sim» faz o mesmo
       // que o «Não está na app?» da app (partnerInvite.js). A pergunta
@@ -886,19 +934,37 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       await reply('mix_full_add_partner')
       return
     }
-    const resolved = await resolvePartner(profile, game, { addToRowId: row.id })
+    const resolved = await resolvePartner(profile, game, { addToRowId: row.id, rows: existingRows })
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
     if (isMine(profile, partner.id) || (partner.guest && partner.phoneHash === myHash)) {
       await reply('partner_is_you')
       return
     }
-    if (partner.guest) {
-      // Convidado (com número, via menção) já inscrito neste jogo?
-      if (existingRows.some((r) => r.guestPhoneHash === partner.phoneHash || r.partnerGuestPhoneHash === partner.phoneHash)) {
-        await reply('partner_already_in', { name: partner.name })
+    // O X também está inscrito sozinho — com conta ou como convidado: ficam
+    // logo em dupla, na inscrição do X (Francisco, 8 out — antes o X tinha de
+    // responder «Sim»). Com convidados respondia «já está inscrito» e ficavam
+    // os dois sem dupla (M4 A2N, 20 out). Já em dupla → diz com quem.
+    const partnerAt = partnerRowOf(existingRows, partner)
+    if (partnerAt?.solo) {
+      const fullError = await joinSoloRows(partnerAt.row, row, row.user_id ? { partner_id: row.user_id } : { partner_guest_id: row.guest_id })
+      timer.mark('gravar')
+      if (fullError) {
+        await reply('mix_full_add_partner')
         return
       }
+      repostHooks.requestRepostForGame(organizationId, game.id)
+      return
+    }
+    if (partnerAt) {
+      await reply('partner_in_pair_you_stay', { name: partner.name, other: otherInPair(people, partnerAt) })
+      return
+    }
+    if (isPartnerListed(existingRows, partner)) {
+      await reply('partner_already_in', { name: partner.name })
+      return
+    }
+    if (partner.guest) {
       const insertError = await attachGuestPartner(game.id, row.id, partner)
       timer.mark('gravar')
       if (insertError) {
@@ -910,23 +976,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       }
       repostHooks.requestRepostForGame(organizationId, game.id)
       await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
-      return
-    }
-    // O X também está inscrito sozinho: ficam logo em dupla, na inscrição do
-    // X (Francisco, 8 out — antes o X tinha de responder «Sim»).
-    const partnerSolo = existingRows.find((r) => r.status === 'confirmed' && r.user_id === partner.id && !r.partner_id && !r.partner_guest_id)
-    if (partnerSolo) {
-      const fullError = await joinSoloRows(partnerSolo, row, row.guest_id ? { partner_guest_id: row.guest_id } : { partner_id: profile.id })
-      timer.mark('gravar')
-      if (fullError) {
-        await reply('mix_full_add_partner')
-        return
-      }
-      repostHooks.requestRepostForGame(organizationId, game.id)
-      return
-    }
-    if (existingRows.some((r) => r.user_id === partner.id || r.partner_id === partner.id)) {
-      await reply('partner_already_in', { name: partner.name })
       return
     }
     const { error } = await supabase
@@ -1011,18 +1060,51 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       await reply('mix_full_pair')
       return
     }
-    const resolved = await resolvePartner(profile, game)
+    const resolved = await resolvePartner(profile, game, { rows: existingRows })
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
     if (isMine(profile, partner.id) || (partner.guest && partner.phoneHash === myHash)) {
       await reply('partner_is_you')
       return
     }
-    if (partner.guest) {
-      if (existingRows.some((r) => r.guestPhoneHash === partner.phoneHash || r.partnerGuestPhoneHash === partner.phoneHash)) {
-        await reply('partner_already_in', { name: partner.name })
-        return
+    // O parceiro já está inscrito (A2N, M4, 27 set: «in com Diogo» com o
+    // Diogo já dentro dava «já está inscrito» e o Bernardo ficava de fora).
+    // Sozinho → quem escreveu entra na inscrição dele e ficam em dupla, sem
+    // o Diogo perder o lugar; só precisa de 1 vaga. Já em dupla → diz com
+    // quem, e que pode entrar sozinho. Vale também quando o X é convidado
+    // sem conta (M4 A2N, 20 out).
+    const partnerAt = partnerRowOf(existingRows, partner)
+    if (partnerAt && !partnerAt.solo) {
+      await reply('partner_in_pair', { name: partner.name, other: otherInPair(people, partnerAt) })
+      return
+    }
+    if (partnerAt) {
+      // O X sozinho: quem escreveu entra logo na inscrição dele e ficam em
+      // dupla, sem o X ter de responder «Sim» (Francisco, 8 out). Só precisa
+      // de 1 vaga (a de cima já o garante); mix cheio → suplente com «In».
+      const me = await asPartnerFields(game.id, profile)
+      const { error } = await supabase
+        .from('participants')
+        .update({ ...me, joined_alone: false })
+        .eq('id', partnerAt.row.id)
+      timer.mark('gravar')
+      if (error) {
+        await cleanupMyGuest(me)
+        if (isGameFull(error)) {
+          await reply('mix_full_pair')
+          return
+        }
+        throw new Error(`Failed to join the partner's row: ${error.message}`)
       }
+      repostHooks.requestRepostForGame(organizationId, game.id)
+      if (isNewGuest) await reply('guest_pair_joined', { partner: partner.name, appUrl: config.appUrl })
+      return
+    }
+    if (isPartnerListed(existingRows, partner)) {
+      await reply('partner_already_in', { name: partner.name })
+      return
+    }
+    if (partner.guest) {
       if (left < 2) {
         await reply('mix_one_spot_pair')
         return
@@ -1042,46 +1124,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       }
       repostHooks.requestRepostForGame(organizationId, game.id)
       await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
-      return
-    }
-    // O parceiro já está inscrito (A2N, M4, 27 set: «in com Diogo» com o
-    // Diogo já dentro dava «já está inscrito» e o Bernardo ficava de fora).
-    // Sozinho → quem escreveu entra na inscrição dele e ficam em dupla, sem
-    // o Diogo perder o lugar; só precisa de 1 vaga. Já em dupla → diz com
-    // quem, e que pode entrar sozinho.
-    const partnerRow = existingRows.find((row) => row.status === 'confirmed' && (row.user_id === partner.id || row.partner_id === partner.id))
-    if (partnerRow) {
-      if (partnerRow.partner_id || partnerRow.partner_guest_id) {
-        const otherId = partnerRow.user_id === partner.id
-          ? (partnerRow.partner_id ?? partnerRow.partner_guest_id)
-          : (partnerRow.user_id ?? partnerRow.guest_id)
-        const other = people.find((p) => p.id === otherId)?.name || '?'
-        await reply('partner_in_pair', { name: partner.name, other })
-        return
-      }
-      // O X sozinho: quem escreveu entra logo na inscrição dele e ficam em
-      // dupla, sem o X ter de responder «Sim» (Francisco, 8 out). Só precisa
-      // de 1 vaga (a de cima já o garante); mix cheio → suplente com «In».
-      const me = await asPartnerFields(game.id, profile)
-      const { error } = await supabase
-        .from('participants')
-        .update({ ...me, joined_alone: false })
-        .eq('id', partnerRow.id)
-      timer.mark('gravar')
-      if (error) {
-        await cleanupMyGuest(me)
-        if (isGameFull(error)) {
-          await reply('mix_full_pair')
-          return
-        }
-        throw new Error(`Failed to join the partner's row: ${error.message}`)
-      }
-      repostHooks.requestRepostForGame(organizationId, game.id)
-      if (isNewGuest) await reply('guest_pair_joined', { partner: partner.name, appUrl: config.appUrl })
-      return
-    }
-    if (existingRows.some((row) => row.user_id === partner.id || row.partner_id === partner.id)) {
-      await reply('partner_already_in', { name: partner.name })
       return
     }
     if (left < 2) {

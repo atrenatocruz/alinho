@@ -649,3 +649,63 @@ test('«In com X»: conta-convidado antiga com o mesmo nome não torna o nome am
   assert.doesNotMatch(out, /mais do que uma pessoa/)
   assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'c']])
 })
+
+// M4 A2N, 20 out: o Tiago e o Rodrigo (convidado sem conta) já estavam os
+// dois inscritos sozinhos; «In @Rodrigo» respondia «já está inscrito» e
+// ficavam sem dupla. Agora junta-os, como entre duas contas (8 out).
+const rodrigoSolo = () => {
+  db.game_guests = [{ id: 'gr', game_id: 'm', name: 'Rodrigo Santos', phone_hash: hash('966666666'), whatsapp_jid: '351966666666@s.whatsapp.net' }]
+  db.participants.push(
+    { id: 'pa', game_id: 'm', user_id: 'a', status: 'confirmed', joined_alone: true, created_at: '2026-10-20T10:00:00Z' },
+    { id: 'pr', game_id: 'm', guest_id: 'gr', status: 'confirmed', joined_alone: true, created_at: '2026-10-20T10:05:00Z' },
+  )
+}
+
+test('os dois sozinhos, o X convidado: «In @X» junta-os em dupla', async () => {
+  rodrigoSolo()
+  const out = await say('In @351966666666', '351911111111', ['351966666666'])
+  assert.doesNotMatch(out, /já está inscrito/)
+  assert.deepEqual(db.participants.map((p) => [p.id, p.guest_id ?? null, p.partner_id ?? null, p.status]), [['pr', 'gr', 'a', 'confirmed']])
+  assert.equal(db.game_guests.length, 1, 'não se cria outro Rodrigo')
+})
+
+test('os dois sozinhos, o X convidado: «In com <nome>» sem @ também os junta', async () => {
+  rodrigoSolo()
+  const out = await say('in com rodrigo santos')
+  assert.doesNotMatch(out, /já está inscrito|Queres inscrever/)
+  assert.deepEqual(db.participants.map((p) => [p.id, p.partner_id ?? null]), [['pr', 'a']])
+  assert.equal(db.game_guests.length, 1)
+})
+
+test('quem escreve ainda não está e o X convidado está sozinho: entra com ele', async () => {
+  rodrigoSolo()
+  db.participants = db.participants.filter((p) => p.id !== 'pa')
+  await say('in com rodrigo santos')
+  assert.deepEqual(db.participants.map((p) => [p.id, p.guest_id, p.partner_id]), [['pr', 'gr', 'a']])
+})
+
+test('o X convidado já está noutra dupla: diz com quem e não mexe', async () => {
+  rodrigoSolo()
+  db.participants.find((p) => p.id === 'pr').partner_id = 'b'
+  db.participants = db.participants.filter((p) => p.id !== 'pa')
+  const out = await say('in com rodrigo santos')
+  assert.match(out, /Rodrigo Santos já está em dupla com Afonso Dias/)
+  assert.equal(db.participants.length, 1)
+})
+
+test('os dois sozinhos, o X com conta mas inscrito pela linha-convidado de antes: junta-os', async () => {
+  rodrigoSolo()
+  db.profiles.push({ id: 'r', name: 'Rodrigo Santos', phone_hash: hash('966666666'), phone_verified_at: '2026-10-19T10:00:00Z', language: 'pt' })
+  db.memberships.push({ user_id: 'r', organization_id: 'o' })
+  const out = await say('In @351966666666', '351911111111', ['351966666666'])
+  assert.doesNotMatch(out, /já está inscrito/)
+  assert.deepEqual(db.participants.map((p) => [p.id, p.partner_id ?? null]), [['pr', 'a']])
+})
+
+test('já inscrito sozinho e o X convidado noutra dupla: diz com quem, e continua inscrito', async () => {
+  rodrigoSolo()
+  db.participants.find((p) => p.id === 'pr').partner_id = 'b'
+  const out = await say('in com rodrigo santos')
+  assert.match(out, /Rodrigo Santos já está em dupla com Afonso Dias\. Continuas inscrito sozinho\./)
+  assert.deepEqual(db.participants.map((p) => [p.id, p.partner_id ?? null]), [['pa', null], ['pr', 'b']])
+})
