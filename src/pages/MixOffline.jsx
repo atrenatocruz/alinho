@@ -4,6 +4,7 @@ import { Trophy, RotateCcw, Share2, Download } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import { PrimaryButton, ShareModal, ConfirmSheet } from '../components/ui'
 import { formDuplas, seedCourts, nextSobeDesce, standings } from '../lib/mixLogic'
+import { appHref } from '../lib/native'
 
 const STORAGE_KEY = 'alinho-mix-offline-v1'
 
@@ -201,7 +202,7 @@ export default function MixOffline() {
   }
 
   const gameForShare = { title: gameTitle, location: null, num_courts: numCourts }
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const shareUrl = typeof window !== 'undefined' ? appHref() : ''
 
   const buildDuplasShareText = () => {
     const lines = [t('mixoffline.share_duplas_header', { title: gameTitle }), '']

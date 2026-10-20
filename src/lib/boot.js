@@ -26,4 +26,7 @@ export async function hideBoot() {
   boot.classList.add('boot-leave')
   await wait(450)
   boot.remove()
+  // A app das lojas troca aqui a cor das letras da barra das horas
+  // (nativeShell.js). No browser ninguém ouve.
+  window.dispatchEvent(new Event('alinho:boot-done'))
 }

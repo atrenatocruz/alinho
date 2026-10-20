@@ -14,6 +14,8 @@ import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 import EmailField from '../components/EmailField'
 import { emailProblem } from '../lib/emailCheck'
 import { supabase } from '../lib/supabase'
+import { Browser } from '@capacitor/browser'
+import { IS_NATIVE } from '../lib/native'
 
 /* Entrar no alinho.pt (design-handoff/2026-10-13-login, aprovado pelo
    Francisco a 13 out; publicado a pedido dele a 18 out). Primeiro diz-se o
@@ -224,6 +226,13 @@ export default function Login() {
     const onShow = (e) => { if (e.persisted) setGoogleLoading(false) }
     window.addEventListener('pageshow', onShow)
     return () => window.removeEventListener('pageshow', onShow)
+  }, [])
+  // Na app das lojas, o Google abre no browser do telemóvel: fechá-lo sem
+  // entrar também volta o botão ao normal.
+  useEffect(() => {
+    if (!IS_NATIVE) return undefined
+    const sub = Browser.addListener('browserFinished', () => setGoogleLoading(false))
+    return () => { sub.then((s) => s.remove()) }
   }, [])
   const handleGoogleLogin = async () => {
     setGoogleLoading(true)

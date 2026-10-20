@@ -15,6 +15,7 @@ import FaceCircles from '../event/FaceCircles'
 import { ratingBand, peopleRatingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 import { KIND_COLORS } from '../../lib/kindColors'
+import { appOrigin } from '../../lib/native'
 
 /* ════════════════════════════════════════════════════════════════════════
    Cartão da agenda da Home (Homepage unificada, Fase 1, Trello #258).
@@ -335,7 +336,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
     ) : null
   } else if (iOpened) {
     // Quem abriu partilha para encher (contorno); sair faz-se no jogo.
-    button = <CardButton variant="out" onClick={() => sharePageLink({ title: game.title, text: t('home.open_share_text', { time, club: event.orgName || '' }), url: `${window.location.origin}/jogo/${game.id}` })}>{t('home.open_share')}</CardButton>
+    button = <CardButton variant="out" onClick={() => sharePageLink({ title: game.title, text: t('home.open_share_text', { time, club: event.orgName || '' }), url: `${appOrigin()}/jogo/${game.id}` })}>{t('home.open_share')}</CardButton>
   } else if (action && (action.kind === 'join' || action.kind === 'waitlist')) {
     button = <CardButton variant={action.kind === 'join' ? 'lime' : 'out'} disabled={action.busy} onClick={() => action.onAction()}>{t(ACTION_LABEL_KEY[action.kind])}</CardButton>
   } else if (event.myState === 'in' || event.myState === 'waitlist') {

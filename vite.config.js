@@ -21,14 +21,29 @@ const testEnvHtml = (isTest) => ({
     .replace('</head>', '  <meta name="apple-mobile-web-app-title" content="alinho TESTE" />\n  </head>')),
 })
 
+// As apps das lojas (Capacitor: `npm run build:native` → --mode native, BD de
+// desenvolvimento do .env; `build:native:prod` → --mode native-prod, BD de
+// produção do .env.native-prod.local): os
+// ficheiros já vão dentro da app, por isso não há service worker nem
+// manifesto; e a página ocupa o ecrã todo, por baixo da barra das horas
+// (viewport-fit=cover), para o env(safe-area-inset-*) dar as medidas certas.
+// O site (alinho.pt) não muda.
+const nativeHtml = (isNative) => ({
+  name: 'alinho-native-html',
+  transformIndexHtml: (html) => (!isNative ? html : html
+    .replace('content="width=device-width, initial-scale=1.0"', 'content="width=device-width, initial-scale=1.0, viewport-fit=cover"')),
+})
+
 export default defineConfig(({ mode }) => {
   const isTest = loadEnv(mode, process.cwd(), 'VITE_').VITE_APP_ENV === 'test'
+  const isNative = mode === 'native' || mode === 'native-prod'
   const icon = (file) => (isTest ? file.replace(/\.(png|ico)$/, '-teste.$1') : file)
   return {
   plugins: [
     react(),
     testEnvHtml(isTest),
-    VitePWA({
+    nativeHtml(isNative),
+    !isNative && VitePWA({
       // Quem decide quando a versão nova entra é src/lib/appUpdate.js: fica à
       // espera até a pessoa tocar em «Atualizar», ou até voltar à app depois
       // de algum tempo fora (#569, revisto a 29 set).

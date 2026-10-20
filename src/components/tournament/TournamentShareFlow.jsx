@@ -12,6 +12,7 @@ import TournamentShareCard, { T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, bakeIma
 import { qrDataUrl, readLocalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
 import { tournamentUrl } from '../../lib/tournamentPublic'
 import { useAuth } from '../../contexts/AuthContext'
+import { appOrigin } from '../../lib/native'
 
 const PREVIEW_SCALE = 0.62
 
@@ -53,7 +54,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   // O QR: a página do torneio (ou a que vier em qrUrl), com a referência de
   // quem partilhou.
   useEffect(() => {
-    const base = qrUrl || tournamentUrl(tournament, window.location.origin)
+    const base = qrUrl || tournamentUrl(tournament, appOrigin())
     const url = `${base}${profile?.id ? `${base.includes('?') ? '&' : '?'}ref=${profile.id}` : ''}`
     qrDataUrl(url, { size: 240 }).then(setQr).catch((err) => console.error('Error making the QR:', err))
   }, [tournament, qrUrl, profile?.id])

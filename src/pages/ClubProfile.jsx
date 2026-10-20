@@ -25,6 +25,7 @@ import { describeError, errorKind } from '../lib/errors'
 import { listClubTeachers } from '../lib/lessonsApi'
 import { ClubHeader, ClubEvents, ClubPeople, ClubAbout, buildClubEvents, BLOCK, BLOCK_TITLE, ROW } from '../components/club/ClubSections'
 import LiveStrip from '../components/live/LiveStrip'
+import { appHost, appOrigin } from '../lib/native'
 
 export default function ClubProfile() {
   const { t } = useTranslation()
@@ -234,8 +235,8 @@ export default function ClubProfile() {
   // ⤴ «Partilhar o link», para toda a gente (partilhar-link, 12 out): a
   // frase com o link, ou copiá-lo com «✓ Link copiado» durante 2 s.
   const shareClub = async () => {
-    const url = `${window.location.origin}/clube/${club.slug || slug}`
-    const text = t('clubprofile.share_text', { name: club.name, link: `${window.location.host}/clube/${club.slug || slug}` })
+    const url = `${appOrigin()}/clube/${club.slug || slug}`
+    const text = t('clubprofile.share_text', { name: club.name, link: `${appHost()}/clube/${club.slug || slug}` })
     if (await shareLinkOrCopy({ title: club.name, text, url }) === 'copied') {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { supabase } from '../lib/supabase'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
+import { Browser } from '@capacitor/browser'
+import { IS_NATIVE, NATIVE_AUTH_CALLBACK, appHref, appOrigin } from '../lib/native'
 
 const AuthContext = createContext({})
 
@@ -369,7 +371,9 @@ export const AuthProvider = ({ children }) => {
       password,
       options: {
         data: userData,
-        emailRedirectTo: window.location.href,
+        // Na app das lojas, o link do email abre no alinho.pt (appHref): o
+        // email pode ser aberto noutro aparelho, onde a app não está.
+        emailRedirectTo: appHref(),
         ...(captchaToken ? { captchaToken } : {}),
       }
     })
@@ -391,7 +395,7 @@ export const AuthProvider = ({ children }) => {
   // email silently fails to sign the visitor in on the other end.
   const resetPassword = async (email, captchaToken) => {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-password`,
+      redirectTo: `${appOrigin()}/redefinir-password`,
       ...(captchaToken ? { captchaToken } : {}),
     })
     return { data, error }
@@ -405,6 +409,21 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signInWithGoogle = async () => {
+    // Na app das lojas: o Google não deixa entrar dentro da app, por isso
+    // abre-se no browser do telemóvel, e a volta vem por NATIVE_AUTH_CALLBACK
+    // (nativeShell.js), com a página de onde se saiu no ?next=.
+    if (IS_NATIVE) {
+      const next = `${window.location.pathname}${window.location.search}`
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${NATIVE_AUTH_CALLBACK}?next=${encodeURIComponent(next)}`,
+          skipBrowserRedirect: true,
+        },
+      })
+      if (!error && data?.url) await Browser.open({ url: data.url })
+      return { data, error }
+    }
     // Preserve the current URL (including ?org=<slug>, if present) through
     // the OAuth round-trip — signInWithOAuth can't carry custom fields
     // through raw_user_meta_data the way email signUp can, so the org slug

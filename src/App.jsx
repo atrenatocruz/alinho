@@ -37,6 +37,7 @@ import { resolveShortGameLink } from './lib/shortGameLink'
 import ErrorBoundary from './components/ErrorBoundary'
 import { afterLoginPath, savePendingOrgSlug } from './lib/loginLinks'
 import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
+import { IS_NATIVE } from './lib/native'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
@@ -282,8 +283,11 @@ const Guard = ({ require, showSplash, children }) => {
 
   // "/" is the one public route: signed-out visitors see the Landing page
   // (no nav shell), signed-in ones see Home inside Layout.
+  // Na app das lojas a landing (que é para quem chega pelo site) não
+  // aparece: sem sessão, vai-se direto para o login.
   if (require === 'home') {
-    return user ? <Layout>{children}</Layout> : <Landing />
+    if (user) return <Layout>{children}</Layout>
+    return IS_NATIVE ? <Navigate to="/login" replace /> : <Landing />
   }
 
   // Abre com ou sem conta: com sessão vai dentro da app, sem sessão fica na

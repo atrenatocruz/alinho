@@ -12,6 +12,7 @@ import { getLeaguePage, applyToLeague, leagueErrorMessage } from '../lib/leagueA
 import { categoryRows, encounterState, isMine, canClubApply, formatWindow } from '../lib/leagueView'
 import { categoryCode } from '../lib/tournaments'
 import { toDayKey } from '../lib/agenda'
+import { appHref } from '../lib/native'
 
 export default function LeaguePage() {
   const { slug } = useParams()
@@ -76,7 +77,7 @@ export default function LeaguePage() {
         timeAside={currentRound ? t('league.round_of', { total: catRounds.length }) : null}
         dateLine={[t(`league.status_${league.status}`), cat?.home_away ? t('league.home_away') : null].filter(Boolean).join(' · ')}
         onBack={() => navigate(-1)}
-        onShare={() => navigator.share?.({ title: league.name, url: window.location.href })}
+        onShare={() => navigator.share?.({ title: league.name, url: appHref() })}
         status={myRow ? { tone: 'kind', text: t('league.your_position', { pos: myRow.position, code: categoryCode(cat.gender, cat.level) }),
                           meta: t('league.clubs_count', { count: rows.length }) } : null}
         manage={viewer.can_manage ? (

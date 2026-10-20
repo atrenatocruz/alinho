@@ -4,6 +4,7 @@ import TournamentShareFlow from '../tournament/TournamentShareFlow'
 import { bakeCircle } from '../tournament/TournamentShareCard'
 import { shortName, monthName } from '../../lib/monthRanking'
 import { Crown } from './RankPodium'
+import { appOrigin } from '../../lib/native'
 
 /* A imagem do pódio para partilhar (design-handoff/2026-10-12-ranking-do-
    mes-podio, ponto 7 e acerto de 12 out): o fluxo de sempre (foto opcional,
@@ -88,7 +89,7 @@ export default function MonthPodiumShare({ share, org, onClose }) {
   // «Inês C.» já acaba em ponto: nada de «Inês C..».
   const text = `${t(`monthshare.text_${kind}${org ? '' : '_global'}`, { month: name, club: scopeName, names: list }).replace('..', '.')} ${t('friends.share_tags')}`
   const cardOrg = { name: scopeName, initials: org ? initials(org.name) : null, mark: !org, sub: t(`monthshare.org_sub_${kind}`) }
-  const qrUrl = org?.slug ? `${window.location.origin}/clube/${org.slug}` : 'https://alinho.pt'
+  const qrUrl = org?.slug ? `${appOrigin()}/clube/${org.slug}` : 'https://alinho.pt'
 
   return (
     <TournamentShareFlow variant="custom" data={{ date }} text={text} filenameParts={['podio', kind, month.slice(0, 7)]}

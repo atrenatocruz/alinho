@@ -1,5 +1,6 @@
 import { whatsappShare } from '../../lib/partnerInvite'
 import { shortPersonName } from '../../lib/mixLogic'
+import { appOrigin } from '../../lib/native'
 
 // «↗ Partilhar com quem falta» (amigos sem bloquear, 27 set): abre a folha de
 // partilha do telemóvel — escolhe-se um grupo ou uma pessoa (Francisco). Sem
@@ -13,7 +14,7 @@ export async function shareWithMissing(text) {
   window.open(whatsappShare(text), '_blank', 'noopener')
 }
 
-export const sessionLink = (matchId) => `${window.location.origin}/jogos-privados/sessao/${matchId}`
+export const sessionLink = (matchId) => `${appOrigin()}/jogos-privados/sessao/${matchId}`
 
 /** «Rita Figueira» → «Rita F.»; «Teste 1» → «Teste 1». É a peça comum
  *  (shortPersonName, mixLogic.js): o número do fim fica, senão duas contas

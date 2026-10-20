@@ -65,6 +65,7 @@ import { Realce } from '../components/SearchField'
 import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
 import { semAcentos } from '../lib/semAcentos'
 import { cancelMixDate } from '../lib/mixCancel'
+import { appOrigin } from '../lib/native'
 
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
@@ -1211,7 +1212,7 @@ export default function GerirClube() {
   }
 
   const handleCopyInviteLink = async () => {
-    const link = `${window.location.origin}/login?org=${org.slug}`
+    const link = `${appOrigin()}/login?org=${org.slug}`
     try {
       await navigator.clipboard.writeText(link)
       setLinkCopied(true)

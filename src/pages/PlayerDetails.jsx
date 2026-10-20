@@ -22,6 +22,7 @@ import { describeError } from '../lib/errors'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory } from '../components/profile/PlayedHistory'
 import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
+import { appHref } from '../lib/native'
 
 const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
 const AchievementViewer = lazy(() => import('../components/achievements/AchievementViewer'))
@@ -307,7 +308,7 @@ export default function PlayerDetails() {
   return (
     <div className="space-y-4">
       <BackBar onBack={goBack} label={t('playerdetails.back')} title={player.name}
-        onShare={() => sharePageLink({ title: player.name, url: window.location.href })} />
+        onShare={() => sharePageLink({ title: player.name, url: appHref() })} />
 
       {/* O mesmo cartão branco do teu Perfil (R7): foto com moldura, aro ou
           escudo, nome, nível e pontos, seguidores e os três números. */}

@@ -45,6 +45,7 @@ import EventHero from '../components/event/EventHero'
 import EventFacts from '../components/event/EventFacts'
 import { daysAside, longDate, shortDay } from '../components/event/heroDates'
 import PublicInfo from '../components/tournament/PublicInfo'
+import { appOrigin } from '../lib/native'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -210,8 +211,8 @@ export default function TournamentPage() {
   const shareTournament = () => {
     const tour = data?.tournament
     if (!tour) return
-    const text = shareMessage(tour, window.location.origin)
-    if (navigator.share) { navigator.share({ title: tour.name, text, url: tournamentUrl(tour, window.location.origin) }).catch(() => {}); return }
+    const text = shareMessage(tour, appOrigin())
+    if (navigator.share) { navigator.share({ title: tour.name, text, url: tournamentUrl(tour, appOrigin()) }).catch(() => {}); return }
     window.open(whatsappShare(text), '_blank')
   }
   const showSkeleton = useSkeleton(!data && !failed)

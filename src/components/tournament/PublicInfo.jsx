@@ -9,6 +9,7 @@ import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } fr
 import { pricePerPlayer } from '../../lib/tournaments'
 import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
 import { CategoryPriceText } from './CategorySpecialPrice'
+import { appOrigin } from '../../lib/native'
 
 /** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
  *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
@@ -29,9 +30,9 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
 
-  const url = tournamentUrl(tournament, typeof window === 'undefined' ? '' : window.location.origin)
+  const url = tournamentUrl(tournament, typeof window === 'undefined' ? '' : appOrigin())
   const share = () => {
-    const text = shareMessage(tournament, window.location.origin)
+    const text = shareMessage(tournament, appOrigin())
     if (navigator.share) { navigator.share({ title: tournament.name, text, url }).catch(() => {}) ; return }
     window.open(whatsappShare(text), '_blank')
   }

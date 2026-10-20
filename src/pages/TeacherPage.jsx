@@ -27,6 +27,7 @@ import { Avatar, ConfirmSheet, EmptyState, PrimaryButton } from '../components/u
 import {
   LevelPill, MonoLabel, TealTag, TEAL, bandLabel, levelRange, hhmm, isoWeekday, sameDay, euros, lessonTypeLabel,
 } from '../components/lessons/LessonBits'
+import { appHref } from '../lib/native'
 
 const pad = (n) => String(n).padStart(2, '0')
 const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -195,7 +196,7 @@ export default function TeacherPage({ view = 'profile' }) {
   return (
     <div className="space-y-5">
       <BackBar onBack={isMe ? () => navigate('/perfil') : goBack} label={isMe ? t('teacher.schedule_back') : t('common.back')} title={teacher.name}
-        onShare={() => sharePageLink({ title: teacher.name, url: window.location.href })} />
+        onShare={() => sharePageLink({ title: teacher.name, url: appHref() })} />
 
       {isMe && (
         <div className="rounded-[14px] border border-line bg-white p-3 text-sm text-ink-500 leading-snug">
