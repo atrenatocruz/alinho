@@ -12,6 +12,15 @@ export async function adminPairSolos(gameId, userId, partnerId) {
   return data
 }
 
+/** Juntar por inscrição (Francisco, 19 out — o professor do A2N): cada linha
+ *  é um participants.id sozinho, com conta ou convidado sem conta. Função do
+ *  Dev 3: admin_pair_solo_rows (a linha A fica com a dupla, a B sai). */
+export async function adminPairSoloRows(gameId, rowA, rowB) {
+  const { data, error } = await supabase.rpc('admin_pair_solo_rows', { p_game_id: gameId, p_participant_a: rowA, p_participant_b: rowB })
+  if (error) throw error
+  return data
+}
+
 export async function adminSplitPair(gameId, userId) {
   const { error } = await supabase.rpc('admin_split_pair', { p_game_id: gameId, p_user_id: userId })
   if (error) throw error
