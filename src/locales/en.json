@@ -6417,5 +6417,19 @@
   "login2.forgot_lead": "It happens. We will send you a link to choose another one.",
   "login2.forgot_sent": "<0>Sent.</0> Check your email and tap the link. If you don't see it, look in spam.",
   "login2.name_placeholder": "Your first and last name",
-  "login2.or_email": "or with email"
+  "login2.or_email": "or with email",
+  "deletepage.title": "Delete your account",
+  "deletepage.lead": "You can delete your alinho account whenever you want, in the app or here on the website.",
+  "deletepage.how_title": "How to delete it",
+  "deletepage.step_1": "Sign in to alinho, in the app or at alinho.pt.",
+  "deletepage.step_2": "Go to Profile and scroll to the bottom.",
+  "deletepage.step_3": "Tap «Delete my account» and confirm with your name.",
+  "deletepage.go_login": "Sign in to delete your account",
+  "deletepage.signed_in": "You are signed in as {{name}}. You can delete your account right here:",
+  "deletepage.what_title": "What happens",
+  "deletepage.grace": "Your account disappears from the app right away. You have {{days}} days to change your mind: just sign in again. After that, it is deleted for good.",
+  "deletepage.no_access_title": "Can’t sign in?",
+  "deletepage.no_access_body": "Write to us from your account’s email address, or on WhatsApp from the number you use on alinho, asking us to delete your account. We’ll reply once it’s done.",
+  "deletepage.email_subject": "Delete my account",
+  "deletepage.whatsapp_text": "Hi! I want to delete my alinho account."
 }

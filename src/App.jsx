@@ -95,6 +95,7 @@ const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
 const Novidades = lazyPage(() => import('./pages/Novidades'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
+const DeleteAccountPage = lazyPage(() => import('./pages/DeleteAccountPage'))
 const MixOffline = lazyPage(() => import('./pages/MixOffline'))
 const EscolherNivel = lazyPage(() => import('./pages/EscolherNivel'))
 const DefinirGenero = lazyPage(() => import('./pages/DefinirGenero'))
@@ -430,6 +431,8 @@ function AppRoutes() {
         <Route path="/instrucoes" element={<Instructions />} />
         <Route path="/privacidade" element={<PrivacyPolicy />} />
         <Route path="/termos" element={<TermsOfService />} />
+        {/* Pedido público para apagar a conta (Google Play, «Segurança dos dados»). */}
+        <Route path="/apagar-conta" element={<DeleteAccountPage />} />
         {/* Página pública dos planos (Trello #327). */}
         <Route path="/planos" element={<Plans />} />
         {/* Páginas do site (#619): «Como funciona» e «Novidades». */}
