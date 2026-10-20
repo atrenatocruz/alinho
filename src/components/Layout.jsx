@@ -890,13 +890,12 @@ export default function Layout({ children }) {
           não ocupa espaço e nada muda. */}
       <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
         {/* O espaço reservado no fim tem de crescer com a barra (Trello #407).
-            A nav acrescenta env(safe-area-inset-bottom) ao seu próprio fundo —
-            no iPhone com barra de gestos são ~34px — e o pb-28 fixo (7rem)
-            não crescia com ela, por isso o último item da lista ficava por
-            baixo. Aqui a mesma conta, com a mesma unidade. */}
+            A nav fica a var(--nav-bottom) do fundo (index.css: mais no
+            iPhone sem botão) e o pb-28 fixo (7rem) não crescia com ela, por
+            isso o último item da lista ficava por baixo. Aqui a mesma conta. */}
         <div
           className="max-w-2xl mx-auto px-4 pt-6 animate-fade-up"
-          style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}
+          style={{ paddingBottom: 'calc(6rem + var(--nav-bottom))' }}
         >
           <HeaderActionsProvider value={headerActions}>
             {children}
@@ -913,7 +912,7 @@ export default function Layout({ children }) {
           — o StepPage marca o body com data-steps enquanto está aberto. */}
       <nav
         className="app-nav absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
-        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'var(--nav-bottom)' }}
       >
         {/* A ilha ocupa a largura do ecrã (até ~480 px num ecrã largo)
             (Francisco, 13 out — design-handoff/2026-10-13-menu-largura-toda).

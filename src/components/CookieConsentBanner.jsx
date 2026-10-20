@@ -41,7 +41,7 @@ export default function CookieConsentBanner() {
   }
 
   return (
-    <div className="fixed inset-x-0 z-50 bg-ink-900 px-5 py-4 shadow-lift bottom-[calc(5.5rem+env(safe-area-inset-bottom))]">
+    <div className="fixed inset-x-0 z-50 bg-ink-900 px-5 py-4 shadow-lift bottom-[calc(4.5rem+var(--nav-bottom))]">
       <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-3">
         <p className="flex-1 text-sm text-ink-200">
           {t('cookieconsent.message')}{' '}
