@@ -8,6 +8,7 @@ import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmSheet, EmptyState, PrimaryButton, TOP_EDGE } from '../components/ui'
+import { SAFE_TOP } from '../components/GlassBar'
 import HomeSkeleton from '../components/home/HomeSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
@@ -1069,8 +1070,10 @@ export default function Home() {
           data nem calendário na vista de mapa — não há "dia no topo" lá. */}
       {/* Home do futuro (SPEC-1): a linha do sítio, do mapa e do sino; por
           baixo, uma barra só. O dia é a pastilha «Hoje ⌄» da barra. */}
-      <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)` }}
-        className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 ${TOP_EDGE} ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
+      {/* pt: 16 px + a margem do telemóvel (horas e bateria) — na app de
+          iPhone a página vai por baixo dela (viewport-fit=cover). */}
+      <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)`, paddingTop: `calc(1rem + ${SAFE_TOP})` }}
+        className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pb-2 bg-white space-y-1.5 ${TOP_EDGE} ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
         {/* R2 (13 out): em cima o dia da semana, a data em grande (abre o
             calendário) e o sítio; ao descer sai tudo e fica só a barra. */}
         <div ref={topRowRef} className={`flex items-start justify-between gap-2 ${moved ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>

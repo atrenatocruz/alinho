@@ -1847,7 +1847,8 @@ export const switchKnob = (on) => `absolute left-[3px] top-[3px] h-5 w-5 rounded
 export const TOP_EDGE = 'rounded-b-[16px] shadow-[0_1px_2px_rgba(17,17,17,0.06)]'
 export function PageHeader({ title, children, sticky = true }) {
   return (
-    <div className={`${sticky ? 'sticky top-0 z-10' : ''} -mx-4 px-4 -mt-6 pt-4 pb-3 bg-white ${TOP_EDGE} flex items-center justify-between gap-2`}>
+    // pt: 16 px + a margem do telemóvel (na app de iPhone a página vai por baixo das horas).
+    <div className={`${sticky ? 'sticky top-0 z-10' : ''} -mx-4 px-4 -mt-6 pb-3 bg-white ${TOP_EDGE} flex items-center justify-between gap-2`} style={{ paddingTop: `calc(1rem + ${SAFE_TOP})` }}>
       <h2 className="text-3xl text-ink-900 min-w-0 truncate">{title}</h2>
       {children && <div className="flex items-center gap-1 shrink-0">{children}</div>}
     </div>
