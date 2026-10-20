@@ -61,6 +61,7 @@ import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
 import { adminPairSoloRows, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
 import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKeys'
+import { appHref, appOrigin } from '../lib/native'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
@@ -2605,7 +2606,7 @@ export default function GameDetails() {
     )
   }
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const shareUrl = typeof window !== 'undefined' ? appHref() : ''
   const buildShareMessage = () => {
     // Mix terminado sem vencedores calculados (o americano, ou sem dupla
     // vencedora): a imagem diz «RESULTADOS DO MIX», por isso o texto também,
@@ -3463,7 +3464,7 @@ export default function GameDetails() {
           text={shownWinnersShare.text}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
-          qrUrl={orgSlug ? `${window.location.origin}/clube/${orgSlug}` : window.location.origin}
+          qrUrl={orgSlug ? `${appOrigin()}/clube/${orgSlug}` : appOrigin()}
           org={winnersOrg}
           fallbackImage={game.image_url || null}
           onClose={() => setWinnersShareOpen(false)}
@@ -5304,13 +5305,13 @@ export default function GameDetails() {
                     : t('partner.invite_ready_no_email')}
                 </p>
                 <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">
-                  {inviteLink(freshInvite.token, window.location.origin)}
+                  {inviteLink(freshInvite.token, appOrigin())}
                 </div>
                 <PrimaryButton
                   onClick={() => window.open(whatsappShare(t('partner.invite_whatsapp_text', {
                     name: freshInvite.name,
                     title: game.title,
-                    link: inviteLink(freshInvite.token, window.location.origin),
+                    link: inviteLink(freshInvite.token, appOrigin()),
                   })), '_blank')}
                   className="w-full"
                 >
@@ -5318,7 +5319,7 @@ export default function GameDetails() {
                 </PrimaryButton>
                 <PrimaryButton
                   variant="ghost"
-                  onClick={() => navigator.clipboard?.writeText(inviteLink(freshInvite.token, window.location.origin))}
+                  onClick={() => navigator.clipboard?.writeText(inviteLink(freshInvite.token, appOrigin()))}
                   className="w-full !bg-white !border-ink-900"
                 >
                   <Copy size={18} /> {t('partner.invite_copy_link')}
