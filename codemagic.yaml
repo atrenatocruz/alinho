@@ -52,4 +52,7 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        # Só envia: os testers internos (equipa) instalam logo. Pôr a true
+        # quando houver testers externos — pede a revisão beta da Apple, que
+        # exige as «Test Information» preenchidas e uma conta de demonstração.
+        submit_to_testflight: false
