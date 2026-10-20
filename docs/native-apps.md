@@ -125,9 +125,20 @@ Configuração única (feita nos painéis, não no código):
    - *Team settings → Integrations → Developer Portal*: a chave do passo 3, com o
      nome **`alinho_asc`** (Issuer ID, Key ID, `.p8`).
    - *Code signing identities → iOS certificates → Generate certificate* (Apple Distribution).
+   - O Codemagic **não cria o perfil** («No matching profiles found for bundle
+     identifier»): em Apple Developer → Profiles → + → *App Store Connect*, App ID
+     `pt.alinho.app`, o certificado acima, nome `alinho appstore`. Depois, no
+     Codemagic, *Code signing identities → iOS provisioning profiles → Fetch
+     profiles* → `alinho appstore` → *Download selected* (referência `alinho_appstore`).
+     O perfil caduca ao fim de um ano, ou se o certificado for revogado: repetir.
    - *Environment variables*: grupo **`alinho_prod`** com `VITE_SUPABASE_URL`,
      `VITE_SUPABASE_ANON_KEY`, `VITE_TURNSTILE_SITE_KEY` (os do
-     `.env.native-prod.local`) e `APP_STORE_APPLE_ID`.
+     `.env.native-prod.local`) e `APP_STORE_APPLE_ID`, todos *Secret*.
+   - Na app do Codemagic, separador *codemagic.yaml*: escolher o branch onde o
+     ficheiro está e *Check for configuration files*. Sem webhook (separador
+     *Webhooks*), as tags `ios-v*` não lançam builds — lança-se à mão.
+
+Primeira build no TestFlight: 20 out 2026 (build nº 2 do Codemagic, commit `188aff64`, ~4 min).
 
 O plano gratuito do Codemagic dá 500 minutos/mês em Mac M2; uma build demora ~10–15 min.
 
