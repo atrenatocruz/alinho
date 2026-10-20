@@ -5,6 +5,7 @@ import { installDevMockNetwork } from '../lib/devMockNetwork'
 import { Browser } from '@capacitor/browser'
 import { SignInWithApple } from '@capacitor-community/apple-sign-in'
 import { IS_NATIVE, NATIVE_AUTH_CALLBACK, appHref, appOrigin } from '../lib/native'
+import { enablePush, disablePush } from '../lib/push'
 
 const AuthContext = createContext({})
 
@@ -181,6 +182,13 @@ export const AuthProvider = ({ children }) => {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // App das lojas: com sessão, notificações push (src/lib/push.js). No site
+  // não faz nada.
+  const userId = user?.id
+  useEffect(() => {
+    if (userId) enablePush()
+  }, [userId])
 
   // Welcome email on the first session. Strictly `=== null`: the column only
   // exists once migration_welcome_email.sql has run (undefined before that,
@@ -522,6 +530,9 @@ export const AuthProvider = ({ children }) => {
     // de «sair de todos» ou de igualar a base), ou não há rede —, apaga-se a
     // sessão só aqui. Antes a chave ficava guardada e a pessoa ficava presa na
     // conta (QA/Francisco, 30 set).
+    // Antes de sair: este telemóvel deixa de receber os avisos da conta (só
+    // na app das lojas; precisa da sessão, por isso vem primeiro).
+    await disablePush()
     const { error } = await supabase.auth.signOut()
     let forced = false
     if (error) {

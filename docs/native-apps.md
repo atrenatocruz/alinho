@@ -142,9 +142,48 @@ Primeira build no TestFlight: 20 out 2026 (build nº 2 do Codemagic, commit `188
 
 O plano gratuito do Codemagic dá 500 minutos/mês em Mac M2; uma build demora ~10–15 min.
 
+## Notificações push
+
+Os avisos do sino também chegam como notificação (só nas apps). Desenho:
+`docs/superpowers/specs/2026-10-20-push-notifications-design.md`.
+Código: `src/lib/push.js` (telemóvel), `supabase/functions/send-push` (envio),
+`supabase/migration_push_dispositivos.sql` (tabela dos telemóveis).
+
+Configuração única:
+
+1. **Firebase** (console.firebase.google.com, conta do alinho): criar o projeto
+   `alinho` → *Adicionar app* → Android, pacote `pt.alinho.app` → descarregar o
+   `google-services.json` para `android/app/` (vai para o git; não é secreto).
+   **Sem ele o Android não compila** (o Gradle recusa de propósito).
+   Depois: *Definições do projeto → Contas de serviço → Gerar nova chave privada*
+   → um JSON (esse **é secreto**: só para o segredo `FCM_SERVICE_ACCOUNT`).
+2. **Apple Developer**:
+   - *Identifiers* → `pt.alinho.app` → ligar **Push Notifications** → Save.
+   - *Profiles* → `alinho appstore` → Edit → Save/Generate (o perfil antigo
+     deixa de servir depois de ligar o push) → no Codemagic, *Fetch profiles*
+     outra vez e substituir o `alinho_appstore`.
+   - *Keys* → **+** → nome `alinho push`, marcar **Apple Push Notifications
+     service (APNs)** → descarregar o `.p8` (só uma vez) e apontar o Key ID.
+     O Team ID está no canto de cima à direita da conta.
+3. **Supabase** (dev e prod):
+   - Correr `migration_push_dispositivos.sql` no SQL Editor.
+   - Edge Functions → criar `send-push` (colar `supabase/functions/send-push/index.ts`,
+     ou `npx supabase functions deploy send-push --no-verify-jwt --project-ref <ref>`)
+     com **Verify JWT desligado**.
+   - Edge Functions → Secrets: `PUSH_WEBHOOK_SECRET` (uma palavra-passe longa
+     inventada), `FCM_SERVICE_ACCOUNT` (o JSON todo), `APNS_KEY_ID`,
+     `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` (o texto do `.p8`).
+   - Database → Webhooks → *Create*: tabela `notifications`, evento **Insert**,
+     tipo *Supabase Edge Functions* → `send-push`, e um cabeçalho
+     `x-push-secret` com o mesmo valor do `PUSH_WEBHOOK_SECRET`.
+
+Testar: com a app instalada e a sessão aberta, alguém inscreve-te num mix (ou
+sai a tua dupla) → chega «Quem organiza inscreveu-te no …». Os registos da
+função (Edge Functions → send-push → Logs) dizem `sent`, `removed` e `errors`.
+
 ## Ainda por fazer
 
-Notificações push (Android e iPhone), ecrã sem rede, menu de partilha do iOS,
+Ecrã sem rede, menu de partilha do iOS,
 Universal Links (links do alinho.pt abrem na app de iPhone), um clube de
 demonstração para o revisor da Apple e para as capturas finais.
 Plano: https://claude.ai/artifact/MNdTgShgM8H2FEkQ3zjzJX

@@ -56,4 +56,6 @@
     <!-- «Usar a minha localização» e o mapa da Home (navigator.geolocation,
          enableHighAccuracy: false): só a aproximada, pedida ao tocar. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Notificações push (Android 13+ pede autorização; src/lib/push.js). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

@@ -15,6 +15,13 @@
       "insetsHandling": "css",
       "initialViewportFitValueHint": "cover",
       "style": "DARK"
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
     }
   }
 }

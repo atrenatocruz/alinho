@@ -4,6 +4,7 @@ import { Browser } from '@capacitor/browser'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { supabase } from './supabase'
 import { IS_NATIVE, NATIVE_PLATFORM, parseAuthCallback, deepLinkPath } from './native'
+import { setupPush } from './push'
 
 /* O que só a app das lojas faz, ligado uma vez no main.jsx. No browser não
    corre (IS_NATIVE é false). */
@@ -52,6 +53,9 @@ export function setupNativeShell() {
   }, { once: true })
 
   App.addListener('appUrlOpen', ({ url }) => handleUrl(url))
+
+  // Tocar numa notificação push abre a página do aviso.
+  setupPush(openPath)
 
   // O botão «voltar» do Android: volta uma página; na primeira, sai da app
   // (fica em segundo plano, como as outras apps).
