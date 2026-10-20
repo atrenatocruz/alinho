@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "648560750813",
+    "project_id": "alinho-95aeb",
+    "storage_bucket": "alinho-95aeb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:648560750813:android:0260bae98aecff9abb2b34",
+        "android_client_info": {
+          "package_name": "pt.alinho.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAKrqJuwDX-0mE5mIIZwfk2-viGDvwm8M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
