@@ -53,4 +53,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- «Usar a minha localização» e o mapa da Home (navigator.geolocation,
+         enableHighAccuracy: false): só a aproximada, pedida ao tocar. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 </manifest>
