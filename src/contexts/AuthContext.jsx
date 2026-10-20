@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
 import { Browser } from '@capacitor/browser'
+import { SignInWithApple } from '@capacitor-community/apple-sign-in'
 import { IS_NATIVE, NATIVE_AUTH_CALLBACK, appHref, appOrigin } from '../lib/native'
 
 const AuthContext = createContext({})
@@ -450,6 +451,43 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
+  // Sign in with Apple, só na app de iPhone (Login.jsx mostra o botão). A
+  // janela é a nativa da Apple; o token vai para o Supabase (provider
+  // «apple», com o pt.alinho.app nos Client IDs). O nonce: à Apple vai o
+  // hash, ao Supabase o original — é assim que ele confirma o token.
+  const signInWithApple = async () => {
+    const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    const rawNonce = hex(crypto.getRandomValues(new Uint8Array(16)))
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawNonce))
+    const hashedNonce = hex(new Uint8Array(digest))
+    let response
+    try {
+      ;({ response } = await SignInWithApple.authorize({
+        clientId: 'pt.alinho.app',
+        redirectURI: NATIVE_AUTH_CALLBACK,
+        scopes: 'email name',
+        nonce: hashedNonce,
+      }))
+    } catch (err) {
+      // 1001 = a pessoa fechou a janela da Apple.
+      if (String(err?.message || err).includes('1001')) return { cancelled: true }
+      return { error: err }
+    }
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: response.identityToken,
+      nonce: rawNonce,
+    })
+    // A Apple só manda o nome no primeiro login (e só se a pessoa o
+    // partilhar): grava-se logo, por cima do «Novo Utilizador» do trigger.
+    const name = [response.givenName, response.familyName].filter(Boolean).join(' ').trim()
+    if (!error && name && data?.user) {
+      await supabase.auth.updateUser({ data: { name, full_name: name } })
+      await supabase.from('profiles').update({ name }).eq('id', data.user.id).eq('name', 'Novo Utilizador')
+    }
+    return { data, error }
+  }
+
   const signInAsAdmin = () => {
     localStorage.setItem(MOCK_ADMIN_KEY, 'true')
     installDevMockNetwork()
@@ -701,6 +739,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updatePassword,
     signInWithGoogle,
+    signInWithApple,
     signInAsAdmin,
     signOut,
     updateProfile,

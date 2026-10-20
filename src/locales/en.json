@@ -6431,5 +6431,7 @@
   "deletepage.no_access_title": "Can’t sign in?",
   "deletepage.no_access_body": "Write to us from your account’s email address, or on WhatsApp from the number you use on alinho, asking us to delete your account. We’ll reply once it’s done.",
   "deletepage.email_subject": "Delete my account",
-  "deletepage.whatsapp_text": "Hi! I want to delete my alinho account."
+  "deletepage.whatsapp_text": "Hi! I want to delete my alinho account.",
+  "login2.continue_apple": "Continue with Apple",
+  "login.apple_error": "Couldn’t sign in with Apple. Please try again."
 }

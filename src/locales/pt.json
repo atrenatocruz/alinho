@@ -6446,5 +6446,7 @@
   "deletepage.no_access_title": "Não consegues entrar?",
   "deletepage.no_access_body": "Escreve-nos a partir do email da tua conta, ou pelo WhatsApp com o número que usas no alinho, a pedir para apagar a conta. Respondemos quando estiver feito.",
   "deletepage.email_subject": "Apagar a minha conta",
-  "deletepage.whatsapp_text": "Olá! Quero apagar a minha conta do alinho."
+  "deletepage.whatsapp_text": "Olá! Quero apagar a minha conta do alinho.",
+  "login2.continue_apple": "Continuar com a Apple",
+  "login.apple_error": "Não foi possível entrar com a Apple. Tenta outra vez."
 }

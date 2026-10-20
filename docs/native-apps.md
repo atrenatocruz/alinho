@@ -95,8 +95,45 @@ A Google obriga a um teste fechado com **12+ pessoas inscritas 14 dias seguidos*
 antes de pedir a produção. Pode-se enviar versões novas durante o teste sem
 recomeçar a contagem. Cada pessoa precisa de Android e de uma conta Gmail.
 
-## Fase 2 (iPhone) — ainda por fazer
+## iPhone
 
-Sign in with Apple, notificações push (Android também), ecrã sem rede, menu de
-partilha do iOS, `npx cap add ios`, builds na cloud (Codemagic) porque o Mac
-com Sonoma não corre o Xcode 26. Plano: https://claude.ai/artifact/MNdTgShgM8H2FEkQ3zjzJX
+O projeto está em `ios/` (Swift Package Manager, sem CocoaPods). Só iPhone, só
+na vertical (`TARGETED_DEVICE_FAMILY = 1`): num iPad abre em modo de compatibilidade.
+
+**Sign in with Apple** (obrigatório, regra 4.8 da App Store, porque há login com
+o Google): botão só na app de iPhone (`Login.jsx`, `showApple`). A janela é a
+nativa da Apple (`@capacitor-community/apple-sign-in`); o token vai para o
+Supabase com `signInWithIdToken` (`AuthContext.signInWithApple`). A Apple só
+manda o nome no primeiro login: grava-se por cima do «Novo Utilizador».
+
+### Builds no Codemagic
+
+O Mac do Renato (Sonoma 14.8.2) não corre o Xcode 26, que a App Store exige. O
+`codemagic.yaml` compila na cloud e envia para o TestFlight. Corre à mão no
+painel, ou com uma tag `ios-v*` (`git tag ios-v1.0.0 && git push origin ios-v1.0.0`).
+
+Configuração única (feita nos painéis, não no código):
+
+1. **Apple Developer → Identifiers**: App ID `pt.alinho.app` com *Sign In with Apple*.
+2. **App Store Connect → Apps → +**: app iOS, bundle `pt.alinho.app`, idioma
+   Português (Portugal). O número «Apple ID» da app vai para `APP_STORE_APPLE_ID`.
+3. **App Store Connect → Utilizadores e acesso → Integrações → App Store Connect API**:
+   chave de equipa com acesso *App Manager*. O `.p8` só se descarrega uma vez.
+4. **Supabase (prod e dev) → Authentication → Providers → Apple**: ativar, e em
+   *Client IDs* pôr `pt.alinho.app`. Para o login nativo não é precisa a *Secret Key*.
+5. **Codemagic** (entrar com o GitHub, adicionar o repositório):
+   - *Team settings → Integrations → Developer Portal*: a chave do passo 3, com o
+     nome **`alinho_asc`** (Issuer ID, Key ID, `.p8`).
+   - *Code signing identities → iOS certificates → Generate certificate* (Apple Distribution).
+   - *Environment variables*: grupo **`alinho_prod`** com `VITE_SUPABASE_URL`,
+     `VITE_SUPABASE_ANON_KEY`, `VITE_TURNSTILE_SITE_KEY` (os do
+     `.env.native-prod.local`) e `APP_STORE_APPLE_ID`.
+
+O plano gratuito do Codemagic dá 500 minutos/mês em Mac M2; uma build demora ~10–15 min.
+
+## Ainda por fazer
+
+Notificações push (Android e iPhone), ecrã sem rede, menu de partilha do iOS,
+Universal Links (links do alinho.pt abrem na app de iPhone), um clube de
+demonstração para o revisor da Apple e para as capturas finais.
+Plano: https://claude.ai/artifact/MNdTgShgM8H2FEkQ3zjzJX
