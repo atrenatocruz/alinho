@@ -947,7 +947,7 @@ export function StickyTop({ children, belowBackBar = false, className = '' }) {
     return () => { scroller.removeEventListener('scroll', read); window.removeEventListener('resize', read) }
   }, [belowBackBar])
   return (
-    <div ref={ref} style={{ '--bar-bg': 'rgb(var(--ground))', top: belowBackBar ? BELOW_BACKBAR : SAFE_TOP_VAR }}
+    <div ref={ref} data-sticky-top="" style={{ '--bar-bg': 'rgb(var(--ground))', top: belowBackBar ? BELOW_BACKBAR : SAFE_TOP_VAR }}
       className={`sticky z-10 -mx-4 space-y-2 bg-ground px-4 pb-1.5 pt-2 ${className}`}>
       {!belowBackBar && (
         <div aria-hidden="true"
