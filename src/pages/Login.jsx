@@ -401,7 +401,7 @@ export default function Login() {
   )
   const footerLinks = (
     <p className="py-6 text-center text-[13px] text-muted">
-      <Link to="/instrucoes" className="underline underline-offset-2">{t('login2.help')}</Link>
+      <Link to="/ajuda" className="underline underline-offset-2">{t('login2.help')}</Link>
       {' · '}<Link to="/privacidade" className="underline underline-offset-2">{t('login2.privacy')}</Link>
       {' · '}<Link to="/termos" className="underline underline-offset-2">{t('login2.terms')}</Link>
     </p>
@@ -490,7 +490,7 @@ export default function Login() {
             {devBypass}
           </div>
           {invite
-            ? <p className="py-6 text-center text-[13px] text-muted"><Link to="/instrucoes" className="underline underline-offset-2">{t('login2.help')}</Link></p>
+            ? <p className="py-6 text-center text-[13px] text-muted"><Link to="/ajuda" className="underline underline-offset-2">{t('login2.help')}</Link></p>
             : footerLinks}
         </div>
       </div>
