@@ -691,6 +691,15 @@ export default function GerirClube() {
   // membership (see migration_platform_admin_full_access.sql), after which
   // every other club-scoped query/RPC on this page works exactly as it
   // does for a normal org admin.
+  //
+  // Uma vez por grupo (21 out): o ensureOrgAdminAccess recarrega o perfil, e
+  // isso dá um `memberships` novo que voltava a correr este efeito. Desde o
+  // superadmin escondido o acesso não aparece como is_admin, e o ciclo não
+  // parava (Gerir sempre a carregar, ~1600 pedidos em 3 min). O pedido de
+  // acesso fica guardado por slug e não se repete; a função vai por ref.
+  const ensureAccessRef = useRef(ensureOrgAdminAccess)
+  ensureAccessRef.current = ensureOrgAdminAccess
+  const platformOrgRef = useRef(null) // { slug, org } — org null enquanto o pedido está a correr
   useEffect(() => {
     let cancelled = false
 
@@ -708,27 +717,46 @@ export default function GerirClube() {
         return
       }
 
+      const done = platformOrgRef.current
+      if (done?.slug === slug) {
+        // Já pedido para este grupo: fica com o que veio (ou espera pelo
+        // pedido que ainda está a correr).
+        if (done.org) {
+          setOrg(done.org)
+          setOrgLoading(false)
+        }
+        return
+      }
+      platformOrgRef.current = { slug, org: null }
+      // A partir daqui não se olha ao `cancelled`: o próprio pedido de acesso
+      // muda o `memberships` e cancelava-se a si mesmo. Só conta se o grupo
+      // aberto ainda for este.
+      const stillHere = () => platformOrgRef.current?.slug === slug
+
       const { data: anyOrg, error } = await supabase
         .from('organizations')
         .select('*')
         .eq('slug', slug)
         .maybeSingle()
 
-      if (cancelled) return
+      if (!stillHere()) return
 
       if (error || !anyOrg) {
+        platformOrgRef.current = null
         setOrg(null)
         setOrgLoading(false)
         return
       }
 
-      const { error: accessError } = await ensureOrgAdminAccess(anyOrg.id)
-      if (cancelled) return
+      const { error: accessError } = await ensureAccessRef.current(anyOrg.id)
+      if (!stillHere()) return
 
       if (accessError) {
         console.error('Error granting platform admin access:', accessError)
+        platformOrgRef.current = null
         setOrg(null)
       } else {
+        platformOrgRef.current = { slug, org: anyOrg }
         setOrg(anyOrg)
       }
       setOrgLoading(false)
@@ -736,7 +764,7 @@ export default function GerirClube() {
 
     resolveOrg()
     return () => { cancelled = true }
-  }, [slug, memberships, currentUser?.is_platform_admin, ensureOrgAdminAccess])
+  }, [slug, memberships, currentUser?.is_platform_admin])
 
   const currentOrganizationId = org?.id
   // Jogos em aberto e torneios: pelo PLANO, não pelo tipo (Francisco, 26 set:
