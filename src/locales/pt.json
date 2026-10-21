@@ -6499,5 +6499,21 @@
   "timeinput.hours": "Horas",
   "timeinput.minutes": "Minutos",
   "timeinput.hours_of": "{{label}} (horas)",
-  "timeinput.minutes_of": "{{label}} (minutos)"
+  "timeinput.minutes_of": "{{label}} (minutos)",
+  "nov.v20261016.title": "Liga entre clubes, ranking do mês e um visual novo",
+  "nov.v20261016.item_1": "Ranking do mês: conta os pontos que ganhas no mês e recomeça a dia 1. Quem acaba no pódio usa uma moldura à volta da foto durante o mês seguinte.",
+  "nov.v20261016.item_2": "Liga entre clubes: o teu clube forma uma equipa com capitães e joga encontros contra outros clubes. Combinam a data na app e o resultado confirma-se lá.",
+  "nov.v20261016.item_3": "A tua evolução: no Perfil, o cartão das Estatísticas mostra como o teu ranking mudou ao longo do tempo. A página do XP explica os teus níveis de atividade.",
+  "nov.v20261016.item_4": "Medalhas novas e mais 27 conquistas, da «Desforra» ao «Padel de Natal». Vê no teu perfil: algumas já podem ser tuas.",
+  "nov.v20261016.item_5": "Jogos entre amigos do princípio ao fim: marcas o jogo, jogam por rondas e, no fim, confirmam o resultado, que conta para o ranking.",
+  "nov.v20261016.item_6": "Mixes mais variados: a app deixa de juntar duplas que já jogaram juntas nos teus últimos 4 mixes, e o Sobe e desce pode trocar as duplas a cada ronda.",
+  "nov.v20261016.item_7": "Uma Home nova, com os teus próximos jogos logo no topo, e o cartão dos vencedores com foto em todos os jogos, pronto a partilhar.",
+  "nov.v20261016.item_8": "Um visual novo: cada tipo de jogo tem a sua cor, os clubes e a Comunidade estão mais fáceis de ler, os clubes e grupos têm capas novas com o Alino, e o Alino, a nossa mascote, aparece quando ainda não há nada para mostrar.",
+  "nov.v20261016.item_9": "E ainda: pessoas que talvez conheças; jogo em aberto passo a passo; cada pessoa pode criar um grupo grátis; um Gerir novo para quem organiza um clube; desfazer as duplas de um mix e partilhá-las logo a seguir ao sorteio; numa série, mudar só este mix ou também os seguintes; nos torneios, t-shirts, preço especial, mudar a hora de uma categoria e um aviso quando duas categorias chocam; a hora sempre em 24 h; e a app já não fica presa depois de uma atualização.",
+  "nov.v20261009.title": "Desistências sem confusão, e mixes que não se perdem",
+  "nov.v20261009.item_1": "Se alguém sai depois de as duplas estarem feitas, o primeiro suplente entra no lugar dessa pessoa. As outras duplas ficam iguais.",
+  "nov.v20261009.item_2": "Se os resultados estiverem todos marcados e o mix ficar por terminar, a app termina-o no dia seguinte e os jogos contam para o ranking.",
+  "nov.v20261009.item_3": "Quem organiza pode escolher aceitar quem entra pela app. Nesses mixes carregas em «Pedir para entrar» e recebes um aviso quando te aceitarem.",
+  "nov.v20261009.item_4": "Nos torneios, as inscrições fecham sozinhas no fim do prazo.",
+  "nov.v20261009.item_5": "Empates resolvidos como na Federação Portuguesa de Padel."
 }
