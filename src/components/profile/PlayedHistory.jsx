@@ -34,6 +34,12 @@ const PLACE_BOX = {
 const FRAME_BY_PLACE = { 1: 'ouro', 2: 'prata', 3: 'bronze' }
 
 const monthKeyOf = (iso) => `${String(iso).slice(0, 7)}-01`
+
+// Onde acaba a barra presa (StickyTop), a contar do topo do «main»: a altura
+// dela mais o sítio onde se prende (a margem da hora, no iPhone).
+const barBottom = (bar, fallback) => (bar
+  ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight
+  : fallback)
 const lang2 = (l) => (l?.startsWith('en') ? 'en' : 'pt')
 const monthLong = (key, lang) => {
   const d = new Date(`${key.slice(0, 7)}-01T12:00:00`)
@@ -407,9 +413,10 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
     const update = () => {
       const main = document.querySelector('main')
       if (!main) return
-      const bar = document.querySelector('main .sticky.top-0')
-      // A barra presa mede sempre a sua altura a contar do topo do «main».
-      const line = main.getBoundingClientRect().top + (bar ? bar.offsetHeight : 120) + 8
+      const bar = document.querySelector('main [data-sticky-top]')
+      // A barra presa mede sempre a sua altura a contar do topo do «main»
+      // (mais a margem da hora no iPhone, onde ela se prende).
+      const line = main.getBoundingClientRect().top + barBottom(bar, 120) + 8
       // No fundo da lista os últimos meses já não sobem até à barra: conta
       // o último cujo título está à vista.
       const atEnd = main.scrollTop + main.clientHeight >= main.scrollHeight - 4
@@ -431,8 +438,8 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
     const el = document.getElementById(`played-${jumpTo.slice(0, 7)}`)
     if (!el) { data.loadUntil(jumpTo); return }
     const main = document.querySelector('main')
-    const bar = document.querySelector('main .sticky.top-0')
-    if (main) main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - (bar ? bar.offsetHeight : 0) - 8
+    const bar = document.querySelector('main [data-sticky-top]')
+    if (main) main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - barBottom(bar, 0) - 8
     onJumped?.()
   }, [jumpTo, groups, data, onJumped])
   const summary = (key) => months.find((m) => String(m.month).slice(0, 7) === key.slice(0, 7))
