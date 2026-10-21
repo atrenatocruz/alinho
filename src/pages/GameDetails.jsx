@@ -39,6 +39,7 @@ import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
+import SwapGuestSheet from '../components/mix/SwapGuestSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
@@ -214,6 +215,9 @@ export default function GameDetails() {
   const [editingPairs, setEditingPairs] = useState(false)
   // Mix à última da hora (Trello #292): adicionar/tirar antes da Ronda 1.
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
+  // «Trocar por uma conta» num convidado (Francisco, 19 out): o convidado a trocar.
+  const [swapGuest, setSwapGuest] = useState(null)
+  const [swapNotice, setSwapNotice] = useState('')
   // Publicar um rascunho (Trello #544) — a pergunta aberta.
   const [publishOpen, setPublishOpen] = useState(false)
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
@@ -4577,6 +4581,13 @@ export default function GameDetails() {
             )
           })()}
           <PriceRosterSummary roster={priceRoster} ids={people.map((x) => x.id)} normalPrice={game.price_per_player} className="-mt-2 mb-3" />
+          {/* «Trocar por uma conta»: o que mudou, logo por cima da lista (também com o mix cheio). */}
+          {swapNotice && (
+            <div className="mb-3 bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+              <Check size={16} className="text-white shrink-0" />
+              {swapNotice}
+            </div>
+          )}
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -4620,6 +4631,14 @@ export default function GameDetails() {
                               isTest={person.is_test}
                             />
                           </div>
+                          {/* Quem organiza troca o convidado pela conta da pessoa
+                              (Francisco, 19 out; admin_swap_guest_for_account). */}
+                          {isAdmin && person.no_account && !isDraftMix(game) && game.status !== 'cancelled' && !(canPairSolos && !person.hasPartner) && (
+                            <button type="button" onClick={() => setSwapGuest(person)} disabled={busy}
+                              className="mt-1 inline-flex min-h-[32px] items-center text-[13px] font-extrabold text-ink-900 underline underline-offset-2">
+                              {t('swapguest.action')}
+                            </button>
+                          )}
                         </div>
                       </>
                     ) : (
@@ -4670,6 +4689,12 @@ export default function GameDetails() {
                         className="press inline-flex h-8 shrink-0 items-center rounded-full border border-line bg-white px-3 text-xs font-extrabold text-ink-900">
                         {t('mixpairs.join')}
                       </button>
+                      {isAdmin && person.no_account && !isDraftMix(game) && game.status !== 'cancelled' && (
+                        <button type="button" onClick={() => setSwapGuest(person)} disabled={busy}
+                          className="inline-flex min-h-[32px] items-center text-[13px] font-extrabold text-ink-900 underline underline-offset-2">
+                          {t('swapguest.action')}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -5020,6 +5045,22 @@ export default function GameDetails() {
         onClose={() => setDeclineAsk(null)}
         errorOf={requestErrorText}
       />
+      {swapGuest && (
+        <SwapGuestSheet
+          game={game}
+          guest={swapGuest}
+          excludeIds={new Set([...people.filter((p) => !p.no_account).map((p) => p.id), ...waitlist.flatMap((w) => [w.user_id, w.partner_id]).filter(Boolean)])}
+          onClose={() => setSwapGuest(null)}
+          onSwapped={(account) => {
+            setSwapGuest(null)
+            const same = (x) => String(x || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+            setSwapNotice(same(swapGuest.name) === same(account.name)
+              ? t('swapguest.done_same', { guest: swapGuest.name })
+              : t('swapguest.done', { guest: swapGuest.name, name: account.name }))
+            loadGameDetails()
+          }}
+        />
+      )}
       {addPlayerOpen && (
         <AddPlayerSheet
           game={game}
