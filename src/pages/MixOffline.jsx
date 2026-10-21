@@ -58,7 +58,7 @@ export default function MixOffline() {
   const saved = loadSaved()
   const [namesText, setNamesText] = useState(saved?.namesText ?? '')
   const [numCourts, setNumCourts] = useState(saved?.numCourts ?? 1)
-  const [gameTitle, setGameTitle] = useState(saved?.gameTitle ?? 'Mix')
+  const [gameTitle, setGameTitle] = useState(saved?.gameTitle ?? t('mixoffline.default_title'))
   const [teams, setTeams] = useState(saved?.teams ?? null)
   const [rounds, setRounds] = useState(saved?.rounds ?? [])
   const [finished, setFinished] = useState(saved?.finished ?? false)
@@ -155,7 +155,7 @@ export default function MixOffline() {
     setFinished(false)
     setScoreInputs({})
     setScoreError('')
-    setGameTitle('Mix')
+    setGameTitle(t('mixoffline.default_title'))
   }
 
   // Exports everything needed to later populate the real app once it's back
