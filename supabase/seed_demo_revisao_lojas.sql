@@ -88,6 +88,14 @@ BEGIN
             jsonb_build_object('name', v_gente[v_i][1]), now() - interval '60 days', now());
   END LOOP;
 
+  -- O Auth do Supabase lê estes campos como texto: a NULL, o login (e o
+  -- link mágico) falham com «Database error finding user».
+  UPDATE auth.users SET
+    confirmation_token = '', recovery_token = '', email_change = '',
+    email_change_token_new = '', email_change_token_current = '',
+    phone_change = '', phone_change_token = '', reauthentication_token = ''
+  WHERE id = ANY (v_ids || v_rev);
+
   INSERT INTO auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
   SELECT u.id::text, u.id,
          jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
