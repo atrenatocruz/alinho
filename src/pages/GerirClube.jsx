@@ -66,6 +66,8 @@ import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
 import { semAcentos } from '../lib/semAcentos'
 import { cancelMixDate } from '../lib/mixCancel'
 import { appOrigin } from '../lib/native'
+import { SkeletonGate, SkBlock, SkLine, SkPill, SkRow, SkWhiteCard } from '../components/Skeleton'
+import StepSkeleton from '../components/steps/StepSkeleton'
 
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
@@ -2672,9 +2674,26 @@ export default function GerirClube() {
   }
 
   if (orgLoading) {
+    // A forma do Gerir em vez da roda (esqueletos, 12 out): o «‹» a sério;
+    // o topo branco com «GERIR» a sério e o resto a cinzento; o separador,
+    // o «Criar» e os eventos a cinzento.
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      <div className="space-y-6">
+        <SkeletonGate frame={<BackBar onBack={goBack} solid />}>
+          <div className="space-y-6">
+            <div className={`!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2 ${TOP_EDGE}`}>
+              <span aria-hidden className="sk relative block h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#ECECE7]" />
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
+                <SkLine size="title" w="62%" className="mt-1.5" />
+                <div className="mt-2 flex gap-1.5"><SkPill w={52} h={20} /><SkPill w={92} h={20} /></div>
+              </div>
+            </div>
+            <SkBlock h={48} rounded="rounded-full" className="!bg-[#D5D7CF]" />
+            <SkBlock h={52} />
+            <div className="space-y-3"><SkWhiteCard /><SkWhiteCard /></div>
+          </div>
+        </SkeletonGate>
       </div>
     )
   }
@@ -2797,11 +2816,10 @@ export default function GerirClube() {
     }
     if (daSerie.length === 0) {
       return (
-        <div className="flex items-center justify-center py-16">
-          {gamesError
-            ? <p className="text-sm text-danger font-extrabold">{gamesError}</p>
-            : <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>}
-        </div>
+        gamesError
+          ? <div className="flex items-center justify-center py-16"><p className="text-sm text-danger font-extrabold">{gamesError}</p></div>
+          // A série por editar a carregar: a forma dos passos (esqueletos, 12 out).
+          : <StepSkeleton fallback={`/gerir/${org.slug}`} />
       )
     }
     return (
@@ -2890,9 +2908,8 @@ export default function GerirClube() {
       <div className="space-y-6">
         {aCarregar ? (
           loading || games.length === 0 && !gamesError ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-            </div>
+            // O mix por editar a carregar: a forma dos passos (esqueletos, 12 out).
+            <StepSkeleton fallback={`/gerir/${org.slug}`} />
           ) : (
             <div className="card text-center py-12 px-6">
               <p className="text-muted text-sm mb-4">{t('mixwizard.not_found')}</p>
@@ -3102,8 +3119,31 @@ export default function GerirClube() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ink-700"></div>
+        // O «＋ Criar» a sério desde o início; os eventos a cinzento, em
+        // cartões brancos (esqueletos, 12 out).
+        <div className="space-y-4">
+          {activeTab === 'events' && !turmaAberta && (
+            <button type="button" onClick={() => setCreatePicker(true)}
+              className="press flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 text-base font-extrabold text-white">
+              <Plus size={18} /> {t('gerirclube.create_button')}
+            </button>
+          )}
+          {/* Como no carregado: o título «A SEGUIR · N» e uma linha baixa por
+              evento, com a data num quadrado e duas linhas (UX, 18 out). */}
+          <SkeletonGate>
+            <div className="space-y-2.5">
+              <SkLine size="label" w="26%" />
+              {[0, 1, 2].map((i) => (
+                <div key={i} aria-hidden className="flex items-center gap-3 rounded-[20px] bg-white p-3 shadow-card">
+                  <span className="sk relative block h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#ECECE7]" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <SkLine size="text" w={`${[62, 54, 70][i]}%`} />
+                    <SkLine size="label" w="40%" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SkeletonGate>
         </div>
       ) : (
         <>
@@ -4555,9 +4595,8 @@ export default function GerirClube() {
 
                   {groupsError && <div className="mb-3"><p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{groupsError}</p></div>}
                   {groupsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-                    </div>
+                    // Os grupos a cinzento (esqueletos, 12 out).
+                    <SkeletonGate><div className="space-y-3 mb-4"><SkRow /><SkRow /></div></SkeletonGate>
                   ) : clubGroups.length > 0 && (
                     <div className="space-y-3 mb-4">
                       {clubGroups.map((group) => {
@@ -4598,9 +4637,7 @@ export default function GerirClube() {
                             {expandedGroupId === group.id && group.can_manage && (
                               <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
                                 {expandedGroupLoading ? (
-                                  <div className="flex items-center justify-center py-6">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-[3px] border-ink-50 border-t-ink-700"></div>
-                                  </div>
+                                  <SkeletonGate><div className="space-y-2.5"><SkLine size="text" w="40%" /><SkLine size="text" w="65%" /><SkLine size="text" w="50%" /></div></SkeletonGate>
                                 ) : (
                                   <>
                                     <Link

@@ -15,6 +15,7 @@ import { createTournament, saveCategorySpecialPrices, scheduleTournamentOpening,
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError } from '../lib/errors'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
+import StepSkeleton from '../components/steps/StepSkeleton'
 import { EmptyState } from '../components/ui'
 
 export default function CreateTournamentPage() {
@@ -81,7 +82,7 @@ export default function CreateTournamentPage() {
   }
 
   if (org === undefined) {
-    return <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return <StepSkeleton fallback="/gerir" />
   }
   if (!org) {
     return <EmptyState title={t('gerirclube.no_access_title')} />
