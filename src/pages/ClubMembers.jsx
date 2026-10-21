@@ -12,6 +12,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
 import { Avatar, EmptyState, RatingBadge } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
+import { SkeletonGate, SkCircle, SkLine, SkPill } from '../components/Skeleton'
 
 export default function ClubMembers() {
   const { t } = useTranslation()
@@ -49,9 +50,18 @@ export default function ClubMembers() {
       {failed ? (
         <EmptyState icon={PadelIcon} title={t('clubprofile.not_found_title')} subtitle={t('clubprofile.not_found_subtitle')} />
       ) : !members ? (
-        <div className="flex justify-center py-10">
-          <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" />
-        </div>
+        // As linhas a cinzento em vez da roda (esqueletos, 12 out).
+        <SkeletonGate>
+          <div className="card divide-y divide-line overflow-hidden p-0">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+                <SkCircle size={40} />
+                <span className="min-w-0 flex-1"><SkLine size="text" w={`${[58, 46, 64, 40, 52, 48][i]}%`} /></span>
+                <SkPill w={34} h={20} />
+              </div>
+            ))}
+          </div>
+        </SkeletonGate>
       ) : members.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">{t('clubprofile.no_members_visible')}</p>
       ) : (

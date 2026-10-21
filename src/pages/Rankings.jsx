@@ -16,6 +16,8 @@ import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingSca
 import MonthRanking from '../components/rankings/MonthRanking'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 import RankPodium from '../components/rankings/RankPodium'
+import RankingSkeleton from '../components/rankings/RankingSkeleton'
+import { SkeletonGate } from '../components/Skeleton'
 import { useFrames } from '../lib/frames'
 import { Realce } from '../components/SearchField'
 
@@ -70,12 +72,18 @@ export default function Rankings() {
   const [scaleChoice, setScaleChoice] = useState(null)
   const scale = scaleChoice ?? defaultScale(profile?.gender)
 
-  // «Do mês» (#626): só aparece quando a função do Dev 3 existe.
-  const [monthReady, setMonthReady] = useState(false)
+  // «Do mês» (#626): sai só se a função do Dev 3 não existir. Começa à
+  // vista, para o separador não saltar de 2 para 3 opções ao chegarem os
+  // dados (UX, 18 out).
+  const [monthReady, setMonthReady] = useState(true)
   const [monthShare, setMonthShare] = useState(null)
   useEffect(() => {
     supabase.rpc('get_month_ranking_months', { p_organization_id: null })
-      .then(({ error }) => setMonthReady(!error || errorKind(error) !== 'not_ready'))
+      .then(({ error }) => {
+        const ready = !error || errorKind(error) !== 'not_ready'
+        setMonthReady(ready)
+        if (!ready) setMode((m) => (m === 'month' ? 'ranking' : m))
+      })
   }, [])
 
   const scopeOptions = useMemo(() => [
@@ -431,9 +439,8 @@ export default function Rankings() {
       {mode === 'month' ? (
         <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare} />
       ) : loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-        </div>
+        // A forma da lista em vez da roda (esqueletos, 12 out; Francisco, 18 out).
+        <SkeletonGate><RankingSkeleton /></SkeletonGate>
       ) : visible.length === 0 && podiumRows.length === 0 ? (
         <EmptyState
           icon={trimmed ? Search : mode === 'xp' ? Award : Trophy}

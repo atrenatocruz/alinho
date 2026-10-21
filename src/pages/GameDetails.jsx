@@ -10,8 +10,7 @@ import { GlassPinned } from '../components/GlassBar'
 import EventFacts from '../components/event/EventFacts'
 import OrganizerBox from '../components/event/OrganizerBox'
 import { isMixLive } from '../lib/mixLive'
-import { SkeletonGate } from '../components/Skeleton'
-import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
+import EventCoverSkeleton from '../components/event/EventCoverSkeleton'
 import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2 } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -3130,9 +3129,8 @@ export default function GameDetails() {
   if (loading || (!game && orgHint === undefined)) {
     return (
       <div data-loading-game>
-        <SkeletonGate frame={<BackBar onBack={goBack} label={t('gamedetails.back')} />}>
-          <GameDetailsSkeleton />
-        </SkeletonGate>
+        {/* A capa e a folha a cinzento, como no carregado (EventHero; UX, 18 out). */}
+        <EventCoverSkeleton onBack={goBack} />
       </div>
     )
   }
