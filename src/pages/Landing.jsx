@@ -110,6 +110,8 @@ function OrganizersBar() {
         <div>
           <p className={`${SITE_EYEBROW} text-[#5B6068]`}>{t('landing.organizers_eyebrow')}</p>
           <h2 className={`${SITE_H2} mt-3`}>{t('landing.organizers_text')}</h2>
+          {/* A mesma frase da linha verde-clara dos Planos (18 out). */}
+          <p className="mt-4 inline-block rounded-[14px] bg-[#F4F8DC] px-3.5 py-2.5 font-display text-[15px] font-bold leading-snug text-[#3F6212]">{t('landing.organizers_free_pill')}</p>
           <p className={SITE_LEAD}>{t('landing.organizers_lead')}</p>
           <div className="mt-8 flex max-w-[380px] flex-col gap-3">
             <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={`${BTN} bg-ink-900 text-white`}>
@@ -142,8 +144,9 @@ function OrganizersBar() {
 export const PLANS = [
   { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3']] },
   { key: 'plus', name: 'Squad', features: [['f1'], ['f2'], ['f3']] },
-  // Torneios já existem; a liga ainda não (Francisco, 25 set; Trello #538).
-  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5'], ['f6', 'soon']] },
+  // Torneios e liga já existem (a liga entre clubes saiu no main de 16 out;
+  // SPEC dos Planos, 18 out).
+  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5'], ['f6']] },
   { key: 'club', name: 'Club', features: [['f1'], ['f2', 'soon'], ['f3', 'soon'], ['f4', 'soon']] },
 ]
 
