@@ -215,7 +215,7 @@ const organizationInvite: Handler = async ({ admin, callerId, appUrl, body }) =>
           ],
           ctaLabel: 'See invite',
           ctaUrl: `${appUrl}/perfil?tab=convites`,
-          footnote: `You're getting this email because you have an alinho.pt account and someone invited you to a club. If you don't know this club, just ignore it — nothing happens until you accept.`,
+          footnote: `You're getting this email because you have an alinho.pt account and someone invited you to a club. If you don't know this club, just ignore it: nothing happens until you accept.`,
         }),
       }
     : {
@@ -313,7 +313,7 @@ function lessonWhen(startsAt: string, minutes: number, en: boolean): string {
   const locale = en ? 'en-GB' : 'pt-PT'
   const day = new Intl.DateTimeFormat(locale, { timeZone: 'Europe/Lisbon', weekday: 'long', day: 'numeric', month: 'long' }).format(start)
   const hm = (d: Date) => new Intl.DateTimeFormat(locale, { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit' }).format(d)
-  return `${day}, ${hm(start)}–${hm(end)}`
+  return `${day}, ${hm(start)}-${hm(end)}`
 }
 
 // Ao professor, quando chega um pedido. Quem chama é o aluno que acabou de o
