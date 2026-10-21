@@ -345,6 +345,7 @@
   "agenda.filters_reset": "Mostrar tudo",
   "home.join_request_sent": "Pedido enviado. Quando o admin do grupo aceitar, entras.",
   "home.join_request_sent_named": "Pedido enviado para {{name}}. Quando o admin aceitar, entras.",
+  "home.loading_more_days": "A carregar mais dias…",
   "home.join_joined_named": "Entraste em {{name}}.",
   "home.join_joined": "Entraste no grupo.",
   "home.join_club_error": "Não foi possível juntar-te a esse clube. Confirma o nome com o admin.",

@@ -344,6 +344,7 @@
   "agenda.filters_reset": "Show everything",
   "home.join_request_sent": "Request sent. You're in once the group admin accepts.",
   "home.join_request_sent_named": "Request sent to {{name}}. You're in once the admin accepts.",
+  "home.loading_more_days": "Loading more days…",
   "home.join_joined_named": "You joined {{name}}.",
   "home.join_joined": "You joined the group.",
   "home.join_club_error": "Couldn't join that club. Confirm the name with the admin.",
