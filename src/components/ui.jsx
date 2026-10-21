@@ -2322,7 +2322,7 @@ const stripAccents = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 // = nenhuma opção marcada (ainda não há resposta). `startAt`: a opção que
 // fica à vista ao abrir (por omissão, a escolhida). Data de nascimento: os
 // anos abrem em 1995, sem nenhum marcado (UX, 18 out).
-export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false, title = null, highlight = true, startAt = null }) {
+export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false, title = null, highlight = true, startAt = null, label = null }) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_placeholder')
   const [open, setOpen] = useState(false)
@@ -2366,6 +2366,21 @@ export function Select({ value, onChange, options, placeholder, className = '', 
         >
           <span className="truncate">{selected ? selected.label : resolvedPlaceholder}</span>
           <ChevronDown size={14} className="shrink-0" />
+        </button>
+      ) : variant === 'tile' ? (
+        // Bloco branco com o rótulo pequeno em cima e o valor grande em
+        // Outfit (Dia / Mês / Ano no registo por passos).
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`press flex min-h-[72px] flex-col justify-center gap-0.5 rounded-[14px] border-2 bg-white px-4 py-2.5 text-left shadow-card transition-colors duration-fast ${
+            active ? 'border-ink-900' : 'border-transparent'
+          } ${className}`}
+        >
+          {label && <span className="text-xs text-ink-500">{label}</span>}
+          <span className={`font-display text-[26px] font-extrabold leading-tight tabular-nums ${selected ? 'text-ink-900' : 'text-ink-200'}`}>
+            {selected ? (selected.short ?? selected.label) : resolvedPlaceholder}
+          </span>
         </button>
       ) : (
       <button
