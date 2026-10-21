@@ -177,6 +177,10 @@ Configuração única:
      tipo *Supabase Edge Functions* → `send-push`, e um cabeçalho
      `x-push-secret` com o mesmo valor do `PUSH_WEBHOOK_SECRET`.
 
+Em produção (`alinho-prd`) a função ficou com o nome **`smart-responder`** (o nome
+automático do editor) — é o mesmo código do `send-push`. O webhook chama-se
+`push_notifications`. Primeira notificação recebida num iPhone: 21 out 2026.
+
 Testar: com a app instalada e a sessão aberta, alguém inscreve-te num mix (ou
 sai a tua dupla) → chega «Quem organiza inscreveu-te no …». Os registos da
 função (Edge Functions → send-push → Logs) dizem `sent`, `removed` e `errors`.
