@@ -85,6 +85,15 @@ sensíveis; tem perfis públicos e mensagens de grupo, o que o questionário per
 >
 > Questions or ideas? Write to support@alinho.pt.
 
+## Conta para a revisão (App Store / Play)
+
+Clube «alinho Demo» (escondido) e conta `appreview@ensaio.alinho.test`, criados
+em produção a 21 out 2026 com `supabase/seed_demo_revisao_lojas.sql`. A
+palavra-passe não está no git: está com o Renato e no App Store Connect. O
+login por email na app precisa do `localhost` no Turnstile.
+
+Capturas 6,9" (1320×2868) tiradas com esta conta, sem dados de clubes reais.
+
 ## Segurança dos dados (Play) / Privacidade (Apple): o que declarar
 
 Com base em `/privacidade` e no código. A confirmar pela BA antes de submeter.

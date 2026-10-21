@@ -145,7 +145,7 @@ BEGIN
   -- ── 4. O mix de há 3 dias: criado aberto, inscrições, depois jogado ──
   INSERT INTO games (organization_id, title, date, location, max_players, num_courts,
                      court_time_minutes, game_time_minutes, format, created_by, price_per_player)
-  VALUES (v_org, 'Mix de sexta à noite', now() + interval '1 day', 'alinho Demo · Lisboa',
+  VALUES (v_org, 'Mix da noite', now() + interval '1 day', 'alinho Demo · Lisboa',
           8, 2, 90, 25, 'todos_contra_todos', v_rev, 8)
   RETURNING id INTO v_passado;
 
@@ -188,7 +188,7 @@ BEGIN
   -- Daqui a 6 dias: 6 inscritos, o revisor pode entrar (há 2 lugares).
   INSERT INTO games (organization_id, title, date, location, max_players, num_courts,
                      court_time_minutes, game_time_minutes, format, created_by, price_per_player)
-  VALUES (v_org, 'Mix de quinta à noite',
+  VALUES (v_org, 'Mix depois do trabalho',
           date_trunc('day', now() + interval '6 days') + interval '19 hours 30 minutes',
           'alinho Demo · Lisboa', 8, 2, 90, 20, 'sobe_desce', v_rev, 8)
   RETURNING id INTO v_quinta;
@@ -205,7 +205,7 @@ BEGIN
     json_build_object('sub', v_rev::text, 'role', 'authenticated')::text, true);
   INSERT INTO games (organization_id, title, date, location, max_players, num_courts,
                      court_time_minutes, game_time_minutes, format, created_by, price_per_player)
-  VALUES (v_org, 'Mix de domingo de manhã',
+  VALUES (v_org, 'Mix da manhã',
           date_trunc('day', now() + interval '9 days') + interval '10 hours',
           'alinho Demo · Lisboa', 8, 2, 90, 20, 'todos_contra_todos', v_rev, 7)
   RETURNING id INTO v_sabado;
