@@ -454,7 +454,7 @@ export default function PlayerDetails() {
           {!resultsHidden && (
             <Link to="/rankings" state={{ tab: 'global' }} className={`press flex items-center gap-3 px-3.5 py-3 text-ink-900 ${CARD}`}>
               <span className="flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-ctrl bg-ink-900 px-1.5 font-display text-base font-extrabold text-lime-400 tabular-nums">
-                {rankInfo ? `${rankInfo.position}.º` : '—'}
+                {rankInfo ? `${rankInfo.position}.º` : '-'}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-extrabold leading-tight">{t('rankings.title_global')}</span>

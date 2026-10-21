@@ -166,12 +166,12 @@ export default function PlayerStats() {
       {/* Números rápidos. */}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
-          <p className="font-display text-[22px] font-extrabold leading-none text-ink-900 tabular-nums">{best != null ? Math.round(best) : '—'}</p>
+          <p className="font-display text-[22px] font-extrabold leading-none text-ink-900 tabular-nums">{best != null ? Math.round(best) : '-'}</p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">{t('playerstats.best')}</p>
         </div>
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
           <p className="flex items-center gap-1 font-display text-[22px] font-extrabold leading-none text-ink-900 tabular-nums">
-            {streak ? <>{streak.won && <Flame size={18} className="text-[#4D7C0F]" />}{streak.length}</> : '—'}
+            {streak ? <>{streak.won && <Flame size={18} className="text-[#4D7C0F]" />}{streak.length}</> : '-'}
           </p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">
             {streak ? t(streak.won ? 'playerstats.streak_wins' : 'playerstats.streak_losses', { count: streak.length }) : t('playerstats.streak_none')}
@@ -183,7 +183,7 @@ export default function PlayerStats() {
         </div>
         <div className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
           <p className={`font-display text-[22px] font-extrabold leading-none tabular-nums ${deltaClass(month.points)}`}>
-            {month.events > 0 ? deltaText(month.points) : '—'}
+            {month.events > 0 ? deltaText(month.points) : '-'}
           </p>
           <p className="mt-1.5 text-[13px] leading-snug text-muted">{t('playerstats.points_month')}</p>
         </div>
@@ -194,7 +194,7 @@ export default function PlayerStats() {
         <p className={kicker}>{t('playerstats.evolution_title')}</p>
         <div className="card">
           <div className="mb-3 flex items-baseline justify-between gap-2">
-            <p className="font-display text-[26px] font-extrabold leading-none text-ink-900 tabular-nums">{current != null ? Math.round(current) : '—'}</p>
+            <p className="font-display text-[26px] font-extrabold leading-none text-ink-900 tabular-nums">{current != null ? Math.round(current) : '-'}</p>
             <p className="text-[12px] text-muted">{t('playerstats.current')}</p>
           </div>
           <Chips

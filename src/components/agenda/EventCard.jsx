@@ -16,6 +16,7 @@ import { ratingBand, peopleRatingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 import { KIND_COLORS } from '../../lib/kindColors'
 import { appOrigin } from '../../lib/native'
+import NoTime from '../NoTime'
 
 /* ════════════════════════════════════════════════════════════════════════
    Cartão da agenda da Home (Homepage unificada, Fase 1, Trello #258).
@@ -233,11 +234,11 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
     .flatMap((p) => [
       p.user_id
         ? { id: p.user_id, name: p.user?.name, rating: p.user?.rating, gender: p.user?.gender, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url }
-        : { id: p.guest_id ?? null, name: p.guest?.name || 'Jogador', rating: null, gender: null, isGuest: true, avatar_url: null },
+        : { id: p.guest_id ?? null, name: p.guest?.name || t('gamedetails.fallback_player_name'), rating: null, gender: null, isGuest: true, avatar_url: null },
       ...(p.partner_id
         ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, gender: p.partner?.gender, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }]
         : p.partner_guest_id
-          ? [{ id: p.partner_guest_id, name: p.partner_guest?.name || 'Jogador', rating: null, gender: null, isGuest: true, avatar_url: null }]
+          ? [{ id: p.partner_guest_id, name: p.partner_guest?.name || t('gamedetails.fallback_player_name'), rating: null, gender: null, isGuest: true, avatar_url: null }]
           : []),
     ])
   // Convidados contam como jogadores mas não entram na média de nível.
@@ -575,7 +576,7 @@ export function FriendSessionCard({ event, userId, past = false }) {
   else if (inSession) pill = <BandPill>✓ {t('home.next_in')}</BandPill>
   return (
     <HomeCard colors={kindColorsOf(sessionKindKey)} label={label} pill={pill}
-      time={event.hasTime ? formatTime(event.startsAt, i18n.language, HM) : '—'}
+      time={event.hasTime ? formatTime(event.startsAt, i18n.language, HM) : <NoTime onBand />}
       count={{ n: all.length, of: all.length, unit: t('homecard.unit_players') }}
       mine={inSession && !event.finished} past={past} to={to} ariaLabel={title}>
       <CardClub event={event} past={past} place={m.location || null} />
@@ -617,7 +618,7 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
   const won = event.finished && myTeam && m.winner_team && !draw ? m.winner_team === myTeam : null
 
   // R1 (13 out): a moldura comum. Vagas: as pessoas do jogo (4).
-  const time = event.hasTime ? formatTime(event.startsAt, i18n.language, HM) : '—'
+  const time = event.hasTime ? formatTime(event.startsAt, i18n.language, HM) : <NoTime onBand />
   const label = t('agenda.kind_friends')
   let pill = null
   if (past || event.finished) pill = <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>

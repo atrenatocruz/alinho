@@ -341,8 +341,8 @@ export default function CreateSeries() {
             <div>
               <p className={label}>{t('lessons.f_hour')}</p>
               <Chips label={t('lessons.f_hour')} value={f.peak_choice} onChange={(v) => set({ peak_choice: v })} options={[
-                { value: true, label: `${t('lessons.peak')} · ${eur(rowFor(true)?.price_month) || '—'}` },
-                { value: false, label: `${t('lessons.off_peak')} · ${eur(rowFor(false)?.price_month) || '—'}` },
+                { value: true, label: `${t('lessons.peak')} · ${eur(rowFor(true)?.price_month) || t('ui.empty_no_price')}` },
+                { value: false, label: `${t('lessons.off_peak')} · ${eur(rowFor(false)?.price_month) || t('ui.empty_no_price')}` },
               ]} />
               <p className={help}>{t('lessons.mixed_peak_hint')}</p>
             </div>
@@ -350,7 +350,7 @@ export default function CreateSeries() {
           <div>
             <p className={label}>{t('lessons.f_price_per_student')}</p>
             <Chips label={t('lessons.f_price_per_student')} value={f.price_mode} onChange={(v) => set({ price_mode: v })} options={[
-              { value: 'table', label: `${t('lessons.price_table')} · ${eur(tablePrice) || '—'}` },
+              { value: 'table', label: `${t('lessons.price_table')} · ${eur(tablePrice) || t('ui.empty_no_price')}` },
               { value: 'custom', label: t('lessons.price_custom') },
               { value: 'promo', label: t('lessons.price_promo') },
             ]} />

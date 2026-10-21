@@ -135,8 +135,8 @@ export default function CreateSeriesForm({ teachers, prices, peakHours, onCancel
               <div className="mb-2 space-y-1.5">
                 <p className="text-xs text-muted">{t('lessons.mixed_peak_hint')}</p>
                 <ChipGroup value={f.peak_choice} onChange={(v) => set({ peak_choice: v })} options={[
-                  { value: true, label: `${t('lessons.peak')} · ${euros(rowFor(true)?.price_month) || '—'}` },
-                  { value: false, label: `${t('lessons.off_peak')} · ${euros(rowFor(false)?.price_month) || '—'}` },
+                  { value: true, label: `${t('lessons.peak')} · ${euros(rowFor(true)?.price_month) || t('ui.empty_no_price')}` },
+                  { value: false, label: `${t('lessons.off_peak')} · ${euros(rowFor(false)?.price_month) || t('ui.empty_no_price')}` },
                 ]} />
               </div>
             )}

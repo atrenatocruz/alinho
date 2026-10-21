@@ -238,7 +238,7 @@ export function MonthsSheet({ months, month, onPick, onClose }) {
                   <button key={k} type="button" disabled={!m} onClick={() => onPick(`${k}-01`)}
                     className={`rounded-ctrl px-2 py-2.5 text-center ${on ? 'bg-ink-900 text-white' : m ? 'border border-line bg-white text-ink-900' : 'cursor-default border border-dashed border-line text-ink-200'}`}>
                     <span className="block text-sm font-extrabold">{short(k)}</span>
-                    <span className={`block text-[11px] ${on ? 'text-white/75' : m ? 'text-muted' : 'text-ink-200'}`}>{m ? t('played.games_count', { count: m.games }) : '—'}</span>
+                    <span className={`block text-[11px] ${on ? 'text-white/75' : m ? 'text-muted' : 'text-ink-200'}`}>{m ? t('played.games_count', { count: m.games }) : t('ui.empty_no_games')}</span>
                   </button>
                 )
               })}
@@ -286,7 +286,7 @@ function PlayedCard({ r, query = '', other = false }) {
   ) : (
     <div className={`relative flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[18px] ${PLACE_BOX[r.place] || 'bg-ink-50 text-ink-900'}`}>
       {r.place === 1 && <Crown ring={56} />}
-      <span className="font-display text-[22px] font-extrabold leading-none">{r.place ? `${r.place}.º` : '—'}</span>
+      <span className="font-display text-[22px] font-extrabold leading-none">{r.place ? `${r.place}.º` : '-'}</span>
       {r.total ? <span className="mt-0.5 text-[10px] font-bold opacity-70">{t('played.of_total', { total: r.total })}</span> : null}
     </div>
   )
@@ -303,7 +303,7 @@ function PlayedCard({ r, query = '', other = false }) {
     const others = ((r.my_team === 'b' ? r.team_a : r.team_b) || []).map(nb)
     if (pending) accent = { text: t('played.missing_result'), className: 'text-danger' }
     else if (mine.length || others.length) {
-      lines.push(t('played.teams', { partner: (r.partner_name && nb(r.partner_name)) || mine[1] || '—', others: others.join(` ${t('played.and')} `) }))
+      lines.push(t('played.teams', { partner: (r.partner_name && nb(r.partner_name)) || mine[1] || t('ui.empty_no_partner'), others: others.join(` ${t('played.and')} `) }))
     }
     const extra = [durationText(r.duration_minutes) && `⏱ ${durationText(r.duration_minutes)}`, r.rounds_played ? t('played.rounds', { count: r.rounds_played }) : null].filter(Boolean).join(' · ')
     if (extra && !pending) lines.push(extra)

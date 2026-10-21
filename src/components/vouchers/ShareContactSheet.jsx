@@ -23,7 +23,7 @@ export default function ShareContactSheet({ open, club, name, email, onAccept, o
         {[[t('vouchers.share_name'), name], [t('vouchers.share_email'), email]].map(([label, value]) => (
           <div key={label} className="flex items-center justify-between gap-3 border-t border-line px-3 py-2.5 first:border-t-0">
             <span className="text-muted">{label}</span>
-            <b className="min-w-0 truncate font-extrabold text-ink-900">{value || '—'}</b>
+            <b className="min-w-0 truncate font-extrabold text-ink-900">{value || t('ui.empty_not_given')}</b>
           </div>
         ))}
       </div>

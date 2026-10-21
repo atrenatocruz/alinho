@@ -12,7 +12,7 @@ export default function Novidades() {
   usePageTop()
   const { t, i18n } = useTranslation()
   const loginHref = useLoginHref()
-  const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
+  const lang = (i18n.language || 'pt').slice(0, 2)
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
@@ -27,9 +27,9 @@ export default function Novidades() {
                   {novidadeDate(n.date, lang)}
                   {i === 0 && <span className="rounded-full bg-lime-400 px-2 py-0.5 font-sans text-[11px] font-extrabold normal-case tracking-normal text-ink-900">{t('nov.new')}</span>}
                 </p>
-                <h2 className="mt-2 text-xl text-ink-900">{n.title[lang]}</h2>
+                <h2 className="mt-2 text-xl text-ink-900">{t(`nov.${n.key}.title`)}</h2>
                 <ul className="mt-3 list-disc space-y-2 pl-5 text-ink-700 leading-relaxed marker:text-ink-900">
-                  {n.items[lang].map((item) => <li key={item}>{item}</li>)}
+                  {Array.from({ length: n.items }, (_, j) => t(`nov.${n.key}.item_${j + 1}`)).map((item) => <li key={item}>{item}</li>)}
                 </ul>
               </article>
             ))}

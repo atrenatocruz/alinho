@@ -303,7 +303,7 @@ export default function TeacherPage({ view = 'profile' }) {
                 <td className="font-semibold text-ink-900 py-1.5">{t(`lessons.price_row_${type}`)}</td>
                 {LESSON_DURATIONS.map((d) => {
                   const v = priceFor(type, d)
-                  return <td key={d} className="text-right px-1 py-1.5 text-ink-900">{v == null ? '—' : euros(v)}</td>
+                  return <td key={d} className="text-right px-1 py-1.5 text-ink-900">{v == null ? '-' : euros(v)}</td>
                 })}
               </tr>
             ))}

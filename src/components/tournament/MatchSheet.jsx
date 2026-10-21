@@ -167,8 +167,8 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
   const h2h = both ? headToHead(match.entry_a_id, match.entry_b_id, matches, match) : []
   const hasStats = both && (recA.played || recB.played)
   const num = (v) => new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(v)
-  const diffText = (r) => (r.scored ? (r.gamesWon - r.gamesLost > 0 ? `+${r.gamesWon - r.gamesLost}` : String(r.gamesWon - r.gamesLost)) : '—')
-  const placeText = (p) => (p ? t('tournament.stats.group_place', { place: p.place, group: p.group, points: p.points }) : '—')
+  const diffText = (r) => (r.scored ? (r.gamesWon - r.gamesLost > 0 ? `+${r.gamesWon - r.gamesLost}` : String(r.gamesWon - r.gamesLost)) : '-')
+  const placeText = (p) => (p ? t('tournament.stats.group_place', { place: p.place, group: p.group, points: p.points }) : '-')
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
@@ -217,9 +217,9 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
                 <StatRow label={t('tournament.stats.record')} a={recA.wins} b={recB.wins}
                   textA={`${recA.wins}–${recA.losses}`} textB={`${recB.wins}–${recB.losses}`} />
                 <StatRow label={t('tournament.stats.win_pct')} a={recA.winPct} b={recB.winPct}
-                  textA={recA.winPct == null ? '—' : `${recA.winPct}%`} textB={recB.winPct == null ? '—' : `${recB.winPct}%`} />
+                  textA={recA.winPct == null ? '-' : `${recA.winPct}%`} textB={recB.winPct == null ? '-' : `${recB.winPct}%`} />
                 <StatRow label={t('tournament.stats.avg_games')} a={recA.avgGames} b={recB.avgGames}
-                  textA={recA.avgGames == null ? '—' : num(recA.avgGames)} textB={recB.avgGames == null ? '—' : num(recB.avgGames)} />
+                  textA={recA.avgGames == null ? '-' : num(recA.avgGames)} textB={recB.avgGames == null ? '-' : num(recB.avgGames)} />
                 <StatRow label={t('tournament.stats.diff')} bar={false}
                   a={recA.scored ? recA.gamesWon - recA.gamesLost : null} b={recB.scored ? recB.gamesWon - recB.gamesLost : null}
                   textA={diffText(recA)} textB={diffText(recB)} />
@@ -243,7 +243,7 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
                     <div key={m.id} className="flex items-center gap-2.5 px-3 py-2.5">
                       <span className="w-[76px] shrink-0 truncate font-mono text-[10px] font-bold uppercase tracking-wide text-ink-500">{phaseShort(m, groups, t)}</span>
                       <span className="min-w-0 flex-1 truncate text-[13px] text-ink-700">
-                        {m.winner_entry_id ? t('tournament.stats.won', { name: nameOf(m.winner_entry_id) }) : '—'}
+                        {m.winner_entry_id ? t('tournament.stats.won', { name: nameOf(m.winner_entry_id) }) : t('ui.empty_not_played')}
                       </span>
                       {score && <span className="shrink-0 font-display text-[15px] font-extrabold tabular-nums text-ink-900">{score}</span>}
                     </div>

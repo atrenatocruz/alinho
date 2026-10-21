@@ -26,6 +26,7 @@ import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
 import { SkeletonGate, SkBlock } from '../Skeleton'
 import { daysAside, shortDay } from '../event/heroDates'
+import NoTime from '../NoTime'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
@@ -239,7 +240,7 @@ function EventRow({ event, member }) {
     const x = event.tournament
     const a = shortDay(x.starts_on, i18n.language)
     const b = x.ends_on && String(x.ends_on).slice(0, 10) !== String(x.starts_on || '').slice(0, 10) ? shortDay(x.ends_on, i18n.language) : null
-    time = b ? `${a.split(' ')[0]}–${b}` : a || '—'
+    time = b ? `${a.split(' ')[0]}-${b}` : a || <NoTime onBand label={t('ui.empty_day_tbd')} />
     timeAside = daysAside(x.starts_on, x.ends_on, i18n.language, t)
     chips = null
     if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
