@@ -361,16 +361,16 @@ function AfterLogin() {
 // seu canónico e título, e no resto da app o canónico sai — as páginas da
 // app estão fora do índice (robots.txt) e não devem apontar para a landing.
 const PUBLIC_HEAD = {
-  '/': { title: 'alinho — mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
+  '/': { title: 'alinho.pt: mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
   '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
   // Páginas do site (#619, 10 out): título e descrição próprios, no mesmo estilo.
   '/como-funciona': {
-    title: 'Como funciona o alinho.pt — mixes, nível, torneios e WhatsApp',
+    title: 'Como funciona o alinho.pt: mixes, nível, torneios e WhatsApp',
     canonical: 'https://www.alinho.pt/como-funciona',
     description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
   '/novidades': {
-    title: 'Novidades do alinho.pt — o que mudou em cada versão',
+    title: 'Novidades do alinho.pt: o que mudou em cada versão',
     canonical: 'https://www.alinho.pt/novidades',
     description: 'As mudanças de cada versão do alinho.pt, a mais recente em cima.',
   },
