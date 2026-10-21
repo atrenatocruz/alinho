@@ -15,7 +15,7 @@ import {
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { Avatar, ConfirmSheet, EmptyState, LoadErrorState, PrimaryButton } from '../components/ui'
 import { describeError } from '../lib/errors'
-import { SkeletonGate, SkWhiteCard } from '../components/Skeleton'
+import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
 
 const SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
 
@@ -289,7 +289,7 @@ export default function GroupMatches() {
 
   return (
     <div className="space-y-5 max-w-lg mx-auto">
-      <BackBar onBack={goBack} title={t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')} />
+      <BackBar onBack={goBack} title={loading && !org ? '' : t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')} />
 
       {/* Botão por baixo do subtítulo, a toda a largura: ao lado do título ficava
           espremido em três linhas e o ícone encolhia. */}
@@ -297,7 +297,12 @@ export default function GroupMatches() {
         <div>
           {/* Grupo: «Jogos entre amigos»; clube: «Jogos em aberto» — é o mesmo
               com nomes diferentes (Francisco, 28 set; substitui a regra de 27). */}
-          <h2 className="text-3xl text-ink-900">{t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')}</h2>
+          {/* Enquanto não se sabe se é grupo ou clube, o título fica a cinzento:
+              antes dizia «Jogos em aberto» e mudava para «Jogos entre amigos»
+              (QA, 21 out). */}
+          {loading && !org
+            ? <div className="space-y-2"><SkLine size="big" w="62%" /><SkLine size="text" w="52%" /></div>
+            : <h2 className="text-3xl text-ink-900">{t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')}</h2>}
           {org && <p className="text-muted text-sm mt-0.5">{t('groupmatches.subtitle', { group: org.name })}</p>}
         </div>
         <Link to={`/clube/${slug}/jogos/novo`} className="block">
