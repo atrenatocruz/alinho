@@ -145,7 +145,7 @@ export default function Rankings() {
       if (period !== ALWAYS) {
         return withoutHidden(monthly.byMonth[period], hidden).map((p) => ({
           // Está na lista do mês porque jogou nesse mês.
-          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, gender: p.user?.gender, ranked: true, played: true,
+          user_id: p.user_id, name: p.user?.name || t('ui.empty_no_name'), avatar_url: null, gender: p.user?.gender, ranked: true, played: true,
           sub: `${t('rankings.mix_count', { count: p.participations })} · 🏆 ${t('rankings.mixes_won_count', { count: p.mixesWon })}`,
           value: p.points > 0 ? `+${p.points}` : String(p.points), valueLabel: t('rankings.points_label'),
         }))
@@ -344,7 +344,7 @@ export default function Rankings() {
         >
           {!allScales && (
             <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${row.position ? positionStyle(row.position) : 'bg-ink-50 text-muted'}`}>
-              {row.position ?? '—'}
+              {row.position ?? '-'}
             </span>
           )}
           <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" frame={frames[row.user_id]} />
@@ -497,7 +497,7 @@ export default function Rankings() {
           className="sticky bottom-24 z-10 w-full flex items-center gap-3 px-3.5 py-2.5 rounded-card bg-ink-900 text-white shadow-lift text-left"
         >
           <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${me.position ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>
-            {me.position ?? '—'}
+            {me.position ?? '-'}
           </span>
           <Avatar name={me.name} url={me.avatar_url} size="w-9 h-9 text-xs" />
           <div className="flex-1 min-w-0">

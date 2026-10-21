@@ -26,7 +26,7 @@ export function PastRow({ item, query = '' }) {
     <button type="button" onClick={item.abrir || undefined} disabled={!item.abrir}
       className="flex w-full items-center gap-3 rounded-ctrl border border-line bg-surface p-3 text-left disabled:cursor-default">
       <span className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-ctrl border border-line bg-white">
-        <b className="text-lg leading-none text-ink-900">{d ? d.getDate() : '—'}</b>
+        <b className="text-lg leading-none text-ink-900">{d ? d.getDate() : '-'}</b>
         <span className="mt-0.5 font-mono text-[10px] font-bold text-muted">{d ? monthShort(d, i18n.language) : ''}</span>
       </span>
       <span className="min-w-0 flex-1">

@@ -55,7 +55,7 @@ function KindPicker({ kind, setKind, pointsTo, setPointsTo, startOpen = false, h
       {kind === 'pontos' && (
         <label className="flex items-center gap-2.5 text-sm text-muted">
           {t('friends.points_to_before')}
-          <input inputMode="numeric" value={pointsTo} placeholder="—" aria-label={t('friends.points_to_aria')}
+          <input inputMode="numeric" value={pointsTo} placeholder="21" aria-label={t('friends.points_to_aria')}
             onChange={(e) => setPointsTo(clean(e.target.value))}
             className="input-field h-12 w-20 text-center text-lg font-extrabold tabular-nums" />
           {t('friends.points_to_after')}

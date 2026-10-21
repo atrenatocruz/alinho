@@ -257,7 +257,7 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
       inputMode="decimal"
       value={draft[k]?.[field] ?? ''}
       onChange={(e) => setCell(k, field, e.target.value)}
-      placeholder="—"
+      placeholder=""
       aria-label={field}
       className="w-[72px] rounded-lg border border-line bg-canvas px-2 py-1.5 text-right text-sm tabular-nums text-ink-900 placeholder:text-ink-200 focus:outline-none focus:ring-2 focus:ring-lime-400"
     />
@@ -306,7 +306,7 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
             })}
             <tr className="border-t border-line">
               <td className="py-1 font-semibold text-ink-900" colSpan={2}>{t('lessons.trial')}</td>
-              <td className="py-1 text-right text-ink-500">—</td>
+              <td className="py-1 text-right text-ink-500">-</td>
               <td className="py-1 pl-1.5 text-right">{cell(keyOf('trial', 60, peak), 'lesson')}</td>
             </tr>
           </tbody>

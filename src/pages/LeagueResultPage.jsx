@@ -10,10 +10,11 @@ import { getLeagueEncounter, submitResult, resolveEncounter, leagueErrorMessage 
 import { emptyDraft, draftFromMatches, draftToMatches, draftProblem } from '../lib/leagueResultDraft'
 
 function PlayerSelect({ value, options, onChange, label }) {
+  const { t } = useTranslation()
   return (
     <select aria-label={label} value={value || ''} onChange={(e) => onChange(e.target.value || null)}
       className="min-h-[48px] w-full rounded-ctrl border border-line bg-white px-3 text-base font-bold">
-      <option value="">—</option>
+      <option value="">{t('ui.empty_choose')}</option>
       {options.map((o) => <option key={o.user_id} value={o.user_id}>{o.name}</option>)}
     </select>
   )

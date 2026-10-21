@@ -17,6 +17,7 @@ import { CardClub } from '../agenda/EventCard'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from '../agenda/HomeCard'
 import { formatTime } from '../../lib/formatDate'
 import { describeError } from '../../lib/errors'
+import NoTime from '../NoTime'
 
 /** As fotos de quem já aceitou e um círculo tracejado por lugar que falta. */
 export function InviteFaces({ accepted, slots, size = 'w-7 h-7 text-[10px]' }) {
@@ -46,7 +47,7 @@ export default function FriendInviteEventCard({ event, onDecline }) {
   // A mesma frase da lista «Jogos entre amigos».
   const waitLine = r.pending > 0 ? t('friends.waiting_answers', { count: r.pending })
     : r.isCreator ? t('friends.form_teams_now') : t('friends.waiting_teams')
-  const time = event.hasTime ? formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) : '—'
+  const time = event.hasTime ? formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) : <NoTime onBand />
   return (
     <>
       <HomeCard colors={kindColorsOf('friends')} label={t('agenda.kind_friends')}

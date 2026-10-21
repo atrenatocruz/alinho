@@ -166,7 +166,7 @@ export default function TeacherSchedule() {
         </div>
       ) : (
         <>
-          <b className="font-extrabold text-ink-900 break-words min-w-0">{value || '—'}</b>
+          <b className="font-extrabold text-ink-900 break-words min-w-0">{value || t('ui.empty_not_given')}</b>
           <button type="button" onClick={() => setEditing(key)} className="font-extrabold text-ink-900 hover:underline">
             {t('teacher.schedule_change')}
           </button>

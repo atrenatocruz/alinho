@@ -97,7 +97,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
                 </td>
                 <td className="py-1.5 pr-2">
                   <span className={`text-xs ${passes ? 'font-bold text-ink-900' : 'text-ink-900'}`}>
-                    {team?.name || '—'}
+                    {team?.name || t('ui.empty_tbd')}
                   </span>
                   {team?.seed ? (
                     <span className="ml-1 font-mono text-xs text-muted">
