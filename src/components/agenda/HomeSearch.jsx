@@ -27,6 +27,7 @@ import { Realce } from '../SearchField'
 import { EmptyState } from '../ui'
 
 import { eventTitle, eventMatches } from './homeSearchMatch'
+import NoTime from '../NoTime'
 
 export { eventMatches }
 
@@ -252,7 +253,7 @@ export default function HomeSearch({ events, query, todayKey, linkFor, location,
               <div className="flex min-h-[44px] items-center gap-3">
                 <Link to={to || '#'} onClick={remember} className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="w-12 shrink-0">
-                    <span className="block text-[17px] font-extrabold leading-none text-ink-900 tabular-nums">{e.hasTime ? formatTime(e.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                    <span className="block text-[17px] font-extrabold leading-none text-ink-900 tabular-nums">{e.hasTime ? formatTime(e.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) : <NoTime small />}</span>
                     <span className="mt-1 block text-[11px] font-semibold text-muted">{whenShort(e.dayKey, todayKey, t, i18n.language)}</span>
                   </span>
                   <span className="min-w-0">

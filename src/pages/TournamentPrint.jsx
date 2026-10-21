@@ -68,7 +68,7 @@ const Blank = ({ w = 44 }) => (
 function GroupSheet({ group, matches, entries }) {
   const { t } = useTranslation()
   const mine = matches.filter((m) => m.stage === 'grupo' && m.group_id === group.id)
-  const nameOf = (id) => entries[id]?.name || '—'
+  const nameOf = (id) => entries[id]?.name || t('ui.empty_tbd')
   // Com jogos já feitos, a tabela sai com a classificação de agora (o mesmo
   // desempate da página); sem nenhum, fica em branco para somar à mão.
   const anyPlayed = mine.some(played)
@@ -131,7 +131,7 @@ function BracketSheet({ matches, entries, title }) {
   const side = (m, which) => {
     const id = which === 'a' ? m.entry_a_id : m.entry_b_id
     const source = which === 'a' ? m.source_a : m.source_b
-    return entries[id]?.name || sourceText(source, matches, t) || '—'
+    return entries[id]?.name || sourceText(source, matches, t) || t('ui.empty_tbd')
   }
 
   const Bracket = ({ list, label }) => (
@@ -210,10 +210,10 @@ function DayGrid({ day, matches, entries, locale }) {
                           {m.round ? ` · ${roundName(m.round, t)}` : ''}
                         </span>
                         <span className="block">
-                          {nameOf(m.entry_a_id) || sourceText(m.source_a, null, t) || '—'}
+                          {nameOf(m.entry_a_id) || sourceText(m.source_a, null, t) || t('ui.empty_tbd')}
                         </span>
                         <span className="block">
-                          {nameOf(m.entry_b_id) || sourceText(m.source_b, null, t) || '—'}
+                          {nameOf(m.entry_b_id) || sourceText(m.source_b, null, t) || t('ui.empty_tbd')}
                         </span>
                         <span className="mt-0.5 block">
                           {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={20} /> – <Blank w={20} /></>}

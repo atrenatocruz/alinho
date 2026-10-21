@@ -2522,7 +2522,7 @@ export default function GameDetails() {
   const teamById = Object.fromEntries(teams.map(team => [team.id, team]))
   const teamName = (teamId) => {
     const team = teamById[teamId]
-    if (!team) return '—'
+    if (!team) return t('ui.empty_tbd')
     return `${firstLastName(team.player1?.name)} / ${firstLastName(team.player2?.name)}`
   }
 
@@ -4820,7 +4820,7 @@ export default function GameDetails() {
                         >
                           {t(HISTORY_ACTION_LABEL_KEY[event.action] || event.action)}
                         </span>
-                        <span className="font-extrabold text-ink-900">{event.user?.name || '—'}</span>
+                        <span className="font-extrabold text-ink-900">{event.user?.name || t('ui.empty_no_name')}</span>
                         {event.partner?.name && (
                           <span className="text-sm text-muted">
                             {t('gamedetails.history_with_partner', { name: event.partner.name })}

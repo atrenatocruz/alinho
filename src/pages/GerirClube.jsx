@@ -4087,7 +4087,7 @@ export default function GerirClube() {
                             <b className="font-mono text-sm font-extrabold uppercase">{String(linha || '').slice(0, 3)}</b>
                           ) : (
                             <>
-                              <b className="font-display text-[22px] font-extrabold leading-none">{dia ? dia.getDate() : '—'}</b>
+                              <b className="font-display text-[22px] font-extrabold leading-none">{dia ? dia.getDate() : '-'}</b>
                               <span className="mt-0.5 font-mono text-[10px] font-bold uppercase">{dia ? dia.toLocaleDateString(i18n.language, { month: 'short' }).replace('.', '') : ''}</span>
                             </>
                           )}
@@ -4839,7 +4839,7 @@ export default function GerirClube() {
                 <div className="card space-y-3">
                   <div>
                     <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_owner_label')}</p>
-                    <p className="text-base font-extrabold text-ink-900">{scannedVoucher.user?.name || '—'}</p>
+                    <p className="text-base font-extrabold text-ink-900">{scannedVoucher.user?.name || t('ui.empty_no_name')}</p>
                   </div>
                   <div className="pt-3 border-t border-line">
                     <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_mix_label')}</p>

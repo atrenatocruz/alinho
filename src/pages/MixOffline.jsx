@@ -115,7 +115,7 @@ export default function MixOffline() {
   const teamById = Object.fromEntries((teams || []).map((team) => [team.id, team]))
   const teamLabel = (id) => {
     const team = teamById[id]
-    return team ? `${team.player1.name} / ${team.player2.name}` : '—'
+    return team ? `${team.player1.name} / ${team.player2.name}` : t('ui.empty_tbd')
   }
 
   const handleSaveScore = (matchIndex) => {

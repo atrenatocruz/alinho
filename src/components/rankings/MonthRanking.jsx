@@ -143,7 +143,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
             <button type="button" onClick={seeMe}
               className="sticky bottom-24 z-10 flex w-full items-center gap-3 rounded-card bg-ink-900 px-3.5 py-2.5 text-left text-white shadow-lift">
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-ctrl text-sm font-extrabold tabular-nums ${me?.qualified ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>
-                {me?.qualified ? me.place : '—'}
+                {me?.qualified ? me.place : '-'}
               </span>
               <Avatar name={me?.name || '?'} url={me?.avatar_url} size="w-9 h-9 text-xs" />
               <div className="min-w-0 flex-1">

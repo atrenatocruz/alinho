@@ -264,7 +264,7 @@ function PastLessons({ series, students }) {
                 className="flex w-full items-center gap-3 px-3 py-3 text-left disabled:cursor-default">
                 <span className="w-16 shrink-0 font-extrabold text-ink-900">{t(`lessons.wd_short_${series.weekday}`)} {d.getDate()}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-900">
-                  {cancelled ? '—' : [t('lessons.past_came', { count: all.length - faltas, total: all.length }), faltas ? t('lessons.past_missed', { count: faltas }) : null].filter(Boolean).join(' · ')}
+                  {cancelled ? t('ui.empty_cancelled') : [t('lessons.past_came', { count: all.length - faltas, total: all.length }), faltas ? t('lessons.past_missed', { count: faltas }) : null].filter(Boolean).join(' · ')}
                 </span>
                 <span className={`shrink-0 rounded-full px-2 py-[3px] text-[11px] font-extrabold ${cancelled ? 'bg-danger/10 text-danger' : 'bg-ink-50 text-ink-700'}`}>
                   {t(cancelled ? 'lessons.past_cancelled' : 'lessons.past_given')}

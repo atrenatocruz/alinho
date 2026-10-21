@@ -12,6 +12,7 @@ import { fromDayKey, EVENT_KINDS } from '../../lib/agenda'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { InviteFaces } from '../friends/FriendInviteEventCard'
 import { kindColorsOf } from '../agenda/HomeCard'
+import NoTime from '../NoTime'
 
 // Os estados em que «estou dentro»: não os convites por responder, os pedidos,
 // a lista de suplentes nem o «não vou».
@@ -62,7 +63,7 @@ function InviteNextCard({ event, todayKey, to }) {
   const place = [event.orgName, r.location].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ')
   return (
     <Link to={to} className="press flex w-[208px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_0_0_2px_#111111]">
-      <Band kind="friends" time={event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+      <Band kind="friends" time={event.hasTime === false ? <NoTime onBand /> : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
         sub={`${whenShort(event.dayKey, todayKey, t, i18n.language)} · ${t(SHORT_KIND.friends)}`} />
       <div className="flex flex-1 flex-col px-3 pb-2.5 pt-2">
         <p className="line-clamp-2 font-display text-[14px] font-extrabold leading-[1.2] text-ink-900">{t('home.invite_by', { name: r.creatorFirst })}</p>
@@ -99,7 +100,7 @@ function NextCard({ event, todayKey, userId, to }) {
   const place = [event.orgName, eventPlace(event)].filter(Boolean).join(' · ')
   const body = (
     <>
-      <Band kind={event.kind} time={event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+      <Band kind={event.kind} time={event.hasTime === false ? <NoTime onBand /> : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
         sub={`${whenShort(event.dayKey, todayKey, t, i18n.language)} · ${t(SHORT_KIND[event.kind] || style.labelKey)}`} />
       <div className="flex flex-1 flex-col px-3 pb-2.5 pt-2">
         <p className="line-clamp-2 font-display text-[14px] font-extrabold leading-[1.2] text-ink-900">{title}</p>

@@ -5,6 +5,7 @@
 // player2_tshirt (Dev 3). «Não quero» é uma escolha e grava-se como 'none';
 // sem escolha ainda, null.
 import { useTranslation } from 'react-i18next'
+import i18n from '../../lib/i18n'
 
 export const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 export const NO_TSHIRT = 'none'
@@ -74,8 +75,13 @@ export function TshirtPicker({ rules, value, onChange, label, disabled = false }
   )
 }
 
-/** O tamanho em pequeno: «L», «—» (não quer), «?» (ainda não escolheu). */
-export const sizeMark = (size) => (size === NO_TSHIRT ? '—' : size || '?')
+/** O tamanho em pequeno: «L», «sem» (não quer), «falta» (ainda não escolheu; UX, 21 out). */
+export const sizeMark = (size) => (size === NO_TSHIRT ? i18n.t('ui.empty_no_tshirt') : size || i18n.t('ui.empty_tshirt_pending'))
+
+/** O mesmo, com o «falta» a cinzento. */
+export function SizeMark({ size }) {
+  return size || size === NO_TSHIRT ? sizeMark(size) : <span className="text-[#6B7280]">{sizeMark(size)}</span>
+}
 
 /** O bloco «T-shirt do torneio» do criar e do editar (SPEC, ponto 1). */
 export function TshirtField({ rules, onChange, FieldLabel }) {
