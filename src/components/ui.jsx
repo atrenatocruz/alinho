@@ -918,11 +918,42 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
  *  sempre o mesmo tamanho, preso ou solto — não treme ao descer.
  *  `belowBackBar`: nas páginas com o «‹» preso (BackBar, 64 px + a margem do
  *  telemóvel), prende-se logo por baixo dele em vez de no topo. */
-const BELOW_BACKBAR = 'calc(4rem + var(--safe-top, env(safe-area-inset-top, 0px)))'
+const SAFE_TOP_VAR = 'var(--safe-top, env(safe-area-inset-top, 0px))'
+const BELOW_BACKBAR = `calc(4rem + ${SAFE_TOP_VAR})`
+// Sem «‹» por cima, prende-se logo abaixo da hora e da bateria do iPhone (na
+// app, a página vai por baixo delas) e, enquanto está preso, uma faixa do
+// cinzento da página tapa essa margem — senão os separadores e o conteúdo
+// passavam por baixo da hora (Renato, TestFlight 21 out). No site e no
+// Android a margem é 0 e nada muda.
 export function StickyTop({ children, belowBackBar = false, className = '' }) {
+  const ref = useRef(null)
+  const [stuck, setStuck] = useState(false)
+  useEffect(() => {
+    if (belowBackBar) return undefined
+    const el = ref.current
+    let area = el?.parentElement
+    while (area && !/(auto|scroll)/.test(getComputedStyle(area).overflowY)) area = area.parentElement
+    const scroller = area || window
+    const read = () => {
+      if (!el) return
+      const top = parseFloat(getComputedStyle(el).top) || 0
+      const areaTop = area ? area.getBoundingClientRect().top : 0
+      const scrolled = area ? area.scrollTop > 0 : window.scrollY > 0
+      setStuck(scrolled && el.getBoundingClientRect().top - areaTop <= top + 0.5)
+    }
+    read()
+    scroller.addEventListener('scroll', read, { passive: true })
+    window.addEventListener('resize', read)
+    return () => { scroller.removeEventListener('scroll', read); window.removeEventListener('resize', read) }
+  }, [belowBackBar])
   return (
-    <div style={{ '--bar-bg': 'rgb(var(--ground))', ...(belowBackBar ? { top: BELOW_BACKBAR } : {}) }}
-      className={`sticky top-0 z-10 -mx-4 space-y-2 bg-ground px-4 pb-1.5 pt-2 ${className}`}>
+    <div ref={ref} style={{ '--bar-bg': 'rgb(var(--ground))', top: belowBackBar ? BELOW_BACKBAR : SAFE_TOP_VAR }}
+      className={`sticky z-10 -mx-4 space-y-2 bg-ground px-4 pb-1.5 pt-2 ${className}`}>
+      {!belowBackBar && (
+        <div aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-0 bottom-full bg-ground transition-opacity duration-fast ${stuck ? 'opacity-100' : 'opacity-0'}`}
+          style={{ height: SAFE_TOP_VAR }} />
+      )}
       {children}
     </div>
   )
