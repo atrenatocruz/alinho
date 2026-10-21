@@ -15,6 +15,7 @@ import {
 import { compactTime } from '../lib/teacherSchedule'
 import { describeError, errorKind } from '../lib/errors'
 import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
 
 /* ─── «Pedir aula ao <nome>» (Trello #392, assunto 1) ─────────────────────
    Desenho aprovado pelo Francisco a 26 set (design-handoff/2026-09-26-
@@ -178,7 +179,8 @@ export default function RequestLesson() {
   }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
-    return <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+    // A forma da página em vez da roda (esqueletos, 12 out).
+    return <SkeletonGate frame={<BackBar onBack={() => navigate(`/professor/${id}`)} />}><div className="mt-4"><div className="space-y-3"><SkLine size="title" w="55%" /><SkWhiteCard /><SkWhiteCard /></div></div></SkeletonGate>
   }
   const back = (to, text) => <BackBar onBack={() => navigate(to)} label={text} title={data?.teacher?.name} />
   if (!data?.teacher) {

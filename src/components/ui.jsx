@@ -18,6 +18,7 @@ import { frameInsideBox, frameSrc } from '../lib/frames'
 import { useDragScroll } from '../lib/useDragScroll'
 import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
 import TimeInput from './TimeInput'
+import { SkeletonGate, SkCircle, SkLine } from './Skeleton'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -1660,9 +1661,17 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
 
         <div className="overflow-y-auto">
           {rows === null ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-            </div>
+            // As linhas a cinzento em vez da roda (esqueletos, 12 out).
+            <SkeletonGate>
+              <div className="divide-y divide-line">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <SkCircle size={40} />
+                    <span className="min-w-0 flex-1"><SkLine size="text" w={`${[55, 42, 62, 48, 38][i]}%`} /></span>
+                  </div>
+                ))}
+              </div>
+            </SkeletonGate>
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted text-center py-10">{emptyText}</p>
           ) : (

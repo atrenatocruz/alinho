@@ -24,6 +24,7 @@ import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardButton, kindCo
 import FaceCircles from '../event/FaceCircles'
 import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
+import { SkeletonGate, SkBlock } from '../Skeleton'
 import { daysAside, shortDay } from '../event/heroDates'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
@@ -424,7 +425,8 @@ function ClubPlayed({ club }) {
       .catch((err) => { console.error('Error loading played events:', err); if (alive) setData({ rows: [], total: 0 }) })
     return () => { alive = false }
   }, [club.id])
-  if (!data) return <div className="flex justify-center py-6"><div className="h-7 w-7 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+  // Dois cartões a cinzento em vez da roda (esqueletos, 12 out).
+  if (!data) return <SkeletonGate><div className="space-y-2.5"><SkBlock h={92} rounded="rounded-card" /><SkBlock h={92} rounded="rounded-card" /></div></SkeletonGate>
   const rows = data.rows || []
   if (rows.length === 0) {
     return (

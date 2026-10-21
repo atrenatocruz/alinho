@@ -18,6 +18,7 @@ import KindHero from '../components/KindHero'
 import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
 import { coverOf, useOrgCovers } from '../lib/orgCover'
 import { Realce } from '../components/SearchField'
+import { SkeletonGate, SkBlock, SkCircle, SkLine, SkRow } from '../components/Skeleton'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
    Encontrar clubes, grupos e professores — e só isso. Desenho:
@@ -70,6 +71,25 @@ const TABS = [
 // A mesma regra de todas as pesquisas de nomes (src/lib/semAcentos.js).
 const norm = semAcentos
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
+
+
+// Um cartão de clube a cinzento, com a forma do verdadeiro: capa, logótipo,
+// nome, linha pequena e o botão de baixo.
+function OrgCardSkeleton() {
+  return (
+    <div aria-hidden className="overflow-hidden rounded-[22px] bg-white shadow-card">
+      <SkBlock h={104} rounded="rounded-none" />
+      <div className="px-4 pb-4">
+        <span className="relative -mt-9 inline-block rounded-[28%] bg-white p-[3px]">
+          <span className="sk relative block h-14 w-14 overflow-hidden rounded-[28%] bg-[#ECECE7]" />
+        </span>
+        <SkLine size="title" w="62%" className="mt-1.5" />
+        <SkLine size="text" w="44%" className="mt-2" />
+        <SkBlock h={44} rounded="rounded-[14px]" className="mt-3.5" />
+      </div>
+    </div>
+  )
+}
 
 export default function Comunidade() {
   const { t, i18n } = useTranslation()
@@ -417,9 +437,38 @@ export default function Comunidade() {
       </StickyTop>
 
       {busy ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-        </div>
+        // A forma da página em vez da roda (esqueletos, 12 out): o título da
+        // secção a sério; os cartões a cinzento.
+        <SkeletonGate>
+          <div className="space-y-4">
+          {/* «OS TEUS» já se sabe (as inscrições estão em memória): o título a
+              sério e um círculo cinzento por cada um, até 4, para nada saltar
+              quando a lista chega (UX, 18 out). */}
+          {showMineRow && (
+            <section>
+              <p className="mb-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[.1em] text-[#4F535A]">{t('comunidade.mine_heading')} · {myOrgs.length}</p>
+              <div className="-mx-4 flex gap-3.5 overflow-hidden px-4 pb-1 pt-1.5">
+                {myOrgs.slice(0, 4).map((org) => (
+                  <div key={org.id} className="flex w-[84px] shrink-0 flex-col items-center gap-1.5">
+                    <SkCircle size={62} />
+                    <SkLine size="text" w="70%" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          <section>
+            {searching
+              ? <SkLine size="label" w="30%" className="mb-2.5" />
+              : <p className="mb-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[.1em] text-[#4F535A]">
+                  {t({ clubs: 'comunidade.filter_clubs', groups: 'comunidade.filter_groups', teachers: 'comunidade.tab_teachers' }[tab] || 'comunidade.tab_orgs')}
+                </p>}
+            {tab === 'teachers'
+              ? <div className="space-y-2.5"><SkRow /><SkRow /><SkRow /><SkRow /></div>
+              : <div className="space-y-3"><OrgCardSkeleton /><OrgCardSkeleton /></div>}
+          </section>
+          </div>
+        </SkeletonGate>
       ) : nothing ? (
         <EmptyState
           icon={tab === 'teachers' ? GraduationCap : Users}

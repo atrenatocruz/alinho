@@ -36,6 +36,7 @@ import FriendResultButtons from '../components/friends/FriendResultButtons'
 import { resultHow } from '../components/friends/FriendResultNotice'
 import { shortName } from '../components/friends/friendShare'
 import { unreadFriendResultNotice } from '../lib/notifications'
+import EventCoverSkeleton from '../components/event/EventCoverSkeleton'
 
 // «Vai» / «Por responder» (amigos sem bloquear, 27 set).
 const STATUS_KEY = { accepted: 'friends.tag_going', pending: 'friends.status_pending', declined: 'friends.tag_declined', guest: 'friends.guest_tag' }
@@ -372,7 +373,8 @@ export default function FriendSession() {
 
   if (loadError) return <div className="mx-auto max-w-lg">{back}<LoadErrorState title={loadError} /></div>
   if (!data) {
-    return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    // A capa e a folha a cinzento em vez da roda (esqueletos, 12 out).
+    return <div className="mx-auto max-w-lg"><EventCoverSkeleton onBack={goBack} /></div>
   }
 
   const person = (p, onClick) => (

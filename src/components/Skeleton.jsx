@@ -124,6 +124,20 @@ export function SkRow() {
   )
 }
 
+/** Um cartão branco a sério (cantos de 20 px, sombra) com linhas cinzentas
+ *  dentro: para as listas de cartões brancos no fundo da página (UX, 18 out:
+ *  cinzento sobre o fundo cinzento quase não se via). */
+export function SkWhiteCard({ lines = 3, className = '' }) {
+  const ws = ['38%', '70%', '52%']
+  return (
+    <div aria-hidden className={`rounded-[20px] bg-white p-4 shadow-card space-y-2.5 ${className}`}>
+      <SkLine size="label" w={ws[0]} />
+      <SkLine size="title" w={ws[1]} />
+      {lines > 2 && <SkLine size="text" w={ws[2]} />}
+    </div>
+  )
+}
+
 /** Página genérica (enquanto chega o código de uma página carregada à
  *  parte): o título e 3 cartões, a cinzento. */
 export function GenericPageSkeleton() {
