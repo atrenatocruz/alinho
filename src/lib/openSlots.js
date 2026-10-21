@@ -3,6 +3,8 @@
 // batch before publishing it. num_courts/max_players/format are left out
 // of each row deliberately: their schema defaults (1 court, 4 players,
 // 'sobe_desce') are already exactly right for a single 4-player slot.
+import i18n from './i18n'
+
 export function buildOpenSlotRows({ organizationId, date, priceDefault, timeRanges, createdBy }) {
   const batchId = crypto.randomUUID()
 
@@ -11,12 +13,12 @@ export function buildOpenSlotRows({ organizationId, date, priceDefault, timeRang
     const endDate = new Date(`${date}T${end}:00`)
     const courtTimeMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
     if (courtTimeMinutes <= 0) {
-      throw new Error(`hora de fim (${end}) tem de ser depois da hora de início (${start}).`)
+      throw new Error(i18n.t('openslots.end_after_start', { end, start }))
     }
 
     return {
       organization_id: organizationId,
-      title: 'Jogo em aberto',
+      title: i18n.t('openslots.default_title'),
       date: startDate.toISOString(),
       court_time_minutes: courtTimeMinutes,
       price_per_player: priceDefault ?? null,
@@ -72,7 +74,7 @@ export function batchSlotsPayload(date, ranges) {
   return ranges.filter((r) => r.start && r.end).map((r) => {
     const start = new Date(`${date}T${r.start}:00`)
     const minutes = Math.round((new Date(`${date}T${r.end}:00`).getTime() - start.getTime()) / 60000)
-    if (minutes <= 0) throw new Error(`hora de fim (${r.end}) tem de ser depois da hora de início (${r.start}).`)
+    if (minutes <= 0) throw new Error(i18n.t('openslots.end_after_start', { end: r.end, start: r.start }))
     return { ...(r.gameId ? { game_id: r.gameId } : {}), starts_at: start.toISOString(), minutes }
   })
 }

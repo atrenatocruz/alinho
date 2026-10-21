@@ -145,10 +145,11 @@ function OrgLine({ org }) {
 }
 
 function Footer({ qr }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-end justify-between gap-3">
       <div>
-        <p className="text-[12px] font-extrabold leading-tight text-white">Joga padel<br />no alinho.pt</p>
+        <p className="text-[12px] font-extrabold leading-tight text-white">{t('share.play_padel')}<br />{t('share.on_alinho')}</p>
         <p className="mt-0.5 text-[7.5px] text-[#9CA3AF]">alinho.pt · #alinhopadel</p>
       </div>
       {qr && (

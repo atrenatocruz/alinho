@@ -11,6 +11,7 @@ import { Sheet } from '../agenda/AgendaControls'
 import { describeError } from '../../lib/errors'
 import { dayKeyInTz, hhmmInTz } from '../../lib/tournamentDay'
 import { removePlayerFromEntry } from '../../lib/tournamentApi'
+import i18n from '../../lib/i18n'
 
 const BTN = 'inline-flex min-h-[48px] w-full items-center justify-center rounded-ctrl px-5 text-base font-extrabold transition-all duration-fast active:scale-[0.98] disabled:opacity-40'
 
@@ -32,7 +33,7 @@ export function whenText(iso, lang, short = false) {
   if (!iso) return ''
   const day = new Date(`${dayKeyInTz(new Date(iso))}T12:00`)
   const wd = day.toLocaleDateString(lang, { weekday: short ? 'short' : 'long' }).replace('.', '').split('-')[0]
-  return short ? `${wd} ${hhmmInTz(iso)}` : `${wd} às ${hhmmInTz(iso)}`
+  return short ? `${wd} ${hhmmInTz(iso)}` : i18n.t('tournament.when_at', { day: wd, time: hhmmInTz(iso), lng: lang })
 }
 
 /** A caixa amarela de cima: o que falta resolver, e «Resolver ›». */
@@ -152,7 +153,7 @@ export function categoriesClash(a, b) {
 export function categoryWhen(c, lang) {
   if (!c?.day_date) return ''
   const wd = new Date(`${c.day_date}T12:00`).toLocaleDateString(lang, { weekday: 'long' }).split('-')[0]
-  return c.start_time ? `${wd} às ${String(c.start_time).slice(0, 5)}` : wd
+  return c.start_time ? i18n.t('tournament.when_at', { day: wd, time: String(c.start_time).slice(0, 5), lng: lang }) : wd
 }
 
 /** A caixa amarela de quem joga: o aviso e, se houver, a ligação. */
