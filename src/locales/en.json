@@ -1175,6 +1175,12 @@
   "achievements.boca_a_boca_desc": "3 people you invited played their first mix",
   "achievements.embaixador_da_bola_name": "Ball Ambassador",
   "achievements.embaixador_da_bola_desc": "10 people you invited played their first mix",
+  "achievements.deste_boleia_name": "Gave a Lift",
+  "achievements.deste_boleia_desc": "Someone you invited played their first game",
+  "achievements.primeira_rotunda_name": "First Roundabout",
+  "achievements.primeira_rotunda_desc": "Win 2 games with the same partner",
+  "achievements.ate_a_porta_name": "To the Door",
+  "achievements.ate_a_porta_desc": "Win a mix with the same partner",
   "achievements.primeira_bola_name": "First Ball",
   "achievements.primeira_bola_desc": "Play your first mix",
   "achievements.areia_nos_tenis_name": "Sand in the Shoes",
@@ -6516,5 +6522,6 @@
   "nov.v20261009.item_2": "If every result is in and the mix is left open, the app finishes it the next day and the games count for the ranking.",
   "nov.v20261009.item_3": "Organisers can choose to approve who joins through the app. In those mixes you tap «Ask to join» and get a notice when you are accepted.",
   "nov.v20261009.item_4": "In tournaments, sign-ups close on their own at the deadline.",
-  "nov.v20261009.item_5": "Ties are broken as in the Portuguese Padel Federation."
+  "nov.v20261009.item_5": "Ties are broken as in the Portuguese Padel Federation.",
+  "mixoffline.default_title": "Mix"
 }

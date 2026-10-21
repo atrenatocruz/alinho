@@ -1179,6 +1179,12 @@
   "achievements.boca_a_boca_desc": "3 pessoas que convidaste jogaram o primeiro mix",
   "achievements.embaixador_da_bola_name": "Embaixador da Bola",
   "achievements.embaixador_da_bola_desc": "10 pessoas que convidaste jogaram o primeiro mix",
+  "achievements.deste_boleia_name": "Deste Boleia",
+  "achievements.deste_boleia_desc": "Uma pessoa que convidaste jogou o primeiro jogo",
+  "achievements.primeira_rotunda_name": "Primeira Rotunda",
+  "achievements.primeira_rotunda_desc": "Ganha 2 jogos com o mesmo parceiro",
+  "achievements.ate_a_porta_name": "Até à Porta",
+  "achievements.ate_a_porta_desc": "Ganha um mix com o mesmo parceiro",
   "achievements.primeira_bola_name": "Primeira Bola",
   "achievements.primeira_bola_desc": "Joga o teu primeiro mix",
   "achievements.areia_nos_tenis_name": "Areia nos Ténis",
@@ -6531,5 +6537,6 @@
   "nov.v20261009.item_2": "Se os resultados estiverem todos marcados e o mix ficar por terminar, a app termina-o no dia seguinte e os jogos contam para o ranking.",
   "nov.v20261009.item_3": "Quem organiza pode escolher aceitar quem entra pela app. Nesses mixes carregas em «Pedir para entrar» e recebes um aviso quando te aceitarem.",
   "nov.v20261009.item_4": "Nos torneios, as inscrições fecham sozinhas no fim do prazo.",
-  "nov.v20261009.item_5": "Empates resolvidos como na Federação Portuguesa de Padel."
+  "nov.v20261009.item_5": "Empates resolvidos como na Federação Portuguesa de Padel.",
+  "mixoffline.default_title": "Mix"
 }

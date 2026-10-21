@@ -27,6 +27,8 @@ const MEDAL_KEYS = new Set([
   'ano_novo_padel_novo', 'par_perfeito', 'noite_de_santos', 'bronzeado_de_padel', 'esgotado', 'fecha_campo',
   'a_malta_toda', 'casa_cheia', 'alma_do_grupo', 'fiel_ao_clube', 'sobrevivente', 'classico',
   'batismo_de_campo', 'boca_a_boca', 'embaixador_da_bola',
+  // As três da estrada (design-handoff/2026-10-21-conquista-primeira-rotunda).
+  'deste_boleia', 'primeira_rotunda', 'ate_a_porta',
 ])
 
 /** O endereço da medalha, ou null se esta conquista ainda não tem uma. */
