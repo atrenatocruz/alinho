@@ -14,7 +14,7 @@
 --     (account_origins.ref_user_id, quando essa tabela existir). Uma vez por
 --     pessoa, nunca o próprio, sem contas de teste. Dá-se também a quem
 --     convidou, quando o convidado joga (não espera pelo próximo jogo dele).
---   · primeira_rotunda (épica, jogo): 2 jogos ganhos com o mesmo parceiro
+--   · primeira_rotunda (comum, jogo; Francisco, 21 out): 2 jogos ganhos com o mesmo parceiro
 --     (com conta), de qualquer tipo, não precisam de ser seguidos.
 --   · ate_a_porta (lendária, jogo): ganhar um mix de dupla fixa
 --     (games.winner_team_id; sobe_desce, escalada, todos_contra_todos,
@@ -35,9 +35,12 @@ BEGIN;
 -- ── 1. O catálogo ───────────────────────────────────────────────────────
 INSERT INTO achievements (key, category, rarity, sort, active) VALUES
   ('deste_boleia',     'antiguidade', 'raro',     1028, TRUE),
-  ('primeira_rotunda', 'jogo',        'epico',    1029, TRUE),
+  ('primeira_rotunda', 'jogo',        'comum',    1029, TRUE),
   ('ate_a_porta',      'jogo',        'lendario', 1030, TRUE)
 ON CONFLICT (key) DO NOTHING;
+-- A Primeira Rotunda passou a comum (Francisco, 21 out); acerta onde esta
+-- migração já tinha corrido com 'epico'.
+UPDATE achievements SET rarity = 'comum' WHERE key = 'primeira_rotunda' AND rarity <> 'comum';
 
 -- ── 2. Já jogou? (interna) ──────────────────────────────────────────────
 -- Um jogo com resultado, de qualquer tipo, como a tabela _a27.
