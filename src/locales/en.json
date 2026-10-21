@@ -6516,5 +6516,6 @@
   "nov.v20261009.item_2": "If every result is in and the mix is left open, the app finishes it the next day and the games count for the ranking.",
   "nov.v20261009.item_3": "Organisers can choose to approve who joins through the app. In those mixes you tap «Ask to join» and get a notice when you are accepted.",
   "nov.v20261009.item_4": "In tournaments, sign-ups close on their own at the deadline.",
-  "nov.v20261009.item_5": "Ties are broken as in the Portuguese Padel Federation."
+  "nov.v20261009.item_5": "Ties are broken as in the Portuguese Padel Federation.",
+  "mixoffline.default_title": "Mix"
 }

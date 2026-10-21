@@ -6531,5 +6531,6 @@
   "nov.v20261009.item_2": "Se os resultados estiverem todos marcados e o mix ficar por terminar, a app termina-o no dia seguinte e os jogos contam para o ranking.",
   "nov.v20261009.item_3": "Quem organiza pode escolher aceitar quem entra pela app. Nesses mixes carregas em «Pedir para entrar» e recebes um aviso quando te aceitarem.",
   "nov.v20261009.item_4": "Nos torneios, as inscrições fecham sozinhas no fim do prazo.",
-  "nov.v20261009.item_5": "Empates resolvidos como na Federação Portuguesa de Padel."
+  "nov.v20261009.item_5": "Empates resolvidos como na Federação Portuguesa de Padel.",
+  "mixoffline.default_title": "Mix"
 }

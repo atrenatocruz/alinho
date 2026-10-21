@@ -234,11 +234,11 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
     .flatMap((p) => [
       p.user_id
         ? { id: p.user_id, name: p.user?.name, rating: p.user?.rating, gender: p.user?.gender, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url }
-        : { id: p.guest_id ?? null, name: p.guest?.name || 'Jogador', rating: null, gender: null, isGuest: true, avatar_url: null },
+        : { id: p.guest_id ?? null, name: p.guest?.name || t('gamedetails.fallback_player_name'), rating: null, gender: null, isGuest: true, avatar_url: null },
       ...(p.partner_id
         ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, gender: p.partner?.gender, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }]
         : p.partner_guest_id
-          ? [{ id: p.partner_guest_id, name: p.partner_guest?.name || 'Jogador', rating: null, gender: null, isGuest: true, avatar_url: null }]
+          ? [{ id: p.partner_guest_id, name: p.partner_guest?.name || t('gamedetails.fallback_player_name'), rating: null, gender: null, isGuest: true, avatar_url: null }]
           : []),
     ])
   // Convidados contam como jogadores mas não entram na média de nível.
