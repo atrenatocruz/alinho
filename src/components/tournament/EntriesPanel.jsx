@@ -20,6 +20,7 @@ import { tshirtOn, shirtRulesOf } from './tshirt'
 import { useNavigate } from 'react-router-dom'
 import { listTournamentClashes } from '../../lib/tournamentApi'
 import { ClashBanner, ClashCaseSheet, ClashListSheet, ClashSwapSheet, casesFor } from './Clashes'
+import { appOrigin } from '../../lib/native'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -486,7 +487,7 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
   const [fresh, setFresh] = useState(null) // [{ token, name, email }]
   // Numa troca não há inscrição nova: o título diz o que falta (#434).
   const [freshTitle, setFreshTitle] = useState('')
-  const linkOf = (token) => tournamentInviteLink(token, window.location.origin)
+  const linkOf = (token) => tournamentInviteLink(token, appOrigin())
 
   const act = async (fn) => {
     setBusy(true); setError('')

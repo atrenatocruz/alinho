@@ -21,6 +21,7 @@ import { categoryGenderQuestion } from './genderCheck'
 import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
 import { setMyTshirtSize } from '../../lib/tournamentApi'
 import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
+import { appOrigin } from '../../lib/native'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -245,7 +246,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
     window.dispatchEvent(new CustomEvent('tournament:reload'))
   }
 
-  const link = fresh ? tournamentInviteLink(fresh.token, window.location.origin) : ''
+  const link = fresh ? tournamentInviteLink(fresh.token, appOrigin()) : ''
 
   return (
     <div className="space-y-2.5">

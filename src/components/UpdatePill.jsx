@@ -19,7 +19,7 @@ export default function UpdatePill() {
     <div
       role="status"
       className="pointer-events-none fixed inset-x-0 z-[55] flex justify-center px-4 animate-fade-up"
-      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 88px)' }}
+      style={{ bottom: 'calc(72px + var(--nav-bottom))' }}
     >
       <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-ink-900 py-1 pl-4 pr-1 text-sm text-white shadow-lift ring-1 ring-white/10">
         <span className="mr-1 font-medium">{t('appupdate.new_version')}</span>

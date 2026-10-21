@@ -39,6 +39,12 @@
    hash. Sem efeito visual. */
 :root { --alinho-css: '2026-09-29'; }
 
+/* A distância do menu de baixo ao fundo do ecrã: 16 px, e no iPhone sem botão
+   (app das lojas, viewport-fit=cover) só o suficiente para não tocar na barra
+   de gestos — com 16 px + a margem toda (34 px) ficava a 50 px e tapava a
+   barra «Tu» dos Rankings (Renato, 20 out). No browser a margem é 0: 16 px. */
+:root { --nav-bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) - 0.75rem)); }
+
 /* ════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS — tweak the theme here, everything follows.
    Mapped into Tailwind utilities via tailwind.config.js.

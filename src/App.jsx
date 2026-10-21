@@ -40,6 +40,7 @@ import { resolveShortGameLink } from './lib/shortGameLink'
 import ErrorBoundary from './components/ErrorBoundary'
 import { afterLoginPath, savePendingOrgSlug } from './lib/loginLinks'
 import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
+import { IS_NATIVE } from './lib/native'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
@@ -97,6 +98,7 @@ const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
 const Novidades = lazyPage(() => import('./pages/Novidades'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
+const DeleteAccountPage = lazyPage(() => import('./pages/DeleteAccountPage'))
 const MixOffline = lazyPage(() => import('./pages/MixOffline'))
 const EscolherNivel = lazyPage(() => import('./pages/EscolherNivel'))
 const DefinirGenero = lazyPage(() => import('./pages/DefinirGenero'))
@@ -168,6 +170,23 @@ const LoadErrorScreen = ({ onRetry }) => {
         <PrimaryButton onClick={onRetry} className="w-full">{t('app.load_error_retry')}</PrimaryButton>
       </div>
     </div>
+  )
+}
+
+// O /instrucoes antigo abre a Ajuda, na mesma parte.
+function InstrucoesToAjuda() {
+  const { hash } = useLocation()
+  return <Navigate to={`/ajuda${hash}`} replace />
+}
+
+// A Ajuda: dentro da app com sessão, a página do site sem ela.
+function AjudaRoute({ showSplash }) {
+  const { user } = useAuth()
+  if (!user && !showSplash) return <Instructions />
+  return (
+    <Guard require="protected" showSplash={showSplash}>
+      <Ajuda />
+    </Guard>
   )
 }
 
@@ -289,8 +308,11 @@ const Guard = ({ require, showSplash, children }) => {
 
   // "/" is the one public route: signed-out visitors see the Landing page
   // (no nav shell), signed-in ones see Home inside Layout.
+  // Na app das lojas a landing (que é para quem chega pelo site) não
+  // aparece: sem sessão, vai-se direto para o login.
   if (require === 'home') {
-    return user ? <Layout>{children}</Layout> : <Landing />
+    if (user) return <Layout>{children}</Layout>
+    return IS_NATIVE ? <Navigate to="/login" replace /> : <Landing />
   }
 
   // Abre com ou sem conta: com sessão vai dentro da app, sem sessão fica na
@@ -363,16 +385,16 @@ function AfterLogin() {
 // seu canónico e título, e no resto da app o canónico sai — as páginas da
 // app estão fora do índice (robots.txt) e não devem apontar para a landing.
 const PUBLIC_HEAD = {
-  '/': { title: 'alinho — mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
-  '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
+  '/': { title: 'alinho.pt: mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
+  '/ajuda': { title: 'Ajuda do alinho.pt', canonical: 'https://www.alinho.pt/ajuda' },
   // Páginas do site (#619, 10 out): título e descrição próprios, no mesmo estilo.
   '/como-funciona': {
-    title: 'Como funciona o alinho.pt — mixes, nível, torneios e WhatsApp',
+    title: 'Como funciona o alinho.pt: mixes, nível, torneios e WhatsApp',
     canonical: 'https://www.alinho.pt/como-funciona',
     description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
   '/novidades': {
-    title: 'Novidades do alinho.pt — o que mudou em cada versão',
+    title: 'Novidades do alinho.pt: o que mudou em cada versão',
     canonical: 'https://www.alinho.pt/novidades',
     description: 'As mudanças de cada versão do alinho.pt, a mais recente em cima.',
   },
@@ -434,11 +456,16 @@ function AppRoutes() {
             renders; redirecting on that would bounce them straight past
             the form they came here to fill in. */}
         <Route path="/redefinir-password" element={<ResetPassword />} />
-        <Route path="/instrucoes" element={<Instructions />} />
+        {/* A Ajuda passou para /ajuda (site arrumado, 18 out): o /instrucoes
+            leva lá, com a mesma âncora (#faq, #whatsapp, #ranking, #xp) —
+            o robô do WhatsApp e links antigos continuam a funcionar. */}
+        <Route path="/instrucoes" element={<InstrucoesToAjuda />} />
         <Route path="/privacidade" element={<PrivacyPolicy />} />
         <Route path="/termos" element={<TermsOfService />} />
         {/* A página de um parceiro (18 out): sem sessão vai ao login e volta (PO). */}
         <Route path="/parceiro/:slug" element={<Guard require="protected" showSplash={showSplash}><PartnerPage /></Guard>} />
+        {/* Pedido público para apagar a conta (Google Play, «Segurança dos dados»). */}
+        <Route path="/apagar-conta" element={<DeleteAccountPage />} />
         {/* Página pública dos planos (Trello #327). */}
         <Route path="/planos" element={<Plans />} />
         {/* Páginas do site (#619): «Como funciona» e «Novidades». */}
@@ -747,14 +774,9 @@ function AppRoutes() {
             sai para a página pública /planos. */}
         {/* A ajuda dentro da app (17 out): o (?) dos Rankings já não sai para a
             página pública /instrucoes. */}
-        <Route
-          path="/ajuda"
-          element={
-            <Guard require="protected" showSplash={showSplash}>
-              <Ajuda />
-            </Guard>
-          }
-        />
+        {/* Com sessão, a ajuda abre dentro da app (Renato, 17 out); sem
+            sessão, a página da Ajuda do site, aberta a toda a gente. */}
+        <Route path="/ajuda" element={<AjudaRoute showSplash={showSplash} />} />
         <Route
           path="/gerir/planos"
           element={

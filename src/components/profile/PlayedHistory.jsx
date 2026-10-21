@@ -34,6 +34,12 @@ const PLACE_BOX = {
 const FRAME_BY_PLACE = { 1: 'ouro', 2: 'prata', 3: 'bronze' }
 
 const monthKeyOf = (iso) => `${String(iso).slice(0, 7)}-01`
+
+// Onde acaba a barra presa (StickyTop), a contar do topo do «main»: a altura
+// dela mais o sítio onde se prende (a margem da hora, no iPhone).
+const barBottom = (bar, fallback) => (bar
+  ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight
+  : fallback)
 const lang2 = (l) => (l?.startsWith('en') ? 'en' : 'pt')
 const monthLong = (key, lang) => {
   const d = new Date(`${key.slice(0, 7)}-01T12:00:00`)
@@ -232,7 +238,7 @@ export function MonthsSheet({ months, month, onPick, onClose }) {
                   <button key={k} type="button" disabled={!m} onClick={() => onPick(`${k}-01`)}
                     className={`rounded-ctrl px-2 py-2.5 text-center ${on ? 'bg-ink-900 text-white' : m ? 'border border-line bg-white text-ink-900' : 'cursor-default border border-dashed border-line text-ink-200'}`}>
                     <span className="block text-sm font-extrabold">{short(k)}</span>
-                    <span className={`block text-[11px] ${on ? 'text-white/75' : m ? 'text-muted' : 'text-ink-200'}`}>{m ? t('played.games_count', { count: m.games }) : '—'}</span>
+                    <span className={`block text-[11px] ${on ? 'text-white/75' : m ? 'text-muted' : 'text-ink-200'}`}>{m ? t('played.games_count', { count: m.games }) : t('ui.empty_no_games')}</span>
                   </button>
                 )
               })}
@@ -280,7 +286,7 @@ function PlayedCard({ r, query = '', other = false }) {
   ) : (
     <div className={`relative flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[18px] ${PLACE_BOX[r.place] || 'bg-ink-50 text-ink-900'}`}>
       {r.place === 1 && <Crown ring={56} />}
-      <span className="font-display text-[22px] font-extrabold leading-none">{r.place ? `${r.place}.º` : '—'}</span>
+      <span className="font-display text-[22px] font-extrabold leading-none">{r.place ? `${r.place}.º` : '-'}</span>
       {r.total ? <span className="mt-0.5 text-[10px] font-bold opacity-70">{t('played.of_total', { total: r.total })}</span> : null}
     </div>
   )
@@ -297,7 +303,7 @@ function PlayedCard({ r, query = '', other = false }) {
     const others = ((r.my_team === 'b' ? r.team_a : r.team_b) || []).map(nb)
     if (pending) accent = { text: t('played.missing_result'), className: 'text-danger' }
     else if (mine.length || others.length) {
-      lines.push(t('played.teams', { partner: (r.partner_name && nb(r.partner_name)) || mine[1] || '—', others: others.join(` ${t('played.and')} `) }))
+      lines.push(t('played.teams', { partner: (r.partner_name && nb(r.partner_name)) || mine[1] || t('ui.empty_no_partner'), others: others.join(` ${t('played.and')} `) }))
     }
     const extra = [durationText(r.duration_minutes) && `⏱ ${durationText(r.duration_minutes)}`, r.rounds_played ? t('played.rounds', { count: r.rounds_played }) : null].filter(Boolean).join(' · ')
     if (extra && !pending) lines.push(extra)
@@ -407,9 +413,10 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
     const update = () => {
       const main = document.querySelector('main')
       if (!main) return
-      const bar = document.querySelector('main .sticky.top-0')
-      // A barra presa mede sempre a sua altura a contar do topo do «main».
-      const line = main.getBoundingClientRect().top + (bar ? bar.offsetHeight : 120) + 8
+      const bar = document.querySelector('main [data-sticky-top]')
+      // A barra presa mede sempre a sua altura a contar do topo do «main»
+      // (mais a margem da hora no iPhone, onde ela se prende).
+      const line = main.getBoundingClientRect().top + barBottom(bar, 120) + 8
       // No fundo da lista os últimos meses já não sobem até à barra: conta
       // o último cujo título está à vista.
       const atEnd = main.scrollTop + main.clientHeight >= main.scrollHeight - 4
@@ -431,8 +438,8 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
     const el = document.getElementById(`played-${jumpTo.slice(0, 7)}`)
     if (!el) { data.loadUntil(jumpTo); return }
     const main = document.querySelector('main')
-    const bar = document.querySelector('main .sticky.top-0')
-    if (main) main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - (bar ? bar.offsetHeight : 0) - 8
+    const bar = document.querySelector('main [data-sticky-top]')
+    if (main) main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - barBottom(bar, 0) - 8
     onJumped?.()
   }, [jumpTo, groups, data, onJumped])
   const summary = (key) => months.find((m) => String(m.month).slice(0, 7) === key.slice(0, 7))

@@ -10,8 +10,7 @@ import { GlassPinned } from '../components/GlassBar'
 import EventFacts from '../components/event/EventFacts'
 import OrganizerBox from '../components/event/OrganizerBox'
 import { isMixLive } from '../lib/mixLive'
-import { SkeletonGate } from '../components/Skeleton'
-import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
+import EventCoverSkeleton from '../components/event/EventCoverSkeleton'
 import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2 } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -39,6 +38,7 @@ import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
+import SwapGuestSheet from '../components/mix/SwapGuestSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
@@ -59,8 +59,9 @@ import EventActionsSheet from '../components/EventActionsSheet'
 import RoundAlarm from '../components/RoundAlarm'
 import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
-import { adminPairSolos, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
+import { adminPairSoloRows, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
 import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKeys'
+import { appHref, appOrigin } from '../lib/native'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
@@ -191,7 +192,7 @@ export default function GameDetails() {
   const [genderConfirm, setGenderConfirm] = useState(null) // { then, name? } | null
   // O admin junta dois «Sozinhos» ou separa uma dupla (Francisco, 27 set).
   const [pairFor, setPairFor] = useState(null) // a pessoa sozinha
-  const [pairWith, setPairWith] = useState(null) // o id escolhido
+  const [pairWith, setPairWith] = useState(null) // a linha (participants.id) escolhida
   const [splitFor, setSplitFor] = useState(null) // { userId, names }
   // Já entrei pelo WhatsApp? (Francisco, 26 set) — { name, then } enquanto
   // se pergunta; o nome fica guardado depois do «Sim, sou eu».
@@ -213,6 +214,9 @@ export default function GameDetails() {
   const [editingPairs, setEditingPairs] = useState(false)
   // Mix à última da hora (Trello #292): adicionar/tirar antes da Ronda 1.
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
+  // «Trocar por uma conta» num convidado (Francisco, 19 out): o convidado a trocar.
+  const [swapGuest, setSwapGuest] = useState(null)
+  const [swapNotice, setSwapNotice] = useState('')
   // Publicar um rascunho (Trello #544) — a pergunta aberta.
   const [publishOpen, setPublishOpen] = useState(false)
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
@@ -2518,7 +2522,7 @@ export default function GameDetails() {
   const teamById = Object.fromEntries(teams.map(team => [team.id, team]))
   const teamName = (teamId) => {
     const team = teamById[teamId]
-    if (!team) return '—'
+    if (!team) return t('ui.empty_tbd')
     return `${firstLastName(team.player1?.name)} / ${firstLastName(team.player2?.name)}`
   }
 
@@ -2605,7 +2609,7 @@ export default function GameDetails() {
     )
   }
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const shareUrl = typeof window !== 'undefined' ? appHref() : ''
   const buildShareMessage = () => {
     // Mix terminado sem vencedores calculados (o americano, ou sem dupla
     // vencedora): a imagem diz «RESULTADOS DO MIX», por isso o texto também,
@@ -3125,9 +3129,8 @@ export default function GameDetails() {
   if (loading || (!game && orgHint === undefined)) {
     return (
       <div data-loading-game>
-        <SkeletonGate frame={<BackBar onBack={goBack} label={t('gamedetails.back')} />}>
-          <GameDetailsSkeleton />
-        </SkeletonGate>
+        {/* A capa e a folha a cinzento, como no carregado (EventHero; UX, 18 out). */}
+        <EventCoverSkeleton onBack={goBack} />
       </div>
     )
   }
@@ -3463,7 +3466,7 @@ export default function GameDetails() {
           text={shownWinnersShare.text}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
-          qrUrl={orgSlug ? `${window.location.origin}/clube/${orgSlug}` : window.location.origin}
+          qrUrl={orgSlug ? `${appOrigin()}/clube/${orgSlug}` : appOrigin()}
           org={winnersOrg}
           fallbackImage={game.image_url || null}
           onClose={() => setWinnersShareOpen(false)}
@@ -4576,6 +4579,13 @@ export default function GameDetails() {
             )
           })()}
           <PriceRosterSummary roster={priceRoster} ids={people.map((x) => x.id)} normalPrice={game.price_per_player} className="-mt-2 mb-3" />
+          {/* «Trocar por uma conta»: o que mudou, logo por cima da lista (também com o mix cheio). */}
+          {swapNotice && (
+            <div className="mb-3 bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+              <Check size={16} className="text-white shrink-0" />
+              {swapNotice}
+            </div>
+          )}
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -4588,13 +4598,17 @@ export default function GameDetails() {
             // Antes pareciam todos soltos (Francisco, 26 set). Nos mixes só a
             // solo (ou que rodam parceiros), a lista de sempre.
             (() => {
-              const personRow = (person, idx) => (
-                  <div
-                    key={`${person.id}-${idx}`}
-                    className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
-                      person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
-                    }`}
-                  >
+              // «Sozinhos» (UX, 19 out): o «Juntar» desce para uma 3.ª linha,
+              // alinhada com o nome, para o nome caber inteiro; num convidado,
+              // o «Trocar por uma conta» vai ao lado, na mesma linha.
+              const personRow = (person, idx) => {
+                const soloLine = canPairSolos && !person.hasPartner
+                return (
+                <div
+                  key={`${person.id}-${idx}`}
+                  className={`rounded-ctrl p-3.5 ${person.id === user.id ? 'bg-ink-50' : 'bg-canvas'}`}
+                >
+                  <div className="flex items-center gap-3">
                     {person.is_guest ? (
                       <>
                         <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
@@ -4615,6 +4629,14 @@ export default function GameDetails() {
                               isTest={person.is_test}
                             />
                           </div>
+                          {/* Quem organiza troca o convidado pela conta da pessoa
+                              (Francisco, 19 out; admin_swap_guest_for_account). */}
+                          {isAdmin && person.no_account && !isDraftMix(game) && game.status !== 'cancelled' && !(canPairSolos && !person.hasPartner) && (
+                            <button type="button" onClick={() => setSwapGuest(person)} disabled={busy}
+                              className="mt-1 inline-flex min-h-[32px] items-center text-[13px] font-extrabold text-ink-900 underline underline-offset-2">
+                              {t('swapguest.action')}
+                            </button>
+                          )}
                         </div>
                       </>
                     ) : (
@@ -4642,15 +4664,9 @@ export default function GameDetails() {
                       </Link>
                     )}
                     {/* Sozinho num mix em dupla: o admin junta-lhe um parceiro de
-                        entre os outros sozinhos (Francisco, 27 set). Convidados
-                        sem conta ficam de fora — a RPC admin_pair_solos só
-                        conhece user_id. */}
-                    {canPairSolos && !person.hasPartner && !person.no_account && (
-                      <button type="button" onClick={() => { setPairWith(null); setPairFor(person) }} disabled={busy}
-                        className="press shrink-0 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-extrabold text-ink-900">
-                        {t('mixpairs.join')}
-                      </button>
-                    )}
+                        entre os outros sozinhos (Francisco, 27 set). Desde 19 out
+                        também convidados sem conta (o professor do A2N): junta-se
+                        por linha de inscrição (admin_pair_solo_rows). */}
                     {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
                         Cancelado (#464): a lista fica como estava, sem mexer. */}
                     <PriceRosterTag roster={priceRoster} userId={person.id} normalPrice={game.price_per_player} />
@@ -4665,7 +4681,23 @@ export default function GameDetails() {
                       </button>
                     )}
                   </div>
-              )
+                  {soloLine && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 pl-[52px]">
+                      <button type="button" onClick={() => { setPairWith(null); setPairFor(person) }} disabled={busy}
+                        className="press inline-flex h-8 shrink-0 items-center rounded-full border border-line bg-white px-3 text-xs font-extrabold text-ink-900">
+                        {t('mixpairs.join')}
+                      </button>
+                      {isAdmin && person.no_account && !isDraftMix(game) && game.status !== 'cancelled' && (
+                        <button type="button" onClick={() => setSwapGuest(person)} disabled={busy}
+                          className="inline-flex min-h-[32px] items-center text-[13px] font-extrabold text-ink-900 underline underline-offset-2">
+                          {t('swapguest.action')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                )
+              }
               const pairs = participants.filter((r) => r.user?.id && r.partner?.id)
               // Mesmo sem nenhuma dupla, quem está sozinho aparece como tal
               // («Sozinhos · 8», o M4 de terça do A2N, Francisco 26 set).
@@ -4694,7 +4726,10 @@ export default function GameDetails() {
                               </span>
                             )}
                           </MonoLabel>
-                          {canSplit && (
+                          {/* Separar ainda só conhece duplas de duas contas: com um
+                              convidado (titular ou parceiro) fica escondido até à
+                              função por linha do Dev 3 (PO e Dev 3, 20 out). */}
+                          {canSplit && !r.user?.no_account && !r.partner?.no_account && (
                             <button type="button" disabled={busy}
                               onClick={() => setSplitFor({ userId: r.user.id, names: two.map((x) => x.name).join(' e ') })}
                               className="press -my-2 min-h-[44px] px-1 text-xs font-extrabold text-muted">
@@ -4785,7 +4820,7 @@ export default function GameDetails() {
                         >
                           {t(HISTORY_ACTION_LABEL_KEY[event.action] || event.action)}
                         </span>
-                        <span className="font-extrabold text-ink-900">{event.user?.name || '—'}</span>
+                        <span className="font-extrabold text-ink-900">{event.user?.name || t('ui.empty_no_name')}</span>
                         {event.partner?.name && (
                           <span className="text-sm text-muted">
                             {t('gamedetails.history_with_partner', { name: event.partner.name })}
@@ -5008,6 +5043,22 @@ export default function GameDetails() {
         onClose={() => setDeclineAsk(null)}
         errorOf={requestErrorText}
       />
+      {swapGuest && (
+        <SwapGuestSheet
+          game={game}
+          guest={swapGuest}
+          excludeIds={new Set([...people.filter((p) => !p.no_account).map((p) => p.id), ...waitlist.flatMap((w) => [w.user_id, w.partner_id]).filter(Boolean)])}
+          onClose={() => setSwapGuest(null)}
+          onSwapped={(account) => {
+            setSwapGuest(null)
+            const same = (x) => String(x || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+            setSwapNotice(same(swapGuest.name) === same(account.name)
+              ? t('swapguest.done_same', { guest: swapGuest.name })
+              : t('swapguest.done', { guest: swapGuest.name, name: account.name }))
+            loadGameDetails()
+          }}
+        />
+      )}
       {addPlayerOpen && (
         <AddPlayerSheet
           game={game}
@@ -5133,7 +5184,7 @@ export default function GameDetails() {
               onClick={() => setBirthdayPrompt(false)}
             >
               <div
-                className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-5 animate-pop space-y-4"
+                className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-5 animate-pop space-y-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between">
@@ -5228,17 +5279,19 @@ export default function GameDetails() {
             confirmLabel={t('mixpairs.join_confirm')}
             cancelLabel={t('gamedetails.cancel')}
             confirmDisabled={!pairWith}
-            onConfirm={async () => { await adminPairSolos(id, pairFor.id, pairWith); loadGameDetails() }}
+            onConfirm={async () => { await adminPairSoloRows(id, pairFor.rowId, pairWith); loadGameDetails() }}
             onClose={() => { setPairFor(null); setPairWith(null) }}
             errorOf={(error) => mixPairErrorMessage(t, error)}
           >
             <div className="space-y-2">
-              {people.filter((x) => !x.hasPartner && !x.no_account && x.id !== pairFor?.id).map((x) => (
-                <button key={x.id} type="button" onClick={() => setPairWith(x.id)}
-                  className={`press flex min-h-[48px] w-full items-center gap-3 rounded-ctrl border px-3 py-2 text-left ${pairWith === x.id ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
+              {people.filter((x) => !x.hasPartner && x.rowId !== pairFor?.rowId).map((x) => (
+                <button key={x.rowId} type="button" onClick={() => setPairWith(x.rowId)}
+                  className={`press flex min-h-[48px] w-full items-center gap-3 rounded-ctrl border px-3 py-2 text-left ${pairWith === x.rowId ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
                   <Avatar name={x.name} url={x.avatar_url} size="w-8 h-8 text-[11px]" />
                   <span className="min-w-0 flex-1 truncate text-sm font-extrabold">{x.name}</span>
-                  {pairWith === x.id && <Check size={18} />}
+                  {/* Sem conta: diz-se, como na lista (Convidado). */}
+                  {x.no_account && <span className={`shrink-0 text-[11px] font-extrabold ${pairWith === x.rowId ? 'text-white/80' : 'text-muted'}`}>{t('gamedetails.guest_badge')}</span>}
+                  {pairWith === x.rowId && <Check size={18} />}
                 </button>
               ))}
             </div>
@@ -5291,13 +5344,13 @@ export default function GameDetails() {
                     : t('partner.invite_ready_no_email')}
                 </p>
                 <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">
-                  {inviteLink(freshInvite.token, window.location.origin)}
+                  {inviteLink(freshInvite.token, appOrigin())}
                 </div>
                 <PrimaryButton
                   onClick={() => window.open(whatsappShare(t('partner.invite_whatsapp_text', {
                     name: freshInvite.name,
                     title: game.title,
-                    link: inviteLink(freshInvite.token, window.location.origin),
+                    link: inviteLink(freshInvite.token, appOrigin()),
                   })), '_blank')}
                   className="w-full"
                 >
@@ -5305,7 +5358,7 @@ export default function GameDetails() {
                 </PrimaryButton>
                 <PrimaryButton
                   variant="ghost"
-                  onClick={() => navigator.clipboard?.writeText(inviteLink(freshInvite.token, window.location.origin))}
+                  onClick={() => navigator.clipboard?.writeText(inviteLink(freshInvite.token, appOrigin()))}
                   className="w-full !bg-white !border-ink-900"
                 >
                   <Copy size={18} /> {t('partner.invite_copy_link')}

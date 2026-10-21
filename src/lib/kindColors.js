@@ -41,9 +41,13 @@ export const KIND_HERO = {
   lesson: '/topo/topo-aula.webp',
   friends: '/topo/topo-amigos.webp',
 }
-// 920×400: o clube ou o grupo sem foto (R5, R8, R9).
-export const CLUB_HERO = '/topo/topo-clube-alino.webp'
-export const GROUP_HERO = '/topo/topo-grupo-alino.webp'
+// O clube ou o grupo sem capa: as capas de 17 out com a cena inteira —
+// «Entrada» e «Malta». As de antes (/topo/topo-*-alino.webp) tinham o lado
+// esquerdo azul liso (Francisco, 19 out: design-handoff/2026-10-19-capas-
+// sem-cinzento). Ficam em public/ enquanto houver cover_url antigos a apontar
+// para elas.
+export const CLUB_HERO = '/capas/capa-entrada.webp'
+export const GROUP_HERO = '/capas/capa-malta.webp'
 // 384×384: o círculo do clube ou do grupo sem foto — uma imagem própria,
 // centrada nas caras, em vez de cortar a do topo (Francisco, 14 out, clube
 // «A»; design-handoff/2026-10-14-avatares-clube-grupo).

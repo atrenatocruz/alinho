@@ -7,6 +7,7 @@
 // a 3× com o html-to-image.
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { toPng } from 'html-to-image'
+import { useTranslation } from 'react-i18next'
 import logoWordmark from '../../logo/primary-dark-card.svg'
 
 export const A_CARD_W = 360
@@ -57,6 +58,7 @@ function Logo() {
  * format: 'stories' | 'square' · qr: data URL (só nas stories)
  */
 const AchievementShareCard = forwardRef(function AchievementShareCard({ rarity, data, format = 'stories', qr = null }, ref) {
+  const { t } = useTranslation()
   const nodeRef = useRef(null)
   const square = format === 'square'
   const H = square ? A_SQUARE_H : A_STORY_H
@@ -110,7 +112,7 @@ const AchievementShareCard = forwardRef(function AchievementShareCard({ rarity, 
         {!square && (
           <div className="mb-[14px] mt-auto flex w-full items-end justify-between gap-3">
             <div>
-              <p className="text-[12px] font-extrabold leading-tight">Joga padel<br />no alinho.pt</p>
+              <p className="text-[12px] font-extrabold leading-tight">{t('share.play_padel')}<br />{t('share.on_alinho')}</p>
               <p className="mt-0.5 text-[7.5px] text-white/70">alinho.pt · #alinhopadel</p>
             </div>
             {qr && (

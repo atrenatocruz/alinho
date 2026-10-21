@@ -24,9 +24,11 @@ import { teacherContact } from '../lib/teacherContact'
 import { supabase } from '../lib/supabase'
 import { followPlayer, getFollowCounts, unfollowPlayer } from '../lib/follows'
 import { Avatar, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
 import {
   LevelPill, MonoLabel, TealTag, TEAL, bandLabel, levelRange, hhmm, isoWeekday, sameDay, euros, lessonTypeLabel,
 } from '../components/lessons/LessonBits'
+import { appHref } from '../lib/native'
 
 const pad = (n) => String(n).padStart(2, '0')
 const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -132,11 +134,8 @@ export default function TeacherPage({ view = 'profile' }) {
   }, [id, range])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-      </div>
-    )
+    // A forma da página em vez da roda (esqueletos, 12 out).
+    return <SkeletonGate frame={<BackBar onBack={goBack} />}><div className="mt-4"><div className="space-y-3"><SkLine size="title" w="55%" /><SkWhiteCard /><SkWhiteCard /></div></div></SkeletonGate>
   }
   if (failed || !data?.teacher) {
     return (
@@ -195,7 +194,7 @@ export default function TeacherPage({ view = 'profile' }) {
   return (
     <div className="space-y-5">
       <BackBar onBack={isMe ? () => navigate('/perfil') : goBack} label={isMe ? t('teacher.schedule_back') : t('common.back')} title={teacher.name}
-        onShare={() => sharePageLink({ title: teacher.name, url: window.location.href })} />
+        onShare={() => sharePageLink({ title: teacher.name, url: appHref() })} />
 
       {isMe && (
         <div className="rounded-[14px] border border-line bg-white p-3 text-sm text-ink-500 leading-snug">
@@ -304,7 +303,7 @@ export default function TeacherPage({ view = 'profile' }) {
                 <td className="font-semibold text-ink-900 py-1.5">{t(`lessons.price_row_${type}`)}</td>
                 {LESSON_DURATIONS.map((d) => {
                   const v = priceFor(type, d)
-                  return <td key={d} className="text-right px-1 py-1.5 text-ink-900">{v == null ? '—' : euros(v)}</td>
+                  return <td key={d} className="text-right px-1 py-1.5 text-ink-900">{v == null ? '-' : euros(v)}</td>
                 })}
               </tr>
             ))}

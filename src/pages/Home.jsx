@@ -8,6 +8,7 @@ import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmSheet, EmptyState, PrimaryButton, TOP_EDGE } from '../components/ui'
+import { SAFE_TOP } from '../components/GlassBar'
 import HomeSkeleton from '../components/home/HomeSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
@@ -47,7 +48,7 @@ import { loadLeagueHome, leagueForYouItems } from '../lib/leagueAgenda'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
-  toDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
+  toDayKey, fromDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
@@ -90,6 +91,35 @@ const writeSession = (key, value) => {
 // voltam a pedir-se por trás e substituem estes quando chegam.
 let homeCache = null
 
+// Os jogos chegam aos bocados (21 out): de ontem até uma semana à frente, e
+// mais uma semana de cada vez ao chegar ao fim da lista. Antes vinham todos
+// os jogos de sempre, com os participantes, e a Home não mostra passado
+// nenhum — esse vive em «Já jogados», com paginação própria. Os jogos onde
+// estou vêm sempre, por mais longe que sejam (os meus próximos jogos).
+const WINDOW_DAYS = 7
+const MAX_DAYS_AHEAD = 120
+const startOfDay = (offsetDays) => {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + offsetDays)
+  return d
+}
+const GAME_SELECT = `
+  *,
+  organization:organizations (name, kind, group_logo_url),
+  participants (
+    id, user_id, partner_id, guest_id, partner_guest_id, status, created_at,
+    user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
+    partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
+    guest:game_guests!participants_guest_id_fkey (id, name),
+    partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
+  ),
+  scored:matches (id)
+`
+const byGameDate = (a, b) => new Date(a.date) - new Date(b.date)
+// Listas de ids no URL aos bocados, para o pedido não ficar comprido demais.
+const chunks = (list, size = 150) => Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size))
+
 export default function Home() {
   const { t, i18n } = useTranslation()
   // Torneios com inscrições abertas, para quem ainda não é membro de nada
@@ -118,6 +148,10 @@ export default function Home() {
   const [privateMatches, setPrivateMatches] = useState(() => cached?.privateMatches || [])
   const [myMixResults, setMyMixResults] = useState(() => cached?.myMixResults || new Map())
   const [loading, setLoading] = useState(() => !cached)
+  // Até que dia (a contar de hoje, exclusive) os jogos estão pedidos.
+  const [gamesDays, setGamesDays] = useState(() => cached?.gamesDays || WINDOW_DAYS + 1)
+  const gamesDaysRef = useRef(gamesDays)
+  const [loadingMore, setLoadingMore] = useState(false)
   // Esqueleto (não o círculo a rodar): só se demorar mais de 0,2 s; ao fim
   // de 8 s sem dados, o erro de sempre.
   const showSkeleton = useSkeleton(loading)
@@ -312,55 +346,106 @@ export default function Home() {
   const orgIds = orgs.map((o) => o.id)
   const orgIdsKey = orgIds.slice().sort().join(',')
 
-  const loadGames = async () => {
-    if (orgIds.length === 0) {
-      setGames([])
-      return
-    }
-    const { data, error } = await supabase
-      .from('games')
-      .select(`
-        *,
-        organization:organizations (name, kind, group_logo_url),
-        participants (
-          id, user_id, partner_id, guest_id, partner_guest_id, status, created_at,
-          user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
-          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
-          guest:game_guests!participants_guest_id_fkey (id, name),
-          partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
-        ),
-        scored:matches (id)
-      `)
-      .in('organization_id', orgIds)
-      // «A decorrer» só com a ronda começada ou um resultado (mixLive, 12 out):
-      // basta saber se há um jogo com resultado.
-      .not('scored.score_a', 'is', null)
-      .limit(1, { referencedTable: 'scored' })
-      .order('date', { ascending: true })
-    if (error) throw error
+  const gameQuery = () => supabase
+    .from('games')
+    .select(GAME_SELECT)
+    .in('organization_id', orgIds)
+    // «A decorrer» só com a ronda começada ou um resultado (mixLive, 12 out):
+    // basta saber se há um jogo com resultado.
+    .not('scored.score_a', 'is', null)
+    .limit(1, { referencedTable: 'scored' })
+    .order('date', { ascending: true })
 
-    // level/is_guest vivem em memberships (por clube) — uma query para
-    // todos os clubes, indexada por clube+jogador.
-    const { data: memberRows, error: memberError } = await supabase
-      .from('memberships')
-      .select('user_id, organization_id, level, is_guest')
-      .in('organization_id', orgIds)
-    if (memberError) throw memberError
-    const byKey = new Map((memberRows || []).map((m) => [`${m.organization_id}:${m.user_id}`, m]))
+  // level/is_guest vivem em memberships (por clube) — só de quem aparece
+  // nestes jogos, não de todos os membros dos meus clubes.
+  const withMembers = async (rows) => {
+    const userIds = [...new Set(rows.flatMap((g) => (g.participants || []).flatMap((p) => [p.user_id, p.partner_id])).filter(Boolean))]
+    const memberRows = (await Promise.all(chunks(userIds).map(async (ids) => {
+      const { data, error } = await supabase
+        .from('memberships')
+        .select('user_id, organization_id, level, is_guest')
+        .in('organization_id', orgIds)
+        .in('user_id', ids)
+      if (error) throw error
+      return data || []
+    }))).flat()
+    const byKey = new Map(memberRows.map((m) => [`${m.organization_id}:${m.user_id}`, m]))
     const attach = (person, userId, orgId) => {
       if (!person) return person
       const m = byKey.get(`${orgId}:${userId}`)
       return { ...person, level: m?.level, is_guest: m?.is_guest ?? false }
     }
-
-    setGames((data || []).filter(isAgendaGame).map((game) => ({
+    return rows.filter(isAgendaGame).map((game) => ({
       ...game,
       participants: (game.participants || []).map((p) => ({
         ...p,
         user: attach(p.user, p.user_id, game.organization_id),
         partner: attach(p.partner, p.partner_id, game.organization_id),
       })),
-    })))
+    }))
+  }
+
+  // Os jogos onde estou para lá da janela: para «Os teus próximos jogos»
+  // não perder o de daqui a três semanas.
+  const loadMyLaterGames = async (until) => {
+    const { data: mine, error } = await supabase
+      .from('participants')
+      .select('game_id, game:games!inner(date)')
+      .or(`user_id.eq.${user.id},partner_id.eq.${user.id}`)
+      .gte('game.date', until)
+    if (error) throw error
+    const ids = [...new Set((mine || []).map((p) => p.game_id))]
+    if (ids.length === 0) return []
+    const { data, error: gamesError } = await gameQuery().in('id', ids)
+    if (gamesError) throw gamesError
+    return data || []
+  }
+
+  // Só a resposta do último pedido conta: um realtime antigo não apaga a
+  // semana que entretanto se pediu a mais.
+  const gamesSeq = useRef(0)
+  const loadGames = async (days = gamesDaysRef.current) => {
+    if (orgIds.length === 0) {
+      setGames([])
+      return
+    }
+    const seq = ++gamesSeq.current
+    const until = startOfDay(days).toISOString()
+    const [windowRes, later] = await Promise.all([
+      gameQuery().gte('date', startOfDay(-1).toISOString()).lt('date', until),
+      loadMyLaterGames(until),
+    ])
+    if (windowRes.error) throw windowRes.error
+    const inWindow = new Set((windowRes.data || []).map((g) => g.id))
+    const rows = await withMembers([...(windowRes.data || []), ...later.filter((g) => !inWindow.has(g.id))])
+    if (seq !== gamesSeq.current) return
+    setGames(rows)
+  }
+
+  // Volta a pedir só estes jogos (realtime): os escondidos (cancelados…) saem.
+  const refreshGames = async (ids) => {
+    const { data, error } = await gameQuery().in('id', ids)
+    if (error) throw error
+    const fresh = await withMembers(data || [])
+    setGames((list) => [...list.filter((g) => !ids.includes(g.id)), ...fresh].sort(byGameDate))
+  }
+  const gameIdsRef = useRef(new Set())
+  gameIdsRef.current = new Set(games.map((g) => g.id))
+
+  // Mais dias para a frente (fim da lista, ou um dia escolhido no calendário).
+  const extendGames = async (days) => {
+    const next = Math.min(days, MAX_DAYS_AHEAD)
+    if (next <= gamesDaysRef.current || loadingMore) return
+    gamesDaysRef.current = next
+    setGamesDays(next)
+    setLoadingMore(true)
+    try {
+      await loadGames(next)
+    } catch (error) {
+      console.error('Error loading more days of games:', error)
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   // O resultado do próprio em cada mix terminado (venceu? quanto ganhou ou
@@ -433,19 +518,49 @@ export default function Home() {
   // O que já se mostrou fica para a próxima vez que se abre a Home.
   useEffect(() => {
     if (loading || !user?.id) return
-    homeCache = { userId: user.id, games, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests }
-  }, [loading, user?.id, games, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests])
+    homeCache = { userId: user.id, games, gamesDays, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests }
+  }, [loading, user?.id, games, gamesDays, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests])
 
   useEffect(() => {
     if (!user) return
     loadAll()
     if (orgIds.length === 0) return
+    // Realtime (21 out): as mudanças juntam-se durante 400 ms e só se voltam
+    // a pedir os jogos tocados que estão na lista. Antes cada inscrição em
+    // qualquer jogo, até num de há meses, voltava a pedir tudo.
+    const pending = { ids: new Set(), full: false }
+    let timer = null
+    const flush = () => {
+      timer = null
+      const ids = [...pending.ids]
+      const full = pending.full
+      pending.ids.clear()
+      pending.full = false
+      if (full) loadGames().catch(() => {})
+      else if (ids.length > 0) refreshGames(ids).catch(() => {})
+    }
+    const queue = (gameId) => {
+      if (gameId) pending.ids.add(gameId)
+      else pending.full = true
+      if (!timer) timer = setTimeout(flush, 400)
+    }
     const subscription = supabase
       .channel('home_agenda')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => loadGames().catch(() => {}))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, () => loadGames().catch(() => {}))
+      // Um jogo novo, mudado de dia ou apagado: a janela toda outra vez.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `organization_id=in.(${orgIds.join(',')})` }, () => queue(null))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, (payload) => {
+        const row = payload.new && Object.keys(payload.new).length > 0 ? payload.new : payload.old
+        // Um DELETE só traz a chave: sem saber o jogo, pede-se tudo.
+        if (!row?.game_id) return queue(null)
+        if (gameIdsRef.current.has(row.game_id)) return queue(row.game_id)
+        // Inscrevi-me num jogo que não está na lista (longe, noutro aparelho).
+        if (row.user_id === user.id || row.partner_id === user.id) queue(null)
+      })
       .subscribe()
-    return () => subscription.unsubscribe()
+    return () => {
+      if (timer) clearTimeout(timer)
+      subscription.unsubscribe()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, orgIdsKey, isPrivateMatchesEnabled, isLessonsEnabled])
 
@@ -716,6 +831,47 @@ export default function Home() {
     return () => main.removeEventListener('scroll', updateVisibleDay)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days])
+
+  // Perto do fim da lista pede mais uma semana, antes de lá se chegar. Se a
+  // lista nem enche o ecrã (poucos jogos), a janela dobra de uma vez em vez
+  // de ir semana a semana — no máximo MAX_DAYS_AHEAD dias.
+  const maybeLoadMore = () => {
+    if (loading || loadingMore || orgIds.length === 0 || viewMode !== 'list' || filters.show === 'played') return
+    if (gamesDaysRef.current >= MAX_DAYS_AHEAD) return
+    const main = scroller()
+    if (!main) return
+    const spacer = window.innerHeight * 0.4 // o h-[40vh] do fim da lista
+    if (main.scrollHeight - spacer <= main.clientHeight) extendGames(gamesDaysRef.current * 2)
+    else if (main.scrollHeight - main.scrollTop - main.clientHeight < spacer + 800) extendGames(gamesDaysRef.current + WINDOW_DAYS)
+  }
+  useEffect(() => {
+    const main = scroller()
+    if (!main) return
+    main.addEventListener('scroll', maybeLoadMore, { passive: true })
+    maybeLoadMore()
+    return () => main.removeEventListener('scroll', maybeLoadMore)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, loadingMore, days, viewMode, filters.show, orgIdsKey])
+
+  // Um dia do calendário que ainda não está pedido: pede até lá (e mais uma
+  // semana) e salta quando os dias chegarem.
+  const pendingDay = useRef(null)
+  const pickDay = (dayKey) => {
+    touchedList.current = true
+    const offset = Math.round((fromDayKey(dayKey) - startOfDay(0)) / 86400000)
+    if (offset + 1 > gamesDaysRef.current && gamesDaysRef.current < MAX_DAYS_AHEAD) {
+      pendingDay.current = dayKey
+      extendGames(offset + 1 + WINDOW_DAYS)
+    }
+    requestAnimationFrame(() => scrollToDay(dayKey))
+  }
+  useEffect(() => {
+    if (!pendingDay.current || loadingMore) return
+    const dayKey = pendingDay.current
+    pendingDay.current = null
+    requestAnimationFrame(() => scrollToDay(dayKey))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, loadingMore])
 
   /* Topo que encolhe (Home do futuro, SPEC-1, ponto 3): a deslizar para
      baixo, a linha do sítio, do mapa e do sino sobe e fica só a barra; a
@@ -1069,8 +1225,10 @@ export default function Home() {
           data nem calendário na vista de mapa — não há "dia no topo" lá. */}
       {/* Home do futuro (SPEC-1): a linha do sítio, do mapa e do sino; por
           baixo, uma barra só. O dia é a pastilha «Hoje ⌄» da barra. */}
-      <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)` }}
-        className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 ${TOP_EDGE} ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
+      {/* pt: 16 px + a margem do telemóvel (horas e bateria) — na app de
+          iPhone a página vai por baixo dela (viewport-fit=cover). */}
+      <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)`, paddingTop: `calc(1rem + ${SAFE_TOP})` }}
+        className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pb-2 bg-white space-y-1.5 ${TOP_EDGE} ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
         {/* R2 (13 out): em cima o dia da semana, a data em grande (abre o
             calendário) e o sítio; ao descer sai tudo e fica só a barra. */}
         <div ref={topRowRef} className={`flex items-start justify-between gap-2 ${moved ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
@@ -1170,6 +1328,7 @@ export default function Home() {
             </section>
             </Fragment>
           ))}
+          {loadingMore && <p className="text-center text-[12px] font-semibold text-muted">{t('home.loading_more_days')}</p>}
           {/* Sem dias de hoje em diante: o topo vem no fim. */}
           {!firstUpcomingDay && topBlock}
           <CustomizePill long onClick={() => setCustomizeOpen(true)} />
@@ -1265,7 +1424,7 @@ export default function Home() {
         <MonthSheet
           dayKey={visibleDay}
           counts={counts}
-          onPick={(k) => { setMonthOpen(false); requestAnimationFrame(() => scrollToDay(k)) }}
+          onPick={(k) => { setMonthOpen(false); pickDay(k) }}
           onClose={() => setMonthOpen(false)}
         />
       )}

@@ -5,6 +5,7 @@
 // A base de dados só aceita estas três (migration_organization_cover.sql).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import i18n from './i18n'
 import { CLUB_HERO, GROUP_HERO } from './kindColors'
 
 const BUCKET = 'club-logos'
@@ -19,8 +20,17 @@ const BUCKET = 'club-logos'
 // imagens dos tipos de jogo e um grupo com «Dupla» confundia-se com os jogos
 // entre amigos. O Dev 3 troca as que já estavam escolhidas (SQL, depois disto
 // estar no main).
-export const COVER_PRESETS = ['bancada', 'esplanada', 'balneario', 'entrada', 'malta', 'vitrine', 'jantar', 'rececao', 'manha']
-  .map((key) => ({ key, url: `/capas/capa-${key}.webp`, labelKey: `cover.preset_${key}` }))
+// A 2.ª leva (Francisco, 18 out) entra depois das nove primeiras. Cada capa
+// diz onde o quadrado da folha a centra: com o Alino, à direita; as «só o
+// sítio» (pavilhão, terraço, raquetes, vista de cima) centram de outra forma.
+// As classes estão escritas por inteiro para o Tailwind as encontrar.
+const ALINO = 'object-[72%_40%]'
+export const COVER_PRESETS = [
+  ['bancada', ALINO], ['esplanada', ALINO], ['balneario', ALINO], ['entrada', ALINO], ['malta', ALINO],
+  ['vitrine', ALINO], ['jantar', ALINO], ['rececao', ALINO], ['manha', ALINO],
+  ['sol', ALINO], ['pavilhao', 'object-[50%_50%]'], ['praia', ALINO], ['terraco', 'object-[30%_50%]'], ['quinta', ALINO],
+  ['chuva', ALINO], ['raquetes', 'object-[35%_60%]'], ['festa', ALINO], ['aereo', 'object-[60%_50%]'],
+].map(([key, pos]) => ({ key, pos, url: `/capas/capa-${key}.webp`, labelKey: `cover.preset_${key}` }))
 
 /** A capa a mostrar: a escolhida, ou a do Alino do tipo. */
 export const coverOf = (org, cover = org?.cover_url) =>
@@ -35,7 +45,7 @@ export const isPresetCover = (url) => !!url && (url.startsWith('/capas/') || url
  * endereço público, para gravar em organizations.cover_url.
  */
 export async function uploadOrgCover(orgId, file, y = 0.5) {
-  if (file.size > 15 * 1024 * 1024) throw new Error('Imagem demasiado grande (máx. 15MB)')
+  if (file.size > 15 * 1024 * 1024) throw new Error(i18n.t('image.too_big'))
   const bmp = await createImageBitmap(file)
   let sw = bmp.width
   let sh = Math.round(bmp.width / 3)
@@ -48,7 +58,7 @@ export async function uploadOrgCover(orgId, file, y = 0.5) {
   canvas.height = Math.round(w / 3)
   canvas.getContext('2d').drawImage(bmp, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
   const blob = await new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Falha ao comprimir a imagem'))), 'image/jpeg', 0.82))
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(i18n.t('image.compress_failed')))), 'image/jpeg', 0.82))
 
   const path = `${orgId}/cover-${Date.now()}.jpg`
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false })

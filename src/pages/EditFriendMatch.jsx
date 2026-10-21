@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import { EmptyState, LoadErrorState } from '../components/ui'
+import StepSkeleton from '../components/steps/StepSkeleton'
 import CreateFriendMatch from './CreateFriendMatch'
 
 export default function EditFriendMatch() {
@@ -24,7 +25,7 @@ export default function EditFriendMatch() {
 
   if (error) return <LoadErrorState title={error} />
   if (!data) {
-    return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return <StepSkeleton fallback="/jogos-privados" />
   }
   // Quem criou, ou quem disse «Vou» com o nome (SPEC 2026-10-07-amigos-convidado).
   const mine = (data.invitees || []).some((i) => i.user_id && i.user_id === profile?.id

@@ -713,7 +713,7 @@ export default function Profile() {
                     onClick={() => setPhotoMenuOpen(false)}
                   >
                     <div
-                      className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-xs p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-pop"
+                      className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-xs p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-pop"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-between px-3 py-2.5">
@@ -864,7 +864,7 @@ export default function Profile() {
         <Link to="/rankings" state={{ tab: 'global', scrollToMe: true }}
           className="press flex items-center gap-3 rounded-card bg-lime-400 px-3.5 py-3 text-ink-900">
           <span className="flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-ctrl bg-ink-900 px-1.5 font-display text-base font-extrabold text-lime-400 tabular-nums">
-            {rankInfo ? `${rankInfo.position}.º` : '—'}
+            {rankInfo ? `${rankInfo.position}.º` : '-'}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-extrabold leading-tight">{t('rankings.title_global')}</span>

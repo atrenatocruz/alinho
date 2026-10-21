@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { shortName, monthPoints, monthPointsMuted, splitMonthRanking, monthGender, monthTitle, nextMonthKey, monthName } from './monthRanking'
+import i18n from './i18n'
 
 describe('ranking do mês: textos', () => {
   it('nome curto do pódio', () => {
@@ -8,7 +9,7 @@ describe('ranking do mês: textos', () => {
     expect(shortName('Rita')).toBe('Rita')
     expect(shortName('Admin (Dev)')).toBe('Admin D.')
     expect(shortName('Teste 2')).toBe('Teste 2')
-    expect(shortName('')).toBe('—')
+    expect(shortName('')).toBe(i18n.t('ui.empty_no_name'))
   })
   it('pontos com sinal; zero e negativos a cinzento', () => {
     expect(monthPoints(86)).toBe('+86')

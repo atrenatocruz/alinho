@@ -1,0 +1,58 @@
+# Build da app de iPhone na cloud (Codemagic): o Mac do Renato não passa do
+# Sonoma, e a App Store só aceita builds do Xcode 26. Ver docs/native-apps.md
+# («iPhone: builds no Codemagic») para o que é preciso no painel do Codemagic.
+#
+# Corre à mão (Start new build → ios-testflight) ou com uma tag `ios-v*`.
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      # Chave da App Store Connect API, criada no painel (Teams → Integrations).
+      app_store_connect: alinho_asc
+    environment:
+      node: 22
+      xcode: latest
+      # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY e VITE_TURNSTILE_SITE_KEY de
+      # produção (os mesmos do .env.native-prod.local), e APP_STORE_APPLE_ID.
+      groups:
+        - alinho_prod
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: pt.alinho.app
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'ios-v*'
+    scripts:
+      - name: Dependências
+        script: npm ci
+      - name: Build da app (BD de produção)
+        # As variáveis do grupo alinho_prod têm prioridade sobre os .env.
+        script: npm run build:native:prod
+      - name: Copiar para o projeto iOS
+        script: npx cap sync ios
+      - name: Perfis de assinatura
+        script: xcode-project use-profiles
+      - name: Número da build (o último do TestFlight + 1)
+        script: |
+          cd ios/App
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          agvtool new-version -all $((LATEST + 1))
+      - name: Compilar o .ipa
+        script: |
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Só envia: os testers internos (equipa) instalam logo. Pôr a true
+        # quando houver testers externos — pede a revisão beta da Apple, que
+        # exige as «Test Information» preenchidas e uma conta de demonstração.
+        submit_to_testflight: false

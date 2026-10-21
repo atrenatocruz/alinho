@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase'
 import { Avatar, RatingBadge, EmptyState } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import RankPodium from './RankPodium'
+import RankingSkeleton from './RankingSkeleton'
+import { SkeletonGate } from '../Skeleton'
 import {
   MONTH_MIN_GAMES, monthGender, monthPoints, monthPointsMuted, splitMonthRanking,
   monthKey, monthTitle, monthName, nextMonthKey,
@@ -92,9 +94,8 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
       </div>
 
       {rows === null ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700" />
-        </div>
+        // O pódio e as linhas a cinzento; o título do mês, em cima, já é a sério.
+        <SkeletonGate><RankingSkeleton title={false} /></SkeletonGate>
       ) : failed ? (
         // O separador inteiro falhou: a página vazia de erro (com o Alino triste, regra do Francisco via Dev 1).
         <EmptyState icon={Trophy} pose="triste" title={t('month.unavailable')} />
@@ -142,7 +143,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
             <button type="button" onClick={seeMe}
               className="sticky bottom-24 z-10 flex w-full items-center gap-3 rounded-card bg-ink-900 px-3.5 py-2.5 text-left text-white shadow-lift">
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-ctrl text-sm font-extrabold tabular-nums ${me?.qualified ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>
-                {me?.qualified ? me.place : '—'}
+                {me?.qualified ? me.place : '-'}
               </span>
               <Avatar name={me?.name || '?'} url={me?.avatar_url} size="w-9 h-9 text-xs" />
               <div className="min-w-0 flex-1">

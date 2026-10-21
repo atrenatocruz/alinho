@@ -4,6 +4,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { BackBar, Tabs } from '../components/ui'
 import { GlassPinned } from '../components/GlassBar'
+import { SkeletonGate, SkBlock, SkCircle, SkLine } from '../components/Skeleton'
 import { sharePageLink } from '../lib/shareImage'
 import { Award, ChevronRight, UserPlus, UserCheck, Clock, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -21,6 +22,8 @@ import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import { describeError } from '../lib/errors'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory } from '../components/profile/PlayedHistory'
+import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
+import { appHref } from '../lib/native'
 
 const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
 const AchievementViewer = lazy(() => import('../components/achievements/AchievementViewer'))
@@ -188,10 +191,40 @@ export default function PlayerDetails() {
   const dayMonth = (d) => { const x = new Date(`${String(d).slice(0, 10)}T12:00:00`); return `${x.getDate()}${i18n.language?.startsWith('en') ? '' : ' de'} ${x.toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT', { month: 'long' })}` }
 
   if (loading) {
+    // A forma do perfil em vez da roda (esqueletos, 12 out): «‹», «⤴» e o
+    // separador a sério; o cartão, o botão de seguir e o resto a cinzento.
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-      </div>
+      <SkeletonGate frame={
+        <div className="space-y-4">
+          <BackBar onBack={goBack} label={t('playerdetails.back')}
+            onShare={() => sharePageLink({ url: window.location.href })} />
+        </div>
+      }>
+        <div className="mt-4 space-y-4">
+          <div className="rounded-card border border-line bg-white p-4 shadow-card">
+            <div className="flex items-start gap-4">
+              <SkCircle size={80} />
+              <div className="min-w-0 flex-1 space-y-2 pt-1.5">
+                <SkLine size="title" w="75%" />
+                <SkLine size="big" w="45%" />
+                <SkLine size="text" w="60%" />
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex flex-col items-center gap-1.5">
+                  <SkLine size="title" w="40%" />
+                  <SkLine size="label" w="55%" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <SkBlock h={56} />
+          <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
+          <SkBlock h={150} rounded="rounded-card" />
+          <SkBlock h={76} rounded="rounded-card" />
+        </div>
+      </SkeletonGate>
     )
   }
 
@@ -306,7 +339,7 @@ export default function PlayerDetails() {
   return (
     <div className="space-y-4">
       <BackBar onBack={goBack} label={t('playerdetails.back')} title={player.name}
-        onShare={() => sharePageLink({ title: player.name, url: window.location.href })} />
+        onShare={() => sharePageLink({ title: player.name, url: appHref() })} />
 
       {/* O mesmo cartão branco do teu Perfil (R7): foto com moldura, aro ou
           escudo, nome, nível e pontos, seguidores e os três números. */}
@@ -421,7 +454,7 @@ export default function PlayerDetails() {
           {!resultsHidden && (
             <Link to="/rankings" state={{ tab: 'global' }} className={`press flex items-center gap-3 px-3.5 py-3 text-ink-900 ${CARD}`}>
               <span className="flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-ctrl bg-ink-900 px-1.5 font-display text-base font-extrabold text-lime-400 tabular-nums">
-                {rankInfo ? `${rankInfo.position}.º` : '—'}
+                {rankInfo ? `${rankInfo.position}.º` : '-'}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-extrabold leading-tight">{t('rankings.title_global')}</span>
@@ -544,7 +577,7 @@ export default function PlayerDetails() {
               <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
                 {player.clubs.map((c) => {
                   const group = c.kind === 'group'
-                  const fallback = group ? '/topo/topo-grupo-alino.webp' : '/topo/topo-clube-alino.webp'
+                  const fallback = group ? GROUP_HERO : CLUB_HERO
                   return (
                     <Link key={c.id} to={`/clube/${c.slug}`} className={`press w-[150px] shrink-0 overflow-hidden ${CARD}`}>
                       <img src={c.logo_url || c.avatar_url || (group ? '/topo/avatar-grupo.webp' : '/topo/avatar-clube.webp')} alt=""

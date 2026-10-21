@@ -22,7 +22,8 @@ import { getCategoryBoard, bracketRounds, byDayAndTime, standingsOf } from '../l
 import { hhmmInTz } from '../lib/tournamentDay'
 import { setText } from '../components/tournament/tieBreak'
 
-const ROUND_PT = { R32: '16 avos', R16: 'Oitavos', QF: 'Quartos', SF: 'Meias-finais', F: 'Final', '3P': '3.º e 4.º' }
+// O nome de cada eliminatória. O 3P na folha é «3.º e 4.º» (o jogo pelos dois lugares).
+const roundName = (round, t) => (round === '3P' ? t('tprint.round_3P') : t(`tournament.draw.round_${round}`, { defaultValue: round }))
 
 // Hora de Portugal, como o resto do torneio — não a do computador que
 // imprime (Trello #519, #487).
@@ -40,9 +41,9 @@ const shortDay = (date, locale) => {
  *  escrever à mão. */
 const FINISHED = ['terminado', 'falta', 'desistencia']
 const played = (m) => FINISHED.includes(m.status) || !!m.winner_entry_id
-const resultText = (m) => {
-  if (m.status === 'falta') return `${m.score_a ?? ''}–${m.score_b ?? ''} (falta)`
-  if (m.status === 'desistencia') return `${m.score_a ?? ''}–${m.score_b ?? ''} (desist.)`
+const resultText = (m, t) => {
+  if (m.status === 'falta') return `${m.score_a ?? ''}–${m.score_b ?? ''} (${t('tprint.walkover_tag')})`
+  if (m.status === 'desistencia') return `${m.score_a ?? ''}–${m.score_b ?? ''} (${t('tprint.retired_tag')})`
   // Com o tie-break (25 set): «9–8 (7-5)»; por sets, os sets todos:
   // «2–1 (6-4 · 6-7 (5-7) · 10-8)».
   const sets = m.sets || []
@@ -65,8 +66,9 @@ const Blank = ({ w = 44 }) => (
 
 /* ── Grupos: os jogos para escrever, e a tabela para somar ───────────── */
 function GroupSheet({ group, matches, entries }) {
+  const { t } = useTranslation()
   const mine = matches.filter((m) => m.stage === 'grupo' && m.group_id === group.id)
-  const nameOf = (id) => entries[id]?.name || '—'
+  const nameOf = (id) => entries[id]?.name || t('ui.empty_tbd')
   // Com jogos já feitos, a tabela sai com a classificação de agora (o mesmo
   // desempate da página); sem nenhum, fica em branco para somar à mão.
   const anyPlayed = mine.some(played)
@@ -80,11 +82,11 @@ function GroupSheet({ group, matches, entries }) {
         <thead>
           <tr>
             <th className="w-8 border border-black px-1 py-0.5 text-left font-semibold">#</th>
-            <th className="border border-black px-1 py-0.5 text-left font-semibold">Dupla</th>
-            <th className="w-10 border border-black px-1 py-0.5 text-center font-semibold">J</th>
-            <th className="w-10 border border-black px-1 py-0.5 text-center font-semibold">V</th>
-            <th className="w-14 border border-black px-1 py-0.5 text-center font-semibold">Jogos</th>
-            <th className="w-12 border border-black px-1 py-0.5 text-center font-semibold">Dif</th>
+            <th className="border border-black px-1 py-0.5 text-left font-semibold">{t('tprint.team')}</th>
+            <th className="w-10 border border-black px-1 py-0.5 text-center font-semibold">{t('tprint.played_short')}</th>
+            <th className="w-10 border border-black px-1 py-0.5 text-center font-semibold">{t('tprint.won_short')}</th>
+            <th className="w-14 border border-black px-1 py-0.5 text-center font-semibold">{t('tprint.games')}</th>
+            <th className="w-12 border border-black px-1 py-0.5 text-center font-semibold">{t('tprint.diff_short')}</th>
           </tr>
         </thead>
         <tbody>
@@ -110,7 +112,7 @@ function GroupSheet({ group, matches, entries }) {
             <span className="w-16 shrink-0 font-mono text-[10px]">{m.court_name || '_______'}</span>
             <span className="flex-1">{nameOf(m.entry_a_id)} × {nameOf(m.entry_b_id)}</span>
             <span className="shrink-0">
-              {played(m) ? <b>{resultText(m)}</b> : <><Blank w={26} /> – <Blank w={26} /></>}
+              {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={26} /> – <Blank w={26} /></>}
             </span>
           </li>
         ))}
@@ -129,7 +131,7 @@ function BracketSheet({ matches, entries, title }) {
   const side = (m, which) => {
     const id = which === 'a' ? m.entry_a_id : m.entry_b_id
     const source = which === 'a' ? m.source_a : m.source_b
-    return entries[id]?.name || sourceText(source, matches, t) || '—'
+    return entries[id]?.name || sourceText(source, matches, t) || t('ui.empty_tbd')
   }
 
   const Bracket = ({ list, label }) => (
@@ -138,7 +140,7 @@ function BracketSheet({ matches, entries, title }) {
       <div className="flex flex-wrap gap-3">
         {list.map(({ round, matches: ms }) => (
           <div key={round} className="min-w-[180px] flex-1">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide">{ROUND_PT[round] || round}</p>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide">{roundName(round, t)}</p>
             {ms.map((m) => (
               <div key={m.id} className="mb-1.5 border border-black p-1 text-[11px]">
                 <p className="flex items-baseline justify-between gap-1">
@@ -150,7 +152,7 @@ function BracketSheet({ matches, entries, title }) {
                   {played(m) ? <b className="shrink-0">{m.score_b ?? ''}</b> : <Blank w={22} />}
                 </p>
                 {played(m) && m.status !== 'terminado' && (
-                  <p className="mt-0.5 text-[9px]">{m.status === 'falta' ? 'Falta' : 'Desistência'}</p>
+                  <p className="mt-0.5 text-[9px]">{m.status === 'falta' ? t('tprint.walkover') : t('tprint.retired')}</p>
                 )}
                 <p className="mt-0.5 font-mono text-[9px]">
                   {m.scheduled_at ? hhmm(m.scheduled_at) : '__:__'} · {m.court_name || '_______'}
@@ -166,7 +168,7 @@ function BracketSheet({ matches, entries, title }) {
   return (
     <>
       {rounds.length ? <Bracket list={rounds} label={title} /> : null}
-      {secondary.length ? <Bracket list={secondary} label="Quadro secundário" /> : null}
+      {secondary.length ? <Bracket list={secondary} label={t('tprint.secondary')} /> : null}
     </>
   )
 }
@@ -187,7 +189,7 @@ function DayGrid({ day, matches, entries, locale }) {
       <table className="w-full border-collapse text-[10px]">
         <thead>
           <tr>
-            <th className="w-12 border border-black px-1 py-0.5">Hora</th>
+            <th className="w-12 border border-black px-1 py-0.5">{t('tprint.time')}</th>
             {courts.map((c) => (
               <th key={c} className="border border-black px-1 py-0.5 text-left">{c}</th>
             ))}
@@ -205,16 +207,16 @@ function DayGrid({ day, matches, entries, locale }) {
                       <>
                         <span className="block font-bold">
                           {m.category_code || ''}{m.group_label ? ` · ${m.group_label}` : ''}
-                          {m.round ? ` · ${ROUND_PT[m.round] || m.round}` : ''}
+                          {m.round ? ` · ${roundName(m.round, t)}` : ''}
                         </span>
                         <span className="block">
-                          {nameOf(m.entry_a_id) || sourceText(m.source_a, null, t) || '—'}
+                          {nameOf(m.entry_a_id) || sourceText(m.source_a, null, t) || t('ui.empty_tbd')}
                         </span>
                         <span className="block">
-                          {nameOf(m.entry_b_id) || sourceText(m.source_b, null, t) || '—'}
+                          {nameOf(m.entry_b_id) || sourceText(m.source_b, null, t) || t('ui.empty_tbd')}
                         </span>
                         <span className="mt-0.5 block">
-                          {played(m) ? <b>{resultText(m)}</b> : <><Blank w={20} /> – <Blank w={20} /></>}
+                          {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={20} /> – <Blank w={20} /></>}
                         </span>
                       </>
                     ) : null}
@@ -232,7 +234,7 @@ function DayGrid({ day, matches, entries, locale }) {
 export default function TournamentPrint() {
   const { id } = useParams()
   const [params] = useSearchParams()
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const only = params.get('categoria')
 
   const [page, setPage] = useState(null)
@@ -260,13 +262,13 @@ export default function TournamentPrint() {
   }, [id, only])
 
   if (error) {
-    return <p className="p-6 text-center text-sm">Não foi possível abrir este torneio.</p>
+    return <p className="p-6 text-center text-sm">{t('tprint.error')}</p>
   }
   if (!page) {
-    return <p className="p-6 text-center text-sm">A preparar a folha…</p>
+    return <p className="p-6 text-center text-sm">{t('tprint.loading_sheet')}</p>
   }
 
-  const t = page.tournament
+  const tour = page.tournament
   const cats = (page.categories || []).filter((c) => !only || c.id === only)
 
   // Todos os jogos de todas as categorias mostradas, para a grelha do dia.
@@ -297,25 +299,25 @@ export default function TournamentPrint() {
 
       <div className="nao-imprimir mb-4 flex items-center justify-between gap-3 border-b border-black pb-3">
         <p className="text-[12px]">
-          Folha para imprimir — plano B do dia. Confere antes de imprimir e usa o Ctrl+P (ou Cmd+P).
+          {t('tprint.intro')}
         </p>
         <button
           type="button"
           onClick={() => window.print()}
           className="shrink-0 rounded border border-black px-3 py-1.5 text-[12px] font-bold"
         >
-          Imprimir
+          {t('tprint.print')}
         </button>
       </div>
 
       <header className="mb-4">
-        <h1 className="text-[18px] font-extrabold">{t.name}</h1>
+        <h1 className="text-[18px] font-extrabold">{tour.name}</h1>
         <p className="text-[11px]">
-          {[t.club_name, t.location].filter(Boolean).join(' · ')}
-          {t.starts_on ? ` · ${shortDay(t.starts_on, i18n.language)}${t.ends_on && t.ends_on !== t.starts_on ? ` a ${shortDay(t.ends_on, i18n.language)}` : ''}` : ''}
+          {[tour.club_name, tour.location].filter(Boolean).join(' · ')}
+          {tour.starts_on ? ` · ${tour.ends_on && tour.ends_on !== tour.starts_on ? t('tprint.date_range', { from: shortDay(tour.starts_on, i18n.language), to: shortDay(tour.ends_on, i18n.language) }) : shortDay(tour.starts_on, i18n.language)}` : ''}
         </p>
         <p className="mt-0.5 text-[10px]">
-          Impresso a {new Date().toLocaleString(i18n.language)}. As horas são previstas.
+          {t('tprint.printed_at', { when: new Date().toLocaleString(i18n.language) })}
         </p>
       </header>
 
@@ -331,15 +333,15 @@ export default function TournamentPrint() {
               {c.code} · {c.name}
             </h2>
             {!board ? (
-              <p className="text-[11px]">A preparar…</p>
+              <p className="text-[11px]">{t('tprint.loading')}</p>
             ) : !board.groups.length && !board.matches.length ? (
-              <p className="text-[11px]">Ainda não foi sorteada.</p>
+              <p className="text-[11px]">{t('tprint.not_drawn')}</p>
             ) : (
               <>
                 {board.groups.map((g) => (
                   <GroupSheet key={g.id} group={g} matches={board.matches} entries={board.entries} />
                 ))}
-                <BracketSheet matches={board.matches} entries={board.entries} title="Quadro" />
+                <BracketSheet matches={board.matches} entries={board.entries} title={t('tprint.bracket')} />
               </>
             )}
           </div>
@@ -347,8 +349,7 @@ export default function TournamentPrint() {
       })}
 
       <footer className="mt-6 border-t border-black pt-2 text-[10px]">
-        Se a app falhar: escreve os resultados aqui e passa-os para a app quando voltar.
-        A correção de resultados existe e fica registada.
+        {t('tprint.footer')}
       </footer>
     </div>
   )

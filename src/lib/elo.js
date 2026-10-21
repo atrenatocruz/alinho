@@ -74,7 +74,7 @@ export function peopleRatingBand(rating, genders = []) {
   return band ? { label, fullKey: 'ui.level_band', fullVars: { label } } : { label, fullKey: 'ui.group_level_beginner' }
 }
 
-export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
+export const formatRating = (rating) => (rating == null ? '-' : String(Math.round(rating)))
 
 // Provisório: menos de 12 jogos contados (3 mixes) — o rating ainda é uma
 // estimativa e mostra-se como "~902" e com a marca NOVO. É o mesmo limiar do
@@ -84,9 +84,10 @@ export const formatRating = (rating) => (rating == null ? '—' : String(Math.ro
 export const PROVISIONAL_GAMES = 12
 export const isProvisional = (ratingGames) => ratingGames != null && ratingGames < PROVISIONAL_GAMES
 
-/** "~902" para provisórios, "902" para estabelecidos. */
+/** "~902" para provisórios, "902" para estabelecidos; sem pontos, só "-"
+    (o "~" não vai sozinho com o traço: «~- pontos», QA 21 out). */
 export const formatRatingMaybeProvisional = (rating, ratingGames) =>
-  `${isProvisional(ratingGames) ? '~' : ''}${formatRating(rating)}`
+  `${rating != null && isProvisional(ratingGames) ? '~' : ''}${formatRating(rating)}`
 
 /** Progresso dentro da banda atual, para a barra do cartão de perfil.
     Devolve { nextMin, pct } — nextMin null no topo (M1/F1, barra cheia);

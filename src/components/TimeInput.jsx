@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Clock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 const pad = (n) => String(n).padStart(2, '0')
 const ROWS = 6
@@ -95,6 +96,7 @@ function Part({ value, options, onPick, disabled, label, id }) {
 }
 
 export default function TimeInput({ value = '', onChange, step = 300, className = '', disabled = false, id, 'aria-label': ariaLabel }) {
+  const { t } = useTranslation()
   const [hh = '', mm = ''] = String(value || '').slice(0, 5).split(':')
   const every = Math.max(1, Math.round(Number(step || 300) / 60))
   const hours = Array.from({ length: 24 }, (_, h) => pad(h))
@@ -103,8 +105,8 @@ export default function TimeInput({ value = '', onChange, step = 300, className 
   if (mm && !minutes.includes(mm)) minutes.push(mm)
   minutes.sort()
   const emit = (h, m) => onChange?.({ target: { value: h && m ? `${h}:${m}` : '' } })
-  const hLabel = ariaLabel ? `${ariaLabel} (horas)` : 'Horas'
-  const mLabel = ariaLabel ? `${ariaLabel} (minutos)` : 'Minutos'
+  const hLabel = ariaLabel ? t('timeinput.hours_of', { label: ariaLabel }) : t('timeinput.hours')
+  const mLabel = ariaLabel ? t('timeinput.minutes_of', { label: ariaLabel }) : t('timeinput.minutes')
   // O relógio à direita mostra que é um campo, como o antigo (UX, 16 out);
   // tocar no espaço livre da caixa ou no relógio abre as horas. Nas caixas
   // estreitas (as horas do torneio, 100 px) não cabe e não aparece.

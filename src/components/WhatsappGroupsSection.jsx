@@ -4,6 +4,7 @@ import { MessageCircle, Pencil, Check, X } from 'lucide-react'
 import { BadgePill } from './ui'
 import { listWhatsappGroups, renameWhatsappGroup, WHATSAPP_GROUP_LABEL_MAX } from '../lib/whatsappGroups'
 import { describeError } from '../lib/errors'
+import { SkeletonGate, SkRow } from './Skeleton'
 
 // PostgREST quando a função não existe — a migração ainda não correu.
 const FUNCTION_NOT_FOUND = 'PGRST202'
@@ -179,9 +180,8 @@ export default function WhatsappGroupsSection({ organizationId }) {
       <p className="text-sm text-gray-500 mb-4">{t('gerirclube.whatsapp_groups_description')}</p>
 
       {status === 'loading' ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-        </div>
+        // Os grupos de WhatsApp a cinzento (esqueletos, 12 out).
+        <SkeletonGate><div className="space-y-2.5"><SkRow /><SkRow /></div></SkeletonGate>
       ) : status === 'error' ? (
         <p className="text-sm font-extrabold text-danger">{t('gerirclube.whatsapp_groups_load_error')}</p>
       ) : groups.length === 0 ? (

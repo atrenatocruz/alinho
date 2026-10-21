@@ -149,7 +149,7 @@ export default function PersonalInfo() {
       <div className={CARD}>
         <Row label={t('profile.birthday_label')} hint={ageKey ? t(ageKey) : null}>
           <div className="mt-1">
-            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday()} hideToday />
+            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday()} hideToday birthday />
           </div>
         </Row>
         <Row label={t('profile.gender_label')}>
@@ -242,7 +242,7 @@ export default function PersonalInfo() {
 
       {saveError && <p role="alert" className="mt-4 text-sm font-extrabold text-danger">{saveError}</p>}
       {dirty > 0 && (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+96px)] z-10 mt-4 flex items-center gap-2 rounded-card bg-ink-900 py-2.5 pl-4 pr-2.5 text-white shadow-lift animate-fade-in">
+        <div className="sticky bottom-[calc(80px+var(--nav-bottom))] z-10 mt-4 flex items-center gap-2 rounded-card bg-ink-900 py-2.5 pl-4 pr-2.5 text-white shadow-lift animate-fade-in">
           <span className="min-w-0 flex-1 text-sm">{t('cover.unsaved', { count: dirty })}</span>
           <button type="button" onClick={() => { setForm(base); setSaveError('') }}
             className="min-h-[40px] shrink-0 rounded-ctrl px-3 text-sm font-extrabold text-white/70 hover:text-white">

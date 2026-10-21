@@ -12,7 +12,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { shareLinkOrCopy } from '../lib/shareImage'
-import { ArrowLeft, Building2, Check, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Building2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
@@ -25,6 +25,9 @@ import { describeError, errorKind } from '../lib/errors'
 import { listClubTeachers } from '../lib/lessonsApi'
 import { ClubHeader, ClubEvents, ClubPeople, ClubAbout, buildClubEvents, BLOCK, BLOCK_TITLE, ROW } from '../components/club/ClubSections'
 import LiveStrip from '../components/live/LiveStrip'
+import { appHost, appOrigin } from '../lib/native'
+import { GLASS_ROUND } from '../components/GlassBar'
+import { useSkeleton, useLoadTimeout, SkeletonPage, LoadError, SkBlock, SkLine } from '../components/Skeleton'
 
 export default function ClubProfile() {
   const { t } = useTranslation()
@@ -34,6 +37,8 @@ export default function ClubProfile() {
   const { user, profile, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
   const [loading, setLoading] = useState(true)
+  const showSkeleton = useSkeleton(loading)
+  const lateSkeleton = useLoadTimeout(loading)
   const [notFound, setNotFound] = useState(false)
   const [acting, setActing] = useState(false)
   const [favoriting, setFavoriting] = useState(false)
@@ -224,9 +229,44 @@ export default function ClubProfile() {
   }
 
   if (loading) {
+    // A forma do clube em vez da roda (esqueletos, 12 out): o «‹» a sério
+    // logo; depois de 0,2 s, a capa, o logótipo, o nome e o botão a
+    // cinzento; aos 8 s, o erro de sempre.
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      <div>
+        <div className="relative -mx-4 -mt-6 h-40">
+          {/* A capa num cinzento mais escuro do que o fundo, para se ler como capa e a folha branca subir por cima (UX, 18 out). */}
+          {showSkeleton && <span aria-hidden className="sk absolute inset-0 overflow-hidden bg-[#D5D7CF]" />}
+          <button type="button" onClick={goBack} aria-label={t('common.back')}
+            className={`${GLASS_ROUND} absolute left-4 top-[calc(var(--safe-top,env(safe-area-inset-top))+12px)] z-[1]`}>
+            <ChevronLeft size={22} />
+          </button>
+        </div>
+        {lateSkeleton ? <div className="mt-6"><LoadError /></div> : showSkeleton && (
+          <SkeletonPage label={t('common.loading')}>
+            {/* Como no carregado: a folha branca acaba no botão; os cartões
+                são brancos, no fundo da página (UX, 18 out). */}
+            <div className="relative -mx-4 -mt-5 rounded-t-[22px] bg-white px-4 pb-5">
+              <div className="flex items-end gap-3.5">
+                <span className="-mt-7 rounded-[28%] bg-white p-[3px]">
+                  <span className="sk relative block h-16 w-16 overflow-hidden rounded-[28%] bg-[#ECECE7]" />
+                </span>
+                <div className="min-w-0 flex-1 pt-3"><SkLine size="title" w="70%" /></div>
+              </div>
+              <SkLine size="text" w="55%" className="mt-2.5" />
+              <SkBlock h={44} rounded="rounded-[14px]" className="mt-4" />
+            </div>
+            <div className="mt-5 space-y-3">
+              {[0, 1].map((k) => (
+                <div key={k} className="rounded-[20px] bg-white p-4 shadow-card">
+                  <SkBlock h={64} rounded="rounded-[12px]" />
+                  <SkLine size="text" w="45%" className="mt-3" />
+                  <SkLine size="title" w="62%" className="mt-2" />
+                </div>
+              ))}
+            </div>
+          </SkeletonPage>
+        )}
       </div>
     )
   }
@@ -234,8 +274,8 @@ export default function ClubProfile() {
   // ⤴ «Partilhar o link», para toda a gente (partilhar-link, 12 out): a
   // frase com o link, ou copiá-lo com «✓ Link copiado» durante 2 s.
   const shareClub = async () => {
-    const url = `${window.location.origin}/clube/${club.slug || slug}`
-    const text = t('clubprofile.share_text', { name: club.name, link: `${window.location.host}/clube/${club.slug || slug}` })
+    const url = `${appOrigin()}/clube/${club.slug || slug}`
+    const text = t('clubprofile.share_text', { name: club.name, link: `${appHost()}/clube/${club.slug || slug}` })
     if (await shareLinkOrCopy({ title: club.name, text, url }) === 'copied') {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)

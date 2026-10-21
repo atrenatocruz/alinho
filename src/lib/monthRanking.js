@@ -1,3 +1,4 @@
+import i18n from './i18n'
 /* Ranking do mês (design-handoff/2026-10-12-ranking-do-mes-podio, aprovado
    pelo Francisco a 12 out; regras em REGRAS-BA.md). Os números vêm todos da
    get_month_ranking do Dev 3 (#626): aqui só se arruma o que ela devolve para
@@ -11,7 +12,7 @@ export const monthGender = (scale) => (scale === 'masculino' || scale === 'femin
 /** «Sofia Marques» → «Sofia M.» (o nome curto do pódio). */
 export function shortName(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
-  if (parts.length < 2) return parts[0] || '—'
+  if (parts.length < 2) return parts[0] || i18n.t('ui.empty_no_name')
   // A inicial é a primeira letra do último nome: «Admin (Dev)» → «Admin D.».
   const initial = parts[parts.length - 1].match(/\p{L}/u)?.[0]
   // Sem letra no último nome («Teste 2»): fica o nome inteiro (UX, 13 out).

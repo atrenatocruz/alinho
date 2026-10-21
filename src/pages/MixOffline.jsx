@@ -4,6 +4,7 @@ import { Trophy, RotateCcw, Share2, Download } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import { PrimaryButton, ShareModal, ConfirmSheet } from '../components/ui'
 import { formDuplas, seedCourts, nextSobeDesce, standings } from '../lib/mixLogic'
+import { appHref } from '../lib/native'
 
 const STORAGE_KEY = 'alinho-mix-offline-v1'
 
@@ -57,7 +58,7 @@ export default function MixOffline() {
   const saved = loadSaved()
   const [namesText, setNamesText] = useState(saved?.namesText ?? '')
   const [numCourts, setNumCourts] = useState(saved?.numCourts ?? 1)
-  const [gameTitle, setGameTitle] = useState(saved?.gameTitle ?? 'Mix')
+  const [gameTitle, setGameTitle] = useState(saved?.gameTitle ?? t('mixoffline.default_title'))
   const [teams, setTeams] = useState(saved?.teams ?? null)
   const [rounds, setRounds] = useState(saved?.rounds ?? [])
   const [finished, setFinished] = useState(saved?.finished ?? false)
@@ -114,7 +115,7 @@ export default function MixOffline() {
   const teamById = Object.fromEntries((teams || []).map((team) => [team.id, team]))
   const teamLabel = (id) => {
     const team = teamById[id]
-    return team ? `${team.player1.name} / ${team.player2.name}` : '—'
+    return team ? `${team.player1.name} / ${team.player2.name}` : t('ui.empty_tbd')
   }
 
   const handleSaveScore = (matchIndex) => {
@@ -154,7 +155,7 @@ export default function MixOffline() {
     setFinished(false)
     setScoreInputs({})
     setScoreError('')
-    setGameTitle('Mix')
+    setGameTitle(t('mixoffline.default_title'))
   }
 
   // Exports everything needed to later populate the real app once it's back
@@ -201,7 +202,7 @@ export default function MixOffline() {
   }
 
   const gameForShare = { title: gameTitle, location: null, num_courts: numCourts }
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const shareUrl = typeof window !== 'undefined' ? appHref() : ''
 
   const buildDuplasShareText = () => {
     const lines = [t('mixoffline.share_duplas_header', { title: gameTitle }), '']

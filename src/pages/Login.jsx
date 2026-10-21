@@ -14,6 +14,9 @@ import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 import EmailField from '../components/EmailField'
 import { emailProblem } from '../lib/emailCheck'
 import { supabase } from '../lib/supabase'
+import { App } from '@capacitor/app'
+import { Browser } from '@capacitor/browser'
+import { IS_NATIVE, NATIVE_PLATFORM } from '../lib/native'
 
 /* Entrar no alinho.pt (design-handoff/2026-10-13-login, aprovado pelo
    Francisco a 13 out; publicado a pedido dele a 18 out). Primeiro diz-se o
@@ -89,6 +92,15 @@ function GoogleG({ size = 20 }) {
       <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
       <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
       <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+    </svg>
+  )
+}
+
+// O logótipo da Apple, branco no botão preto (regras da Apple para o botão).
+function AppleLogo({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="shrink-0" fill="currentColor">
+      <path d="M16.37 12.62c-.02-2.3 1.88-3.4 1.97-3.46-1.07-1.57-2.74-1.78-3.33-1.8-1.42-.14-2.77.83-3.49.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.8-.41 6.94 1.16 9.21.77 1.11 1.68 2.36 2.88 2.31 1.16-.05 1.59-.75 2.99-.75 1.4 0 1.79.75 3.01.72 1.24-.02 2.03-1.13 2.79-2.25.88-1.29 1.24-2.53 1.26-2.6-.03-.01-2.42-.93-2.45-3.71zM14.08 5.85c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.77-.97 2.82 1.03.08 2.07-.52 2.71-1.28z"/>
     </svg>
   )
 }
@@ -174,7 +186,7 @@ export default function Login() {
   useKeyboardInset()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { signUp, signIn, signInWithGoogle, signInAsAdmin } = useAuth()
+  const { signUp, signIn, signInWithGoogle, signInWithApple, signInAsAdmin } = useAuth()
 
   // Os ecrãs: 'home' (1, 2 e 3), 'how' · 'email' · 'password' · 'about' (os 4
   // passos de criar conta), 'sent' (confirmar o email) e 'login' (entrar com
@@ -225,6 +237,39 @@ export default function Login() {
     window.addEventListener('pageshow', onShow)
     return () => window.removeEventListener('pageshow', onShow)
   }, [])
+  // Na app das lojas, o Google abre no browser do telemóvel: voltar à app sem
+  // entrar também volta o botão ao normal. O Android nem sempre avisa que o
+  // browser fechou (browserFinished), por isso conta também o regresso da
+  // app ao primeiro plano; se a pessoa entrou, a página muda na mesma.
+  useEffect(() => {
+    if (!IS_NATIVE) return undefined
+    const reset = () => setGoogleLoading(false)
+    const subs = [Browser.addListener('browserFinished', reset), App.addListener('resume', reset)]
+    return () => { subs.forEach((p) => p.then((s) => s.remove())) }
+  }, [])
+  // Sign in with Apple: só na app de iPhone (a App Store obriga, porque há
+  // login com o Google — regra 4.8). Cancelar a janela da Apple não é erro.
+  const showApple = IS_NATIVE && NATIVE_PLATFORM === 'ios'
+  const [appleLoading, setAppleLoading] = useState(false)
+  const handleAppleLogin = async () => {
+    setAppleLoading(true)
+    setGoogleError('')
+    try {
+      const { error: e, cancelled } = await signInWithApple()
+      if (e) throw e
+      if (cancelled) setAppleLoading(false)
+    } catch (err) {
+      console.error('Apple sign-in error:', err)
+      setGoogleError(describeError(t, err, 'login.apple_error'))
+      setAppleLoading(false)
+    }
+  }
+  const appleButton = showApple && (
+    <button type="button" onClick={handleAppleLogin} disabled={appleLoading} className={DARK}>
+      <AppleLogo /> {appleLoading ? t('login.signing_in') : t('login2.continue_apple')}
+    </button>
+  )
+
   const handleGoogleLogin = async () => {
     setGoogleLoading(true)
     setGoogleError('')
@@ -356,7 +401,7 @@ export default function Login() {
   )
   const footerLinks = (
     <p className="py-6 text-center text-[13px] text-muted">
-      <Link to="/instrucoes" className="underline underline-offset-2">{t('login2.help')}</Link>
+      <Link to="/ajuda" className="underline underline-offset-2">{t('login2.help')}</Link>
       {' · '}<Link to="/privacidade" className="underline underline-offset-2">{t('login2.privacy')}</Link>
       {' · '}<Link to="/termos" className="underline underline-offset-2">{t('login2.terms')}</Link>
     </p>
@@ -411,6 +456,7 @@ export default function Login() {
                 </p>
                 {last === 'google' ? (
                   <div className="space-y-2.5">
+                    {appleButton}
                     <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={LIME}>
                       <GoogleG /> {googleLoading ? t('login.signing_in') : t('login2.continue_google')}
                     </button>
@@ -418,6 +464,7 @@ export default function Login() {
                   </div>
                 ) : (
                   <div className="space-y-2.5">
+                    {appleButton}
                     <button type="button" onClick={() => go('login')} className={LIME}>{t('login2.login_email')}</button>
                     <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={OUTLINE}>
                       <GoogleG /> {googleLoading ? t('login.signing_in') : t('login2.continue_google')}
@@ -443,7 +490,7 @@ export default function Login() {
             {devBypass}
           </div>
           {invite
-            ? <p className="py-6 text-center text-[13px] text-muted"><Link to="/instrucoes" className="underline underline-offset-2">{t('login2.help')}</Link></p>
+            ? <p className="py-6 text-center text-[13px] text-muted"><Link to="/ajuda" className="underline underline-offset-2">{t('login2.help')}</Link></p>
             : footerLinks}
         </div>
       </div>
@@ -463,7 +510,9 @@ export default function Login() {
             <h1 className="font-display text-[24px] font-black text-ink-900">{t('login.login_button')}</h1>
           </div>
           <div className="mt-6">{deletedNotice}</div>
-          {/* O Google primeiro, como no «Como queres entrar?» (Francisco/UX, 18 out). */}
+          {/* O Google primeiro, como no «Como queres entrar?» (Francisco/UX, 18 out).
+              No iPhone, a Apple antes dele. */}
+          {appleButton && <div className="mb-2.5">{appleButton}</div>}
           <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={DARK}>
             <GoogleG /> {googleLoading ? t('login.signing_in') : t('login2.continue_google')}
           </button>
@@ -534,6 +583,7 @@ export default function Login() {
             <h1 className={`${title} mt-1.5`}>{t('login2.how_title')}</h1>
             <p className="mt-2 text-[15px] text-muted">{t('login2.how_lead')}</p>
             <div className="mt-6 space-y-2.5">
+              {appleButton}
               <button type="button" onClick={handleGoogleLogin} disabled={googleLoading} className={DARK}>
                 <GoogleG /> {googleLoading ? t('login.signing_in') : t('login2.continue_google')}
               </button>
@@ -613,7 +663,9 @@ export default function Login() {
               {/* Com erro, o campo leva a borda vermelha e o fundo rosa, como a password (UX). */}
               <div className={aboutErr.birthday ? BAD : ''}>
                 <label className={label}>{t('login.birthday_label')}</label>
-                <DateField value={signupBirthday} onChange={(v) => { setSignupBirthday(v); setAboutErr((x) => ({ ...x, birthday: null })) }} max={maxSignupBirthday()} hideToday required />
+                <DateField value={signupBirthday} onChange={(v) => { setSignupBirthday(v); setAboutErr((x) => ({ ...x, birthday: null })) }} max={maxSignupBirthday()} hideToday required birthday />
+                {/* A regra dos 13 anos, à vista (UX, 18 out). */}
+                {!aboutErr.birthday && <p className="mt-1.5 text-xs text-muted">{t('login.birthday_min_age', { age: MIN_SIGNUP_AGE })}</p>}
                 <FieldError id="signup-birthday-erro">{aboutErr.birthday}</FieldError>
               </div>
               <div className={aboutErr.gender ? BAD : ''}>

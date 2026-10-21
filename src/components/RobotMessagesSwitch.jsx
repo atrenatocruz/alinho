@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
+import { SWITCH_TRACK } from './ui'
 
 /**
  * Mensagens novas do robô (design-handoff/2026-10-01-mensagens-whatsapp,
@@ -38,7 +39,7 @@ export default function RobotMessagesSwitch({ organizationId, value, onChange })
 
   return (
     <div className="mt-6 pt-6 border-t border-gray-200">
-      <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+      <label className={`flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line ${saving ? 'opacity-60' : 'cursor-pointer'}`}>
         <div>
           <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.robot_messages_label')}</p>
           <p className="text-[11px] text-muted">
@@ -46,13 +47,16 @@ export default function RobotMessagesSwitch({ organizationId, value, onChange })
           </p>
           <p className="text-[11px] text-muted">{t('gerirclube.robot_messages_who_hint')}</p>
         </div>
+        {/* Interruptor como os outros, não uma caixa de marcar (QA, 19 out). */}
         <input
           type="checkbox"
+          role="switch"
           checked={!!value}
           disabled={saving}
           onChange={(e) => toggle(e.target.checked)}
-          className="w-5 h-5 shrink-0"
+          className="peer sr-only"
         />
+        <span aria-hidden="true" className={SWITCH_TRACK} />
       </label>
       {error && <p role="alert" className="mt-2 text-sm font-extrabold text-danger">{error}</p>}
     </div>

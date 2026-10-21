@@ -4,6 +4,10 @@ import { pendingAccountOrigin, clearAccountOrigin } from '../lib/accountOrigin'
 import { loadMyRef } from '../lib/myRef'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
+import { Browser } from '@capacitor/browser'
+import { SignInWithApple } from '@capacitor-community/apple-sign-in'
+import { IS_NATIVE, NATIVE_AUTH_CALLBACK, appHref, appOrigin } from '../lib/native'
+import { enablePush, disablePush } from '../lib/push'
 
 const AuthContext = createContext({})
 
@@ -180,6 +184,13 @@ export const AuthProvider = ({ children }) => {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // App das lojas: com sessão, notificações push (src/lib/push.js). No site
+  // não faz nada.
+  const userId = user?.id
+  useEffect(() => {
+    if (userId) enablePush()
+  }, [userId])
 
   // Welcome email on the first session. Strictly `=== null`: the column only
   // exists once migration_welcome_email.sql has run (undefined before that,
@@ -387,7 +398,9 @@ export const AuthProvider = ({ children }) => {
       password,
       options: {
         data: userData,
-        emailRedirectTo: window.location.href,
+        // Na app das lojas, o link do email abre no alinho.pt (appHref): o
+        // email pode ser aberto noutro aparelho, onde a app não está.
+        emailRedirectTo: appHref(),
         ...(captchaToken ? { captchaToken } : {}),
       }
     })
@@ -409,7 +422,7 @@ export const AuthProvider = ({ children }) => {
   // email silently fails to sign the visitor in on the other end.
   const resetPassword = async (email, captchaToken) => {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-password`,
+      redirectTo: `${appOrigin()}/redefinir-password`,
       ...(captchaToken ? { captchaToken } : {}),
     })
     return { data, error }
@@ -423,6 +436,21 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signInWithGoogle = async () => {
+    // Na app das lojas: o Google não deixa entrar dentro da app, por isso
+    // abre-se no browser do telemóvel, e a volta vem por NATIVE_AUTH_CALLBACK
+    // (nativeShell.js), com a página de onde se saiu no ?next=.
+    if (IS_NATIVE) {
+      const next = `${window.location.pathname}${window.location.search}`
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${NATIVE_AUTH_CALLBACK}?next=${encodeURIComponent(next)}`,
+          skipBrowserRedirect: true,
+        },
+      })
+      if (!error && data?.url) await Browser.open({ url: data.url })
+      return { data, error }
+    }
     // Preserve the current URL (including ?org=<slug>, if present) through
     // the OAuth round-trip — signInWithOAuth can't carry custom fields
     // through raw_user_meta_data the way email signUp can, so the org slug
@@ -445,6 +473,43 @@ export const AuthProvider = ({ children }) => {
     if (!error && data?.url) {
       if (installed) window.location.assign(data.url)
       else window.location.replace(data.url)
+    }
+    return { data, error }
+  }
+
+  // Sign in with Apple, só na app de iPhone (Login.jsx mostra o botão). A
+  // janela é a nativa da Apple; o token vai para o Supabase (provider
+  // «apple», com o pt.alinho.app nos Client IDs). O nonce: à Apple vai o
+  // hash, ao Supabase o original — é assim que ele confirma o token.
+  const signInWithApple = async () => {
+    const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    const rawNonce = hex(crypto.getRandomValues(new Uint8Array(16)))
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawNonce))
+    const hashedNonce = hex(new Uint8Array(digest))
+    let response
+    try {
+      ;({ response } = await SignInWithApple.authorize({
+        clientId: 'pt.alinho.app',
+        redirectURI: NATIVE_AUTH_CALLBACK,
+        scopes: 'email name',
+        nonce: hashedNonce,
+      }))
+    } catch (err) {
+      // 1001 = a pessoa fechou a janela da Apple.
+      if (String(err?.message || err).includes('1001')) return { cancelled: true }
+      return { error: err }
+    }
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: response.identityToken,
+      nonce: rawNonce,
+    })
+    // A Apple só manda o nome no primeiro login (e só se a pessoa o
+    // partilhar): grava-se logo, por cima do «Novo Utilizador» do trigger.
+    const name = [response.givenName, response.familyName].filter(Boolean).join(' ').trim()
+    if (!error && name && data?.user) {
+      await supabase.auth.updateUser({ data: { name, full_name: name } })
+      await supabase.from('profiles').update({ name }).eq('id', data.user.id).eq('name', 'Novo Utilizador')
     }
     return { data, error }
   }
@@ -483,6 +548,9 @@ export const AuthProvider = ({ children }) => {
     // de «sair de todos» ou de igualar a base), ou não há rede —, apaga-se a
     // sessão só aqui. Antes a chave ficava guardada e a pessoa ficava presa na
     // conta (QA/Francisco, 30 set).
+    // Antes de sair: este telemóvel deixa de receber os avisos da conta (só
+    // na app das lojas; precisa da sessão, por isso vem primeiro).
+    await disablePush()
     const { error } = await supabase.auth.signOut()
     let forced = false
     if (error) {
@@ -700,6 +768,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updatePassword,
     signInWithGoogle,
+    signInWithApple,
     signInAsAdmin,
     signOut,
     updateProfile,

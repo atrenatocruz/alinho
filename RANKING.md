@@ -1,10 +1,10 @@
 # Ranking (rating / "nível") — como funciona e porquê
 
-Modelo em vigor desde `supabase/migration_elo_simples.sql` (28 set 2026). A parte 1 é o que está implementado; a parte 2 é o raciocínio e as simulações que levaram a este modelo, para não se voltar a discutir do zero. Todo o cálculo vive no Postgres; o JavaScript só mostra (`src/lib/elo.js:1-8`).
+Modelo em vigor desde `supabase/migration_elo_simples.sql` (28 set 2026), com a regra 7 retirada por `migration_fim_da_regra_7.sql` (21 out 2026). A parte 1 é o que está implementado; a parte 2 é o raciocínio e as simulações que levaram a este modelo, para não se voltar a discutir do zero. Todo o cálculo vive no Postgres; o JavaScript só mostra (`src/lib/elo.js:1-8`).
 
 ---
 
-## Parte 1 — O modelo, em 7 regras
+## Parte 1 — O modelo, em 6 regras
 
 1. **Um rating global por pessoa** (`profiles.rating`). Começa no nível escolhido à entrada: N1 1900 · N2 1700 · N3 1500 · N4 1300 · N5 1100 · N6 850 · Iniciante 600 (`supabase/migration_elo_entry_levels.sql:140-170`); 900 para quem não escolheu.
 2. **Rating da dupla = média dos dois.** Esperado com a fórmula clássica: `E = 1 / (1 + 10^((R_adv − R_nós) / 400))`.
@@ -12,7 +12,7 @@ Modelo em vigor desde `supabase/migration_elo_simples.sql` (28 set 2026). A part
 4. **Cada um da dupla leva o mesmo.** Ganharam juntos, ganham o mesmo; perderam juntos, perdem o mesmo. Chão em 0, sem teto.
 5. **Só conta vitória, derrota ou empate.** Sets, jogos e pontos só decidem quem ganhou.
 6. **Nada mais mexe no rating.** Não há prémio por ganhar o mix, por noite perfeita, nem por ser campeão de torneio. Isso é assunto de XP e pontos de clube.
-7. **Quando a tua dupla está 150 pontos acima da adversária, ganhar vale cada vez menos, até zero aos 250.** Perder custa o normal. Para subir, joga com gente do teu nível.
+7. ~~Rampa contra duplas muito mais fracas~~ — **retirada a 21 out 2026**. Existiu de 28 set a 21 out (ganho a encolher dos 150 aos 250 de gap); criava um viés negativo para quem joga acima do grupo (ganho 0, derrota por inteiro) e desmotivava jogadores reais. O Elo puro já encolhe os ganhos com a diferença (+3,8 aos 250, +3,0 aos 300, +1,8 aos 400). Ver o §7 da parte 2 para a troca assumida.
 
 Por jogo: `delta = K × (S − E)`, com `S` = 1 / 0.5 / 0. A 2 casas decimais na base, arredondado a inteiro no ecrã.
 
@@ -27,9 +27,9 @@ Por jogo: `delta = K × (S − E)`, com `S` = 1 / 0.5 / 0. A 2 casas decimais na
 | Azarões ganham (E = 0,24) | 1100, 1100, 1300, 1300 | +15.2, +15.2, −15.2, −15.2 |
 | Lugar sem conta na dupla A | 1100, —, 1100, 1100 | +10, —, −10, −10 |
 | A1 está 250 acima, mas a dupla só 100 (E = 0,64): normal | 1250, 950, 1000, 1000 | +7.2, +7.2, −7.2, −7.2 |
-| Dupla 200 acima (E = 0,76): metade | 1300, 1100, 1000, 1000 | **+2.4**, **+2.4**, −4.8, −4.8 |
-| Dupla 250 acima (E = 0,81): zero | 1300, 1200, 1000, 1000 | **0**, **0**, −3.8, −3.8 |
-| Idem, mas perde: custa na mesma | 1300, 1200, 1000, 1000 | −16.2, −16.2, +16.2, +16.2 |
+| Dupla 200 acima (E = 0,76) | 1300, 1100, 1000, 1000 | +4.8, +4.8, −4.8, −4.8 |
+| Dupla 250 acima (E = 0,81): pouco, mas nunca zero | 1300, 1200, 1000, 1000 | +3.8, +3.8, −3.8, −3.8 |
+| Idem, mas perde: custa por inteiro | 1300, 1200, 1000, 1000 | −16.2, −16.2, +16.2, +16.2 |
 
 ### Onde está no código
 
@@ -101,6 +101,8 @@ Tudo o que se segue foi simulado por Monte Carlo (`supabase/ensaio_elo_monte_car
 **7. Quem ganha sempre sobe sempre — daí a regra 7.** Alguém a começar em 850 que ganhe todos os jogos no campo de cima (adversários 950–1050) fica em ≈ 1250 aos 2 meses, ≈ 1580 aos 6, ≈ 1820 ao fim de um ano e ≈ 2220 aos três, sem teto. A causa é a média da dupla: um 1750 com parceiro 950 é uma dupla de 1350 contra 1000, E = 0,85, e cada vitória ainda vale +3, quatro vezes por semana; em singulares valeria +0,3. O Elo só estabiliza quando a pessoa perde, e ele não perde.
 
 A primeira versão da regra (28 set) olhava ao **indivíduo**: 200 acima da dupla adversária, ganho 0. No mix de 28 set deu Renato −2 e Duarte +10 pelos mesmos 4 jogos, e cortou uma vitória que o esperado da dupla dava a 64 %. Contradizia a regra 4 e castigava o forte por ter parceiro fraco. A 29 set passou a olhar à **dupla**, com rampa: a partir de 150 acima da média adversária o ganho desce, até 0 aos 250. Os dois levam sempre o mesmo e nunca se corta um jogo que o Elo dava como disputado. O preço: como o parceiro fraco dilui a média, a trava chega mais tarde (invicto do M6 estabiliza em ≈ 1550 aos 2 anos, contra 1250 na versão individual e 2220 sem regra). O Ruben escolheu 150→250 em vez de 200→300 (≈ 1650) para a trava chegar mais cedo. Num clube normal, onde nenhuma dupla está 150 acima da outra, a regra não muda nada.
+
+**A regra 7 foi retirada a 21 out 2026** (`migration_fim_da_regra_7.sql`). Na prática, o viés pesou mais do que o teto: jogadores reais 250-300 acima do grupo ficaram com ganho zero e derrota por inteiro — valor esperado negativo ao nível verdadeiro, rating empurrado para baixo do real, e gente a desistir dos mixes. Troca assumida pelo Ruben: o invicto extremo volta a poder subir sem teto (~+3/vitória), com o contrapeso de cada derrota continuar a custar por inteiro (uma apaga ~5 vitórias). Se o caso extremo da simulação aparecer na vida real, volta-se ao tema com dados.
 
 **8. Proteger os veteranos de um novato mal declarado.** Com K 20 e sem prémio, o dano já é limitado: ±20 por jogo, o novato entra em 1–2 dos 4 jogos por noite, ±10 a ±30 acumulados nos 12 jogos dele. Regras tipo FIDE ("jogos contra provisórios contam menos para os classificados") ganhavam 0–4 pontos de erro. O K 40 só para o próprio dá a correção mais rápida sem tocar em ninguém: num clube de 40 veteranos com 10 novos (30 % mal declarados), o erro dos veteranos fica em 49–50 com qualquer K do novato, e o dos novos passa de 167 (K 20) para 158 (K 40 × 12). Onde o novato mal declarado faz mesmo mal é no campo em que cai, não nos pontos.
 

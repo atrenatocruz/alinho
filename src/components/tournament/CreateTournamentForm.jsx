@@ -214,7 +214,7 @@ function CategoryTimes({ draft, set, dayLabel, focusCode }) {
               <div key={c.code} className="card">
                 <div className="flex items-center gap-2">
                   <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
-                  <span className="min-w-0 flex-1 text-sm text-ink-900">{c.day ? dayLabel(c.day) : '—'}{c.start_time ? `, ${c.start_time}` : ''}</span>
+                  <span className="min-w-0 flex-1 text-sm text-ink-900">{c.day ? dayLabel(c.day) : t('ui.empty_day_tbd')}{c.start_time ? `, ${c.start_time}` : ''}</span>
                   <Lock size={13} className="shrink-0 text-ink-500" />
                 </div>
                 <p className="mt-1 text-xs text-ink-500">{t('tournament.create.category_time_drawn')}</p>

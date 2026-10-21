@@ -10,12 +10,15 @@ import { HelpContent } from './Instructions'
 export default function Ajuda() {
   const { t } = useTranslation()
   const goBack = useGoBack('/rankings')
+  // A Ajuda nova (site arrumado, 18 out): o mesmo conteúdo do site, com as
+  // faixas a sair das margens da página.
   return (
-    <div className="pb-6">
-      <BackBar onBack={goBack} label={t('common.back')} title={t('instructions.title')} />
-      <h1 className="text-[28px] font-extrabold leading-tight text-ink-900">{t('instructions.title')}</h1>
-      <div className="mt-1">
-        <HelpContent />
+    // O bloco preto do fim vai até ao fundo, por baixo da barra (SPEC: «sem
+    // espaço branco no fim»): a margem de baixo do Layout é engolida aqui.
+    <div style={{ marginBottom: 'calc(-7rem - env(safe-area-inset-bottom))' }}>
+      <BackBar onBack={goBack} label={t('common.back')} title={t('ajuda.title')} />
+      <div className="-mt-6">
+        <HelpContent inApp />
       </div>
     </div>
   )

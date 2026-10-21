@@ -15,6 +15,7 @@ import {
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { Avatar, ConfirmSheet, EmptyState, LoadErrorState, PrimaryButton } from '../components/ui'
 import { describeError } from '../lib/errors'
+import { SkeletonGate, SkWhiteCard } from '../components/Skeleton'
 
 const SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
 
@@ -305,9 +306,13 @@ export default function GroupMatches() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-        </div>
+        // Os jogos a cinzento em vez da roda (esqueletos, 12 out).
+        <SkeletonGate>
+          <div className="space-y-3.5">
+            <SkWhiteCard />
+            <SkWhiteCard />
+          </div>
+        </SkeletonGate>
       ) : loadError ? (
         // Erro a carregar a página toda: o Alino «ups» (mascote, 12 out).
         <LoadErrorState title={loadError} />
