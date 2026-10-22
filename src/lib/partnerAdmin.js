@@ -41,6 +41,7 @@ export async function updatePartnerProfile(partnerId, fields) {
     // O nome também é do parceiro (Francisco, 22 out); só se manda quando muda,
     // para a função antiga (sem p_name) continuar a servir.
     ...(fields.name !== undefined ? { p_name: fields.name } : {}),
+    ...(fields.kind_label !== undefined ? { p_kind_label: fields.kind_label } : {}),
     p_tagline: p(fields.tagline), p_address: p(fields.address), p_hours: p(fields.hours),
     p_phones: p(fields.phones), p_email: p(fields.email),
     p_instagram_url: p(fields.instagram_url), p_website_url: p(fields.website_url),

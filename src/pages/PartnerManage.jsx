@@ -348,7 +348,7 @@ function FieldSheet({ field, partner, onClose, onSaved }) {
       onSaved(await updatePartnerProfile(partner.id, { [field]: phones ? v : v }))
     } catch (e) {
       const k = String(e?.message || '')
-      setError(t(k.includes('bad_email') ? 'partneradmin.err_bad_email' : k.includes('bad_url') ? 'partneradmin.err_bad_url' : k.includes('too_long') ? 'partneradmin.err_too_long' : 'partneradmin.err_save'))
+      setError(t(k.includes('bad_email') ? 'partneradmin.err_bad_email' : k.includes('bad_url') ? 'partneradmin.err_bad_url' : k.includes('name_required') ? 'partneradmin.err_name_required' : k.includes('too_long') ? 'partneradmin.err_too_long' : 'partneradmin.err_save'))
     } finally {
       setBusy(false)
     }

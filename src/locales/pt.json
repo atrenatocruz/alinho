@@ -6697,5 +6697,6 @@
   "notif.partner_month_vouchers_line": "{{count}} códigos para a {{name}}. Vê-os em Gerir › {{name}}.",
   "notif.partner_prize_won_title": "Ganhaste um prémio no ranking de {{month}}",
   "notif.partner_prize_won_line": "{{place}}.º lugar: {{pct}}% de desconto na {{name}}, até {{until}}. Está nos teus Vouchers.",
-  "partneradmin.field_name": "Nome"
+  "partneradmin.field_name": "Nome",
+  "partneradmin.err_name_required": "O nome não pode ficar vazio."
 }

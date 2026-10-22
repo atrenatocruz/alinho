@@ -6682,5 +6682,6 @@
   "notif.partner_month_vouchers_line": "{{count}} codes for {{name}}. See them in Manage › {{name}}.",
   "notif.partner_prize_won_title": "You won a prize in the {{month}} ranking",
   "notif.partner_prize_won_line": "#{{place}}: {{pct}}% off at {{name}}, until {{until}}. It's in your Vouchers.",
-  "partneradmin.field_name": "Name"
+  "partneradmin.field_name": "Name",
+  "partneradmin.err_name_required": "The name can't be empty."
 }
