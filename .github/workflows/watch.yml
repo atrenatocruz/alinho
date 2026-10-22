@@ -46,6 +46,15 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # O Xcode resolve todos os pacotes do projeto, e os do Capacitor estão em
+      # node_modules (ios/App/CapApp-SPM/Package.swift).
+      - name: Pacotes do Capacitor
+        run: npm ci
+
       - name: Compilar a app do relógio
         run: |
           set -o pipefail
