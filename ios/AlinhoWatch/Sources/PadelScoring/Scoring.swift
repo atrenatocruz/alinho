@@ -30,7 +30,7 @@ public enum Scoring {
         switch st.phase {
         case .game: gamePoint(&st, team, &ev)
         case .tieBreak, .superTieBreak: tieBreakPoint(&st, team, &ev)
-        case .points: break
+        case .points: pointsPoint(&st, team)
         }
         if st.isOver {
             st.endedAt = date
@@ -38,6 +38,25 @@ public enum Scoring {
             ev.remove(.switchSides)             // acabou: já não se troca de lado
         }
         return PointResult(state: st, events: ev)
+    }
+
+    /// «Terminar o jogo» antes do fim: contam os sets e os jogos já fechados; os
+    /// pontos do jogo (ou tie-break) a meio ficam no estado mas não contam.
+    public static func stop(_ s: MatchState, at date: Date) -> MatchState {
+        guard !s.isOver else { return s }
+        var st = s
+        finish(&st, .stopped)
+        st.endedAt = date
+        return st
+    }
+
+    // MARK: - Pontos (Americano)
+
+    private static func pointsPoint(_ st: inout MatchState, _ t: Team) {
+        st.points[t.rawValue] += 1
+        if let total = st.config.pointsTotal, st.points[0] + st.points[1] >= total {
+            finish(&st, .rules)
+        }
     }
 
     // MARK: - Jogo (0, 15, 30, 40)
@@ -151,7 +170,12 @@ public enum Scoring {
 
     private static func finish(_ st: inout MatchState, _ reason: EndReason) {
         st.endReason = reason
-        let won = setsWon(st.sets)
-        st.winner = won[0] > won[1] ? .us : won[1] > won[0] ? .them : nil
+        func leader(_ x: [Int]) -> Team? { x[0] > x[1] ? .us : x[1] > x[0] ? .them : nil }
+        if st.phase == .points {
+            st.winner = leader(st.points)
+        } else {
+            // Com os sets empatados, ganha quem tem mais jogos no set a decorrer.
+            st.winner = leader(setsWon(st.sets)) ?? (reason == .stopped ? leader(st.games) : nil)
+        }
     }
 }
