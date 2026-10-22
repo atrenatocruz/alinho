@@ -38,6 +38,7 @@ public struct RootView: View {
             }
         }
         .environmentObject(model)
+        .task { await model.resumeWorkoutIfNeeded() }
     }
 }
 #endif

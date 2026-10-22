@@ -26,12 +26,20 @@ final class AppModel: ObservableObject {
     @Published var flash: Team?
 
     private let store: SessionStore?
+    /// Sessão de treino para o ecrã não se apagar; `nil` nas prints dos ecrãs.
+    private let keeper: WorkoutKeeper?
     private var overlayTask: Task<Void, Never>?
 
     /// `store == nil`: não grava (prints dos ecrãs).
     init(store: SessionStore? = SessionStore(fileURL: SessionStore.defaultURL), session: MatchSession? = nil) {
         self.store = store
+        self.keeper = store == nil ? nil : WorkoutKeeper()
         self.session = session ?? store?.load() ?? MatchSession()
+    }
+
+    /// Ao abrir a app com um jogo a decorrer.
+    func resumeWorkoutIfNeeded() async {
+        if let current, !current.isOver { await keeper?.begin() }
     }
 
     var current: MatchState? { session.current }
@@ -44,6 +52,7 @@ final class AppModel: ObservableObject {
     func start() {
         session.start(at: Date())
         save()
+        Task { await keeper?.begin() }
     }
 
     func point(_ team: Team) {
@@ -57,6 +66,7 @@ final class AppModel: ObservableObject {
         }
         if events.contains(.matchOver) {
             Haptic.play(.long)
+            keeper?.end()
             return
         }
         Haptic.play(events.contains(.setWon) ? .long : .counted)
@@ -68,7 +78,9 @@ final class AppModel: ObservableObject {
     }
 
     func undo() {
+        let wasOver = current?.isOver == true
         guard session.undo() else { return }
+        if wasOver { Task { await keeper?.begin() } }
         hideOverlay()
         Haptic.play(.undo)
         save()
@@ -76,6 +88,7 @@ final class AppModel: ObservableObject {
 
     func stop() {
         session.stop(at: Date())
+        keeper?.end()
         hideOverlay()
         Haptic.play(.long)
         save()
