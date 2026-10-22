@@ -14,3 +14,16 @@ func match(
         at: t0
     )
 }
+
+/// Joga uma sequência de pontos: `u` = Nós, `t` = Eles; espaços ignorados.
+/// Devolve o estado final e os eventos de cada ponto.
+func play(_ s: MatchState, _ seq: String) -> (MatchState, [Set<MatchEvent>]) {
+    var state = s
+    var events: [Set<MatchEvent>] = []
+    for c in seq where c != " " {
+        let r = Scoring.point(state, to: c == "u" ? .us : .them, at: t0)
+        state = r.state
+        events.append(r.events)
+    }
+    return (state, events)
+}
