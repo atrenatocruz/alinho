@@ -6453,7 +6453,6 @@
   "login2.forgot_sent": "<0>Enviado.</0> Vê o teu email e carrega no link. Se não o vires, espreita o spam.",
   "login2.name_placeholder": "O teu nome e apelido",
   "login2.or_email": "ou com o email",
-  "partner.label": "Parceiro do alinho",
   "partner.illustrative": "Imagem ilustrativa",
   "partner.not_found_title": "Este parceiro não existe",
   "partner.not_found_body": "O link pode estar errado, ou o parceiro já saiu do alinho.pt.",
@@ -6698,5 +6697,6 @@
   "notif.partner_prize_won_title": "Ganhaste um prémio no ranking de {{month}}",
   "notif.partner_prize_won_line": "{{place}}.º lugar: {{pct}}% de desconto na {{name}}, até {{until}}. Está nos teus Vouchers.",
   "partneradmin.field_name": "Nome",
-  "partneradmin.err_name_required": "O nome não pode ficar vazio."
+  "partneradmin.err_name_required": "O nome não pode ficar vazio.",
+  "partneradmin.field_kind_label": "Tipo"
 }

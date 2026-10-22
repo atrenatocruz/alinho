@@ -24,7 +24,7 @@ const STATUS_PILL = {
   anulado: 'bg-[#EEF0EC] text-muted line-through',
 }
 // O parceiro gere tudo menos os prémios e a zona (Francisco, 22 out).
-const FIELDS = ['name', 'tagline', 'address', 'hours', 'phones', 'email', 'instagram_url', 'website_url']
+const FIELDS = ['name', 'tagline', 'kind_label', 'address', 'hours', 'phones', 'email', 'instagram_url', 'website_url']
 
 const ymd = (v) => String(v || '').slice(0, 10)
 const asDate = (v) => new Date(`${ymd(v)}T12:00:00`)
