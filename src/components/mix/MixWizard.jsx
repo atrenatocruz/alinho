@@ -72,7 +72,7 @@ function Field({ label, children, hint, locked = false }) {
  */
 export default function MixWizard({
   form, setForm, editingGame, options, mixScopeId, setMixScopeId, maxCourts, locationInputRef,
-  launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null, organizationId = null, onDestroy = null, onUnpublish = null,
+  launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null, organizationId = null,
   orgName = '', orgKind = 'club',
 }) {
   const { t, i18n } = useTranslation()
@@ -239,37 +239,8 @@ export default function MixWizard({
       edit={editingGame ? {
         onSave: () => submit(false), onCancel, dirty: JSON.stringify(form) !== initialForm,
         saving: busy, saveDisabled: !!missingAny, saveHint: missingAny,
-        // «Voltar a rascunho» também no Editar (Francisco, 6 out): a mesma
-        // pergunta e o mesmo unpublish_mix do «Mais ⋯» da página do mix.
-        extra: onUnpublish ? (() => {
-          const leaving = (editingGame.participants || []).filter((p) => ['confirmed', 'waitlisted'].includes(p.status))
-            .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
-          return {
-            label: t('eventactions.to_draft'),
-            title: t('eventactions.to_draft_title'),
-            message: leaving > 0 ? `${t('eventactions.to_draft_people', { count: leaving })} ${t('eventactions.to_draft_message')}` : t('eventactions.to_draft_message'),
-            confirmLabel: t('eventactions.to_draft_confirm'), cancelLabel: t('eventactions.to_draft_keep'),
-            onConfirm: () => onUnpublish(leaving),
-            errorOf: (error) => {
-              const code = ['not_allowed', 'not_published'].find((c) => (error?.message || '').includes(c))
-              return code ? t(`eventactions.to_draft_error_${code}`) : describeError(t, error, 'eventactions.to_draft_error')
-            },
-          }
-        })() : null,
-        // «Cancelar o mix» com inscritos, «Eliminar o mix» sem ninguém (30 set);
-        // a pergunta usa as frases do «Mais ⋯» da página do mix.
-        danger: onDestroy ? (() => {
-          const people = (editingGame.participants || []).filter((p) => ['confirmed', 'waitlisted'].includes(p.status)).length
-          const series = !!editingGame.recurrence_id
-          return {
-            label: t(people ? 'mixwizard.danger_cancel' : 'mixwizard.danger_delete'),
-            // Sem ninguém, a pergunta diz o mesmo que o botão (designer, 30 set).
-            title: t(people ? 'mixcancel.confirm_title' : 'mixwizard.delete_title', { name: editingGame.title || '' }),
-            message: people ? t(series ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint') : t('mixwizard.delete_message'),
-            cancelLabel: t('mixcancel.keep'), confirmLabel: t(people ? 'mixcancel.confirm' : 'mixwizard.delete_confirm'),
-            onConfirm: onDestroy, errorOf: (err) => describeError(t, err, 'mixcancel.error'),
-          }
-        })() : null,
+        // «Voltar a rascunho» e o cancelar/eliminar saíram do Editar (Botões do
+        // Editar, 18 out): estão no fim da folha «Editar e mais opções» do mix.
       } : null}
     >
       {/* Os 4 passos ficam montados e só se mostra um: o autocompletar do

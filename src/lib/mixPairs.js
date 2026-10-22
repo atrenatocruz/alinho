@@ -21,6 +21,14 @@ export async function adminPairSoloRows(gameId, rowA, rowB) {
   return data
 }
 
+/** Separar pela linha de inscrição (Dev 3, 20 out): serve para qualquer
+ *  dupla, com contas ou convidados. A linha fica sozinha e o parceiro passa a
+ *  ter a sua. Função admin_split_pair_row, em produção desde 21 out. */
+export async function adminSplitPairRow(gameId, participantId) {
+  const { error } = await supabase.rpc('admin_split_pair_row', { p_game_id: gameId, p_participant_id: participantId })
+  if (error) throw error
+}
+
 export async function adminSplitPair(gameId, userId) {
   const { error } = await supabase.rpc('admin_split_pair', { p_game_id: gameId, p_user_id: userId })
   if (error) throw error

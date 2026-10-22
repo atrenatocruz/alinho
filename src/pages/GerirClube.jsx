@@ -2748,7 +2748,7 @@ export default function GerirClube() {
             actions={[
               { key: 'open', label: t('series.open_this'), hint: t('series.open_this_hint'), onClick: () => navigate(`/jogo/${singleSheet.id}`) },
               porComecar && { key: 'edit', label: t('eventactions.edit'), hint: t('eventactions.edit_hint'), onClick: () => abrirEdicaoMix(singleSheet) },
-              (porComecar || singleSheet.status === 'in_progress') && { key: 'cancel', danger: true, label: t('eventactions.cancel_one'), hint: t('eventactions.cancel_one_hint'), onClick: () => setSingleCancel(singleSheet) },
+              (porComecar || singleSheet.status === 'in_progress') && { key: 'cancel', danger: true, link: true, label: t('eventactions.cancel_one'), hint: t('eventactions.cancel_one_hint'), onClick: () => setSingleCancel(singleSheet) },
             ].filter(Boolean)}
             onClose={() => setSingleSheet(null)}
           />
@@ -2950,27 +2950,6 @@ export default function GerirClube() {
             organizationId={mixScopeId || currentOrganizationId}
             orgName={(mixScopeId && clubGroups.find((g) => g.id === mixScopeId)?.name) || org?.name || ''}
             orgKind={mixScopeId ? 'group' : (org?.kind || 'club')}
-            // «Cancelar o mix» / «Eliminar o mix» no Editar (30 set): o mesmo
-            // cancelMixDate do «Mais ⋯» da página do mix.
-            onDestroy={editingGame ? async () => {
-              const { outcome } = await cancelMixDate(editingGame)
-              setDoneNotice(t(outcome === 'cancel' ? 'gerirclube.mix_cancelled' : 'gerirclube.mix_deleted'))
-              fecharMix()
-              loadGames()
-            } : null}
-            // «Voltar a rascunho» no Editar (Francisco, 6 out): o mesmo
-            // unpublish_mix do «Mais ⋯» — até o mix terminar, também com
-            // inscritos (saem e recebem um aviso). Num rascunho não aparece.
-            // Com a série em pausa, as datas já estão em rascunho (Dev 1, 9 out):
-            // lê-se o estado fresco da lista, e não o do mix que abriu o Editar.
-            onUnpublish={editingGame && !editingGame.recurrence?.is_paused
-              && ['pending', 'open', 'closed', 'in_progress'].includes((games.find((g) => g.id === editingGame.id) || editingGame).status) ? async (leaving) => {
-              const { error } = await supabase.rpc('unpublish_mix', { p_game_id: editingGame.id })
-              if (error) throw error
-              setDoneNotice(leaving > 0 ? t('eventactions.to_draft_done_people', { count: leaving }) : t('eventactions.to_draft_done'))
-              fecharMix()
-              loadGames()
-            } : null}
           />
         )}
         {deleteSheet}

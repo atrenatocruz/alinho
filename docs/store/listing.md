@@ -85,6 +85,53 @@ sensíveis; tem perfis públicos e mensagens de grupo, o que o questionário per
 >
 > Questions or ideas? Write to support@alinho.pt.
 
+## Español (España)
+
+Copywriter, 21 out 2026. Aprovada pelo Francisco a 21 out (com o robô). Glossário em `Alinho/design-handoff/2026-10-18-linguas/GLOSSARIO-ES.md`
+(Mix = «americana», campo = «pista», dupla = «pareja»). Só se publica quando a app já
+tiver o espanhol; até lá fica aqui guardada.
+
+**Nombre de la app** (máx. 30): `alinho: pádel en grupo`
+
+**Descripción breve** (Play, máx. 80):
+`Americanas, torneos y tu nivel de pádel, con el grupo de WhatsApp de siempre.`
+
+**Subtítulo** (App Store, máx. 30): `Americanas, torneos y tu nivel`
+
+**Descripción completa:**
+
+> Tus partidos de pádel, por fin organizados.
+>
+> alinho reúne en un solo sitio lo que hoy anda repartido entre grupos de WhatsApp y hojas de cálculo: quién juega, cuándo, dónde y con qué nivel.
+>
+> **Para quien juega**
+> • Mira las americanas y los partidos de tus grupos y clubes, y apúntate con un toque, por tu cuenta o con pareja.
+> • ¿No quieres abrir la app? Responde «In» en el grupo de WhatsApp y el robot de alinho te apunta.
+> • Tu nivel sube y baja con cada resultado, y ves en qué puesto estás en el ranking del grupo y del club.
+> • Apúntate a torneos y sigue los partidos y los resultados.
+> • Organiza partidos entre amigos fuera del club y apunta el resultado.
+>
+> **Para quien organiza**
+> • Crea una americana en un minuto, con el formato, las pistas, el nivel y el precio.
+> • Las inscripciones, las listas de espera y las parejas se hacen solas.
+> • Los resultados van al ranking del grupo, sin hacer cuentas a mano.
+>
+> Gratis para quien juega.
+>
+> ¿Dudas o sugerencias? Escríbenos a support@alinho.pt.
+
+**Palabras clave** (App Store, máx. 100, separadas por comas):
+`padel,pádel,americana,torneo,ranking,nivel,club,partidos,whatsapp,grupo,liga,pista`
+
+**Categoría:** Deportes
+
+O robô fica na ficha (Francisco, 21 out: «quero o robô»). O que a linha diz é verdade hoje:
+o robô aceita o «In» em qualquer grupo, com o número português. Mas as mensagens dele ao
+grupo ainda saem em português: **antes de publicar esta ficha, o robô tem de falar espanhol
+(Renato)**. Se não estiver, a alternativa sem robô é tirar a linha do «In» e usar a descrição
+breve `Americanas, torneos y tu nivel de pádel, con tu grupo y tu club de siempre.`
+As capturas têm de ser da app em espanhol.
+
 ## Conta para a revisão (App Store / Play)
 
 Clube «alinho Demo» (escondido) e conta `appreview@ensaio.alinho.test`, criados

@@ -317,7 +317,7 @@ export default function FriendSession() {
           pending > 0 && { key: 'share', label: t('friends.share_missing'), onClick: () => shareWithMissing(t(match.ranked_intent === false ? 'friends.share_text_friendly' : 'friends.share_text', {
             name: creator?.name || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id) })) },
           canLeave && { key: 'leave', label: t('friends.leave_game'), onClick: () => setAskLeave(true) },
-          { key: 'cancel', danger: true, label: t('friends.cancel_game'), onClick: () => setAskCancel(true) },
+          { key: 'cancel', danger: true, link: true, label: t('friends.cancel_game'), onClick: () => setAskCancel(true) },
         ]).filter(Boolean)}
       />
       {sharingWinners && <FriendWinnersShare match={match} games={games} me={me} onClose={() => setSharingWinners(false)} />}

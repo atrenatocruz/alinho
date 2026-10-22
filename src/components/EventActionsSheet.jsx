@@ -23,7 +23,12 @@ export default function EventActionsSheet({ open, title, subtitle, eyebrow = nul
   }, [open, onClose])
 
   if (!open) return null
-  const ordered = [...actions.filter((a) => !a.danger), ...actions.filter((a) => a.danger)]
+  // `link: true` (Botões do Editar, 18 out): as ações que mudam o evento
+  // todo («Voltar a rascunho», «Eliminar…») vão para o fim, depois de uma
+  // linha, em texto sublinhado — preto, ou vermelho com `danger`.
+  const rows = actions.filter((a) => !a.link)
+  const links = [...actions.filter((a) => a.link && !a.danger), ...actions.filter((a) => a.link && a.danger)]
+  const ordered = [...rows.filter((a) => !a.danger), ...rows.filter((a) => a.danger)]
 
   return createPortal(
     <div
@@ -60,6 +65,19 @@ export default function EventActionsSheet({ open, title, subtitle, eyebrow = nul
             </button>
           ))}
         </div>
+        {links.length > 0 && (
+          <div className="mt-1 space-y-1 border-t border-line pt-2.5">
+            {links.map((a) => (
+              <div key={a.key}>
+                <button type="button" disabled={a.disabled} onClick={() => { onClose(); a.onClick() }}
+                  className={`min-h-[36px] text-left font-display text-[15px] font-bold underline underline-offset-2 disabled:cursor-default disabled:no-underline ${a.disabled ? 'text-ink-500' : a.danger ? 'text-danger' : 'text-ink-900'}`}>
+                  {a.label}
+                </button>
+                {a.disabled && a.hint && <p className="text-[12.5px] leading-snug text-[#5B6068]">{a.hint}</p>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>,
     document.body
