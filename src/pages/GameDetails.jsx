@@ -35,7 +35,7 @@ import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/
 import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError, isGameFull } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
-import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
+import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges, splitByRoom } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import SwapGuestSheet from '../components/mix/SwapGuestSheet'
@@ -56,6 +56,7 @@ import { listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite
 import { usePriceRoster, PriceRosterSummary, PriceRosterTag, useSpecialPriceLine } from '../components/SpecialPriceRoster'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
+import { cancelOpenBatch, loadOpenBatchLive } from '../lib/openSlotsApi'
 import RoundAlarm from '../components/RoundAlarm'
 import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
@@ -221,10 +222,20 @@ export default function GameDetails() {
   const [publishOpen, setPublishOpen] = useState(false)
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
   const [cancelOpen, setCancelOpen] = useState(false)
+  // Jogo em aberto: «Cancelar todos os horários» da publicação (Botões do
+  // Editar, 18 out — saiu do Editar). Os horários vivos leem-se ao abrir a folha.
+  const [batchLive, setBatchLive] = useState(null)
+  const [cancelAllOpen, setCancelAllOpen] = useState(false)
   const [draftAskOpen, setDraftAskOpen] = useState(false)
   // Ações do evento (desenho de 26 set): a folha do «Mais ⋯», o «Mudar só
   // este mix» e a pergunta do «Recomeçar».
   const [moreOpen, setMoreOpen] = useState(false)
+  useEffect(() => {
+    if (!moreOpen || !game?.open_batch_id || game?.origin !== 'open_slot') return undefined
+    let alive = true
+    loadOpenBatchLive(game.open_batch_id).then((v) => { if (alive) setBatchLive(v) }).catch(() => {})
+    return () => { alive = false }
+  }, [moreOpen, game?.open_batch_id, game?.origin])
   const [changeOneOpen, setChangeOneOpen] = useState(false)
   const [restartOpen, setRestartOpen] = useState(false)
   // A tira preta de 3 s depois de uma ação da folha (ex.: «Mudar só este mix»).
@@ -1638,6 +1649,68 @@ export default function GameDetails() {
     }
   }
 
+  // Vários de uma vez, sozinhos (#640): os primeiros entram até encher e os
+  // outros ficam suplentes; com «Abrir mais um campo», o campo abre primeiro
+  // (a base de dados promove antes quem já estava em lista de espera).
+  const handleManyAdd = async ({ ids, choice, plan }) => {
+    const beforeIds = people.filter((p) => !p.no_account).map((p) => p.id)
+    setBusy(true)
+    setMixError('')
+    setEditNotice('')
+    try {
+      let room = capacity
+      if (choice === 'court') {
+        const update = { num_courts: plan.nextCourts }
+        if (plan.nextMaxPlayers) update.max_players = plan.nextMaxPlayers
+        const { error } = await supabase.from('games').update(update).eq('id', id)
+        if (error) throw error
+        room = plan.nextCapacity
+      }
+      const nowPeople = await confirmedPeopleNow()
+      const { enter, wait } = splitByRoom(ids, room - nowPeople)
+      const rows = [
+        ...enter.map((uid) => ({ game_id: id, user_id: uid, partner_id: null, status: 'confirmed', joined_alone: true })),
+        ...wait.map((uid) => ({ game_id: id, user_id: uid, partner_id: null, status: 'waitlisted', joined_alone: true })),
+      ]
+      const { error: insertError } = await supabase.from('participants').insert(rows)
+      if (insertError) throw insertError
+      setAddPlayerOpen(false)
+
+      if (!mixStarted) {
+        if (enter.length) {
+          try {
+            await notifyMixChanges(id, enter.filter((pid) => pid !== user.id).map((pid) => ({ user_id: pid, kind: 'mix_joined' })))
+          } catch (error) {
+            console.error('Error notifying players about being added:', error)
+          }
+        }
+        setEditNotice(wait.length
+          ? t('mixedit.notice_many_waitlist', { count: enter.length, wait: wait.length })
+          : t('mixedit.notice_many', { count: enter.length }))
+        loadGameDetails()
+        return
+      }
+
+      if (enter.length || choice === 'court') {
+        try {
+          const changed = await reformDuplas(beforeIds)
+          setEditNotice(t('mixedit.notice_added', { count: changed }))
+        } catch (error) {
+          console.error('Error reforming duplas after adding players:', error)
+          setMixError(t('mixedit.added_not_reformed', { reason: describeError(t, error, 'gamedetails.error_start_mix') }))
+        }
+      } else {
+        setEditNotice(t('mixedit.notice_waitlist'))
+      }
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error adding several players:', error)
+      setMixError(describeError(t, error, 'mixedit.error_add'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleLastMinuteRemove = async (player) => {
     const person = people.find((p) => p.id === player?.id)
     if (!person) return
@@ -2746,6 +2819,8 @@ export default function GameDetails() {
   const mixPaused = !mixStarted && teams.length > 0
   // Juntar sozinhos: só num mix em dupla (sem rodar), antes de começar, e
   // com pelo menos dois sozinhos (os mesmos «Sozinhos» da lista).
+  // Sozinhos com ou sem conta (convidados incluídos): o «Juntar» aparece com
+  // 2 ou mais (Francisco, 19 out — o professor do A2N).
   const canPairSolos = isAdmin && !mixStarted && !mixPaused && game?.status !== 'cancelled'
     && game?.allow_pair_signup && !game?.rotate_partners
     && participants.filter((r) => r.user?.id && !r.partner?.id).length >= 2
@@ -3306,7 +3381,8 @@ export default function GameDetails() {
               ) : (
                 <>
                   <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
-                  <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
+                  {/* No jogo em aberto, «este jogo» e não «este mix» (QA, 19 out). */}
+                  <p className="text-sm text-muted mt-0.5">{t(isOpenGame(game) ? 'mixcancel.banner_text_open' : 'mixcancel.banner_text')}</p>
                 </>
               )}
             </div>
@@ -5069,6 +5145,8 @@ export default function GameDetails() {
           ratingInfoById={ratingInfoById}
           busy={busy}
           onConfirm={handleLastMinuteAdd}
+          onConfirmMany={handleManyAdd}
+          waitlistPeople={waitlist.reduce((n, w) => n + 1 + (w.partner_id || w.partner_guest_id ? 1 : 0), 0)}
           onClose={() => setAddPlayerOpen(false)}
           beforeStart={!mixStarted}
           onGuestAdded={async () => {
@@ -5426,6 +5504,8 @@ export default function GameDetails() {
         const part = (o) => formatDateLib(game.date, i18n.language, o).replace(/\./g, '').toLocaleLowerCase(i18n.language)
         const shortDay = `${weekdayShort(new Date(game.date), i18n.language)} ${new Date(game.date).getDate()} ${part({ month: 'short' })}`
         const time = formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })
+        // «qua 21 · 18:00»: o horário de um jogo em aberto (UX, 18 out).
+        const slotWhen = `${shortDay.replace(/\s\S+$/, '')} · ${time}`
         const notStarted = (['pending', 'open', 'closed'].includes(game.status) || (isDraftMix(game) && !!game.unfilled_at)) && !mixPaused
         const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
         const actions = [
@@ -5444,15 +5524,21 @@ export default function GameDetails() {
           // inscritos e depois de o robô o anunciar. Quem está inscrito sai e
           // recebe um aviso; o mix fica em rascunho no Gerir.
           ['pending', 'open', 'closed', 'in_progress'].includes(game.status)
-            && { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) },
+            && { key: 'draft', link: true, label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) },
           // A vermelho: apaga resultados (UX, 18 out — a cor da ação que pergunta).
           game.status === 'in_progress' && { key: 'restart', danger: true, label: t('eventactions.restart'), hint: t(!isAmericano && !game?.rotate_partners ? 'eventactions.restart_hint' : 'eventactions.restart_hint_reset'), onClick: () => setRestartOpen(true) },
           // Sem ninguém inscrito o mix desaparece: chama-se «Eliminar o mix».
           // Jogo em aberto (ponto 3): «Cancelar este jogo», só este horário.
           isOpenGame(game)
-            ? { key: 'cancel', danger: true, label: t('openday.cancel'), hint: t('openday.cancel_hint'), onClick: () => setCancelOpen(true) }
-            : { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
+            // Jogo em aberto (UX, 18 out): «Cancelar só este horário», com o dia
+            // e a hora por baixo; no fim, «Cancelar todos os horários».
+            ? { key: 'cancel', danger: true, label: t('openday.cancel_only'), hint: `${slotWhen.charAt(0).toUpperCase()}${slotWhen.slice(1)}`, onClick: () => setCancelOpen(true) }
+            // «Voltar a rascunho» e o cancelar/eliminar em texto no fim da
+            // folha (Botões do Editar, 18 out): saíram do Editar do mix.
+            : { key: 'cancel', danger: true, link: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
               hint: t(nobody ? 'eventactions.delete_mix_hint' : isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
+          isOpenGame(game) && batchLive?.games.length > 1 && { key: 'cancel_all', danger: true, link: true,
+            label: t(batchLive.people > 0 ? 'open_slots.cancel_all' : 'open_slots.delete_all'), onClick: () => setCancelAllOpen(true) },
         ].filter(Boolean)
         const dateTitle = isSeriesDate ? `${game.title} · ${shortDay}` : game.title
         return (
@@ -5514,12 +5600,15 @@ export default function GameDetails() {
             <ConfirmSheet
               open={cancelOpen}
               danger
-              title={isOpenGame(game) ? t('openday.cancel_title') : t('mixcancel.confirm_title', { name: dateTitle || '' })}
-              message={isOpenGame(game) ? t('openday.cancel_hint') : nobody
+              // Sem ninguém o mix desaparece: a pergunta diz «Eliminar», como a
+              // linha da folha (QA, 19 out: dizia «Cancelar o …?»).
+              title={isOpenGame(game) ? t('openday.cancel_only_title') : t(nobody ? 'eventactions.delete_title' : 'mixcancel.confirm_title', { name: dateTitle || '' })}
+              // Quantos horários e quantas pessoas (UX, 18 out).
+              message={isOpenGame(game) ? (peopleCount > 0 ? t('openday.cancel_only_message', { count: peopleCount, when: slotWhen }) : t('openday.cancel_only_message_nobody', { when: slotWhen })) : nobody
                 ? t(isSeriesDate ? 'eventactions.cancel_nobody_series' : 'eventactions.cancel_nobody')
                 : t(isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint')}
               cancelLabel={isOpenGame(game) ? t('openday.cancel_keep') : t('mixcancel.keep')}
-              confirmLabel={isOpenGame(game) ? t('openday.cancel') : t('mixcancel.confirm')}
+              confirmLabel={isOpenGame(game) ? t('open_slots.danger_cancel_confirm') : t(nobody ? 'eventactions.delete_confirm' : 'mixcancel.confirm')}
               onConfirm={async () => {
                 const { outcome } = await cancelMixDate(game)
                 if (outcome === 'cancel') { loadGameDetails(); return }
@@ -5531,6 +5620,27 @@ export default function GameDetails() {
               onClose={() => setCancelOpen(false)}
               errorOf={(error) => describeError(t, error, 'mixcancel.error')}
             />
+            {isOpenGame(game) && batchLive && (
+              <ConfirmSheet
+                open={cancelAllOpen}
+                danger
+                title={t(batchLive.people > 0 ? 'open_slots.cancel_all_title' : 'open_slots.delete_all_title')}
+                message={batchLive.people > 0
+                  ? t('open_slots.cancel_all_message', { slots: batchLive.games.length, count: batchLive.people })
+                  : t('open_slots.delete_all_message', { slots: batchLive.games.length })}
+                cancelLabel={t('open_slots.danger_keep')}
+                confirmLabel={t(batchLive.people > 0 ? 'open_slots.danger_cancel_confirm' : 'open_slots.danger_delete_confirm')}
+                onConfirm={async () => {
+                  const outcome = await cancelOpenBatch(batchLive.games)
+                  const notice = t(outcome === 'cancel' ? 'open_slots.cancelled_all' : 'open_slots.deleted_all')
+                  try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
+                  if (orgSlug) navigate(`/gerir/${orgSlug}`, { replace: true, state: { notice } })
+                  else navigate('/', { replace: true })
+                }}
+                onClose={() => setCancelAllOpen(false)}
+                errorOf={(error) => describeError(t, error, 'open_slots.error_cancel')}
+              />
+            )}
           </>
         )
       })()}
