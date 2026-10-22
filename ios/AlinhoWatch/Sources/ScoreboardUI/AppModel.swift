@@ -24,6 +24,10 @@ final class AppModel: ObservableObject {
     @Published var activeHold: HoldTarget?
     /// Último bloco que contou um ponto, para o contorno branco piscar.
     @Published var flash: Team?
+    /// Página do jogo: 0 = marcador, 1 = menu do jogo.
+    @Published var page = 0
+    /// Só nas prints: abre logo nos «Últimos jogos».
+    @Published var showHistory = false
 
     private let store: SessionStore?
     /// Sessão de treino para o ecrã não se apagar; `nil` nas prints dos ecrãs.
@@ -35,6 +39,18 @@ final class AppModel: ObservableObject {
         self.store = store
         self.keeper = store == nil ? nil : WorkoutKeeper()
         self.session = session ?? store?.load() ?? MatchSession()
+    }
+
+    /// O modelo da app; com `-screenshot <nome>`, um estado fixo que não grava.
+    static func launch() -> AppModel {
+        guard let name = ScreenshotFixtures.requested, let f = ScreenshotFixtures.make(name) else {
+            return AppModel()
+        }
+        let model = AppModel(store: nil, session: f.session)
+        model.overlay = f.overlay
+        model.page = f.page
+        model.showHistory = f.showHistory
+        return model
     }
 
     /// Ao abrir a app com um jogo a decorrer.
@@ -51,6 +67,7 @@ final class AppModel: ObservableObject {
 
     func start() {
         session.start(at: Date())
+        page = 0
         save()
         Task { await keeper?.begin() }
     }
