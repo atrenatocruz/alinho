@@ -23,7 +23,8 @@ const STATUS_PILL = {
   expirado: 'bg-[#FDE8E6] text-[#B42318]',
   anulado: 'bg-[#EEF0EC] text-muted line-through',
 }
-const FIELDS = ['tagline', 'address', 'hours', 'phones', 'email', 'instagram_url', 'website_url']
+// O parceiro gere tudo menos os prémios e a zona (Francisco, 22 out).
+const FIELDS = ['name', 'tagline', 'address', 'hours', 'phones', 'email', 'instagram_url', 'website_url']
 
 const ymd = (v) => String(v || '').slice(0, 10)
 const asDate = (v) => new Date(`${ymd(v)}T12:00:00`)

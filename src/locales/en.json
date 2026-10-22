@@ -6681,5 +6681,6 @@
   "notif.partner_month_vouchers_title": "The {{month}} codes are out",
   "notif.partner_month_vouchers_line": "{{count}} codes for {{name}}. See them in Manage › {{name}}.",
   "notif.partner_prize_won_title": "You won a prize in the {{month}} ranking",
-  "notif.partner_prize_won_line": "#{{place}}: {{pct}}% off at {{name}}, until {{until}}. It's in your Vouchers."
+  "notif.partner_prize_won_line": "#{{place}}: {{pct}}% off at {{name}}, until {{until}}. It's in your Vouchers.",
+  "partneradmin.field_name": "Name"
 }

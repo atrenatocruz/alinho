@@ -38,6 +38,9 @@ export async function updatePartnerProfile(partnerId, fields) {
   const p = (v) => (v === undefined ? null : v)
   const { data, error } = await supabase.rpc('update_partner_profile', {
     p_partner_id: partnerId,
+    // O nome também é do parceiro (Francisco, 22 out); só se manda quando muda,
+    // para a função antiga (sem p_name) continuar a servir.
+    ...(fields.name !== undefined ? { p_name: fields.name } : {}),
     p_tagline: p(fields.tagline), p_address: p(fields.address), p_hours: p(fields.hours),
     p_phones: p(fields.phones), p_email: p(fields.email),
     p_instagram_url: p(fields.instagram_url), p_website_url: p(fields.website_url),
