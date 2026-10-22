@@ -27,3 +27,16 @@ func play(_ s: MatchState, _ seq: String) -> (MatchState, [Set<MatchEvent>]) {
     }
     return (state, events)
 }
+
+/// Joga jogos inteiros (4 pontos seguidos) por letra: `u` = Nós, `t` = Eles.
+/// Devolve os eventos do último ponto de cada jogo.
+func games(_ s: MatchState, _ seq: String) -> (MatchState, [Set<MatchEvent>]) {
+    var state = s
+    var events: [Set<MatchEvent>] = []
+    for c in seq where c != " " {
+        let (next, ev) = play(state, String(repeating: c, count: 4))
+        state = next
+        events.append(ev.last!)
+    }
+    return (state, events)
+}
