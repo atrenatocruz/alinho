@@ -1,0 +1,40 @@
+{
+  "sourceLanguage": "pt-PT",
+  "strings": {
+    "NSHealthUpdateUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para o ecrã não se apagar a meio do jogo, o alinho abre uma sessão de treino. Não grava nada."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "So the screen stays on during the match, alinho starts a workout session. Nothing is saved."
+          }
+        }
+      }
+    },
+    "NSHealthShareUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para o ecrã não se apagar a meio do jogo, o alinho abre uma sessão de treino. Não grava nada."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "So the screen stays on during the match, alinho starts a workout session. Nothing is saved."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

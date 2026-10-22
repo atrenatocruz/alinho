@@ -33,3 +33,50 @@ jobs:
       - name: Testes das regras
         working-directory: ios/AlinhoWatch
         run: swift test
+
+  # Compila a app do relógio para o simulador (sem assinatura).
+  watch-app:
+    needs: scoring
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Compilar a app do relógio
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme AlinhoWatch \
+            -destination 'generic/platform=watchOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -40
+
+  # À mão (Actions → Relógio → Run workflow): prova que a app de iPhone compila
+  # com o relógio lá dentro, como o Codemagic a vai compilar.
+  ios-embed:
+    if: github.event_name == 'workflow_dispatch'
+    needs: watch-app
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Web app e Capacitor
+        run: npm ci && npm run build && npx cap sync ios
+
+      - name: Compilar a app de iPhone com o relógio
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -40
