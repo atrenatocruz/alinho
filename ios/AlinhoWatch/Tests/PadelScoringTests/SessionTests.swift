@@ -21,8 +21,9 @@ private func session(_ format: MatchFormat, _ mode: DeuceMode = .golden, server:
     var s = session(.bestOf3, .starPoint, server: .us)
     let initial = s.current
     feed(&s, "uuuttt utut")
-    for _ in 0..<10 { #expect(s.undo()) }
-    #expect(s.current == initial && !s.canUndo && !s.undo())
+    for _ in 0..<10 { let undone = s.undo(); #expect(undone) }
+    let undoneAtStart = s.undo()
+    #expect(s.current == initial && !s.canUndo && !undoneAtStart)
 }
 
 @Test func undoWalksBackAcrossTieBreakAndMatchEnd() {
@@ -30,7 +31,8 @@ private func session(_ format: MatchFormat, _ mode: DeuceMode = .golden, server:
     feedGames(&s, "utututututut")
     feed(&s, "uuuuuuu")
     #expect(s.current!.isOver && s.history.count == 1)
-    #expect(s.undo())
+    let undoneEnd = s.undo()
+    #expect(undoneEnd)
     #expect(!s.current!.isOver && s.current!.phase == .tieBreak && s.history.isEmpty)
     for _ in 0..<6 { s.undo() }
     #expect(s.current!.phase == .tieBreak && s.current!.points == [0, 0] && s.current!.tieBreakFirstServer == .us)
@@ -43,7 +45,8 @@ private func session(_ format: MatchFormat, _ mode: DeuceMode = .golden, server:
     feed(&s, "uu")
     s.stop(at: t0)
     #expect(s.current!.isOver && s.history.count == 1 && s.history[0].endReason == .stopped)
-    #expect(s.undo())
+    let undoneStop = s.undo()
+    #expect(undoneStop)
     #expect(!s.current!.isOver && s.current!.points == [2, 0] && s.history.isEmpty)
 }
 
