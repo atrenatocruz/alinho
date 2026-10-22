@@ -191,10 +191,13 @@ export function HelpContent({ inApp = false }) {
     <div>
       {/* Topo creme: o título e o Alino a dizer olá. O índice vem logo a
           seguir, numa barra presa (ACERTO 18 out). */}
-      <Band inApp={inApp} className={`!pt-8 lg:!pt-14 ${inApp ? '' : 'bg-[#F7F7F4]'}`}>
+      <Band inApp={inApp} className={`overflow-hidden !pt-8 lg:!pt-14 ${inApp ? '' : 'bg-[#F7F7F4]'}`}>
         <div className="relative">
-          <img src="/ajuda/alino-ola.webp" alt="" width="247" height="320" loading="lazy"
-            className="pointer-events-none absolute -top-2 right-0 w-[86px] select-none sm:w-[112px]" />
+          {/* O Alino da biblioteca de 21 out, inteiro. No telemóvel espreita da
+              beira do ecrã: sai um pouco para fora e o topo corta-o
+              (overflow-hidden). No computador fica inteiro na coluna (UX). */}
+          <img src="/ajuda/alino-ola.webp" srcSet="/ajuda/alino-ola@2x.webp 2x" alt="" width="290" height="320" loading="lazy"
+            className={`pointer-events-none absolute -top-2 w-[124px] select-none ${inApp ? '-right-8' : '-right-9 sm:right-0'}`} />
           <h1 className="pr-24 font-display text-[44px] font-black leading-none tracking-[-.03em] text-ink-900 sm:text-[56px]">{t('ajuda.title')}</h1>
           <p className="mt-4 max-w-[26ch] pr-20 text-[17px] leading-[1.5] text-[#2A2E35] sm:max-w-[34ch] sm:pr-28">{t('ajuda.intro')}</p>
         </div>
@@ -318,7 +321,7 @@ export function HelpContent({ inApp = false }) {
       <Band inApp={inApp} className="bg-ink-900 text-center"
         style={inApp ? { paddingBottom: 'calc(3.5rem + 7rem + env(safe-area-inset-bottom))' } : undefined}>
         <span className="mx-auto grid h-[150px] w-[150px] place-items-center overflow-hidden rounded-full bg-[#F1EFE6]">
-          <img src="/ajuda/alino-a-pensar.webp" alt="" width="154" height="320" loading="lazy" className="h-[124px] w-auto" />
+          <img src="/ajuda/alino-a-pensar.webp" srcSet="/ajuda/alino-a-pensar@2x.webp 2x" alt="" width="228" height="320" loading="lazy" className="h-[124px] w-auto" />
         </span>
         <h2 className={`${SITE_H2} mt-6 !text-[34px] !text-white`}>{t('ajuda.end_title')}</h2>
         <p className="mt-2 text-[17px] text-[#C9CDD3]">{t('ajuda.end_text')}</p>
