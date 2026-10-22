@@ -55,6 +55,12 @@ jobs:
       - name: Pacotes do Capacitor
         run: npm ci
 
+      # O @capacitor-community/apple-sign-in 7.1.0 pede o capacitor-swift-pm 7 e o
+      # resto do Capacitor pede o 8: o Xcode não resolve os pacotes do projeto.
+      # O relógio não usa esse plugin, por isso aqui tira-se só para compilar.
+      - name: Tirar o Sign in with Apple (conflito de versões do Capacitor)
+        run: sed -i '' '/AppleSignIn/d' ios/App/CapApp-SPM/Package.swift
+
       - name: Compilar a app do relógio
         run: |
           set -o pipefail
