@@ -6677,5 +6677,9 @@
   "partneradmin.err_bad_email": "That email doesn't look right.",
   "partneradmin.err_bad_url": "The address must start with https://",
   "partneradmin.err_too_long": "Text too long.",
-  "partneradmin.err_save": "Couldn't save. Try again."
+  "partneradmin.err_save": "Couldn't save. Try again.",
+  "notif.partner_month_vouchers_title": "The {{month}} codes are out",
+  "notif.partner_month_vouchers_line": "{{count}} codes for {{name}}. See them in Manage › {{name}}.",
+  "notif.partner_prize_won_title": "You won a prize in the {{month}} ranking",
+  "notif.partner_prize_won_line": "#{{place}}: {{pct}}% off at {{name}}. See it in your Vouchers."
 }

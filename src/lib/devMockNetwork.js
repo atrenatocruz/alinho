@@ -1694,7 +1694,13 @@ const TABLE_MOCKS = {
   ...TOURNAMENT_TABLE_MOCKS,
   ...TOURNAMENT_DRAW_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
-  notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
+  // mockPartnerNotices = 'true': os dois avisos dos parceiros (Dev 3, 22 out).
+  notifications: () => (localStorage.getItem('mockPartnerNotices') === 'true' ? [
+    { id: 'pn1', kind: 'partner_month_vouchers', created_at: new Date().toISOString(),
+      data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', month: '2026-11-01', issued: 3 } },
+    { id: 'pn2', kind: 'partner_prize_won', created_at: new Date().toISOString(),
+      data: { voucher_id: 'pv-2', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', prize_place: 2, discount_pct: 10, prize_month: '2026-11-01', valid_until: '2026-12-31' } },
+  ] : localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
     { id: 'n2', kind: 'mix_joined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
