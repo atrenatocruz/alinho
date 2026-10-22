@@ -20,6 +20,11 @@ export default function PartnerNoticeRow({ notice, onOpen }) {
   const vars = {
     month: monthName(manager ? d.month : d.prize_month, i18n.language), name: d.partner_name || '',
     count: d.issued ?? 0, place: d.prize_place, pct: d.discount_pct,
+    // «até 31 dez»: a validade, para não se perder o desconto (UX, 22 out).
+    until: d.valid_until ? (() => {
+      const v = new Date(`${String(d.valid_until).slice(0, 10)}T12:00:00`)
+      return `${v.getDate()} ${v.toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : i18n.language?.startsWith('es') ? 'es-ES' : 'pt-PT', { month: 'short' }).replace('.', '')}`
+    })() : '',
   }
   const to = manager ? (d.partner_slug ? `/gerir/parceiro/${d.partner_slug}` : '/gerir') : '/perfil?tab=vouchers'
   return (
