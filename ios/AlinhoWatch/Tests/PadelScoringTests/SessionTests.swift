@@ -66,7 +66,8 @@ private func session(_ format: MatchFormat, _ mode: DeuceMode = .golden, server:
     var s = session(.points, total: 16)
     feed(&s, String(repeating: "u", count: 16))
     let done = s
-    #expect(s.point(.them, at: t0).isEmpty && s == done)
+    let events = s.point(.them, at: t0)
+    #expect(events.isEmpty && s == done)
 }
 
 @Test func recordKeepsWhatPhase2Needs() {
