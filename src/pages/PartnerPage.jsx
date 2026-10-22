@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, Clock, ArrowUpRight, Share2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Instagram, Share2, Phone, Mail, Globe } from 'lucide-react'
 import GlassBar, { GLASS_ROUND, useUnderBar } from '../components/GlassBar'
 import KindHero from '../components/KindHero'
 import LocationOpenWith from '../components/LocationOpenWith'
@@ -10,6 +10,7 @@ import { EmptyState } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
 import { sharePageLink } from '../lib/shareImage'
 import { getPartner, prizeMedal } from '../lib/partners'
+import { appHref } from '../lib/native'
 
 /* A página do parceiro (design-handoff/2026-10-18-parceiros-primeiro, SPEC-UX
    ponto 3, aprovado pelo Francisco a 18 out): a mesma estrutura da página do
@@ -63,6 +64,10 @@ function PartnerBody() {
   const endLabel = `${monthEnd.getDate()} ${t('partner.of')} ${monthEnd.toLocaleDateString(loc, { month: 'long' })}`
   const prizes = [...(partner.prizes || [])].sort((a, b) => a.place - b.place)
   const district = partner.prize_district || partner.district
+  const phones = partner.phones || []
+  // Antes do acordo começar (prizes_from no futuro) não há prémios: diz-se a partir de quando.
+  const from = partner.prizes_from ? new Date(`${String(partner.prizes_from).slice(0, 10)}T12:00:00`) : null
+  const soon = prizes.length === 0 && from && from > new Date()
   const row = 'press flex min-h-[56px] items-center gap-3 px-3.5 py-2.5'
 
   return (
@@ -71,11 +76,10 @@ function PartnerBody() {
       <div className="-mx-4 -mt-6">
         <GlassBar anchorRef={coverRef} rowRef={rowRef} filled={under || firstUnder} strip={coverGone} showTitle={under} title={partner.name}
           left={<button type="button" onClick={goBack} aria-label={t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button>}
-          right={<button type="button" onClick={() => sharePageLink({ title: partner.name, url: window.location.href })} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button>} />
+          right={<button type="button" onClick={() => sharePageLink({ title: partner.name, url: appHref() })} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button>} />
         <div ref={coverRef}>
-          <KindHero kind="club" src={partner.cover_url} alt="" className="relative h-44">
-            <span className="absolute bottom-7 right-3 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">{t('partner.illustrative')}</span>
-          </KindHero>
+          {/* A fachada é a foto real (ficha da RM, 21 out): já não leva «Imagem ilustrativa». */}
+          <KindHero kind="club" src={partner.cover_url} alt="" className="relative h-44" imgClassName="object-[50%_12%]" />
         </div>
         <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-4">
           <div className="flex items-end gap-3.5">
@@ -95,13 +99,46 @@ function PartnerBody() {
                 <Clock size={18} className="shrink-0 text-ink-700" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-[14px] font-bold text-ink-900">{partner.hours}</span>
-                  {partner.instagram_url && <span className="block text-[12.5px] text-muted">{t('partner.hours_hint')}</span>}
+                  {phones.length > 0
+                    ? <span className="block text-[12.5px] text-muted">{t('partner.hours_hint_phone')}</span>
+                    : partner.instagram_url && <span className="block text-[12.5px] text-muted">{t('partner.hours_hint')}</span>}
                 </span>
               </div>
             )}
+            {/* Os telefones, o email e o site (ficha da RM, Dev 3, 21 out). */}
+            {phones.map((ph) => (
+              <a key={ph} href={`tel:${ph.replace(/\s+/g, '')}`} className={row}>
+                <Phone size={18} className="shrink-0 text-ink-700" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-[14px] font-bold text-ink-900 tabular-nums">{ph}</span>
+                  <span className="block text-[12.5px] text-muted">{t('partner.call')}</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-ink-500" />
+              </a>
+            ))}
+            {partner.email && (
+              <a href={`mailto:${partner.email}`} className={row}>
+                <Mail size={18} className="shrink-0 text-ink-700" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-display text-[14px] font-bold text-ink-900">{partner.email}</span>
+                  <span className="block text-[12.5px] text-muted">{t('partner.send_email')}</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-ink-500" />
+              </a>
+            )}
+            {partner.website_url && (
+              <a href={partner.website_url} target="_blank" rel="noopener noreferrer" className={row}>
+                <Globe size={18} className="shrink-0 text-ink-700" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-display text-[14px] font-bold text-ink-900">{partner.website_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>
+                  <span className="block text-[12.5px] text-muted">{t('partner.open_site')}</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-ink-500" />
+              </a>
+            )}
             {partner.instagram_url && (
               <a href={partner.instagram_url} target="_blank" rel="noopener noreferrer" className={row}>
-                <ArrowUpRight size={18} className="shrink-0 text-ink-700" />
+                <Instagram size={18} className="shrink-0 text-ink-700" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-[14px] font-bold text-ink-900">{t('partner.instagram_of', { name: partner.name })}</span>
                   <span className="block text-[12.5px] text-muted">{t('partner.open_instagram')}</span>
@@ -125,7 +162,7 @@ function PartnerBody() {
                   <span className="block font-display text-[15px] font-extrabold text-ink-900">{t('partner.place', { place: p.place })}</span>
                   {p.description && <span className="block text-[12.5px] text-muted">{p.description}</span>}
                 </span>
-                <span className="shrink-0 font-display text-[16px] font-black text-ink-900">−{p.discount_pct}%</span>
+                <span className="w-[52px] shrink-0 text-right font-display text-[16px] font-black text-ink-900 tabular-nums">−{p.discount_pct}%</span>
               </div>
             ))}
             <p className="px-3.5 py-3 text-[13px] text-muted">{t('partner.prizes_note')}</p>
@@ -134,6 +171,14 @@ function PartnerBody() {
             className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 font-extrabold text-white">
             {t('partner.see_ranking')}
           </button>
+        </section>
+      )}
+      {soon && (
+        <section>
+          <h2 className="font-display text-[22px] font-extrabold leading-tight text-ink-900">{t('partner.prizes_soon_title')}</h2>
+          <p className="mt-1 rounded-card bg-white px-3.5 py-3 text-[14px] leading-snug text-ink-700 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+            {t('partner.prizes_soon_body', { month: from.toLocaleDateString(loc, { month: 'long' }), district, name: partner.name })}
+          </p>
         </section>
       )}
     </div>

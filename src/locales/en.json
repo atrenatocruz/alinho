@@ -6427,13 +6427,13 @@
   "partner.not_found_body": "The link may be wrong, or the partner has left alinho.pt.",
   "partner.hours_hint": "Bookings via Instagram",
   "partner.instagram_of": "{{name}} on Instagram",
-  "partner.open_instagram": "Opens Instagram",
+  "partner.open_instagram": "Open Instagram",
   "partner.prizes_title": "This month's prizes",
   "partner.prizes_where": "Monthly ranking",
   "partner.ends": "ends on {{date}}",
   "partner.of": "",
   "partner.place": "{{place}} place",
-  "partner.prizes_note": "The discount goes to «My vouchers» on the 1st and lasts 30 days.",
+  "partner.prizes_note": "The discount goes to your Vouchers, in your Profile, on the 1st and is valid until the end of that month.",
   "partner.see_ranking": "See the monthly ranking",
   "reception.title": "Show at reception",
   "reception.plays": "Plays on alinho.pt",
@@ -6598,5 +6598,11 @@
   "nov.v20261009.item_3": "Organisers can choose to approve who joins through the app. In those mixes you tap «Ask to join» and get a notice when you are accepted.",
   "nov.v20261009.item_4": "In tournaments, sign-ups close on their own at the deadline.",
   "nov.v20261009.item_5": "Ties are broken as in the Portuguese Padel Federation.",
-  "mixoffline.default_title": "Mix"
+  "mixoffline.default_title": "Mix",
+  "partner.hours_hint_phone": "Bookings by phone",
+  "partner.call": "Call",
+  "partner.send_email": "Send an email",
+  "partner.open_site": "Open the website",
+  "partner.prizes_soon_title": "Monthly ranking prizes",
+  "partner.prizes_soon_body": "From {{month}}, the top 3 in the monthly ranking in the {{district}} area win a discount at {{name}}."
 }

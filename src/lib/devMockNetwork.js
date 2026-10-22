@@ -259,12 +259,20 @@ const RPC_MOCKS = {
   },
   // localStorage.mockNoH2h = 'true': nunca jogaram um contra o outro (R13).
   // Parceiros (18 out): a RM Terapias, para a demonstração.
+  // A ficha real da RM (migration_parceiros_2_rm_real.sql, Dev 3, 21 out). Os
+  // prémios só a partir de novembro: antes vêm vazios. mockPartnerPrizes='on'
+  // mostra-os já (como em novembro).
   get_partner: (params) => (params?.p_slug === 'rm-terapias' ? {
-    id: 'pt-rm', slug: 'rm-terapias', name: 'RM Terapias', kind_label: 'Massagem desportiva', city: 'Almada', district: 'Setúbal',
+    id: 'pt-rm', slug: 'rm-terapias', name: 'RM Terapias', kind_label: 'Massagens & Tratamentos', city: 'Almada', district: 'Setúbal',
     tagline: 'Massagem desportiva e terapias, com a Rita Manique. Para recuperares entre jogos.',
-    address: 'Rua da Alembrança 5A, Almada', hours: 'Todos os dias, das 8h às 20h', instagram_url: 'https://instagram.com/rmterapias',
-    cover_url: '/parceiros/rm-capa.webp', logo_url: null,
-    prizes: [1, 2, 3].map((place) => ({ place, discount_pct: { 1: 15, 2: 10, 3: 5 }[place], description: 'Desconto numa massagem desportiva' })),
+    address: 'Rua da Alembrança 5A, 2810-006 Feijó (Almada)', hours: '9h às 19h',
+    instagram_url: 'https://www.instagram.com/ritamanique_rmterapias/', website_url: 'https://rmterapias.pt',
+    cover_url: '/parceiros/rm-fachada.webp', logo_url: '/parceiros/rm-logotipo.jpg',
+    phones: ['967 254 460', '969 235 047'], email: 'info@rmterapias.pt',
+    prizes_from: '2026-11-01', prizes_until: null,
+    prizes: localStorage.getItem('mockPartnerPrizes') === 'on'
+      ? [1, 2, 3].map((place) => ({ place, discount_pct: { 1: 15, 2: 10, 3: 5 }[place], description: 'Desconto numa massagem desportiva' }))
+      : [],
     prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal',
   } : null),
   get_head_to_head_summary: () => [localStorage.getItem('mockNoH2h') === 'true' ? { wins: 0, losses: 0, matches_played: 0 } : { wins: 2, losses: 1, matches_played: 3 }],

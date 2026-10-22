@@ -6442,13 +6442,13 @@
   "partner.not_found_body": "O link pode estar errado, ou o parceiro já saiu do alinho.pt.",
   "partner.hours_hint": "Marcações pelo Instagram",
   "partner.instagram_of": "Instagram da {{name}}",
-  "partner.open_instagram": "Abre o Instagram",
+  "partner.open_instagram": "Abrir o Instagram",
   "partner.prizes_title": "Prémios deste mês",
   "partner.prizes_where": "Ranking do mês",
   "partner.ends": "acaba a {{date}}",
   "partner.of": "de",
   "partner.place": "{{place}}.º lugar",
-  "partner.prizes_note": "O desconto vai para «Os meus vouchers» no dia 1 e dura 30 dias.",
+  "partner.prizes_note": "O desconto vai para os teus Vouchers, no Perfil, no dia 1 e vale até ao fim desse mês.",
   "partner.see_ranking": "Ver o ranking do mês",
   "reception.title": "Mostrar na receção",
   "reception.plays": "Joga no alinho.pt",
@@ -6613,5 +6613,11 @@
   "nov.v20261009.item_3": "Quem organiza pode escolher aceitar quem entra pela app. Nesses mixes carregas em «Pedir para entrar» e recebes um aviso quando te aceitarem.",
   "nov.v20261009.item_4": "Nos torneios, as inscrições fecham sozinhas no fim do prazo.",
   "nov.v20261009.item_5": "Empates resolvidos como na Federação Portuguesa de Padel.",
-  "mixoffline.default_title": "Mix"
+  "mixoffline.default_title": "Mix",
+  "partner.hours_hint_phone": "Marcações por telefone",
+  "partner.call": "Ligar",
+  "partner.send_email": "Enviar email",
+  "partner.open_site": "Abrir o site",
+  "partner.prizes_soon_title": "Prémios do ranking do mês",
+  "partner.prizes_soon_body": "A partir de {{month}}, os 3 primeiros do ranking do mês na zona de {{district}} ganham um desconto na {{name}}."
 }
