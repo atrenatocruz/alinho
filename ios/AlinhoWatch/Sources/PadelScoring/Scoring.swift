@@ -29,7 +29,13 @@ public enum Scoring {
         var ev: Set<MatchEvent> = [.point]
         switch st.phase {
         case .game: gamePoint(&st, team, &ev)
-        case .tieBreak, .superTieBreak, .points: break
+        case .tieBreak, .superTieBreak: tieBreakPoint(&st, team, &ev)
+        case .points: break
+        }
+        if st.isOver {
+            st.endedAt = date
+            ev.insert(.matchOver)
+            ev.remove(.switchSides)             // acabou: já não se troca de lado
         }
         return PointResult(state: st, events: ev)
     }
@@ -71,10 +77,81 @@ public enum Scoring {
     }
 
     private static func winGame(_ st: inout MatchState, _ t: Team, _ ev: inout Set<MatchEvent>) {
+        let format = st.config.format
         st.games[t.rawValue] += 1
         st.points = [0, 0]
         st.deuceCount = 0
         ev.insert(.gameWon)
         st.server = st.server?.other
+        let mine = st.games[t.rawValue], theirs = st.games[t.other.rawValue]
+        if mine >= format.gamesPerSet && mine - theirs >= 2 {
+            closeSet(&st, SetScore(st.games[0], st.games[1], .normal), &ev)
+            return
+        }
+        // Jogos ímpares do set: 1.º, 3.º, 5.º…
+        if (st.games[0] + st.games[1]) % 2 == 1 { ev.insert(.switchSides) }
+        if st.games == [format.tieBreakAt, format.tieBreakAt] {
+            st.phase = .tieBreak
+            st.tieBreakFirstServer = st.server
+        }
+    }
+
+    // MARK: - Tie-break (a 7) e super tie-break (a 10)
+
+    private static func tieBreakPoint(_ st: inout MatchState, _ t: Team, _ ev: inout Set<MatchEvent>) {
+        let me = t.rawValue, op = t.other.rawValue
+        st.points[me] += 1
+        let played = st.points[0] + st.points[1]
+        // 1.º ponto: quem calhava; depois muda a cada 2 pontos (1, 2, 2, 2…).
+        if st.server != nil, let first = st.tieBreakFirstServer {
+            st.server = ((played + 1) / 2) % 2 == 0 ? first : first.other
+        }
+        let target = st.phase == .tieBreak ? 7 : 10
+        guard st.points[me] >= target && st.points[me] - st.points[op] >= 2 else {
+            if played % 6 == 0 { ev.insert(.switchSides) }
+            return
+        }
+        if st.phase == .tieBreak {
+            // Conta como um jogo (7-6, ou 9-8 no pro set). No set seguinte serve
+            // primeiro quem recebeu o 1.º ponto do tie-break.
+            st.games[me] += 1
+            ev.insert(.gameWon)
+            if st.server != nil { st.server = st.tieBreakFirstServer?.other }
+            closeSet(&st, SetScore(st.games[0], st.games[1], .tieBreak), &ev)
+        } else {
+            closeSet(&st, SetScore(st.points[0], st.points[1], .superTieBreak), &ev)
+        }
+    }
+
+    // MARK: - Sets e fim
+
+    private static func closeSet(_ st: inout MatchState, _ score: SetScore, _ ev: inout Set<MatchEvent>) {
+        st.sets.append(score)
+        st.games = [0, 0]
+        st.points = [0, 0]
+        ev.insert(.setWon)
+        // Troca-se se o número de jogos do set for ímpar (6-3 sim, 6-4 não).
+        if score.kind != .superTieBreak && (score.us + score.them) % 2 == 1 { ev.insert(.switchSides) }
+        let won = setsWon(st.sets)
+        if max(won[0], won[1]) >= st.config.format.setsToWin {
+            finish(&st, .rules)
+        } else if st.config.format == .twoSetsSuperTieBreak && won == [1, 1] {
+            st.phase = .superTieBreak
+            st.tieBreakFirstServer = st.server
+        } else {
+            st.phase = .game
+        }
+    }
+
+    static func setsWon(_ sets: [SetScore]) -> [Int] {
+        sets.reduce(into: [0, 0]) { won, set in
+            if set.us > set.them { won[0] += 1 } else if set.them > set.us { won[1] += 1 }
+        }
+    }
+
+    private static func finish(_ st: inout MatchState, _ reason: EndReason) {
+        st.endReason = reason
+        let won = setsWon(st.sets)
+        st.winner = won[0] > won[1] ? .us : won[1] > won[0] ? .them : nil
     }
 }
