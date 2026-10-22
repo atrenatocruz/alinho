@@ -88,7 +88,8 @@ function PartnerBody() {
               <h1 ref={nameRef} className={`font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere] transition-opacity duration-fast ${under ? 'opacity-0' : 'opacity-100'}`}>{partner.name}</h1>
             </div>
           </div>
-          <p className="mt-1 text-sm text-muted">{[t('partner.label'), partner.city].filter(Boolean).join(' · ')}</p>
+          {/* O tipo diz logo o que é o parceiro (UX, 22 out): «Massagens & Tratamentos · Almada»; sem tipo, só a cidade. */}
+          <p className="mt-1 text-sm text-muted">{[partner.kind_label, partner.city].filter(Boolean).join(' · ')}</p>
           {partner.tagline && <p className="mt-3 text-[15px] leading-snug text-ink-700">{partner.tagline}</p>}
 
           {/* A morada (abre o mapa), o horário e o Instagram, em linhas. */}
