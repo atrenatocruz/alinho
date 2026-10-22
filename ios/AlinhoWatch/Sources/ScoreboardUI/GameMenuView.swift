@@ -50,7 +50,7 @@ struct GameMenuView: View {
                     .foregroundStyle(Theme.muted)
             }
         }
-        .navigationTitle(match.config.format.shortTitle)
+        .navigationTitle(match.config.format.title)
         .alert(L.t("Terminar o jogo"), isPresented: $confirmEnd) {
             Button(L.t("Terminar"), role: .destructive) { model.stop() }
             Button(L.t("Cancelar"), role: .cancel) {}
