@@ -1,0 +1,35 @@
+name: Relógio
+
+# Testes e build do marcador do Apple Watch (ios/AlinhoWatch). Não temos Mac
+# local: é aqui que se corre o `swift test` das regras e se compila a app.
+# O repositório é público, por isso os Macs do GitHub Actions são grátis.
+# O TestFlight sai do Codemagic (codemagic.yaml), não daqui.
+on:
+  push:
+    paths:
+      - 'ios/AlinhoWatch/**'
+      - 'ios/App/App.xcodeproj/**'
+      - '.github/workflows/watch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: watch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scoring:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Testes das regras
+        working-directory: ios/AlinhoWatch
+        run: swift test
