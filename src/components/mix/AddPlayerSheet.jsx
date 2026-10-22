@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, UserPlus } from 'lucide-react'
+import { Check, Search, UserPlus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, RatingBadge, Chips } from '../ui'
-import { addPlan } from '../../lib/mixEdit'
+import { addPlan, splitByRoom } from '../../lib/mixEdit'
 import { isGenderMismatch } from '../../lib/mixLogic'
 import { contemTexto } from '../../lib/semAcentos'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
@@ -26,15 +26,22 @@ import { describeError } from '../../lib/errors'
    entra. Nome obrigatório, email opcional, sem telemóvel. A conta é criada
    (ou encontrada, se o email já tiver uma) pela edge function
    admin-bulk-create-participants em modo create_only; depois a inscrição
-   segue o caminho de sempre (vagas, suplente, mais um campo). */
+   segue o caminho de sempre (vagas, suplente, mais um campo).
 
-export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity, maxCourts, ratingInfoById, busy, onConfirm, onClose, beforeStart = false, onGuestAdded = null }) {
+   Desde o #640 (Renato, 16 out; plano aprovado pelo Francisco a 19 out):
+   em «Sozinho» escolhem-se várias pessoas, cada uma com um visto, como nos
+   jogos entre amigos. Sem lugar para todos, o passo «cheio» diz quem entra e
+   quem fica suplente (pela ordem em que foram escolhidas) antes de gravar. */
+
+export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity, maxCourts, ratingInfoById, busy, onConfirm, onClose, beforeStart = false, onGuestAdded = null, onConfirmMany = null, waitlistPeople = 0 }) {
   const { t } = useTranslation()
   const [members, setMembers] = useState([])
   const [loadError, setLoadError] = useState(false)
   const [query, setQuery] = useState('')
   const [withPartner, setWithPartner] = useState(false)
   const [playerId, setPlayerId] = useState(null)
+  // Sozinho: vários, pela ordem em que se escolhem (#640).
+  const [picked, setPicked] = useState([])
   const [partnerId, setPartnerId] = useState(null)
   const [step, setStep] = useState('who') // 'who' | 'full'
   const [choice, setChoice] = useState('court')
@@ -78,7 +85,8 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
   const matches = (list) => (q ? list.filter((m) => contemTexto(m.name, q)) : list).slice(0, 8)
   const byId = (id) => members.find((m) => m.id === id)
 
-  const needed = withPartner ? 2 : 1
+  const many = !withPartner && !named && picked.length > 1
+  const needed = withPartner ? 2 : many ? picked.length : 1
   const plan = addPlan({
     capacity, peopleCount, needed,
     numCourts: game.num_courts, maxPlayers: game.max_players, maxCourts,
@@ -87,8 +95,18 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
   const emailError = partnerEmailError(newEmail)
   const ready = named
     ? !nameError && !emailError && (!withPartner || partnerId)
-    : playerId && (!withPartner || partnerId)
+    : withPartner ? playerId && partnerId : picked.length > 0
   const names = [byId(playerId)?.name, withPartner ? byId(partnerId)?.name : null].filter(Boolean).join(' e ')
+  const togglePick = (id) => {
+    setNamed(false)
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
+    setPicked(next)
+    setPlayerId(next[0] || null)
+  }
+  // Quem entra e quem fica suplente, com o campo novo ou sem ele.
+  const free = (choice === 'court' && plan.canAddCourt ? plan.nextCapacity - waitlistPeople : capacity) - peopleCount
+  const split = splitByRoom(picked, free)
+  const nameList = (ids) => new Intl.ListFormat('pt-PT', { type: 'conjunction' }).format(ids.map((id) => byId(id)?.name || '?'))
 
   const seguir = (id, extra, nomes) => {
     if (plan.fits) {
@@ -160,14 +178,22 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
     setTouched(true)
     if (!ready) return
     if (named) { criarEInscrever(); return }
+    if (many) {
+      if (plan.fits) { onConfirmMany?.({ ids: picked, choice: 'fits', plan }); return }
+      setChoice(plan.canAddCourt ? 'court' : 'waitlist')
+      setStep('full')
+      return
+    }
     seguir(playerId, {}, names)
   }
 
-  const memberRow = (m, selected, onPick) => (
+  const memberRow = (m, selected, onPick, check = false) => (
     <button
       key={m.id}
       type="button"
       onClick={onPick}
+      aria-pressed={check ? selected : undefined}
+      data-pick={check ? m.id : undefined}
       className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-ctrl text-left ${selected ? 'bg-lime-100 ring-2 ring-lime-400' : 'hover:bg-ink-50'}`}
     >
       <Avatar name={m.name} url={m.avatar_url} size="w-9 h-9 text-xs" />
@@ -177,6 +203,12 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
         {isGenderMismatch(game, m) && <span className="block text-[11px] text-amber-700">{t('mixedit.outside_gender')}</span>}
       </span>
       <RatingBadge rating={ratingInfoById[m.id]?.rating} gender={ratingInfoById[m.id]?.gender} />
+      {/* O visto, como nos jogos entre amigos (#640). */}
+      {check && (
+        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white'}`} aria-hidden="true">
+          {selected && <Check size={14} strokeWidth={3} />}
+        </span>
+      )}
     </button>
   )
 
@@ -195,9 +227,11 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
       </button>
     )
     return (
-      <Sheet title={t('mixedit.full_title')} onClose={onClose}>
+      <Sheet title={many ? t('mixedit.full_title_many') : t('mixedit.full_title')} onClose={onClose}>
         <div className="space-y-3">
-          <p className="text-sm text-muted">{t('mixedit.full_text', { people: peopleCount, capacity, names })}</p>
+          <p className="text-sm text-muted">{many
+            ? t('mixedit.full_text_many', { people: peopleCount, capacity, count: picked.length })
+            : t('mixedit.full_text', { people: peopleCount, capacity, names })}</p>
           {option(
             'court',
             t('mixedit.add_court_title'),
@@ -206,13 +240,28 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
               : t('mixedit.add_court_limit', { courts: maxCourts }),
             !plan.canAddCourt
           )}
-          {option('waitlist', t('mixedit.waitlist_title'), t(beforeStart ? 'mixedit.waitlist_text_open' : 'mixedit.waitlist_text'))}
+          {option('waitlist', many ? t('mixedit.waitlist_title_many') : t('mixedit.waitlist_title'), t(beforeStart ? 'mixedit.waitlist_text_open' : 'mixedit.waitlist_text'))}
+          {/* Vários: quem entra e quem fica suplente, antes de gravar (#640). */}
+          {many && (
+            <div className="rounded-ctrl bg-[#F4F5F1] px-3.5 py-3 text-sm leading-snug">
+              {split.enter.length > 0 && <p><b className="font-extrabold text-ink-900">{t('mixedit.many_enter', { count: split.enter.length })}</b> {nameList(split.enter)}</p>}
+              {split.wait.length > 0 && <p className={split.enter.length ? 'mt-1.5' : ''}><b className="font-extrabold text-ink-900">{t('mixedit.many_wait', { count: split.wait.length })}</b> {nameList(split.wait)}</p>}
+            </div>
+          )}
+          {/* A preto: ação de quem organiza (regra de 18 out), e diz o que acontece (UX, 19 out). */}
           <PrimaryButton
+            variant="ink"
             className="w-full"
             disabled={busy}
-            onClick={() => onConfirm({ playerId, partnerId: withPartner ? partnerId : null, choice, plan, names, ...(newPlayer ? { newPlayer } : {}) })}
+            onClick={() => (many
+              ? onConfirmMany?.({ ids: picked, choice, plan })
+              : onConfirm({ playerId, partnerId: withPartner ? partnerId : null, choice, plan, names, ...(newPlayer ? { newPlayer } : {}) }))}
           >
-            {busy ? t('mixedit.saving') : t('mixedit.confirm')}
+            {busy ? t('mixedit.saving')
+              : !many ? t('mixedit.confirm')
+              : choice === 'court' ? t('mixedit.confirm_court_many', { count: split.enter.length })
+              : split.wait.length ? t('mixedit.confirm_wait_many', { count: split.wait.length, enter: split.enter.length })
+              : t('mixedit.add_open_many', { count: split.enter.length })}
           </PrimaryButton>
         </div>
       </Sheet>
@@ -238,7 +287,11 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
 
         <Chips
           value={withPartner}
-          onChange={(v) => { setWithPartner(v); if (!v) setPartnerId(null) }}
+          onChange={(v) => {
+            setWithPartner(v)
+            // Com parceiro é uma dupla: fica o 1.º escolhido; ao voltar a «Sozinho», ele continua escolhido.
+            if (v) { setPlayerId(picked[0] || playerId); setPicked([]) } else { setPartnerId(null); setPicked(playerId ? [playerId] : []) }
+          }}
           options={[
             { value: false, label: t('mixedit.alone') },
             { value: true, label: t('mixedit.with_partner') },
@@ -248,7 +301,11 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-1.5">{t('mixedit.player_label')}</p>
           <div className="space-y-1">
-            {matches(available.filter((m) => m.id !== partnerId)).map((m) => memberRow(m, !named && m.id === playerId, () => { setNamed(false); setPlayerId(m.id) }))}
+            {withPartner
+              ? matches(available.filter((m) => m.id !== partnerId)).map((m) => memberRow(m, !named && m.id === playerId, () => { setNamed(false); setPlayerId(m.id) }))
+              // Sozinho: vários com visto (#640); os escolhidos ficam à vista mesmo a pesquisar outro nome.
+              : [...picked.map(byId).filter(Boolean).filter((m) => !matches(available).some((x) => x.id === m.id)), ...matches(available)]
+                .map((m) => memberRow(m, !named && picked.includes(m.id), () => togglePick(m.id), true))}
             {available.length === 0 && !loadError && <p className="text-sm text-muted">{t('mixedit.no_members')}</p>}
           </div>
         </div>
@@ -296,7 +353,7 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
               )}
             </div>
           ) : (
-            <button type="button" onClick={() => { setNamed(true); setPlayerId(null); setTouched(false) }} className="press w-full text-left">
+            <button type="button" onClick={() => { setNamed(true); setPlayerId(null); setPicked([]); setTouched(false) }} className="press w-full text-left">
               <p className="text-sm font-extrabold text-ink-900 flex items-center gap-2">
                 <UserPlus size={16} /> {t('partner.not_in_app_title')}
               </p>
@@ -319,11 +376,12 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
         {/* «Recebe um aviso, pode sair sozinho» não vale para quem não está
             na app (#546): nessa altura não se mostra. */}
         {!named && <p className="text-xs text-muted">{t(beforeStart ? 'mixedit.add_hint_open' : 'mixedit.reform_hint')}</p>}
-        <PrimaryButton className="w-full" disabled={!ready || busy || creating} onClick={next}>
+        <PrimaryButton variant="ink" className="w-full" disabled={!ready || busy || creating} onClick={next}>
           {busy || creating
             ? t('mixedit.saving')
             : named && newName.trim()
               ? t('mixedit.add_named', { name: newName.trim() })
+              : many && plan.fits ? t(beforeStart ? 'mixedit.add_open_many' : 'mixedit.add_and_reform_many', { count: picked.length })
               : plan.fits ? t(beforeStart ? 'mixedit.add_open' : 'mixedit.add_and_reform') : t('mixedit.continue')}
         </PrimaryButton>
       </div>

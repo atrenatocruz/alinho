@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, addPlan, mixChanges } from './mixEdit'
+import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, addPlan, mixChanges, splitByRoom } from './mixEdit'
 
 describe('canEditBeforeRound1', () => {
   it('only while in progress and before any match is drawn', () => {
@@ -75,5 +75,16 @@ describe('mixChanges', () => {
     const afterTeams = [{ player1_id: 'a', player2_id: 'b' }]
     const changes = mixChanges({ beforeIds: ['a', 'b', 'c', 'd'], afterIds: ['a', 'b', 'c'], beforeTeams, afterTeams })
     expect(changes).toEqual([{ user_id: 'd', kind: 'mix_removed' }, { user_id: 'c', kind: 'mix_partner_changed' }])
+  })
+})
+
+describe('splitByRoom (#640: vários de uma vez)', () => {
+  it('os primeiros entram até encher, os outros ficam suplentes', () => {
+    expect(splitByRoom(['a', 'b', 'c', 'd', 'e', 'f', 'g'], 6)).toEqual({ enter: ['a', 'b', 'c', 'd', 'e', 'f'], wait: ['g'] })
+  })
+  it('sem lugar, todos suplentes; com lugar a mais, todos entram', () => {
+    expect(splitByRoom(['a', 'b'], 0)).toEqual({ enter: [], wait: ['a', 'b'] })
+    expect(splitByRoom(['a', 'b'], -3)).toEqual({ enter: [], wait: ['a', 'b'] })
+    expect(splitByRoom(['a', 'b'], 5)).toEqual({ enter: ['a', 'b'], wait: [] })
   })
 })
