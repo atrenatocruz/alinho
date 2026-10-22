@@ -63,6 +63,8 @@ struct SetupView: View {
                         .buttonStyle(LimeButtonStyle())
                         .padding(.top, 4)
                 }
+                // As linhas são cartões nossos; sem isto o watchOS põe-lhes o fundo de botão por cima.
+                .buttonStyle(.plain)
             }
             .navigationTitle(L.t("Novo jogo"))
         }
