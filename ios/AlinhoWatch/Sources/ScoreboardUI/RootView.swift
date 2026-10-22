@@ -1,8 +1,8 @@
 #if os(watchOS)
 import SwiftUI
 
-/// Sem jogo: «Novo jogo». Jogo a decorrer: marcador e menu do jogo. Jogo acabado:
-/// o ecrã de fim.
+/// Sem jogo: «Novo jogo». Jogo a decorrer: marcador e, a deslizar para o lado, o
+/// menu do jogo. Jogo acabado: o ecrã de fim.
 public struct RootView: View {
     @StateObject private var model = AppModel()
 
@@ -12,12 +12,20 @@ public struct RootView: View {
         Group {
             if let match = model.current {
                 if match.isOver {
-                    Text(match.resultText)
+                    NavigationStack {
+                        EndView(match: match)
+                    }
                 } else {
                     ZStack {
-                        NavigationStack {
-                            ScoreboardView(match: match)
+                        TabView {
+                            NavigationStack {
+                                ScoreboardView(match: match)
+                            }
+                            NavigationStack {
+                                GameMenuView(match: match)
+                            }
                         }
+                        .tabViewStyle(.page(indexDisplayMode: .always))
                         if let overlay = model.overlay {
                             OverlayView(overlay: overlay, match: match)
                                 .transition(.opacity)

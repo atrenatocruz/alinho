@@ -28,6 +28,17 @@ public enum Theme {
     }
 }
 
+extension View {
+    /// Cartão cinzento-escuro das listas (Últimos jogos, menu do jogo).
+    func listCard() -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.listBg))
+    }
+}
+
 extension Color {
     init(hex: UInt32) {
         self.init(
