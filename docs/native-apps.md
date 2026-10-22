@@ -142,6 +142,45 @@ Primeira build no TestFlight: 20 out 2026 (build nº 2 do Codemagic, commit `188
 
 O plano gratuito do Codemagic dá 500 minutos/mês em Mac M2; uma build demora ~10–15 min.
 
+## Apple Watch (marcador, fase 1)
+
+Desenho: `docs/superpowers/specs/2026-10-22-apple-watch-marcador-fase1-design.md`
+(entrega do Francisco em `docs/design-handoff/2026-10-22-relogio/`).
+
+- **Código**: `ios/AlinhoWatch/`, um Swift Package com `PadelScoring` (regras,
+  desfazer, gravação; testado) e `ScoreboardUI` (ecrãs, vibrações, sessão de
+  treino). O alvo `AlinhoWatch` no `ios/App/App.xcodeproj` só tem
+  `ios/AlinhoWatch/App/` (arranque, ícone, Info.plist, entitlements) e vai
+  embutido na app de iPhone («Embed Watch Content»). Bundle id
+  `pt.alinho.app.watchkitapp`; funciona sem a app do iPhone aberta.
+- **Testes e build**: GitHub Actions, workflow «Relógio» (`.github/workflows/watch.yml`).
+  Cada push que mexa no relógio corre o `swift test` das regras e compila a app
+  para o simulador. À mão (*Run workflow*): `screenshots` tira prints de todos os
+  ecrãs em dois tamanhos e duas línguas (artefacto `relogio-prints`); `ios-embed`
+  compila a app de iPhone com o relógio lá dentro.
+- **Branch**: `feature/apple-watch`. Não juntar ao `dev` enquanto o relógio não
+  puder ir para o público: a próxima versão de iPhone enviada para revisão leva-o.
+
+Configuração única (painéis):
+
+1. **Apple Developer → Identifiers → +**: App ID `pt.alinho.app.watchkitapp`, com
+   **HealthKit** ligado (a sessão de treino mantém o ecrã ligado durante o jogo;
+   não se grava nada no Saúde).
+2. **Apple Developer → Profiles → +** → *App Store Connect*, App ID
+   `pt.alinho.app.watchkitapp`, o mesmo certificado, nome `alinho watch appstore`.
+   No Codemagic: *Fetch profiles* → `alinho watch appstore` → *Download selected*.
+   Se a build ainda disser «No matching profiles» para o relógio, listar os dois
+   perfis em `ios_signing.provisioning_profiles` no `codemagic.yaml`.
+3. **Codemagic**: *Start new build* → `ios-testflight`, branch `feature/apple-watch`.
+4. **Instalar**: TestFlight no iPhone → alinho → a app do relógio instala-se
+   sozinha, ou pela app Watch do iPhone (*Apps disponíveis*).
+
+Jogo de teste (Renato e Francisco), antes de dizer que está pronto: um jogo de
+90 min; cada modo do 40-40; um tie-break e um super tie-break; desfazer a meio de
+um tie-break e depois do fim de um set; pulso em baixo vários minutos (o ecrã não
+pode voltar ao mostrador); bateria antes e depois; o tempo do toque
+(`HoldDuration.seconds`, 0,5 / 0,7 / 0,9 s) com suor; toques acidentais.
+
 ## Notificações push
 
 Os avisos do sino também chegam como notificação (só nas apps). Desenho:
