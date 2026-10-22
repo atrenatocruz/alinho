@@ -6,6 +6,7 @@
 // encostada em baixo, «✓ Estás dentro». Tocar abre o evento.
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Settings } from 'lucide-react'
 import { KIND_STYLE, friendsMatchTitle } from '../agenda/EventCard'
 import { eventTitle, eventPlace } from '../agenda/homeSearchMatch'
 import { fromDayKey, EVENT_KINDS } from '../../lib/agenda'
@@ -114,21 +115,24 @@ function NextCard({ event, todayKey, userId, to }) {
   return to ? <Link to={to} className={`press ${cls}`}>{body}</Link> : <div className={cls}>{body}</div>
 }
 
-/** A pastilha «⚙ Personalizar» ao lado do título. */
+/** A pastilha «Personalizar» ao lado do título, com o ícone de linha Settings
+ *  (o «⚙» era emoji a cores no iPhone; SPEC 2026-10-19-icone-personalizar).
+ *  O ícone sobe 1,75 px (1 px no botão comprido) para o centro da roda bater
+ *  no centro das maiúsculas, medido na print (UX, 19 out). */
 export function CustomizePill({ onClick, long = false }) {
   const { t } = useTranslation()
   if (long) {
     return (
       <button type="button" onClick={onClick}
         className="press mx-auto mt-5 flex h-10 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-dashed border-[#D1D5DB] bg-white px-4 text-[12.5px] font-extrabold text-ink-700">
-        ⚙ {t('home.customize_home')}
+        <Settings size={15} strokeWidth={2.2} color="#374151" aria-hidden="true" className="shrink-0 -translate-y-px" /><span className="leading-none">{t('home.customize_home')}</span>
       </button>
     )
   }
   return (
     <button type="button" onClick={onClick}
-      className="press flex h-7 shrink-0 items-center rounded-full border border-line bg-white px-2.5 text-[11.5px] font-extrabold normal-case tracking-normal text-ink-900">
-      ⚙ {t('home.customize')}
+      className="press flex h-7 shrink-0 items-center gap-[5px] rounded-full border border-line bg-white px-2.5 text-[11.5px] font-extrabold normal-case tracking-normal text-ink-900">
+      <Settings size={13} strokeWidth={2.2} color="#040404" aria-hidden="true" className="shrink-0 -translate-y-[1.75px]" /><span className="leading-none">{t('home.customize')}</span>
     </button>
   )
 }

@@ -24,3 +24,25 @@ export async function updateOpenSlotBatch(batchId, { price, slots }) {
   if (error) throw error
   return Array.isArray(data) ? data : data?.ids || []
 }
+
+const LIVE = (g) => !['cancelled', 'finished', 'completed'].includes(g.status)
+const confirmedIn = (games) => games.reduce((n, g) => n + (g.participants || []).filter((x) => x.status === 'confirmed').length, 0)
+
+/** Os horários ainda vivos de uma publicação e as pessoas confirmadas neles
+ *  (o «Cancelar todos os horários» da folha de cada horário, 18 out). */
+export async function loadOpenBatchLive(batchId) {
+  const games = (await loadOpenSlotBatch(batchId)).filter(LIVE)
+  return { games, people: confirmedIn(games) }
+}
+
+/** Com alguém confirmado cancela todos (e avisa-se); sem ninguém, apaga-os.
+ *  Devolve 'cancel' ou 'delete'. */
+export async function cancelOpenBatch(games) {
+  const ids = games.filter(LIVE).map((g) => g.id)
+  const outcome = confirmedIn(games) > 0 ? 'cancel' : 'delete'
+  const { error } = outcome === 'cancel'
+    ? await supabase.from('games').update({ status: 'cancelled' }).in('id', ids)
+    : await supabase.from('games').delete().in('id', ids)
+  if (error) throw error
+  return outcome
+}

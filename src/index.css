@@ -374,3 +374,6 @@ html.test-env .fixed.inset-0 {
    aparece: tapava o «Guardar alterações» e o «Seguinte» (designer, 30 set).
    O StepPage põe data-steps no body enquanto está aberto. */
 body[data-steps] .app-nav { display: none; }
+/* Sem a barra de baixo, o espaço reservado para ela também sai: a faixa dos
+   botões do StepPage fica encostada ao fundo (QA, 19 out: 112 px vazios). */
+body[data-steps] main > div { padding-bottom: 0 !important; }

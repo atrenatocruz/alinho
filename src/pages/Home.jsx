@@ -212,15 +212,11 @@ export default function Home() {
   const [openSlot, setOpenSlot] = useState(null)
   const [openBusy, setOpenBusy] = useState(false)
   const [openError, setOpenError] = useState('')
-  // O nível ao abrir só aparece com o open_slot_join na base de dados
-  // (sem ele, entra-se como antes e o nível ficava por gravar).
-  const [openJoinReady, setOpenJoinReady] = useState(false)
-  useEffect(() => {
-    let alive = true
-    supabase.rpc('open_slot_join', { p_game_id: null, p_level: null, p_partner_id: null })
-      .then(({ error }) => { if (alive) setOpenJoinReady(!!error && error.code !== 'PGRST202') })
-    return () => { alive = false }
-  }, [])
+  // O nível e o parceiro ao abrir um jogo usam o open_slot_join, que já está
+  // na base de dados (dev e produção). Antes perguntava-se com p_game_id null
+  // se a função existia, e cada abertura da Home deixava um 400 nos registos
+  // de produção (SI, 19 out).
+  const openJoinReady = true
   // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
   const topBlockRef = useRef(null)
   // Os convites da sessão nova de amigos: no «Para ti» os que já têm
