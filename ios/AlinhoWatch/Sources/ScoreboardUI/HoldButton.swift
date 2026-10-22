@@ -20,8 +20,17 @@ struct HoldButton<Label: View>: View {
 
     @EnvironmentObject private var model: AppModel
     @State private var progress: CGFloat = 0
-    @State private var touching = false
     @State private var holdTask: Task<Void, Never>?
+    /// O dedo está pousado e ainda não escorregou. É `@GestureState` porque volta
+    /// sozinho a `false` quando o sistema cancela o gesto (o deslizar entre páginas,
+    /// o pulso a baixar, uma notificação), coisa que o `onEnded` não apanha.
+    @GestureState private var touch = Touch()
+
+    private struct Touch: Equatable {
+        var down = false
+        var slipped = false
+        var holding: Bool { down && !slipped }
+    }
 
     var body: some View {
         label()
@@ -40,19 +49,16 @@ struct HoldButton<Label: View>: View {
             .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if !touching {
-                            touching = true
-                            begin()
-                        } else if hypot(value.translation.width, value.translation.height) > 12 {
-                            cancel()
-                        }
-                    }
-                    .onEnded { _ in
-                        touching = false
-                        cancel()
+                    .updating($touch) { value, state, _ in
+                        state.down = true
+                        // Depois de escorregar já não volta a contar, mesmo que o dedo regresse.
+                        if hypot(value.translation.width, value.translation.height) > 12 { state.slipped = true }
                     }
             )
+            .onChange(of: touch.holding) { _, holding in
+                if holding { begin() } else { cancel() }
+            }
+            .onDisappear { cancel() }
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { if !disabled { onComplete() } }
     }

@@ -33,6 +33,7 @@ public struct RootView: View {
                         if let overlay = model.overlay {
                             OverlayView(overlay: overlay, match: match)
                                 .transition(.opacity)
+                                .onTapGesture { model.hideOverlay() }
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: model.overlay)

@@ -129,7 +129,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func hideOverlay() {
+    /// Um toque no aviso fecha-o, para o «Desfazer» não ficar tapado 2 s.
+    func hideOverlay() {
         overlayTask?.cancel()
         overlay = nil
     }
