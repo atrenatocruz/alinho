@@ -14,21 +14,32 @@
      último classificado quando os grupos têm tamanhos diferentes;
    - "cabe com folga" = sobra pelo menos 10% do tempo de campo. */
 
-/** Ordem do desempate, num só sítio — como a FPP (Francisco, 28 set,
-    «#592»; substitui a de 21 set). Mudar aqui muda a app inteira.
+/** Ordem do desempate, num só sítio, como no futebol (Francisco, 23 out:
+    «está bem. em última instância o Admin escolhe.»; SPEC em
+    design-handoff/2026-10-23-desempate-grupos). Substitui a de 28 set
+    (#592). Mudar aqui muda a app inteira.
       1. vitórias;
-      2. quem faltou ou desistiu fica em último entre as empatadas;
-      3. entre DUAS: o confronto direto;
-      4. entre TRÊS OU MAIS: só os jogos entre elas — diferença de sets,
-         depois de jogos;
-      5. o resto é sorteio: fica `tiedWith`, e escolhe o organizador.
+      2. quem faltou ou desistiu fica atrás (uma falta conta 6-0 6-0);
+      3. os jogos entre as empatadas: vitórias entre elas (com duas, é o
+         jogo entre as duas), depois diferença de sets, diferença de jogos e
+         jogos ganhos, só nesses jogos;
+      4. diferença de sets no grupo;
+      5. diferença de jogos no grupo;
+      6. jogos ganhos no grupo;
+      7. o ranking da dupla guardado no sorteio (a média dos dois);
+      8. se mesmo assim ficarem iguais: `tiedWith`, e escolhe o organizador.
+         A app nunca sorteia sozinha.
     Quando um critério separa parte das empatadas, as que ficam recomeçam do
-    primeiro critério (duas que sobram de três vão ao confronto direto). */
-export const TIEBREAK_DEFAULT = ['vitorias', 'faltas', 'confronto_direto', 'diferenca_sets_entre', 'diferenca_jogos_entre']
+    primeiro critério (duas que sobram de três vão ao jogo entre as duas). */
+export const TIEBREAK_DEFAULT = [
+  'vitorias', 'faltas',
+  'vitorias_entre', 'diferenca_sets_entre', 'diferenca_jogos_entre', 'jogos_ganhos_entre',
+  'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos', 'ranking',
+]
 
-/** Entre grupos diferentes (melhores terceiros) não há jogos entre elas:
-    compara-se o que cada uma fez no seu grupo. */
-export const TIEBREAK_BETWEEN_GROUPS = ['vitorias', 'faltas', 'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos']
+/** Entre grupos diferentes (melhores terceiros) não há jogos entre elas: o
+    passo 3 não se aplica (SPEC de 23 out). */
+export const TIEBREAK_BETWEEN_GROUPS = ['vitorias', 'faltas', 'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos', 'ranking']
 
 export const GROUP_SIZE_MIN = 3
 export const GROUP_SIZE_MAX = 7
@@ -370,10 +381,13 @@ export function matchUnits(m, gamesScoring) {
     ids; `winner` é 'a' ou 'b' quando se sabe (ver `matchWinner`);
     `forfeit` é o lado que faltou ou desistiu.
     Faltas e desistências contam para a classificação do grupo (o adversário
-    ganha), mas não mexem no ranking da app: isso é decidido noutro sítio. */
-export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT } = {}) {
+    ganha), mas não mexem no ranking da app: isso é decidido noutro sítio.
+    `ratings`: { [id]: ranking da dupla no sorteio }, para o passo 7. Sem
+    ele, esse passo não separa ninguém. */
+export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT, ratings = null, tiebreaks = [] } = {}) {
   const rows = new Map(teamIds.map((id) => ({
     id, played: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, setsWon: 0, setsLost: 0, forfeits: 0,
+    rating: ratings?.[id] ?? null,
   })).map((r) => [r.id, r]))
 
   const played = matches.filter(isPlayed)
@@ -397,7 +411,7 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
   }
 
   const list = [...rows.values()].map((r) => ({ ...r, diff: r.gamesWon - r.gamesLost }))
-  return sortWithTiebreak(list, played, tiebreak)
+  return sortWithTiebreak(list, played, tiebreak, tiebreaks)
 }
 
 /** Ordena aplicando os critérios por ordem. O confronto direto só se aplica
@@ -414,8 +428,13 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
     Quem continua empatado depois de TODOS os critérios fica na ordem em que
     veio e leva `tiedWith`: os ids das outras duplas desse empate. É o
     organizador que decide (sorteio, moeda) — as contas não inventam uma
-    ordem (Trello #484). Sem empate destes, `tiedWith` não aparece. */
-export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
+    ordem (Trello #484). Sem empate destes, `tiedWith` não aparece.
+
+    Quem ficou à frente (ou atrás) por um desempate leva `decidedBy`: o
+    critério que o separou das empatadas, e `decidedAmong`: quantas eram
+    nesse momento. É o que a etiqueta da tabela diz («2.º pela diferença de
+    sets», «3.º pelo jogo entre as duas»). Sem empate, não aparece. */
+export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT, tiebreaks = []) {
   const gamesScoring = isGamesScoring(matches)
   const value = (row, criterion, tiedIds) => {
     switch (criterion) {
@@ -424,19 +443,35 @@ export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
       case 'diferenca_jogos': return row.diff
       case 'diferenca_sets': return (row.setsWon || 0) - (row.setsLost || 0)
       case 'jogos_ganhos': return row.gamesWon
-      // Entre três ou mais, o confronto direto não se usa: contam os jogos
-      // entre elas, nos critérios a seguir (FPP, #592).
+      // Vitórias só nos jogos entre as empatadas: com duas, é o jogo entre
+      // as duas (23 out). O 'confronto_direto' antigo só valia com duas.
+      case 'vitorias_entre': return headToHeadWins(row.id, tiedIds, matches)
       case 'confronto_direto': return tiedIds.length === 2 ? headToHeadWins(row.id, tiedIds, matches) : 0
       case 'diferenca_sets_entre': return diffAmong(row.id, tiedIds, matches, gamesScoring).sets
       case 'diferenca_jogos_entre': return diffAmong(row.id, tiedIds, matches, gamesScoring).games
+      case 'jogos_ganhos_entre': return diffAmong(row.id, tiedIds, matches, gamesScoring).gamesWon
+      // Sem ranking guardado, fica atrás de quem o tem.
+      case 'ranking': return row.rating == null ? -Infinity : Number(row.rating)
       default: return 0
     }
   }
 
-  const compareWithin = (group, depth) => {
-    if (group.length <= 1) return group
+  // `label` = o critério que separou estas linhas das outras empatadas.
+  // Separar pelo primeiro critério (as vitórias, logo de início) não é um
+  // desempate: aí fica o que já vinha de trás.
+  const compareWithin = (group, depth, label = null) => {
+    if (group.length <= 1) return group.map((r) => (label ? { ...r, ...label } : r))
     if (depth >= tiebreak.length) {
       const ids = group.map((r) => r.id)
+      // Passo 8: o desempate jogado no campo, ou a escolha do organizador,
+      // se já estiver gravado para estas duplas (tournament_tiebreaks).
+      const record = findTiebreak(tiebreaks, ids)
+      if (record) {
+        const at = new Map(record.ranking.map((id, i) => [id, i]))
+        const decided = { decidedBy: record.decided_by === 'organizador' ? 'organizador' : 'desempate', decidedAmong: group.length,
+          tiebreakForm: record.form, tiebreakScore: tiebreakScore(record) }
+        return [...group].sort((x, y) => at.get(x.id) - at.get(y.id)).map((r) => ({ ...r, ...decided }))
+      }
       return group.map((r) => ({ ...r, tiedWith: ids.filter((id) => id !== r.id) }))
     }
     const criterion = tiebreak[depth]
@@ -447,13 +482,61 @@ export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
       if (!byValue.has(s.v)) byValue.set(s.v, [])
       byValue.get(s.v).push(s.row)
     }
-    if (byValue.size === 1) return compareWithin(group, depth + 1)
+    if (byValue.size === 1) return compareWithin(group, depth + 1, label)
+    const next = depth === 0 ? label : { decidedBy: criterion, decidedAmong: group.length }
     return [...byValue.entries()]
       .sort((x, y) => y[0] - x[0])
-      .flatMap(([, sub]) => compareWithin(sub, 0))
+      .flatMap(([, sub]) => compareWithin(sub, 0, next))
   }
 
   return compareWithin([...rows], 0).map((row, i) => ({ ...row, position: i + 1 }))
+}
+
+/** O desempate gravado para exatamente estas duplas, se houver. */
+function findTiebreak(tiebreaks, ids) {
+  if (!tiebreaks?.length) return null
+  const key = [...ids].sort().join(',')
+  return tiebreaks.find((t) => [...(t.entry_ids || [])].sort().join(',') === key
+    && (t.ranking || []).length === ids.length) || null
+}
+
+/** O resultado do desempate entre duas duplas, do lado de quem ganhou
+    («10-8»), para a etiqueta. Com três ou mais, ou sem resultado, null. */
+function tiebreakScore(record) {
+  const r = record?.results
+  if (!Array.isArray(r) || r.length !== 1 || record.ranking?.length !== 2) return null
+  const winnerIsA = r[0].a === record.ranking[0]
+  const w = winnerIsA ? r[0].score_a : r[0].score_b
+  const l = winnerIsA ? r[0].score_b : r[0].score_a
+  return w == null || l == null ? null : `${w}-${l}`
+}
+
+/** A ordem de um desempate a três ou mais, jogado todas contra todas
+    (SPEC, 23 out): vitórias, depois diferença de pontos. `results`:
+    [{ a, b, score_a, score_b }]. Devolve { ranking, tied } — `tied` são os
+    blocos que continuam iguais (aí escolhe o organizador, e o ecrã manda a
+    ordem escolhida ao record_tournament_tiebreak). */
+export function tiebreakOrder(entryIds, results = []) {
+  const rows = entryIds.map((id) => ({ id, wins: 0, diff: 0 }))
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  for (const m of results) {
+    const a = byId.get(m.a)
+    const b = byId.get(m.b)
+    if (!a || !b || m.score_a == null || m.score_b == null || m.score_a === m.score_b) continue
+    if (m.score_a > m.score_b) a.wins += 1
+    else b.wins += 1
+    a.diff += m.score_a - m.score_b
+    b.diff += m.score_b - m.score_a
+  }
+  const sorted = [...rows].sort((x, y) => (y.wins - x.wins) || (y.diff - x.diff))
+  const tied = []
+  for (let i = 0; i < sorted.length;) {
+    let j = i + 1
+    while (j < sorted.length && sorted[j].wins === sorted[i].wins && sorted[j].diff === sorted[i].diff) j += 1
+    if (j - i > 1) tied.push(sorted.slice(i, j).map((r) => r.id))
+    i = j
+  }
+  return { ranking: sorted.map((r) => r.id), tied }
 }
 
 /** Vitórias de `id` só nos jogos contra as duplas de `tiedIds`. */
@@ -476,38 +559,43 @@ export function diffAmong(id, tiedIds, matches, gamesScoring = isGamesScoring(ma
   const tied = new Set(tiedIds)
   let sets = 0
   let games = 0
+  let gamesWon = 0
   for (const m of matches) {
     if (!tied.has(m.a) || !tied.has(m.b) || !isPlayed(m)) continue
     if (m.a !== id && m.b !== id) continue
     const u = matchUnits(m, gamesScoring)
     const sign = m.a === id ? 1 : -1
     sets += sign * (u.setsA - u.setsB)
-    if (gamesScoring) games += sign * (u.gamesA - u.gamesB)
+    if (gamesScoring) {
+      games += sign * (u.gamesA - u.gamesB)
+      gamesWon += m.a === id ? u.gamesA : u.gamesB
+    }
   }
-  return { sets, games }
+  return { sets, games, gamesWon }
 }
 
 /** Melhores terceiros (ou melhores k-ésimos) entre grupos de tamanhos
     diferentes: compara-se só o que é comparável — ignoram-se os jogos contra
     o último classificado dos grupos maiores. SUPOSIÇÃO, por confirmar. */
-export function bestOfPosition(groups, position, { tiebreak = TIEBREAK_BETWEEN_GROUPS } = {}) {
+export function bestOfPosition(groups, position, { tiebreak = TIEBREAK_BETWEEN_GROUPS, tiebreaks = [] } = {}) {
   const smallest = Math.min(...groups.map((g) => g.teamIds.length))
   const rows = []
   for (const g of groups) {
-    const standings = groupStandings(g.teamIds, g.matches, { tiebreak })
+    const ratings = g.ratings || null
+    const standings = groupStandings(g.teamIds, g.matches, { tiebreak, ratings })
     const row = standings[position - 1]
     if (!row) continue
     if (g.teamIds.length > smallest) {
       // Tira os jogos contra os últimos classificados a mais.
       const drop = new Set(standings.slice(smallest).map((r) => r.id))
       const kept = g.matches.filter((m) => !drop.has(m.a) && !drop.has(m.b))
-      const adjusted = groupStandings(g.teamIds.filter((id) => !drop.has(id)), kept, { tiebreak })
+      const adjusted = groupStandings(g.teamIds.filter((id) => !drop.has(id)), kept, { tiebreak, ratings })
       const mine = adjusted.find((r) => r.id === row.id)
       if (mine) { rows.push({ ...mine, group: g.number ?? null }); continue }
     }
     rows.push({ ...row, group: g.number ?? null })
   }
-  return sortWithTiebreak(rows, groups.flatMap((g) => g.matches), tiebreak)
+  return sortWithTiebreak(rows, groups.flatMap((g) => g.matches), tiebreak, tiebreaks)
 }
 
 // ── Quadro ───────────────────────────────────────────────────────────────
