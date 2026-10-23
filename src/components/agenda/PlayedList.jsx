@@ -118,7 +118,11 @@ function PlayedCard({ row }) {
   const event = { orgName: row.org_name, orgKind: row.org_kind, orgLogo: row.org_logo, orgId: row.organization_id }
   // Quem ganhou vê «🏆 Venceste» no canto, no lugar de «Terminado» (UX,
   // 10 out). i_won vem do list_played_events (Dev 3); sem ele, «Terminado».
-  const state = row.i_won
+  // Um mix de um dia que já passou e ficou a meio: «Por terminar», para quem
+  // organiza o encontrar e pôr os resultados (bug em produção, 23 out).
+  const state = row.por_terminar
+    ? <StateTag tone="wait">{t('pastevents.unfinished')}</StateTag>
+    : row.i_won
     ? <StateTag tone="live">{t('agenda.result_won')}</StateTag>
     : <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
   const mascot = mascotFor(kind)
