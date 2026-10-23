@@ -62,10 +62,26 @@ describe('as opções que uma categoria pequena recebe (Trello #455)', () => {
     expect(opcoes.some((o) => o.kind === 'eliminatoria')).toBe(true)
   })
 
-  it('3, 4 e 5 duplas só têm «só eliminatória» — e é por isso que ela tem de sortear', () => {
+  it('3, 4 e 5 duplas: com singleGroup, também um grupo só (BA, 23 out), e é o recomendado', () => {
     for (const n of [3, 4, 5]) {
       expect(formatOptions(n).map((o) => o.kind)).toEqual(['eliminatoria'])
+      expect(formatOptions(n, { singleGroup: true }).map((o) => o.kind)).toEqual(['eliminatoria', 'grupo_unico'])
+      const best = recommendFormat(formatOptions(n, { maxDurationMin: 45, availableHours: 20, singleGroup: true }))
+      expect(best.kind).toBe('grupo_unico')
+      expect(best.guaranteed).toBe(n - 1)
+      expect(best.qualifiersPerGroup).toBe(0)
     }
+  })
+
+  it('o grupo só vai de 3 a 7 duplas, sem quadro', () => {
+    expect(formatOptions(2, { singleGroup: true }).some((o) => o.kind === 'grupo_unico')).toBe(false)
+    expect(formatOptions(8, { singleGroup: true }).some((o) => o.kind === 'grupo_unico')).toBe(false)
+    const seven = formatOptions(7, { singleGroup: true }).find((o) => o.kind === 'grupo_unico')
+    expect(seven).toMatchObject({ key: 'grupo-unico-7', groupCount: 1, sizes: [7], qualifiers: 0, matches: 21, guaranteed: 6, phases: 1 })
+  })
+
+  it('o texto do grupo só tem a sua chave', () => {
+    expect(groupsWords(formatOptions(5, { singleGroup: true }).find((o) => o.kind === 'grupo_unico')).key).toBe('tournament.draw.opt_single_group')
   })
 })
 

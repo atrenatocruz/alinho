@@ -4905,6 +4905,7 @@
   "tournament.draw.opt_pass_one": "top 1 goes through",
   "tournament.draw.opt_pass_other": "top {{count}} go through",
   "tournament.draw.opt_knockout": "Knockout only",
+  "tournament.draw.opt_single_group": "One group, everyone plays everyone",
   "tournament.draw.opt_line": "{{guaranteed}} · {{matches}} · {{hours}} h of court · {{phases}}",
   "tournament.draw.opt_no_fit": "Does not fit: {{hours}} h for this category alone.",
   "tournament.draw.recommended": "Recommended",

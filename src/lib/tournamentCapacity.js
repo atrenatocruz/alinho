@@ -16,7 +16,7 @@
      antes das 8h. */
 
 import {
-  SLACK_DEFAULT, GROUP_SIZE_MAX, formatOptions, recommendFormat, groupMatchCount, knockoutRounds,
+  SLACK_DEFAULT, formatOptions, recommendFormat, knockoutRounds,
 } from './tournamentFormat'
 
 // ── 1. Quanto tempo de campo ocupa um jogo ───────────────────────────────
@@ -75,32 +75,6 @@ export const MAX_TEAMS_SEARCH = { from: 4, to: 64 }
     folga em cada ronda). */
 export const groupRounds = (size) => (size % 2 === 0 ? size - 1 : size)
 
-/** Um grupo só, todos contra todos, sem final: ganha o 1.º da tabela (BA,
-    23 out). Sozinho com 3 duplas ou menos; de 4 a 7 compara-se com os
-    outros formatos (com 4 e 5 ganha sempre: 3 ou 4 jogos contra 1). */
-export const SINGLE_GROUP_MAX = GROUP_SIZE_MAX
-function singleGroupOption(teams, maxDurationMin, { availableHours = null, slack = SLACK_DEFAULT } = {}) {
-  const matches = groupMatchCount(teams)
-  const hours = (matches * maxDurationMin) / 60
-  const hasLimit = availableHours != null
-  return {
-    key: `grupo-unico-${teams}`,
-    kind: 'grupo_unico',
-    groupCount: 1,
-    sizes: [teams],
-    qualifiersPerGroup: 0,
-    qualifiers: 0,
-    byes: 0,
-    secondary: false,
-    guaranteed: Math.max(0, teams - 1),
-    phases: 1,
-    matches,
-    hours,
-    fits: hasLimit ? hours <= availableHours : null,
-    fitsWithSlack: hasLimit ? hours <= availableHours * (1 - slack) : null,
-  }
-}
-
 /** Rondas em sequência de uma opção: as do maior grupo mais as do quadro. */
 export function optionRounds(option) {
   if (!option) return 0
@@ -119,17 +93,13 @@ export function optionRounds(option) {
 export function categoryNeed(teams, { maxDurationMin, availableHours = null, availableMinutes = null, thirdPlaceMatch = false, secondaryBracket = false, slack = SLACK_DEFAULT } = {}) {
   const n = Math.floor(Number(teams) || 0)
   if (n < 2) return null
-  let option
-  if (n <= 3) {
-    option = singleGroupOption(n, maxDurationMin, { availableHours, slack })
-  } else {
-    const all = formatOptions(n, { maxDurationMin, availableHours, thirdPlaceMatch, secondaryBracket, slack })
-    if (n <= SINGLE_GROUP_MAX) all.push(singleGroupOption(n, maxDurationMin, { availableHours, slack }))
-    const enough = all.filter((o) => o.guaranteed >= MIN_GUARANTEED)
-    const pool = enough.length ? enough : all
-    const inTime = availableMinutes == null ? [] : pool.filter((o) => optionRounds(o) * maxDurationMin <= availableMinutes)
-    option = recommendFormat(inTime.length ? inTime : pool)
-  }
+  // O grupo único (3 a 7 duplas) já vem do formatOptions, como no passo do
+  // formato depois das inscrições.
+  const all = formatOptions(n, { maxDurationMin, availableHours, thirdPlaceMatch, secondaryBracket, slack, singleGroup: true })
+  const enough = all.filter((o) => o.guaranteed >= MIN_GUARANTEED)
+  const pool = enough.length ? enough : all
+  const inTime = availableMinutes == null ? [] : pool.filter((o) => optionRounds(o) * maxDurationMin <= availableMinutes)
+  const option = recommendFormat(inTime.length ? inTime : pool)
   const rounds = optionRounds(option)
   return {
     teams: n,

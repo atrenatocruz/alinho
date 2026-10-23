@@ -383,6 +383,19 @@ describe('peças dos separadores (continuação)', () => {
     expect(qualifiersPerGroup(null)).toBe(2)
     expect(qualifiersPerGroup({ format: { qualifiers_per_group: 1 } })).toBe(1)
   })
+
+  it('grupo único: 0 é a sério, não vira 2 (BA, 23 out)', () => {
+    expect(qualifiersPerGroup({ format: { qualifiers_per_group: 0 } })).toBe(0)
+  })
+
+  it('grupo único: o sorteio faz um grupo, todos contra todos, e nenhum quadro', () => {
+    const p = buildDrawPayload(duplas(5), { groupCount: 1, perGroup: 0 })
+    expect(p.groups).toHaveLength(1)
+    expect(p.groups[0].teams).toHaveLength(5)
+    expect(p.group_matches).toHaveLength(10)
+    expect(p.bracket).toEqual([])
+    expect(p.third_place).toBe(false)
+  })
 })
 
 describe('buildKnockoutPayload — só eliminatória (Trello #455)', () => {
