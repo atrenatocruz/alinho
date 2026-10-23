@@ -3993,7 +3993,12 @@ export default function GerirClube() {
                       detalhe = [item.quando ? quandoCurto(item.quando, false) : null, t('gerirclube.status_cancelled')].filter(Boolean).join(' · ')
                     }
                     if (tipo === 'mix' && !isDraftMix(row)) {
-                      abrir = row.recurrence_id
+                      // Em «Por terminar» abre o próprio mix, para pôr os
+                      // resultados; antes abria o cartão da série (QUINTAS @
+                      // IPC, 23 out).
+                      abrir = itemPorTerminar(item)
+                        ? () => navigate(`/jogo/${row.id}`)
+                        : row.recurrence_id
                         ? () => navigate(`/gerir/${org.slug}/serie/${row.recurrence_id}`, { state: { fromGerir: true } })
                         : () => setSingleSheet(row)
                     }
