@@ -6180,7 +6180,7 @@
   "league.error_outside_window": "That time is outside the round.",
   "league.error_not_your_proposal": "This time was proposed by your club: wait for the reply.",
   "league.error_set_invalid": "A set has an impossible score.",
-  "league.error_no_winner": "A set is missing a winner: someone must have won 2.",
+  "league.error_no_winner": "A set is missing: nobody has won 2.",
   "league.error_sets_after_win": "There is an extra set after the match was already decided.",
   "league.error_player_twice": "Nobody can play two matches in the same encounter.",
   "league.error_not_in_roster": "A player is not on the roster.",
