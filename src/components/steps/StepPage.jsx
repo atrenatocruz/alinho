@@ -127,8 +127,8 @@ export default function StepPage({
   )
   return (
     <MissingContext.Provider value={{ shown: missingShown && canExplain, field: nextMissingField, message: nextHint }}>
-    // A coluna ocupa o ecrã todo, para a faixa dos botões ficar sempre no
-    // fundo, também com pouco conteúdo (QA, 19 out: ficavam 112 px vazios).
+    {/* A coluna ocupa o ecrã todo, para a faixa dos botões ficar sempre no
+        fundo, também com pouco conteúdo (QA, 19 out: ficavam 112 px vazios). */}
     <div className="mx-auto flex min-h-[calc(100dvh-24px)] max-w-lg flex-col">
       {/* «Cancelar / Voltar» sempre visível ao deslizar (27 set). No editar,
           «Cancelar» em todos os passos e o nome do passo no meio (30 set). */}
