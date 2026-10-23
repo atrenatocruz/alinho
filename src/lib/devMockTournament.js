@@ -792,3 +792,77 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
     ].filter((n) => !promotedRead.has(n.id))
   },
 }
+
+// ── Horário com «Todas» (23 out) ────────────────────────────────────────
+// localStorage.mockTHorario = 'true' (com mockTournament): quatro categorias
+// com jogos hoje, em 2 campos (= '3': em 3 campos, para a grelha deslizar).
+// Com mockTClashMine sou a dupla e1 do M4 e m5-3 do MX4.
+const horarioOn = () => !!localStorage.getItem('mockTHorario')
+const H_TEAMS = {
+  'cat-m4': [['e1', 'Nogueira / Barros'], ['h-m4-2', 'Rocha / Liz'], ['h-m4-3', 'Silva / Rocha'], ['h-m4-4', 'Botas / Corvo'], ['h-m4-5', 'Saltão / Nunes'], ['h-m4-6', 'Santos / Grácio']],
+  'cat-f4': [['h-f4-1', 'Costa / Lima'], ['h-f4-2', 'Eufrásio / Sá'], ['h-f4-3', 'Neves / Mimoso'], ['h-f4-4', 'Tapia / Ruas']],
+  'cat-mx4': [['m5-3', 'Barros / Ferreira'], ['h-mx-2', 'Henrique / Claro'], ['h-mx-3', 'Diogo / Fátima'], ['h-mx-4', 'Dôro / Magalhães']],
+  'cat-m3': [['h-m3-1', 'Martins / Fernandes'], ['h-m3-2', 'Rocha / Liz'], ['h-m3-3', 'Pereira / Gil'], ['h-m3-4', 'Matos / Reis']],
+}
+const hAt = (hh, mm) => {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const local = new Date(`${day}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`)
+  return local.toISOString()
+}
+// [categoria, grupo, a, b, hora, minuto, campo, estado, resultado a, b]
+const H_MATCHES = () => {
+  const now = new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  // Os jogos andam com o relógio: os que já passaram acabaram, o da hora de
+  // agora está a decorrer.
+  const slots = [-120, -75, -30, 15, 60, 105].map((d) => nowMin + d - ((nowMin + d) % 15))
+  const three = localStorage.getItem('mockTHorario') === '3'
+  const rows = [
+    ['cat-m4', 1, 0, 1, 0, 'Campo 1'], ['cat-m4', 2, 2, 3, 0, 'Campo 2'],
+    ['cat-m4', 3, 4, 5, 1, 'Campo 1'], ['cat-f4', 1, 2, 3, 1, 'Campo 2'],
+    ['cat-f4', 2, 0, 1, 2, 'Campo 1'], ['cat-mx4', 1, 2, 3, 2, 'Campo 2'],
+    ['cat-mx4', 3, 0, 1, 3, 'Campo 1'], ['cat-m3', 1, 0, 1, 3, 'Campo 2'],
+    ['cat-m4', null, null, null, 4, 'Campo 1'], ['cat-f4', 2, 0, 1, 4, 'Campo 2'],
+    ['cat-m3', 2, 2, 3, 5, 'Campo 1'],
+    ...(three ? [['cat-m3', 1, 2, 3, 0, 'Campo 3'], ['cat-f4', 1, 0, 3, 2, 'Campo 3'], ['cat-mx4', 1, 0, 2, 4, 'Campo 3']] : []),
+  ]
+  return rows.map(([cat, group, a, b, slot, court], i) => {
+    const min = slots[slot]
+    const at = hAt(Math.floor(min / 60), min % 60)
+    const state = slot <= 1 ? 'terminado' : slot === 2 ? 'a_decorrer' : 'marcado'
+    const teams = H_TEAMS[cat]
+    const ea = a == null ? null : teams[a][0]
+    const eb = b == null ? null : teams[b][0]
+    const sa = state === 'marcado' ? null : 9
+    const sb = state === 'marcado' ? null : (state === 'a_decorrer' ? 4 : 6)
+    return {
+      id: `h-${i}`, category_id: cat, group_id: group ? `${cat}-hg${group}` : null, stage: group ? 'grupo' : 'quadro', round: group ? null : 'SF', bracket_slot: 1,
+      entry_a_id: ea, entry_b_id: eb, source_a: group ? null : '1.º Grupo 1', source_b: group ? null : '2.º Grupo 2',
+      scheduled_at: at, previous_scheduled_at: null, court_name: court, status: state,
+      score_a: sa, score_b: sb, winner_entry_id: state === 'terminado' ? ea : null,
+    }
+  })
+}
+const hCat = (url) => decodeURIComponent(url).match(/category_id=eq\.([a-z0-9-]+)/)?.[1]
+export const TOURNAMENT_HORARIO_TABLE_MOCKS = {
+  tournament_public_groups: (url) => {
+    if (!horarioOn()) return undefined
+    const c = hCat(url)
+    return [1, 2, 3].flatMap((g) => (H_TEAMS[c] || []).slice(0, 2).map(([id], pi) => ({
+      id: `${c}-hg${g}`, category_id: c, number: g, name: `Grupo ${g}`, entry_id: g === 1 ? id : null, position: pi + 1,
+    })))
+  },
+  tournament_public_entries: (url) => {
+    if (!horarioOn()) return undefined
+    const c = hCat(url)
+    return (H_TEAMS[c] || []).map(([id, name]) => {
+      const [p1, p2] = name.split(' / ')
+      return { id, category_id: c, team_name: null, status: 'validada', player1_name: p1, player2_name: p2 }
+    })
+  },
+  tournament_public_matches: (url) => {
+    if (!horarioOn()) return undefined
+    const c = hCat(url)
+    return H_MATCHES().filter((m) => m.category_id === c)
+  },
+}
