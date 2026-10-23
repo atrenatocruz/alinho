@@ -3085,7 +3085,9 @@ export default function GerirClube() {
               options={[
                 { value: 'all', label: t('gerirclube.kind_all') },
                 { value: 'mix', label: t('gerirclube.kind_mixes'), dot: KIND_COLORS.mix.strong },
-                { value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong },
+                // Os grupos não criam jogos em aberto (só o Club): o filtro
+                // sai deles (REGRAS-BA, 21 out).
+                ...(isGroupOrg ? [] : [{ value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong }]),
                 { value: 'torneio', label: t('gerirclube.kind_tournaments'), dot: KIND_COLORS.tournament.strong },
                 ...(isGroupOrg ? [] : [{ value: 'turma', label: t('gerirclube.kind_series'), dot: KIND_COLORS.lesson.strong }]),
               ]}
@@ -3154,8 +3156,10 @@ export default function GerirClube() {
                   ['aberto', canPlanEvents && !isGroupOrg],
                   ['amigos', isGroupOrg],
                   ['torneio', canPlanEvents && tournamentsReady],
-                  // A liga é entre clubes: só um clube a cria (não um grupo).
-                  ['liga', org?.kind === 'club'],
+                  // A liga vai pelo plano, como os torneios: clubes e grupos
+                  // Community ou Club (Francisco, 21 out; a base do Dev 3 em
+                  // migration_liga_pelo_plano.sql).
+                  ['liga', canPlanEvents],
                   ['turma', !isGroupOrg && lessonsReady],
                 ].filter(([, mostra]) => mostra).map(([tipo]) => tipo)
                 return (

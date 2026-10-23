@@ -171,8 +171,13 @@ export async function clearBracketFromGroups(categoryId) {
 
 /** Quantas duplas passam de cada grupo, pelo formato guardado na categoria.
  *  Sem formato guardado (sorteio à mão), assume-se 2 — o do desenho. */
-export const qualifiersPerGroup = (category) =>
-  Number(category?.format?.qualifiers_per_group) || 2
+// 0 é a sério: o grupo único não leva ninguém a um quadro (BA, 23 out). Só
+// sem valor nenhum (categorias antigas) é que vale o 2 de sempre.
+export const qualifiersPerGroup = (category) => {
+  const v = category?.format?.qualifiers_per_group
+  if (v === 0 || v === '0') return 0
+  return Number(v) || 2
+}
 
 /** Os jogos de eliminatória por ronda, na ordem do quadro. */
 export function bracketRounds(matches, stage = 'principal') {

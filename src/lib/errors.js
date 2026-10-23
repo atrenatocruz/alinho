@@ -56,6 +56,9 @@ export function errorKind(error) {
   if (code === '23505' || /duplicate key/i.test(msg)) return 'duplicate'
   // Resultado antes da hora do jogo (Dev 3, migration_resultado_so_a_partir_da_hora.sql).
   if (/(^|\W)too_early$/.test(msg)) return 'too_early'
+  // Jogos em aberto fora do plano Club (Dev 3, gatilho em games, 21 out): só
+  // se vê na app antiga, porque a nova já não mostra o botão aos grupos.
+  if (/(^|\W)plan_no_open_games$/.test(msg)) return 'plan_no_open_games'
 
   // RAISE EXCEPTION das nossas funções — frases já escritas para o utilizador
   if (code === 'P0001' && msg) return 'business'
@@ -99,6 +102,7 @@ export function describeError(t, error, fallbackKey = 'errors.generic') {
     case 'permission': return t('errors.permission')
     case 'org_name_taken': return t('errors.org_name_taken')
     case 'too_early': return t('errors.too_early')
+    case 'plan_no_open_games': return t('errors.plan_no_open_games')
     case 'duplicate': return t('errors.duplicate')
     case 'business': return sentence(error.message)
     default: {

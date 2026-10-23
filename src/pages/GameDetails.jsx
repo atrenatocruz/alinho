@@ -60,7 +60,7 @@ import { cancelOpenBatch, loadOpenBatchLive } from '../lib/openSlotsApi'
 import RoundAlarm from '../components/RoundAlarm'
 import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
-import { adminPairSoloRows, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
+import { adminPairSoloRows, adminSplitPairRow, mixPairErrorMessage } from '../lib/mixPairs'
 import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKeys'
 import { appHref, appOrigin } from '../lib/native'
 
@@ -194,7 +194,7 @@ export default function GameDetails() {
   // O admin junta dois «Sozinhos» ou separa uma dupla (Francisco, 27 set).
   const [pairFor, setPairFor] = useState(null) // a pessoa sozinha
   const [pairWith, setPairWith] = useState(null) // a linha (participants.id) escolhida
-  const [splitFor, setSplitFor] = useState(null) // { userId, names }
+  const [splitFor, setSplitFor] = useState(null) // { rowId, names }
   // Já entrei pelo WhatsApp? (Francisco, 26 set) — { name, then } enquanto
   // se pergunta; o nome fica guardado depois do «Sim, sou eu».
   const [lookalike, setLookalike] = useState(null)
@@ -4802,12 +4802,11 @@ export default function GameDetails() {
                               </span>
                             )}
                           </MonoLabel>
-                          {/* Separar ainda só conhece duplas de duas contas: com um
-                              convidado (titular ou parceiro) fica escondido até à
-                              função por linha do Dev 3 (PO e Dev 3, 20 out). */}
-                          {canSplit && !r.user?.no_account && !r.partner?.no_account && (
+                          {/* Separar pela linha (admin_split_pair_row, 21 out):
+                              também nas duplas com convidados. */}
+                          {canSplit && (
                             <button type="button" disabled={busy}
-                              onClick={() => setSplitFor({ userId: r.user.id, names: two.map((x) => x.name).join(' e ') })}
+                              onClick={() => setSplitFor({ rowId: r.id, names: two.map((x) => x.name).join(' e ') })}
                               className="press -my-2 min-h-[44px] px-1 text-xs font-extrabold text-muted">
                               {t('mixpairs.split')}
                             </button>
@@ -5381,7 +5380,7 @@ export default function GameDetails() {
             confirmLabel={t('mixpairs.split_confirm')}
             cancelLabel={t('mixpairs.split_keep')}
             // Separar não é vermelho: volta-se a juntar.
-            onConfirm={async () => { await adminSplitPair(id, splitFor.userId); loadGameDetails() }}
+            onConfirm={async () => { await adminSplitPairRow(id, splitFor.rowId); loadGameDetails() }}
             onClose={() => setSplitFor(null)}
             errorOf={(error) => mixPairErrorMessage(t, error)}
           />

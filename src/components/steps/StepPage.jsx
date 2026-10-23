@@ -162,7 +162,7 @@ export default function StepPage({
       <div className="mt-6 space-y-6">{children}</div>
 
       {error && (
-        <p className="mt-6 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>
+        <p role="alert" className="mt-6 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>
       )}
 
       <div className="h-8 shrink-0" aria-hidden="true" />
