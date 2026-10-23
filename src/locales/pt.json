@@ -4899,6 +4899,7 @@
   "tournament.draw.opt_pass_one": "passa 1",
   "tournament.draw.opt_pass_other": "passam {{count}}",
   "tournament.draw.opt_knockout": "Só eliminatória",
+  "tournament.draw.opt_single_group": "Um grupo só, todos contra todos",
   "tournament.draw.opt_line": "{{guaranteed}} · {{matches}} · {{hours}} h de campo · {{phases}}",
   "tournament.draw.opt_no_fit": "Não cabe: {{hours}} h só para esta categoria.",
   "tournament.draw.recommended": "Recomendado",

@@ -109,6 +109,7 @@ export const availableCourtHours = (days) =>
 
 /** Todas as opções sensatas para um número de duplas, com as contas feitas.
     `qualifiersPerGroup` 1 ou 2 (SPEC §5). Inclui sempre "só eliminatória".
+    Com `singleGroup`, também «um grupo só» de 3 a 7 duplas (passam 0).
 
     Cada opção: { key, kind, groupCount, sizes, qualifiersPerGroup, qualifiers,
     byes, secondary, matches, guaranteed, phases, hours, fits, slack }. */
@@ -120,6 +121,7 @@ export function formatOptions(teamCount, {
   slack = SLACK_DEFAULT,
   thirdPlaceMatch = false,
   secondaryBracket = false,
+  singleGroup = false,
 } = {}) {
   const options = []
 
@@ -170,6 +172,27 @@ export function formatOptions(teamCount, {
     }
   }
 
+  // Um grupo só, todos contra todos, sem final: ganha o 1.º da tabela, com o
+  // desempate da FPP (BA, 23 out; aprovado pelo Francisco). De 3 a 7 duplas.
+  // Com 4 e 5 é sempre o recomendado (3 ou 4 jogos garantidos contra 1).
+  // Só com `singleGroup`: o passo do formato liga-o quando o ecrã o souber
+  // sortear (passam 0, nenhum quadro); as contas do Criar já o usam.
+  if (singleGroup && teamCount >= min && teamCount <= max) {
+    options.push(finishOption({
+      key: `grupo-unico-${teamCount}`,
+      kind: 'grupo_unico',
+      groupCount: 1,
+      sizes: [teamCount],
+      qualifiersPerGroup: 0,
+      qualifiers: 0,
+      byes: 0,
+      secondary: false,
+      guaranteed: teamCount - 1,
+      phases: 1,
+      matches: groupMatchCount(teamCount),
+    }, { maxDurationMin, availableHours, slack }))
+  }
+
   return options
 }
 
@@ -191,9 +214,13 @@ function finishOption(option, { maxDurationMin, availableHours, slack }) {
     — antes dizia «3 grupos de 4» para 4+3+3. Devolve a chave e os números
     (quem traduz é o ecrã, como o `formatWords` da página pública); a
     chave trata do singular e do plural dos grupos e de quem passa.
-    Só para opções com grupos — «Só eliminatória» tem o seu texto. */
+    Só para opções com grupos — «Só eliminatória» tem o seu texto. O grupo
+    único tem a sua chave («Um grupo só, todos contra todos»). */
 export function groupsWords(option, locale = 'pt-PT') {
   const sizes = option?.sizes || []
+  if (option?.kind === 'grupo_unico') {
+    return { key: 'tournament.draw.opt_single_group', values: { count: 1, size: sizes[0] ?? 0, sizes: String(sizes[0] ?? 0), per: 0 } }
+  }
   const equal = sizes.every((n) => n === sizes[0])
   return {
     key: equal ? 'tournament.draw.opt_groups_equal' : 'tournament.draw.opt_groups_mixed',
