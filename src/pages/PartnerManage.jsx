@@ -8,7 +8,7 @@ import { useFeatureFlag } from '../lib/useFeatureFlag'
 import { getPartner } from '../lib/partners'
 import {
   myManagedPartners, partnerListVouchers, partnerRedeemVoucher, updatePartnerProfile,
-  uploadPartnerImage, imageProblem, normalizeCode,
+  uploadPartnerImage, imageProblem, normalizeCode, codeKey,
 } from '../lib/partnerAdmin'
 
 /* Gerir um parceiro (a Rita, da RM Terapias): design-handoff/2026-10-22-
@@ -131,7 +131,7 @@ export default function PartnerManage() {
         </div>
       </div>
 
-      <Tabs value={tab} onChange={setTab} label={partner.name}
+      <Tabs value={tab} onChange={(v) => { setTab(v); setToast('') }} label={partner.name}
         options={[{ value: 'codes', label: t('partneradmin.tab_codes') }, { value: 'profile', label: t('partneradmin.tab_profile') }]} />
 
       {toast && <p role="status" className="rounded-ctrl bg-[#E7F6D5] px-3.5 py-2.5 text-[14px] font-bold text-[#3F6212]">{toast}</p>}
@@ -200,7 +200,8 @@ function ValidateSheet({ partner, vouchers, loc, onClose, onUsed }) {
   useEffect(() => { inputRef.current?.focus() }, [])
 
   const norm = normalizeCode(code)
-  const found = norm.length >= 4 ? vouchers.find((v) => normalizeCode(v.code) === norm) : null
+  const key = codeKey(code)
+  const found = key.length >= 4 ? vouchers.find((v) => codeKey(v.code) === key) : null
   const shortDate = (v) => dayMonth(v, loc)
   const preview = found && found.status === 'por_usar' ? found : null
   const localError = !found ? null
@@ -213,7 +214,8 @@ function ValidateSheet({ partner, vouchers, loc, onClose, onUsed }) {
     setBusy(true)
     setError('')
     try {
-      const r = await partnerRedeemVoucher(norm)
+      // Com o código da lista (com o hífen), a base reconhece-o como quer que se tenha escrito.
+      const r = await partnerRedeemVoucher(found ? found.code : norm)
       onUsed(r?.discount_pct ?? preview?.discount_pct)
     } catch (e) {
       const k = String(e?.message || '')
@@ -237,7 +239,7 @@ function ValidateSheet({ partner, vouchers, loc, onClose, onUsed }) {
         className="mt-3 w-full rounded-ctrl border-[1.5px] border-ink-900 bg-white px-4 py-3 font-mono text-[20px] font-bold tracking-[0.08em] text-ink-900 outline-none" />
 
       {shown && <p className="mt-3 rounded-ctrl bg-[#FDE8E6] px-3.5 py-3 text-[14px] font-bold text-[#B42318]">{shown}</p>}
-      {!shown && norm.length >= 8 && !found && (
+      {!shown && key.length >= 8 && !found && (
         <p className="mt-3 rounded-ctrl bg-[#FDE8E6] px-3.5 py-3 text-[14px] font-bold text-[#B42318]">{t('partneradmin.err_not_found')}</p>
       )}
 

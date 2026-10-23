@@ -72,3 +72,6 @@ export async function uploadPartnerImage(partnerId, file, kind) {
 
 /** «  rm-abc 123 » → «RM-ABC123»: como a base aceita (maiúsculas, sem espaços). */
 export const normalizeCode = (code) => String(code || '').replace(/\s+/g, '').toUpperCase()
+
+/** Para comparar: sem espaços nem hífenes (ao balcão escreve-se «rm q3u5xj» ou «rmq3u5xj»; QA, 23 out). */
+export const codeKey = (code) => String(code || '').replace(/[\s-]+/g, '').toUpperCase()

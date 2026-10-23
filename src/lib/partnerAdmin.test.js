@@ -15,3 +15,11 @@ describe('página de quem gere um parceiro', () => {
     expect(imageProblem(null)).toBe('bad_type')
   })
 })
+
+describe('o código ao balcão', () => {
+  it('compara sem espaços nem hífenes', async () => {
+    const { codeKey } = await import('./partnerAdmin')
+    expect(codeKey('RM Q3U5XJ')).toBe(codeKey('RM-Q3U5XJ'))
+    expect(codeKey('rmq3u5xj')).toBe('RMQ3U5XJ')
+  })
+})
