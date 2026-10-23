@@ -617,20 +617,21 @@ export default function Layout({ children }) {
   // resto. Com cinco partes iguais, «Comunidade» ficava justo (UX, 18 out). Medem-se logo os textos todos
   // (os escondidos também têm largura), para a mudança ser um movimento só;
   // e outra vez quando a letra acaba de carregar.
-  // Deslizar o dedo para o lado muda de separador do menu (Francisco, 21 out).
-  const contentRef = useRef(null)
-  const navigate = useNavigate()
-  useSwipeTabs({
-    mainRef, contentRef, paths: navItems.map((n) => n.path), current: location.pathname,
-    onSwitch: (path, top) => navigate(path, { state: { swipeTop: top } }),
-  })
-
   const labelRefs = useRef({})
   const [pillW, setPillW] = useState({})
   // A pastilha do escolhido é uma só, que desliza de um item para o outro
   // (220 ms, a curva das folhas), para se perceber de onde para onde se foi
   // (UX, 21 out; deslizar entre separadores). Segue a caixa do item ativo.
   const navBoxRef = useRef(null)
+  const pillRef = useRef(null)
+  // Deslizar o dedo para o lado, em cima do menu, muda de separador
+  // (Francisco, 21 out; só no menu, não na página, a 23 out).
+  const contentRef = useRef(null)
+  const navigate = useNavigate()
+  useSwipeTabs({
+    mainRef, contentRef, areaRef: navBoxRef, pillRef, paths: navItems.map((n) => n.path), current: location.pathname,
+    onSwitch: (path, top) => navigate(path, { state: { swipeTop: top } }),
+  })
   const linkRefs = useRef({})
   const [pill, setPill] = useState(null)
   const labelsKey = navItems.map((n) => n.label).join('|')
@@ -916,8 +917,7 @@ export default function Layout({ children }) {
           ocupava só a direita e a coluna ficava descentrada na janela (10 px
           de um lado, 54 do outro — Francisco, 15 out). No telemóvel a barra
           não ocupa espaço e nada muda. */}
-      {/* overscroll-x-none: o deslize para o lado é nosso (useSwipeTabs), não o «voltar» do browser. */}
-      <main ref={mainRef} className="flex-1 overflow-y-auto overscroll-x-none [scrollbar-gutter:stable_both-edges]">
+      <main ref={mainRef} className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
         {/* O espaço reservado no fim tem de crescer com a barra (Trello #407).
             A nav fica a var(--nav-bottom) do fundo (index.css: mais no
             iPhone sem botão) e o pb-28 fixo (7rem) não crescia com ela, por
@@ -949,13 +949,14 @@ export default function Layout({ children }) {
             O escolhido tem a largura do texto; os outros repartem o resto. */}
         <div
           ref={navBoxRef}
-          className="relative pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
+          // touch-none: o dedo para o lado em cima do menu é nosso (deslizar entre separadores).
+          className="relative touch-none pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10"
         >
           {pill && (
-            <span aria-hidden="true"
+            <span ref={pillRef} aria-hidden="true"
               className="absolute top-1 bottom-1 rounded-full bg-white/15 transition-[left,width] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
               style={{ left: pill.left, width: pill.width }} />
           )}

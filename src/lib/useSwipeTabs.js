@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react'
-import { startsAtEdge, lockDirection, neighbour, followOffset, shouldSwitch } from './swipeTabs'
+import { lockDirection, neighbour, followOffset, shouldSwitch } from './swipeTabs'
 
 /* O gesto de deslizar entre os separadores do menu de baixo (plano em
    notas-entre-devs/2026-10-19-deslizar-separadores/PLANO.md). Só nos ecrãs
    do menu (`paths`); nunca muda os separadores de dentro de uma página.
 
-   Não conta (PLANO, «Quando não conta»): nos 24 px de cada borda, quando o
-   dedo começa em algo que já desliza para o lado (filtros, caras, capas,
-   mapas, gráfico), na pílula dos separadores, num campo de escrever, ou com
-   uma folha aberta.
+   Só com o dedo EM CIMA do menu de baixo (`areaRef`), Francisco, 23 out:
+   «Fica só em cima do menu. Não na pág.» Na página não faz nada, por isso
+   já não são precisas as exceções das bordas, dos filtros e das caras. Um
+   toque normal nos ícones continua a ser um toque: só depois de o dedo
+   andar claramente para o lado é que o clique que se segue é engolido.
+   Com uma folha aberta também não conta.
 
    Animação (UX): durante, a página vai com o dedo, mais devagar, até 25%.
    Ao largar, passado o limite, a página de agora sai ~30% para o lado do
@@ -20,23 +22,9 @@ import { startsAtEdge, lockDirection, neighbour, followOffset, shouldSwitch } fr
 const CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)' // a das folhas (useSheetDrag)
 const IN_MS = 220
 const BACK_MS = 160
-// Lista juntada com a versão do Bugs (19 out): o gráfico é role="slider" e os
-// sítios sem papel próprio marcam-se com data-no-tab-swipe.
-const NO_SWIPE = 'input, textarea, select, [contenteditable="true"], [role=tablist], [role="slider"], [data-no-swipe], [data-no-tab-swipe], .leaflet-container, canvas'
 
 function reducedMotion() {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
-}
-
-/** Algum elemento entre o dedo e a página já desliza para o lado? */
-function scrollsSideways(target, stop) {
-  for (let el = target; el && el !== stop; el = el.parentElement) {
-    if (el.scrollWidth > el.clientWidth + 2) {
-      const ox = getComputedStyle(el).overflowX
-      if (ox === 'auto' || ox === 'scroll') return true
-    }
-  }
-  return false
 }
 
 function sheetOpen() {
@@ -44,7 +32,7 @@ function sheetOpen() {
   return !!document.querySelector('[aria-modal="true"], [role="dialog"], .fixed.inset-0.z-50') || document.body.hasAttribute('data-steps')
 }
 
-export function useSwipeTabs({ mainRef, contentRef, paths, current, onSwitch }) {
+export function useSwipeTabs({ mainRef, contentRef, areaRef, pillRef, paths, current, onSwitch }) {
   const tops = useRef(new Map())
   const live = useRef({ paths, current, onSwitch })
   live.current = { paths, current, onSwitch }
@@ -60,8 +48,18 @@ export function useSwipeTabs({ mainRef, contentRef, paths, current, onSwitch }) 
 
   useEffect(() => {
     const main = mainRef.current
-    if (!main) return
+    const area = areaRef.current
+    if (!main || !area) return
     let g = null // o gesto em curso
+    let swallowClick = false // depois de um deslize, o «clique» do fim não abre o ícone
+
+    // A pastilha lima acompanha o dedo (no máximo meio item para cada lado).
+    const setPill = (x, ms) => {
+      const pill = pillRef?.current
+      if (!pill) return
+      pill.style.transition = ms ? `transform ${ms}ms ${CURVE}` : 'none'
+      pill.style.transform = x ? `translate3d(${x}px,0,0)` : ''
+    }
 
     const setX = (x, ms) => {
       const el = contentRef.current
@@ -77,10 +75,9 @@ export function useSwipeTabs({ mainRef, contentRef, paths, current, onSwitch }) 
       const { paths: ps, current: cur } = live.current
       if (e.touches.length !== 1 || !ps.includes(cur)) return
       const t = e.touches[0]
-      const width = main.clientWidth
-      if (startsAtEdge(t.clientX, window.innerWidth)) return
-      if (e.target.closest?.(NO_SWIPE) || scrollsSideways(e.target, main) || sheetOpen()) return
-      g = { x0: t.clientX, y0: t.clientY, dx: 0, dy: 0, dir: null, width }
+      if (sheetOpen()) return
+      swallowClick = false
+      g = { x0: t.clientX, y0: t.clientY, dx: 0, dy: 0, dir: null, width: main.clientWidth, item: area.clientWidth / Math.max(1, ps.length) }
     }
 
     const onMove = (e) => {
@@ -91,10 +88,15 @@ export function useSwipeTabs({ mainRef, contentRef, paths, current, onSwitch }) 
       if (!g.dir) g.dir = lockDirection(g.dx, g.dy)
       if (g.dir === 'v') { g = null; return }
       if (g.dir !== 'h') return
-      e.preventDefault() // o dedo está a ir para o lado: a lista não desce
+      e.preventDefault() // o dedo está a ir para o lado
+      swallowClick = true
       const { paths: ps, current: cur } = live.current
       const next = neighbour(ps, cur, g.dx)
-      if (!reducedMotion()) setX(followOffset(g.dx, g.width, !!next), 0)
+      if (!reducedMotion()) {
+        setX(followOffset(g.dx, g.width, !!next), 0)
+        // O menu anda no sentido do dedo; a página no contrário (puxa-se a seguinte).
+        setPill(next ? -Math.sign(g.dx) * Math.min(Math.abs(g.dx) * 0.5, g.item / 2) : 0, 0)
+      }
     }
 
     const onEnd = () => {
@@ -104,6 +106,7 @@ export function useSwipeTabs({ mainRef, contentRef, paths, current, onSwitch }) 
       const dx = g.dx
       const dy = g.dy
       g = null
+      setPill(0, reducedMotion() ? 0 : BACK_MS)
       if (!shouldSwitch(dx, dy, !!next)) { setX(0, reducedMotion() ? 0 : BACK_MS); return }
 
       const top = tops.current.get(next) ?? 0
@@ -156,15 +159,25 @@ export function useSwipeTabs({ mainRef, contentRef, paths, current, onSwitch }) 
       })
     }
 
-    main.addEventListener('touchstart', onStart, { passive: true })
-    main.addEventListener('touchmove', onMove, { passive: false })
-    main.addEventListener('touchend', onEnd, { passive: true })
-    main.addEventListener('touchcancel', onEnd, { passive: true })
-    return () => {
-      main.removeEventListener('touchstart', onStart)
-      main.removeEventListener('touchmove', onMove)
-      main.removeEventListener('touchend', onEnd)
-      main.removeEventListener('touchcancel', onEnd)
+    // Um deslize não pode virar toque: o clique que vem a seguir é engolido.
+    const onClick = (e) => {
+      if (!swallowClick) return
+      swallowClick = false
+      e.preventDefault()
+      e.stopPropagation()
     }
-  }, [mainRef, contentRef])
+
+    area.addEventListener('touchstart', onStart, { passive: true })
+    area.addEventListener('touchmove', onMove, { passive: false })
+    area.addEventListener('touchend', onEnd, { passive: true })
+    area.addEventListener('touchcancel', onEnd, { passive: true })
+    area.addEventListener('click', onClick, true)
+    return () => {
+      area.removeEventListener('touchstart', onStart)
+      area.removeEventListener('touchmove', onMove)
+      area.removeEventListener('touchend', onEnd)
+      area.removeEventListener('touchcancel', onEnd)
+      area.removeEventListener('click', onClick, true)
+    }
+  }, [mainRef, contentRef, areaRef, pillRef])
 }
