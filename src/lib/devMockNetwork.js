@@ -293,6 +293,23 @@ const RPC_MOCKS = {
     return [{ nationality: 'PT', gender: person.gender, age_category: 'senior' }]
   },
   // localStorage.mockNoH2h = 'true': nunca jogaram um contra o outro (R13).
+  // Parceiros (18 out): a RM Terapias, para a demonstração.
+  // A ficha real da RM (migration_parceiros_2_rm_real.sql, Dev 3, 21 out). Os
+  // prémios só a partir de novembro: antes vêm vazios. mockPartnerPrizes='on'
+  // mostra-os já (como em novembro).
+  get_partner: (params) => (params?.p_slug === 'rm-terapias' ? {
+    id: 'pt-rm', slug: 'rm-terapias', name: 'RM Terapias', kind_label: 'Massagens & Tratamentos', city: 'Almada', district: 'Setúbal',
+    tagline: 'Massagem desportiva e terapias, com a Rita Manique. Para recuperares entre jogos.',
+    address: 'Rua da Alembrança 5A, 2810-006 Feijó (Almada)', hours: '9h às 19h',
+    instagram_url: 'https://www.instagram.com/ritamanique_rmterapias/', website_url: 'https://rmterapias.pt',
+    cover_url: '/parceiros/rm-fachada.webp', logo_url: '/parceiros/rm-logotipo.jpg',
+    phones: ['967 254 460', '969 235 047'], email: 'info@rmterapias.pt',
+    prizes_from: '2026-11-01', prizes_until: null,
+    prizes: localStorage.getItem('mockPartnerPrizes') === 'on'
+      ? [1, 2, 3].map((place) => ({ place, discount_pct: { 1: 15, 2: 10, 3: 5 }[place], description: 'Desconto numa massagem desportiva' }))
+      : [],
+    prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal',
+  } : null),
   get_head_to_head_summary: () => [localStorage.getItem('mockNoH2h') === 'true' ? { wins: 0, losses: 0, matches_played: 0 } : { wins: 2, losses: 1, matches_played: 3 }],
   get_head_to_head_matches: () => (localStorage.getItem('mockNoH2h') === 'true' ? [] : [
     { match_id: 'm1', label: 'Mix de Segunda-feira', match_date: '2026-09-01', player_score: 6, opponent_score: 4, won: true },
@@ -1834,6 +1851,7 @@ const TABLE_MOCKS = {
     { key: 'lessons', enabled: localStorage.getItem('mockLessonsFlag') === 'true' },
     // localStorage.mockFriendInvites = 'true' liga o jogo entre amigos novo (#342).
     { key: 'friend_invites', enabled: localStorage.getItem('mockFriendInvites') === 'true' },
+    { key: 'parceiros', enabled: localStorage.getItem('mockParceiros') === 'true' },
   ],
   // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
   // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).
@@ -2124,6 +2142,14 @@ TABLE_MOCKS.xp_events = () => (localStorage.getItem('mockXpMonth') === 'empty' ?
   ...[['mix_participation', 20], ['mix_games', 20]].map(([kind, amount]) => ({ kind, amount, occurred_at: xpAgo(7), source_game_id: 'xp-g2', source_private_match_id: null, games: { title: 'Mix de terça' } })),
   { kind: 'friendly_match', amount: 10, occurred_at: xpAgo(12), source_game_id: null, source_private_match_id: 'xp-p2', games: null },
 ])
+
+// localStorage.mockPartnerVoucher = 'true' — o voucher da RM Terapias do 3.º do mês (parceiros, 18 out).
+const VOUCHERS_BEFORE = TABLE_MOCKS.vouchers
+TABLE_MOCKS.vouchers = (url) => (localStorage.getItem('mockPartnerVoucher') === 'true' ? [{
+  id: 'v-rm', status: 'por_usar', used_at: null, created_at: new Date().toISOString(), game: null, contact_shared_at: null,
+  partner_id: 'pt-rm', prize_place: 3, prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal', discount_pct: 5,
+  code: 'RM-7K4Q', valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10), partner: { name: 'RM Terapias', slug: 'rm-terapias', logo_url: null },
+}] : (VOUCHERS_BEFORE ? VOUCHERS_BEFORE(url) : []))
 
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)

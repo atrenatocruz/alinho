@@ -56,7 +56,9 @@ export default function Rankings() {
   // Quem chega com state.tab (Perfil → "Ranking global", links antigos)
   // abre no sítio equivalente.
   const initialTab = location.state?.tab
-  const [mode, setMode] = useState(initialTab === 'assiduidade' ? 'xp' : 'ranking')
+  // «do-mes» (o cartão do parceiro na Home, 18 out): abre o «Do mês», já no
+  // distrito do parceiro e em «Todos».
+  const [mode, setMode] = useState(initialTab === 'assiduidade' ? 'xp' : initialTab === 'do-mes' ? 'month' : 'ranking')
   const [scope, setScope] = useState(
     (initialTab === 'geral' || initialTab === 'mensal') && currentOrganizationId ? currentOrganizationId : 'global'
   )

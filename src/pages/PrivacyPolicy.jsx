@@ -12,8 +12,9 @@ import { formatDate } from '../lib/formatDate'
    não muda. */
 
 // A ordem em que as secções aparecem — privacy.section_<key>_title / _body.
+// «partners» (Parceiros e publicidade) entra com os parceiros (BA, 18 out).
 const SECTIONS = [
-  'intro', 'data_collected', 'purpose', 'visibility', 'sharing',
+  'intro', 'data_collected', 'purpose', 'visibility', 'sharing', 'partners',
   'cookies', 'retention', 'rights', 'changes', 'controller', 'contact',
 ]
 const SUMMARY = [1, 2, 3, 4, 5, 6]

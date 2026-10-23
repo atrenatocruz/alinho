@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
    «Ver o QR» a lima. O que o VoucherCard já fazia continua: o convite a
    partilhar o contacto (#556) e «Usar». Os usados ficam por baixo, apagados. */
 export default function VoucherTicket({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel,
-  onMarkUsed, onShowQR, needsConsent = false, shared = false, onAccept, onUnshare }) {
+  onMarkUsed, onShowQR, needsConsent = false, shared = false, onAccept, onUnshare, fromText = null, showLabel = null }) {
   const { t } = useTranslation()
   const used = status === 'usado'
   return (
@@ -18,7 +18,7 @@ export default function VoucherTicket({ prizeText, gameTitle, gameDate, organiza
       <div className="p-3.5">
         <p className="font-display text-2xl font-extrabold leading-tight text-ink-900">{prizeText || gameTitle}</p>
         <p className="mt-1 text-sm text-muted">
-          {t('vouchers.r7_from', { game: gameTitle, date: gameDate })}{!used ? ` ${t('vouchers.r7_show_qr')}` : ''}
+          {fromText || <>{t('vouchers.r7_from', { game: gameTitle, date: gameDate })}{!used ? ` ${t('vouchers.r7_show_qr')}` : ''}</>}
         </p>
         {!used ? (
           <>
@@ -40,7 +40,7 @@ export default function VoucherTicket({ prizeText, gameTitle, gameDate, organiza
             )}
             <button type="button" onClick={onShowQR}
               className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-lime-400 px-4 font-extrabold text-ink-900">
-              {t('vouchers.r7_see_qr')}
+              {showLabel || t('vouchers.r7_see_qr')}
             </button>
             <button type="button" onClick={onMarkUsed}
               className="mt-2 flex min-h-[44px] w-full items-center justify-center text-sm font-extrabold text-ink-700 underline underline-offset-2">

@@ -1,3 +1,4 @@
+import { withMyRef, refInText } from '../../lib/myRef'
 import { MonoLabel } from './TournamentBits'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,8 +33,8 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
 
   const url = tournamentUrl(tournament, typeof window === 'undefined' ? '' : appOrigin())
   const share = () => {
-    const text = shareMessage(tournament, appOrigin())
-    if (navigator.share) { navigator.share({ title: tournament.name, text, url }).catch(() => {}) ; return }
+    const text = refInText(shareMessage(tournament, appOrigin())) // ?ref= (19 out)
+    if (navigator.share) { navigator.share({ title: tournament.name, text, url: withMyRef(url) }).catch(() => {}) ; return }
     window.open(whatsappShare(text), '_blank')
   }
 

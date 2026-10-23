@@ -24,7 +24,7 @@ export { POLICY_VERSION }
    ════════════════════════════════════════════════════════════════════════ */
 export default function ConsentGate() {
   const { t } = useTranslation()
-  const { user, refreshMemberships } = useAuth()
+  const { user, profile, refreshMemberships } = useAuth()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -52,6 +52,8 @@ export default function ConsentGate() {
   // joga há semanas parecia que a conta tinha sido apagada (UX, 11 out). Conta
   // criada há mais de um dia = já existia.
   const existing = user.created_at && Date.now() - new Date(user.created_at).getTime() > 86400000
+  // Já tinha aceitado uma versão antiga: a mudança é a dos parceiros (BA, 18 out).
+  const reaccept = profile?.consent_accepted_at != null
   const linkCls = 'underline font-extrabold text-ink-900'
 
   return (
@@ -60,7 +62,11 @@ export default function ConsentGate() {
         <Wordmark variant="light" className="h-7 mx-auto mb-8" />
         <ShieldCheck size={40} className="mx-auto text-ink-700 mb-4" />
         <h1 className="text-2xl text-ink-900 mb-1.5">{t('consentgate.heading')}</h1>
-        {existing ? (
+        {reaccept ? (
+          <p className="text-muted text-sm mb-7 leading-relaxed">
+            <Trans i18nKey="consentgate.body_partners" components={{ privacy: <Link to="/privacidade" className={linkCls} /> }} />
+          </p>
+        ) : existing ? (
           <p className="text-muted text-sm mb-7 leading-relaxed">
             <Trans i18nKey="consentgate.body_updated" components={{ terms: <Link to="/termos" className={linkCls} />, privacy: <Link to="/privacidade" className={linkCls} /> }} />
           </p>

@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { pendingAccountOrigin, clearAccountOrigin } from '../lib/accountOrigin'
+import { loadMyRef } from '../lib/myRef'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
 import { Browser } from '@capacitor/browser'
@@ -206,6 +208,20 @@ export const AuthProvider = ({ children }) => {
       .catch((error) => console.error('Welcome email not sent:', error))
   }
 
+  // A origem da conta (19 out, Dev 3): entrega-se uma vez, depois da primeira
+  // sessão. A base só grava em contas com menos de 48 h, uma vez, e nunca o
+  // próprio ref (devolve false sem erro): em qualquer resposta sem erro, limpa.
+  // Sem a função (PGRST202), fica guardada para a próxima vez.
+  const deliverAccountOrigin = () => {
+    const pending = pendingAccountOrigin()
+    if (!pending) return
+    supabase.rpc('set_my_account_origin', { p_origin: pending.origin, p_ref_code: pending.ref })
+      .then(({ error }) => {
+        if (!error) clearAccountOrigin()
+        else if (error.code !== 'PGRST202') console.error('Account origin not saved:', error)
+      })
+  }
+
   const loadFeatureFlags = async () => {
     const { data, error } = await supabase.from('feature_flags').select('key, enabled')
     if (error) {
@@ -293,6 +309,8 @@ export const AuthProvider = ({ children }) => {
         // After the language reconciliation above, so a pre-auth EN choice
         // has usually landed by the time the function reads profiles.language.
         sendWelcomeEmail(profileData)
+        deliverAccountOrigin()
+        loadMyRef()
         await loadFeatureFlags()
 
         let { data: membershipData, error: membershipError } = await supabase
