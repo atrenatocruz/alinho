@@ -168,7 +168,7 @@ function PartnerBody() {
             ))}
             <p className="px-3.5 py-3 text-[13px] text-muted">{t('partner.prizes_note')}</p>
           </div>
-          <button type="button" onClick={() => navigate('/rankings', { state: { tab: 'do-mes', scope: `district:${district}` } })}
+          <button type="button" onClick={() => navigate('/rankings', { state: { tab: 'do-mes', scope: `district:${district}`, scale: 'all' } })}
             className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 font-extrabold text-white">
             {t('partner.see_ranking')}
           </button>
