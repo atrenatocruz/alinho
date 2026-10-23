@@ -127,6 +127,43 @@ function subscribe(categoryId, fn) {
   }
 }
 
+/** Várias categorias de uma vez (o «Todas» do Horário, 23 out): cada uma
+ *  continua com a sua leitura partilhada (a mesma do Quadro), e aqui só se
+ *  juntam. Os jogos levam o `category_id` de onde vieram. */
+export function useCategoryBoards(categoryIds = []) {
+  const [, setVersion] = useState(0)
+  const key = categoryIds.join(',')
+  useEffect(() => {
+    const ids = key ? key.split(',') : []
+    const offs = ids.map((id) => subscribe(id, () => setVersion((v) => v + 1)))
+    for (const id of ids) {
+      const st = storeOf(id)
+      if (!st.inflight && (!st.loaded || st.listeners.size === 1)) load(id)
+    }
+    return () => offs.forEach((off) => off())
+  }, [key])
+
+  const parts = categoryIds.map((id) => [id, storeOf(id)])
+  const merged = { groups: [], entries: {}, matches: [] }
+  // Um jogo ou um grupo só entra uma vez, mesmo que venha em duas leituras.
+  const seen = new Set()
+  for (const [id, st] of parts) {
+    const data = st.data || EMPTY
+    for (const g of data.groups) if (!seen.has(`g${g.id}`)) { seen.add(`g${g.id}`); merged.groups.push(g) }
+    Object.assign(merged.entries, data.entries)
+    for (const m of data.matches) {
+      if (seen.has(`m${m.id}`)) continue
+      seen.add(`m${m.id}`)
+      merged.matches.push(m.category_id ? m : { ...m, category_id: id })
+    }
+  }
+  return {
+    ...merged,
+    loading: parts.some(([, st]) => !st.loaded && !st.data),
+    notReady: parts.length > 0 && parts.every(([, st]) => st.notReady),
+  }
+}
+
 export default function useCategoryBoard(categoryId) {
   const [, setVersion] = useState(0)
 
