@@ -459,7 +459,10 @@ function ClubPlayed({ club }) {
         return (
           // R5 (13 out): o cartão do R1, a cinzento por já ter passado.
           <HomeCard key={`${r.kind}-${r.id}`} colors={kindColorsOf(kind)} label={t(KIND_STYLE[kind]?.labelKey || 'agenda.kind_mix')}
-            pill={<BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
+            pill={r.por_terminar
+              // Ficou a meio num dia que já passou (23 out): «Por terminar».
+              ? <span className="whitespace-nowrap rounded-full bg-[#B86E00] px-[9px] py-1 font-display text-[11px] font-bold normal-case leading-none tracking-normal text-white">{t('pastevents.unfinished')}</span>
+              : <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
             time={r.kind === 'tournament' ? shortDay(r.date, i18n.language) : timeOf(r.date)} past to={to} ariaLabel={title}>
             <div className="flex items-baseline justify-between gap-2">
               <CardTitle past>{title}</CardTitle>

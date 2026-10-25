@@ -8,7 +8,7 @@ import {
   courtHours, availableCourtHours, formatOptions, recommendFormat, groupsWords,
   pickSeeds, drawGroups, groupRoundRobin, groupStandings, headToHeadWins,
   bestOfPosition, buildFirstRound, noSameGroupClash, seededRandom,
-  TIEBREAK_DEFAULT, TIEBREAK_BETWEEN_GROUPS, diffAmong,
+  TIEBREAK_DEFAULT, TIEBREAK_BETWEEN_GROUPS, diffAmong, tiebreakOrder,
 } from './tournamentFormat'
 
 const teams = (n, points = null) => Array.from({ length: n }, (_, i) => ({
@@ -265,7 +265,7 @@ describe('classificação do grupo', () => {
     expect(tabela.map((r) => r.id).slice(0, 2)).toEqual(['t2', 't1'])
   })
 
-  it('empate a três: o confronto direto conta só entre as empatadas', () => {
+  it('empate a três: entre elas tudo igual, decide a diferença de jogos no grupo (23 out)', () => {
     // t1, t2 e t3 com 2V cada (ciclo), t4 sem vitórias.
     const ciclo = [
       { a: 't1', b: 't2', scoreA: 9, scoreB: 7 },
@@ -276,11 +276,13 @@ describe('classificação do grupo', () => {
       { a: 't3', b: 't4', scoreA: 9, scoreB: 6 },
     ]
     const tabela = groupStandings(['t1', 't2', 't3', 't4'], ciclo)
-    // Entre elas está 1V-1V-1V e tudo igual nos jogos entre elas (os jogos
-    // contra o t4 não contam, #592): é sorteio, fica a ordem de entrada.
+    // Entre elas está 1V-1V-1V e tudo igual nos jogos entre elas. Os sets no
+    // grupo também (2-1 cada). Decide a diferença de jogos no grupo (passo
+    // 5): t1 +9, t2 +6, t3 +3.
     expect(tabela.map((r) => r.id)).toEqual(['t1', 't2', 't3', 't4'])
-    expect(tabela[0].tiedWith).toEqual(['t2', 't3'])
-    expect(tabela[3].id).toBe('t4')
+    expect(tabela.some((r) => r.tiedWith)).toBe(false)
+    expect(tabela[0]).toMatchObject({ decidedBy: 'diferenca_jogos', decidedAmong: 3 })
+    expect(tabela[3].decidedBy).toBeUndefined()
     // E o confronto direto entre as três é mesmo 1 vitória para cada.
     expect(headToHeadWins('t1', ['t1', 't2', 't3'], ciclo)).toBe(1)
     expect(headToHeadWins('t4', ['t1', 't2', 't3'], ciclo)).toBe(0)
@@ -366,20 +368,23 @@ describe('desempates como a FPP (#592, RG 2026 10.10)', () => {
     expect(groupStandings(['A', 'B', 'C', 'D'], jogos).map((r) => r.id)).toEqual(['B', 'A', 'C', 'D'])
   })
 
-  it('a sets: primeiro a diferença de sets entre elas; sem os jogos de cada set, o resto é sorteio', () => {
+  it('a sets: primeiro a diferença de sets entre elas; depois a do grupo', () => {
     const jogos = [
       { a: 'A', b: 'B', scoreA: 2, scoreB: 0 }, { a: 'B', b: 'C', scoreA: 2, scoreB: 1 }, { a: 'C', b: 'A', scoreA: 2, scoreB: 1 },
       { a: 'A', b: 'D', scoreA: 2, scoreB: 0 }, { a: 'B', b: 'D', scoreA: 2, scoreB: 0 }, { a: 'C', b: 'D', scoreA: 2, scoreB: 0 },
     ]
     // Sets entre elas: A 2-0 e 1-2 → +1; B 0-2 e 2-1 → -1; C 1-2 e 2-1 → 0.
     expect(groupStandings(['A', 'B', 'C', 'D'], jogos).map((r) => r.id)).toEqual(['A', 'C', 'B', 'D'])
-    // Tudo 2-1 entre elas: sets iguais, jogos desconhecidos → sorteio.
+    // Tudo 2-1 entre elas: decide a diferença de sets no grupo (A +2, B +1,
+    // C +2), e A e C voltam ao jogo entre as duas (o C ganhou).
     const iguais = [
       { a: 'A', b: 'B', scoreA: 2, scoreB: 1 }, { a: 'B', b: 'C', scoreA: 2, scoreB: 1 }, { a: 'C', b: 'A', scoreA: 2, scoreB: 1 },
       { a: 'A', b: 'D', scoreA: 2, scoreB: 0 }, { a: 'B', b: 'D', scoreA: 2, scoreB: 1 }, { a: 'C', b: 'D', scoreA: 2, scoreB: 0 },
     ]
     const t = groupStandings(['A', 'B', 'C', 'D'], iguais)
-    expect(t.slice(0, 3).every((r) => r.tiedWith?.length === 2)).toBe(true)
+    expect(t.map((r) => r.id)).toEqual(['C', 'A', 'B', 'D'])
+    expect(t[0]).toMatchObject({ decidedBy: 'vitorias_entre', decidedAmong: 2 })
+    expect(t[2]).toMatchObject({ decidedBy: 'diferenca_sets', decidedAmong: 3 })
   })
 
   it('entre duas, o confronto direto — mesmo com pior diferença geral', () => {
@@ -392,7 +397,7 @@ describe('desempates como a FPP (#592, RG 2026 10.10)', () => {
     expect(groupStandings(['A', 'B', 'C', 'D'], jogos).map((r) => r.id).slice(0, 2)).toEqual(['B', 'A'])
   })
 
-  it('de quatro empatadas separam-se duas; as duas que ficam voltam ao confronto direto (10.10.2)', () => {
+  it('de quatro empatadas separam-se duas; as duas que ficam recomeçam, e decidem os jogos ganhos', () => {
     // Todas com 1 vitória: A>B, B>C, C>D, D>A. Entre as quatro, sets 1-1
     // para todas.
     const jogos = [
@@ -402,11 +407,12 @@ describe('desempates como a FPP (#592, RG 2026 10.10)', () => {
       { a: 'D', b: 'A', scoreA: 9, scoreB: 7 }, // D +2
     ]
     // Jogos entre as quatro: A +4-2 = +2; B -4+4 = 0; C -4+2 = -2; D -2+2 = 0.
-    // B e D empatados a 0 → entre duas, confronto direto: não jogaram → sorteio.
+    // B e D empatados a 0 → entre as duas não jogaram; no grupo, sets e
+    // diferença iguais; jogos ganhos: D 16, B 14.
     const t = groupStandings(['A', 'B', 'C', 'D'], jogos)
-    expect(t.map((r) => r.id)).toEqual(['A', 'B', 'D', 'C'])
-    expect(t[1].tiedWith).toEqual(['D'])
-    expect(t[0].tiedWith).toBeUndefined()
+    expect(t.map((r) => r.id)).toEqual(['A', 'D', 'B', 'C'])
+    expect(t[1]).toMatchObject({ decidedBy: 'jogos_ganhos', decidedAmong: 2 })
+    expect(t.some((r) => r.tiedWith)).toBe(false)
   })
 
   it('quem faltou fica em último entre as empatadas, e a falta conta 6-0 6-0 para as outras', () => {
@@ -423,12 +429,41 @@ describe('desempates como a FPP (#592, RG 2026 10.10)', () => {
     expect(t.map((r) => r.id)).toEqual(['C', 'B', 'A', 'D'])
     expect(t.find((r) => r.id === 'A')).toMatchObject({ forfeits: 1 })
     // A falta vale 2 sets e 12 jogos para o B, também no pro set.
-    expect(diffAmong('B', ['A', 'B'], jogos)).toEqual({ sets: 2, games: 12 })
+    expect(diffAmong('B', ['A', 'B'], jogos)).toEqual({ sets: 2, games: 12, gamesWon: 12 })
   })
 
-  it('os melhores terceiros comparam-se pelo que fizeram no grupo', () => {
-    expect(TIEBREAK_BETWEEN_GROUPS).toEqual(['vitorias', 'faltas', 'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos'])
-    expect(TIEBREAK_DEFAULT).toEqual(['vitorias', 'faltas', 'confronto_direto', 'diferenca_sets_entre', 'diferenca_jogos_entre'])
+  it('a ordem de 23 out; os melhores terceiros sem o passo 3', () => {
+    expect(TIEBREAK_DEFAULT).toEqual([
+      'vitorias', 'faltas',
+      'vitorias_entre', 'diferenca_sets_entre', 'diferenca_jogos_entre', 'jogos_ganhos_entre',
+      'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos', 'ranking',
+    ])
+    expect(TIEBREAK_BETWEEN_GROUPS).toEqual(['vitorias', 'faltas', 'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos', 'ranking'])
+  })
+
+  // Duas duplas iguais em tudo e sem jogo entre elas (o caso que antes ia a
+  // sorteio): decide o ranking guardado no sorteio (passo 7).
+  const gemeas = [
+    { a: 'A', b: 'C', scoreA: 9, scoreB: 5 }, { a: 'B', b: 'C', scoreA: 9, scoreB: 5 },
+    { a: 'A', b: 'D', scoreA: 9, scoreB: 5 }, { a: 'B', b: 'D', scoreA: 9, scoreB: 5 },
+  ]
+  it('passo 7: iguais em tudo, decide o ranking da dupla no sorteio', () => {
+    const t = groupStandings(['A', 'B', 'C', 'D'], gemeas, { ratings: { A: 1275, B: 1312, C: 1000, D: 1000 } })
+    expect(t.map((r) => r.id).slice(0, 2)).toEqual(['B', 'A'])
+    expect(t[0]).toMatchObject({ decidedBy: 'ranking', decidedAmong: 2, rating: 1312 })
+  })
+  it('sem ranking guardado, fica empatado: escolhe o organizador (tiedWith)', () => {
+    const t = groupStandings(['A', 'B', 'C', 'D'], gemeas)
+    expect(t[0].tiedWith).toEqual(['B'])
+    expect(t[0].decidedBy).toBeUndefined()
+  })
+  it('quem não tem ranking guardado fica atrás de quem o tem', () => {
+    const t = groupStandings(['A', 'B', 'C', 'D'], gemeas, { ratings: { A: null, B: 900 } })
+    expect(t[0].id).toBe('B')
+  })
+  it('sem empates não há etiquetas', () => {
+    const t = groupStandings(['A', 'B'], [{ a: 'A', b: 'B', scoreA: 9, scoreB: 3 }])
+    expect(t.every((r) => r.decidedBy === undefined)).toBe(true)
   })
 })
 
@@ -523,5 +558,40 @@ describe('groupsWords — o rótulo de cada opção de formato (#540)', () => {
   it('em inglês também', () => {
     expect(label(10, { max: 4 }, 'en')).toContain('3 groups: 4, 3, and 3 → top 1 goes through')
     expect(label(12, {}, 'en')).toContain('3 groups of 4 → top 2 go through')
+  })
+})
+
+describe('passo 8: o desempate jogado no campo (23 out)', () => {
+  const gemeas = [
+    { a: 'A', b: 'C', scoreA: 9, scoreB: 5 }, { a: 'B', b: 'C', scoreA: 9, scoreB: 5 },
+    { a: 'A', b: 'D', scoreA: 9, scoreB: 5 }, { a: 'B', b: 'D', scoreA: 9, scoreB: 5 },
+  ]
+  it('duas duplas: o desempate gravado decide, com o resultado para a etiqueta', () => {
+    const tiebreaks = [{ entry_ids: ['B', 'A'], ranking: ['B', 'A'], form: 'super_tiebreak_10', decided_by: 'desempate',
+      results: [{ a: 'A', b: 'B', score_a: 8, score_b: 10 }] }]
+    const t = groupStandings(['A', 'B', 'C', 'D'], gemeas, { tiebreaks })
+    expect(t.map((r) => r.id).slice(0, 2)).toEqual(['B', 'A'])
+    expect(t[0]).toMatchObject({ decidedBy: 'desempate', tiebreakForm: 'super_tiebreak_10', tiebreakScore: '10-8' })
+    expect(t[0].tiedWith).toBeUndefined()
+  })
+  it('a escolha do organizador também fica gravada', () => {
+    const tiebreaks = [{ entry_ids: ['A', 'B'], ranking: ['A', 'B'], form: 'organizador', decided_by: 'organizador', results: null }]
+    const t = groupStandings(['A', 'B', 'C', 'D'], gemeas, { tiebreaks })
+    expect(t[0]).toMatchObject({ id: 'A', decidedBy: 'organizador', tiebreakScore: null })
+  })
+  it('um desempate de outras duplas não serve', () => {
+    const tiebreaks = [{ entry_ids: ['A', 'C'], ranking: ['C', 'A'], form: 'tiebreak_7', decided_by: 'desempate' }]
+    expect(groupStandings(['A', 'B', 'C', 'D'], gemeas, { tiebreaks })[0].tiedWith).toEqual(['B'])
+  })
+  it('três ou mais: vitórias e depois diferença de pontos; o que ficar igual vai ao organizador', () => {
+    const r = tiebreakOrder(['A', 'B', 'C'], [
+      { a: 'A', b: 'B', score_a: 10, score_b: 8 }, { a: 'B', b: 'C', score_a: 10, score_b: 4 }, { a: 'C', b: 'A', score_a: 10, score_b: 5 },
+    ])
+    // Uma vitória cada: diferença A +2-5 = -3, B -2+6 = +4, C -6+5 = -1.
+    expect(r).toEqual({ ranking: ['B', 'C', 'A'], tied: [] })
+    const roda = tiebreakOrder(['A', 'B', 'C'], [
+      { a: 'A', b: 'B', score_a: 10, score_b: 8 }, { a: 'B', b: 'C', score_a: 10, score_b: 8 }, { a: 'C', b: 'A', score_a: 10, score_b: 8 },
+    ])
+    expect(roda.tied).toEqual([['A', 'B', 'C']])
   })
 })
