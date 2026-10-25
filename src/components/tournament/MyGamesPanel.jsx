@@ -22,7 +22,8 @@ import { PanelSkeleton } from './TournamentSkeleton'
 
 /** Sáb 10:00 — dia curto + hora, em mono, como no desenho. */
 function When({ date, time, locale }) {
-  if (!date) return <b className="font-mono text-xs font-bold text-ink-500">—</b>
+  const { t } = useTranslation()
+  if (!date) return <b className="text-xs font-bold text-[#6B7280]">{t('ui.empty_to_schedule')}</b>
   const d = new Date(`${date}T${time || '00:00'}`)
   const day = d.toLocaleDateString(locale, { weekday: 'short' }).replace('.', '')
   return (

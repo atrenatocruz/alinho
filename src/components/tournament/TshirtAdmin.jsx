@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Sheet } from '../agenda/AgendaControls'
 import { Tabs } from '../ui'
 import { adminSetTshirtSize, getTshirtCounts, getTshirtPeople } from '../../lib/tournamentApi'
-import { NO_TSHIRT, TshirtPicker, sizeMark, sizesOf, tshirtOf, tshirtOn, shirtRulesOf } from './tshirt'
+import { NO_TSHIRT, TshirtPicker, SizeMark, sizesOf, tshirtOf, tshirtOn, shirtRulesOf } from './tshirt'
 import { PanelSkeleton } from './TournamentSkeleton'
 
 const euros = (cents, locale) => (Number(cents || 0) / 100).toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -126,7 +126,7 @@ function TshirtPeopleSheet({ tournament, counts, onClose, onChanged }) {
                     <span className="min-w-0 flex-1 text-sm text-ink-900">
                       {p.name}{p.codes.length ? <span className="text-muted"> · {p.codes.join(' · ')}</span> : null}
                     </span>
-                    <b className="font-mono text-sm text-ink-900">{sizeMark(p.size)}</b>
+                    <b className="font-mono text-sm text-ink-900"><SizeMark size={p.size} /></b>
                     <ChevronRight size={16} className="shrink-0 text-muted" />
                   </button>
                 ))}
@@ -163,7 +163,7 @@ export function PairShirts({ entry }) {
     .filter((m) => m !== undefined)
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-ink-50 px-2 py-0.5 font-mono text-[11px] font-bold text-ink-700">
-      <span aria-hidden="true">👕</span>{marks.map(sizeMark).join(' · ')}
+      <span aria-hidden="true">👕</span>{marks.map((m, i) => <span key={i}>{i > 0 && ' · '}<SizeMark size={m} /></span>)}
     </span>
   )
 }

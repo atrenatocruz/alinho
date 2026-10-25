@@ -27,6 +27,7 @@ import {
   BarChart3, ArrowUpDown, Users, UsersRound, Link, UserPlus, MessageCircle,
   Smartphone, Flag, ListOrdered, Layers, GraduationCap, BookOpen, Gift,
   Scale, Hash, Compass, Crosshair, Anchor, Egg, Dumbbell, Plane, Bell,
+  Car, RotateCw, DoorOpen,
 } from 'lucide-react'
 
 const ICONS = {
@@ -131,6 +132,10 @@ const ICONS = {
   recrutador: UserPlus,
   premio_levantado: Gift,
   cartao_completo: Award,
+  // As três da estrada (21 out).
+  deste_boleia: Car,
+  primeira_rotunda: RotateCw,
+  ate_a_porta: DoorOpen,
 }
 
 // Troféus de evento (ou futuros) sem ícone dedicado caem aqui.

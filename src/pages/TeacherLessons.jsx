@@ -15,6 +15,7 @@ import { compactTime } from '../lib/teacherSchedule'
 import { describeError, errorKind } from '../lib/errors'
 import { ConfirmSheet, EmptyState, Tabs } from '../components/ui'
 import { LevelPill, bandLabel } from '../components/lessons/LessonBits'
+import { SkeletonGate, SkWhiteCard } from '../components/Skeleton'
 
 /* ─── «As minhas aulas» do professor (Trello #392, assunto 2) ─────────────
    Desenho aprovado pelo Francisco a 26 set (design-handoff/2026-09-26-
@@ -230,7 +231,8 @@ export default function TeacherLessons() {
       ]} />
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+        // As aulas a cinzento, em cartões brancos (esqueletos, 12 out).
+        <SkeletonGate><div className="space-y-3"><SkWhiteCard /><SkWhiteCard /><SkWhiteCard /></div></SkeletonGate>
       ) : tab === 'requests' ? (
         pending.length === 0
           ? <EmptyState icon={GraduationCap} title={t('myLessons.no_requests_title')} subtitle={t('myLessons.no_requests_text')} />

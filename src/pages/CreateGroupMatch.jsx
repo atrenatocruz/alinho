@@ -7,6 +7,7 @@ import { useParams } from 'react-router-dom'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
 import { getClubProfile } from '../lib/clubProfile'
 import CreateFriendMatch from './CreateFriendMatch'
+import StepSkeleton from '../components/steps/StepSkeleton'
 import CreateGroupMatchSlots from './CreateGroupMatchSlots'
 
 export default function CreateGroupMatch() {
@@ -18,7 +19,7 @@ export default function CreateGroupMatch() {
     getClubProfile(slug).then(setOrg).catch((err) => console.error('Error loading club profile:', err))
   }, [on, slug])
   if (loading || (on && !org)) {
-    return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return <StepSkeleton fallback="/gerir" />
   }
   return on ? <CreateFriendMatch group={{ id: org.id, slug, name: org.name, kind: org.kind }} /> : <CreateGroupMatchSlots />
 }

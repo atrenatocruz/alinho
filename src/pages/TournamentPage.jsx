@@ -1,3 +1,4 @@
+import { withMyRef, refInText } from '../lib/myRef'
 // Página do torneio (Trello #361, «Torneio 1/6») — print 05 do desenho
 // aprovado (design-handoff/2026-09-19-torneios). É o ESQUELETO onde os
 // outros ecrãs se penduram: topo em cartão grande (mesma regra dos mixes),
@@ -211,8 +212,8 @@ export default function TournamentPage() {
   const shareTournament = () => {
     const tour = data?.tournament
     if (!tour) return
-    const text = shareMessage(tour, appOrigin())
-    if (navigator.share) { navigator.share({ title: tour.name, text, url: tournamentUrl(tour, appOrigin()) }).catch(() => {}); return }
+    const text = refInText(shareMessage(tour, appOrigin())) // ?ref= (19 out)
+    if (navigator.share) { navigator.share({ title: tour.name, text, url: withMyRef(tournamentUrl(tour, appOrigin())) }).catch(() => {}); return }
     window.open(whatsappShare(text), '_blank')
   }
   const showSkeleton = useSkeleton(!data && !failed)
@@ -561,7 +562,9 @@ export default function TournamentPage() {
           descer (Francisco, 11 out, para experimentar — StickyBar). */}
       <div id="tournament-tabs" className="scroll-mt-20" />
       <StickyTabs resetKey={`${category?.id || ''}:${tab}`} pullKey={pullKey} shadow={tab !== 'schedule'} belowBackBar={false} glass>
-      {categories.length > 0 && (
+      {/* No Horário com várias categorias, a escolha é a linha de pastilhas
+          «Todas · M4 · F5…» dentro do painel (UX, 22 out). */}
+      {categories.length > 0 && !(tab === 'schedule' && categories.length > 1) && (
         <CategorySelect
           categories={categories}
           mineId={activeMy(data)?.category_id}

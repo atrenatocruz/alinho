@@ -15,6 +15,7 @@ import { formatDate } from '../lib/formatDate'
 import { Avatar, ConfirmSheet, EmptyState } from '../components/ui'
 import { StateTag } from '../components/agenda/EventCard'
 import { LevelPill, MonoLabel, TEAL, TealTag, bandLabel, euros, hhmm, lessonTypeLabel, levelRange } from '../components/lessons/LessonBits'
+import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
 
 const pad = (n) => String(n).padStart(2, '0')
 const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -50,7 +51,8 @@ export default function LessonPage() {
     return <div className="space-y-5">{back}<EmptyState icon={GraduationCap} title={t('lessons.lesson_not_found_title')} subtitle={t('lessons.lesson_not_found_subtitle')} /></div>
   }
   if (!data) {
-    return <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+    // A forma da página em vez da roda (esqueletos, 12 out).
+    return <SkeletonGate frame={back}><div className="mt-4"><div className="space-y-3"><SkLine size="title" w="55%" /><SkWhiteCard /><SkWhiteCard /></div></div></SkeletonGate>
   }
 
   const l = data.lesson

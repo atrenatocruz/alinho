@@ -60,7 +60,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
   useEffect(() => { if (rows) onUnusedChange?.(totals.unused) }, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
   const mixes = useMemo(() => {
     const seen = new Map()
-    for (const v of list) if (v.game_id && !seen.has(v.game_id)) seen.set(v.game_id, `${v.game_title || '—'} · ${day(v.game_date)}`)
+    for (const v of list) if (v.game_id && !seen.has(v.game_id)) seen.set(v.game_id, `${v.game_title || t('ui.empty_unnamed_mix')} · ${day(v.game_date)}`)
     return [...seen.entries()].map(([value, label]) => ({ value, label }))
   }, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
   const shown = list
@@ -73,7 +73,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
   const byDay = useMemo(() => {
     const groups = new Map()
     for (const v of [...shown].sort(newestFirst)) {
-      const key = v.game_id || v.game_date || '—'
+      const key = v.game_id || v.game_date || 'sem-dia'
       if (!groups.has(key)) {
         groups.set(key, { key, label: [day(v.game_date), v.game_title].filter(Boolean).join(' · '), items: [] })
       }
@@ -118,7 +118,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
       <div className={`card space-y-2 ${inSheet && used ? 'opacity-60' : ''}`}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate font-extrabold text-ink-900">{inSheet ? (v.game_title || '—') : (v.player_name || '—')}</p>
+            <p className="truncate font-extrabold text-ink-900">{inSheet ? (v.game_title || t('ui.empty_unnamed_mix')) : (v.player_name || t('ui.empty_no_name'))}</p>
             <p className="truncate text-xs text-muted">
               {(inSheet ? [day(v.game_date), v.prize] : [v.game_title, day(v.game_date)]).filter(Boolean).join(' · ')}
             </p>
@@ -205,7 +205,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
                   className="card flex w-full items-center gap-3 text-left">
                   <Avatar name={p.name} size="w-10 h-10 text-sm" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-extrabold text-ink-900">{p.name || '—'}</span>
+                    <span className="block truncate font-extrabold text-ink-900">{p.name || t('ui.empty_no_name')}</span>
                     <span className="block truncate text-xs text-muted">{p.contact || t('vouchers.no_contact')}</span>
                   </span>
                   <span className={`shrink-0 text-sm font-extrabold ${p.unused ? 'text-ink-900' : 'text-muted'}`}>
@@ -226,7 +226,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
             className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-[24px] bg-white px-5 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-lift sm:rounded-[24px]"
             onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-ink-200" />
-            <p id="voucher-person-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{openPerson.name || '—'}</p>
+            <p id="voucher-person-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{openPerson.name || t('ui.empty_no_name')}</p>
             <p className="mt-1 text-sm text-muted">
               {openPerson.contact
                 ? [openPerson.contact, openPerson.sharedAt && t('vouchers.shared_on', { date: shortDay(openPerson.sharedAt) })].filter(Boolean).join(' · ')
@@ -242,7 +242,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
 
       <ConfirmSheet
         open={!!ask}
-        title={ask ? t('vouchers.redeem_title', { name: ask.player_name || '—' }) : ''}
+        title={ask ? t('vouchers.redeem_title', { name: ask.player_name || t('ui.empty_no_name') }) : ''}
         message={ask ? `${[ask.game_title, day(ask.game_date), ask.prize].filter(Boolean).join(' · ')}. ${t('vouchers.redeem_body')}` : ''}
         confirmLabel={t('vouchers.redeem')}
         cancelLabel={t('common.back')}
@@ -251,7 +251,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
           const v = ask
           await redeemVoucher(v.voucher_id)
           setRows((prev) => prev.map((x) => (x.voucher_id === v.voucher_id ? { ...x, status: 'usado', used_at: new Date().toISOString() } : x)))
-          setToast(t('vouchers.redeemed', { name: v.player_name || '—' }))
+          setToast(t('vouchers.redeemed', { name: v.player_name || t('ui.empty_no_name') }))
         }}
         onClose={() => setAsk(null)}
       />

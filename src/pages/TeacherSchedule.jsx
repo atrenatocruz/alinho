@@ -11,6 +11,7 @@ import {
 import { describeError } from '../lib/errors'
 import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import { Prices } from '../components/lessons/ClubLessonsPanel'
+import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
 
 /* ─── «O meu horário» (Trello #418) ───────────────────────────────────────
    Pedido de um professor real (Diogo Gonçalves, A2N, 25 set 2026): depois
@@ -137,11 +138,8 @@ export default function TeacherSchedule() {
   const back = <BackBar onBack={() => (adminTp ? navigate(-1) : navigate('/perfil'))} label={adminTp ? t('teacher.schedule_admin_back') : t('teacher.schedule_back')} title={heading} />
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-      </div>
-    )
+    // A forma da página em vez da roda (esqueletos, 12 out).
+    return <SkeletonGate frame={back}><div className="mt-4"><div className="space-y-3"><SkLine size="title" w="55%" /><SkWhiteCard /><SkWhiteCard /></div></div></SkeletonGate>
   }
 
   // Só quem já foi aprovado chega aqui pelo Perfil; um link direto antes
@@ -168,7 +166,7 @@ export default function TeacherSchedule() {
         </div>
       ) : (
         <>
-          <b className="font-extrabold text-ink-900 break-words min-w-0">{value || '—'}</b>
+          <b className="font-extrabold text-ink-900 break-words min-w-0">{value || t('ui.empty_not_given')}</b>
           <button type="button" onClick={() => setEditing(key)} className="font-extrabold text-ink-900 hover:underline">
             {t('teacher.schedule_change')}
           </button>

@@ -52,9 +52,9 @@ export function setSiteLanguage(lang) {
   }
 }
 
-// A Ajuda do site vive, por agora, nas Instruções (/instrucoes); a Ajuda nova
-// em /ajuda vem a seguir (#658) e muda só aqui.
-export const HELP_PATH = '/instrucoes'
+// A Ajuda vive em /ajuda (o /instrucoes leva lá): sem sessão, a página do
+// site; com sessão, dentro da app.
+export const HELP_PATH = '/ajuda'
 const LINKS = [
   { to: '/como-funciona', key: 'hiw.nav_link', paths: ['/como-funciona'] },
   { to: '/planos', key: 'landing.pricing_nav_link', paths: ['/planos'] },
@@ -63,6 +63,9 @@ const LINKS = [
 const FOOTER_LINKS = [
   ...LINKS,
   { to: '/novidades', key: 'nov.footer_link', paths: ['/novidades'] },
+  // «Parceiros» leva ao separador Parceiros dos Planos, para quem quer ser
+  // parceiro (SPEC dos Planos, 18 out; PO, 19 out).
+  { to: '/planos#parceiros', key: 'partners.footer_link', paths: [] },
   { to: '/privacidade', key: 'landing.privacy_link', paths: ['/privacidade'] },
   { to: '/termos', key: 'landing.terms_link', paths: ['/termos'] },
 ]
@@ -77,6 +80,15 @@ const toTop = (pathname, to) => () => { if (pathname === to) window.scrollTo(0, 
 export function SiteHeader({ sticky = true }) {
   const { t } = useTranslation()
   const ref = useRef(null)
+  // Preso: diz a sua altura em --site-head, para as barras presas da página
+  // (os separadores dos Planos, o índice da Ajuda) ficarem logo por baixo.
+  useEffect(() => {
+    if (!sticky || !ref.current) return undefined
+    const root = document.documentElement
+    const ro = new ResizeObserver(() => root.style.setProperty('--site-head', `${ref.current?.offsetHeight || 0}px`))
+    ro.observe(ref.current)
+    return () => { ro.disconnect(); root.style.removeProperty('--site-head') }
+  }, [sticky])
   useEffect(() => {
     if (sticky) return undefined
     const root = document.documentElement

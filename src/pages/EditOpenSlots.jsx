@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { loadOpenSlotBatch } from '../lib/openSlotsApi'
 import { describeError } from '../lib/errors'
 import { EmptyState, LoadErrorState } from '../components/ui'
+import StepSkeleton from '../components/steps/StepSkeleton'
 import CreateOpenSlots from './CreateOpenSlots'
 
 export default function EditOpenSlots() {
@@ -23,7 +24,7 @@ export default function EditOpenSlots() {
 
   if (error) return <LoadErrorState title={error} />
   if (!games) {
-    return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return <StepSkeleton fallback="/gerir" />
   }
   if (!games.some((g) => !['cancelled', 'finished', 'completed'].includes(g.status))) {
     return <EmptyState title={t('open_slots.edit_nothing')} />

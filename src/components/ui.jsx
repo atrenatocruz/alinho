@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { withMyRef, refInText } from '../lib/myRef'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -18,6 +19,7 @@ import { frameInsideBox, frameSrc } from '../lib/frames'
 import { useDragScroll } from '../lib/useDragScroll'
 import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
 import TimeInput from './TimeInput'
+import { SkeletonGate, SkCircle, SkLine } from './Skeleton'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -661,7 +663,9 @@ export function PickerInput({ type = 'date', value, hint, className = '', ...pro
 /** Separador — muda o que o ecrã mostra. 2 ou 3 opções, só texto.
  *  `options`: [{ value, label, badge? }]. `badge` é um número pequeno ao
  *  lado do texto (ex.: pedidos por responder); não é um ícone. */
-export function Tabs({ options, value, onChange, label, className = '' }) {
+// `small`: o separador pequeno, à direita por baixo de outra coisa (o «Lista ·
+// Grelha» do Horário, UX 22 out). A mesma pílula, mais baixa.
+export function Tabs({ options, value, onChange, label, className = '', small = false }) {
   if (import.meta.env?.DEV && options.length > 3) {
     // Com mais de 3 não é separador: a página tem de ser repensada (SPEC).
     console.warn('[Tabs] mais de 3 separadores — a regra é 2 ou 3:', options.map((o) => o.label))
@@ -701,13 +705,13 @@ export function Tabs({ options, value, onChange, label, className = '' }) {
     return () => ro?.disconnect()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labels])
-  const size = ['px-2 text-[15px]', 'px-1 text-[13px]', 'px-0.5 text-[12px]'][level]
+  const size = small ? 'min-h-[32px] px-1 text-[12.5px]' : `min-h-[44px] ${['px-2 text-[15px]', 'px-1 text-[13px]', 'px-0.5 text-[12px]'][level]}`
   return (
     <div
       ref={ref}
       role="tablist"
       aria-label={label}
-      className={`grid gap-1 rounded-full bg-[#E7E9ED] p-1 ${className}`}
+      className={`grid rounded-full bg-[#E7E9ED] ${small ? 'gap-0.5 p-[3px]' : 'gap-1 p-1'} ${className}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       {options.map((o) => {
@@ -719,7 +723,7 @@ export function Tabs({ options, value, onChange, label, className = '' }) {
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
-            className={`flex min-h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-full ${size} leading-tight transition-colors duration-fast ${
+            className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full ${size} leading-tight transition-colors duration-fast ${
               on
                 ? 'bg-white font-extrabold text-[#040404] shadow-[0_1px_2px_rgba(0,0,0,0.10),0_2px_6px_rgba(0,0,0,0.08)]'
                 : 'font-bold text-[#4B5563] hover:text-[#040404]'
@@ -1660,9 +1664,17 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
 
         <div className="overflow-y-auto">
           {rows === null ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-            </div>
+            // As linhas a cinzento em vez da roda (esqueletos, 12 out).
+            <SkeletonGate>
+              <div className="divide-y divide-line">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <SkCircle size={40} />
+                    <span className="min-w-0 flex-1"><SkLine size="text" w={`${[55, 42, 62, 48, 38][i]}%`} /></span>
+                  </div>
+                ))}
+              </div>
+            </SkeletonGate>
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted text-center py-10">{emptyText}</p>
           ) : (
@@ -1969,10 +1981,12 @@ export function LoadErrorState({ title, subtitle, onRetry }) {
 /* ─── ShareModal ─────────────────────────────────────────────────────────
    Share sheet used for mixes: editable caption + link, WhatsApp + native
    share (when the device supports it) + copy-link fallback. */
-export function ShareModal({ title, message, url, onClose, imageCard }) {
+export function ShareModal({ title, message, url: rawUrl, onClose, imageCard }) {
   const { t } = useTranslation()
+  // O ?ref= de quem partilha (origem da conta, 19 out).
+  const url = withMyRef(rawUrl)
   const resolvedTitle = title ?? t('ui.share_default_title')
-  const [caption, setCaption] = useState(message)
+  const [caption, setCaption] = useState(() => refInText(message))
   const [editingCaption, setEditingCaption] = useState(false)
   const [copied, setCopied] = useState(false)
   const shareCardRef = useRef(null)

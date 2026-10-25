@@ -16,6 +16,8 @@ import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingSca
 import MonthRanking from '../components/rankings/MonthRanking'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 import RankPodium from '../components/rankings/RankPodium'
+import RankingSkeleton from '../components/rankings/RankingSkeleton'
+import { SkeletonGate } from '../components/Skeleton'
 import { useFrames } from '../lib/frames'
 import { Realce } from '../components/SearchField'
 
@@ -54,7 +56,9 @@ export default function Rankings() {
   // Quem chega com state.tab (Perfil → "Ranking global", links antigos)
   // abre no sítio equivalente.
   const initialTab = location.state?.tab
-  const [mode, setMode] = useState(initialTab === 'assiduidade' ? 'xp' : 'ranking')
+  // «do-mes» (o cartão do parceiro na Home, 18 out): abre o «Do mês», já no
+  // distrito do parceiro e em «Todos».
+  const [mode, setMode] = useState(initialTab === 'assiduidade' ? 'xp' : initialTab === 'do-mes' ? 'month' : 'ranking')
   const [scope, setScope] = useState(
     (initialTab === 'geral' || initialTab === 'mensal') && currentOrganizationId ? currentOrganizationId : 'global'
   )
@@ -70,12 +74,18 @@ export default function Rankings() {
   const [scaleChoice, setScaleChoice] = useState(null)
   const scale = scaleChoice ?? defaultScale(profile?.gender)
 
-  // «Do mês» (#626): só aparece quando a função do Dev 3 existe.
-  const [monthReady, setMonthReady] = useState(false)
+  // «Do mês» (#626): sai só se a função do Dev 3 não existir. Começa à
+  // vista, para o separador não saltar de 2 para 3 opções ao chegarem os
+  // dados (UX, 18 out).
+  const [monthReady, setMonthReady] = useState(true)
   const [monthShare, setMonthShare] = useState(null)
   useEffect(() => {
     supabase.rpc('get_month_ranking_months', { p_organization_id: null })
-      .then(({ error }) => setMonthReady(!error || errorKind(error) !== 'not_ready'))
+      .then(({ error }) => {
+        const ready = !error || errorKind(error) !== 'not_ready'
+        setMonthReady(ready)
+        if (!ready) setMode((m) => (m === 'month' ? 'ranking' : m))
+      })
   }, [])
 
   const scopeOptions = useMemo(() => [
@@ -137,7 +147,7 @@ export default function Rankings() {
       if (period !== ALWAYS) {
         return withoutHidden(monthly.byMonth[period], hidden).map((p) => ({
           // Está na lista do mês porque jogou nesse mês.
-          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, gender: p.user?.gender, ranked: true, played: true,
+          user_id: p.user_id, name: p.user?.name || t('ui.empty_no_name'), avatar_url: null, gender: p.user?.gender, ranked: true, played: true,
           sub: `${t('rankings.mix_count', { count: p.participations })} · 🏆 ${t('rankings.mixes_won_count', { count: p.mixesWon })}`,
           value: p.points > 0 ? `+${p.points}` : String(p.points), valueLabel: t('rankings.points_label'),
         }))
@@ -336,7 +346,7 @@ export default function Rankings() {
         >
           {!allScales && (
             <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${row.position ? positionStyle(row.position) : 'bg-ink-50 text-muted'}`}>
-              {row.position ?? '—'}
+              {row.position ?? '-'}
             </span>
           )}
           <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" frame={frames[row.user_id]} />
@@ -431,9 +441,8 @@ export default function Rankings() {
       {mode === 'month' ? (
         <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare} />
       ) : loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-        </div>
+        // A forma da lista em vez da roda (esqueletos, 12 out; Francisco, 18 out).
+        <SkeletonGate><RankingSkeleton /></SkeletonGate>
       ) : visible.length === 0 && podiumRows.length === 0 ? (
         <EmptyState
           icon={trimmed ? Search : mode === 'xp' ? Award : Trophy}
@@ -490,7 +499,7 @@ export default function Rankings() {
           className="sticky bottom-24 z-10 w-full flex items-center gap-3 px-3.5 py-2.5 rounded-card bg-ink-900 text-white shadow-lift text-left"
         >
           <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${me.position ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>
-            {me.position ?? '—'}
+            {me.position ?? '-'}
           </span>
           <Avatar name={me.name} url={me.avatar_url} size="w-9 h-9 text-xs" />
           <div className="flex-1 min-w-0">

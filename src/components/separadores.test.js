@@ -29,7 +29,10 @@ const UI = 'src/components/ui.jsx'
 const EXCECOES = {
   oldTrack: {},
   // Os dias do marcador passaram a <Chips> (Dev 1, alinhamento de 26 set).
-  tablist: {},
+  // Os separadores do SITE são palavras com traço lima, como o menu do topo
+  // (opção C, Francisco, 19 out; exceção escrita no SPEC dos separadores pela
+  // UX). Na app continua a pílula do <Tabs>.
+  tablist: { 'src/pages/Plans.jsx': 'Dev 1 — site, opção C (19 out)' },
 }
 
 const files = (dir) => readdirSync(dir).flatMap((name) => {

@@ -110,6 +110,8 @@ function OrganizersBar() {
         <div>
           <p className={`${SITE_EYEBROW} text-[#5B6068]`}>{t('landing.organizers_eyebrow')}</p>
           <h2 className={`${SITE_H2} mt-3`}>{t('landing.organizers_text')}</h2>
+          {/* A mesma frase da linha verde-clara dos Planos (18 out). */}
+          <p className="mt-4 inline-block rounded-[14px] bg-[#F4F8DC] px-3.5 py-2.5 font-display text-[15px] font-bold leading-snug text-[#3F6212]">{t('landing.organizers_free_pill')}</p>
           <p className={SITE_LEAD}>{t('landing.organizers_lead')}</p>
           <div className="mt-8 flex max-w-[380px] flex-col gap-3">
             <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={`${BTN} bg-ink-900 text-white`}>
@@ -140,11 +142,19 @@ function OrganizersBar() {
 // não existe no produto vai marcado "em breve" — nada de "mais escolhido" ou
 // outros sinais inventados (PRODUCT.md). Preços de lançamento, por validar.
 export const PLANS = [
-  { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3']] },
+  // Todos os grupos têm jogos entre amigos do grupo (Francisco, 21 out); o
+  // Squad herda-os em «Tudo o que o Free tem».
+  { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3'], ['f4']] },
   { key: 'plus', name: 'Squad', features: [['f1'], ['f2'], ['f3']] },
-  // Torneios já existem; a liga ainda não (Francisco, 25 set; Trello #538).
-  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5'], ['f6', 'soon']] },
-  { key: 'club', name: 'Club', features: [['f1'], ['f2', 'soon'], ['f3', 'soon'], ['f4', 'soon']] },
+  // O que cada plano inclui (Francisco, 21 out; design-handoff/2026-10-21-
+  // planos-o-que-inclui/REGRAS-BA.md): o Community tem torneios, liga e jogos
+  // entre amigos do grupo; o Club tem jogos em aberto, professores e a gestão
+  // do clube, e não os jogos entre amigos do grupo (por isso deixa de dizer
+  // «Tudo o que o Community tem»).
+  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5'], ['f6'], ['f7']] },
+  // «Aulas e professores» sem «em breve» (Francisco, 22 out); as reservas e os
+  // pagamentos continuam «em breve».
+  { key: 'club', name: 'Club', features: [['f1'], ['f5'], ['f2'], ['f3', 'soon'], ['f4', 'soon']] },
 ]
 
 export function PlanCard({ plan }) {

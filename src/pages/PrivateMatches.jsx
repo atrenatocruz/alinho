@@ -19,6 +19,8 @@ import FriendSessionsList from '../components/friends/FriendSessionsList'
 import FriendSessionCard, { FriendsMonthLine, FriendsEmpty } from '../components/friends/FriendSessionCard'
 import { ScoreEntrySimple, ScoreEntrySets } from '../components/friends/FriendScoreEntry'
 import { appOrigin } from '../lib/native'
+import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
+import { withMyRef } from '../lib/myRef'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
 // name-only guest — team_a_player1 is always the creator, always a real
@@ -49,7 +51,7 @@ function InviteLinks({ match }) {
 
   const copyLink = async (slotKey) => {
     const url = `${appOrigin()}/jogos-privados/${match.id}/entrar?slot=${slotKey}`
-    await navigator.clipboard.writeText(url)
+    await navigator.clipboard.writeText(withMyRef(url)) // ?ref= (19 out)
     setCopied(slotKey)
     setTimeout(() => setCopied(''), 1500)
   }
@@ -309,16 +311,8 @@ export default function PrivateMatches() {
     ? t('friends.waiting_answers', { count: s.pending })
     : s.is_creator ? t('friends.form_teams_now') : t('friends.waiting_teams'))
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-5">
+  const header = (
+    <>
       <BackBar onBack={goBack} label={t('privatematches.back')} title={t('privatematches.title')} />
 
       <div className="flex items-center justify-between">
@@ -329,6 +323,28 @@ export default function PrivateMatches() {
           </PrimaryButton>
         </Link>
       </div>
+    </>
+  )
+
+  if (loading) {
+    // O título e o «+ Novo» a sério; os jogos a cinzento (esqueletos, 12 out).
+    return (
+      <div className="space-y-5">
+        {header}
+        <SkeletonGate>
+          <div className="space-y-3">
+            <SkLine size="label" w="28%" />
+            <SkWhiteCard />
+            <SkWhiteCard />
+          </div>
+        </SkeletonGate>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {header}
 
       {/* Convites por responder (#342). */}
       <FriendSessionsList sessions={false} />

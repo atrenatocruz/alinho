@@ -91,7 +91,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
     .map((m) => ({
       ...m,
       id: m.match_id,
-      court: m.court || '—',
+      court: m.court || t('ui.empty_no_court'),
       startsAt: new Date(m.scheduled_at),
       endsAt: new Date(new Date(m.scheduled_at).getTime() + duration * 60000),
       players: [...(m.team_a?.players || []), ...(m.team_b?.players || [])].filter(Boolean),

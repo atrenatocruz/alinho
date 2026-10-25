@@ -24,7 +24,9 @@ import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardButton, kindCo
 import FaceCircles from '../event/FaceCircles'
 import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
+import { SkeletonGate, SkBlock } from '../Skeleton'
 import { daysAside, shortDay } from '../event/heroDates'
+import NoTime from '../NoTime'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
@@ -238,7 +240,7 @@ function EventRow({ event, member }) {
     const x = event.tournament
     const a = shortDay(x.starts_on, i18n.language)
     const b = x.ends_on && String(x.ends_on).slice(0, 10) !== String(x.starts_on || '').slice(0, 10) ? shortDay(x.ends_on, i18n.language) : null
-    time = b ? `${a.split(' ')[0]}–${b}` : a || '—'
+    time = b ? `${a.split(' ')[0]}-${b}` : a || <NoTime onBand label={t('ui.empty_day_tbd')} />
     timeAside = daysAside(x.starts_on, x.ends_on, i18n.language, t)
     chips = null
     if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
@@ -424,7 +426,8 @@ function ClubPlayed({ club }) {
       .catch((err) => { console.error('Error loading played events:', err); if (alive) setData({ rows: [], total: 0 }) })
     return () => { alive = false }
   }, [club.id])
-  if (!data) return <div className="flex justify-center py-6"><div className="h-7 w-7 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+  // Dois cartões a cinzento em vez da roda (esqueletos, 12 out).
+  if (!data) return <SkeletonGate><div className="space-y-2.5"><SkBlock h={92} rounded="rounded-card" /><SkBlock h={92} rounded="rounded-card" /></div></SkeletonGate>
   const rows = data.rows || []
   if (rows.length === 0) {
     return (
@@ -456,7 +459,10 @@ function ClubPlayed({ club }) {
         return (
           // R5 (13 out): o cartão do R1, a cinzento por já ter passado.
           <HomeCard key={`${r.kind}-${r.id}`} colors={kindColorsOf(kind)} label={t(KIND_STYLE[kind]?.labelKey || 'agenda.kind_mix')}
-            pill={<BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
+            pill={r.por_terminar
+              // Ficou a meio num dia que já passou (23 out): «Por terminar».
+              ? <span className="whitespace-nowrap rounded-full bg-[#B86E00] px-[9px] py-1 font-display text-[11px] font-bold normal-case leading-none tracking-normal text-white">{t('pastevents.unfinished')}</span>
+              : <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
             time={r.kind === 'tournament' ? shortDay(r.date, i18n.language) : timeOf(r.date)} past to={to} ariaLabel={title}>
             <div className="flex items-baseline justify-between gap-2">
               <CardTitle past>{title}</CardTitle>

@@ -54,7 +54,6 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BackBar, ConfirmSheet } from '../ui'
 import { ChevronLeft } from 'lucide-react'
-import { PrimaryButton } from '../ui'
 
 const MissingContext = createContext(null)
 
@@ -116,6 +115,11 @@ export default function StepPage({
   }, [])
   const cancelEdit = () => (edit?.dirty ? setAsking(true) : edit.onCancel())
   const last = !stepped || step >= total
+  // A faixa dos botões, presa em baixo em todos os passos (criar e editar; UX,
+  // 18 out): o fundo da página, sem transparência, 12 px em cima e a margem
+  // segura em baixo. Fica no fim do conteúdo, por isso a última linha sobe
+  // sempre acima dela.
+  const bar = 'sticky bottom-0 z-10 -mx-4 mt-auto bg-ground px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]'
   const black = 'w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white'
   const outline = 'w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900'
   const missingBox = missingShown && canExplain && !missingAtField && (
@@ -123,7 +127,9 @@ export default function StepPage({
   )
   return (
     <MissingContext.Provider value={{ shown: missingShown && canExplain, field: nextMissingField, message: nextHint }}>
-    <div className="mx-auto max-w-lg pb-28">
+    {/* A coluna ocupa o ecrã todo, para a faixa dos botões ficar sempre no
+        fundo, também com pouco conteúdo (QA, 19 out: ficavam 112 px vazios). */}
+    <div className="mx-auto flex min-h-[calc(100dvh-24px)] max-w-lg flex-col">
       {/* «Cancelar / Voltar» sempre visível ao deslizar (27 set). No editar,
           «Cancelar» em todos os passos e o nome do passo no meio (30 set). */}
       {/* Editar usa a mesma barra de vidro dos outros ecrãs (Renato, 16 out:
@@ -156,11 +162,18 @@ export default function StepPage({
       <div className="mt-6 space-y-6">{children}</div>
 
       {error && (
-        <p className="mt-6 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>
+        <p role="alert" className="mt-6 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>
       )}
 
+      <div className="h-8 shrink-0" aria-hidden="true" />
       {edit ? (
-        <div className="mt-8 space-y-2.5">
+        // Botões do Editar (SPEC 2026-10-18-editar-botoes, Francisco 18 out):
+        // presos em baixo e empilhados — «Seguinte» a preto, «Guardar
+        // alterações» em contorno; no último passo só «Guardar», a preto.
+        // O «Voltar a rascunho» e o «Eliminar» saíram para a folha «Editar e
+        // mais opções» de cada evento; o `extra`/`danger` só fica para quem
+        // ainda os passa (o torneio, até o Dev 1 os mudar).
+        <div className={`${bar} space-y-2.5`}>
           {!last && missingBox}
           {!last && (
             <button type="button" onClick={tryNext} disabled={(nextDisabled && !canExplain) || busy}
@@ -195,12 +208,14 @@ export default function StepPage({
             </div>
           )}
         </div>
-      ) : footer ? <div className="mt-8">{footer}</div> : (
-        <div className="mt-8">
+      ) : footer ? <div className={bar}>{footer}</div> : (
+        <div className={bar}>
           {missingBox}
-          <PrimaryButton onClick={tryNext} disabled={(nextDisabled && !canExplain) || busy} className="w-full">
+          {/* A preto, como os outros «Seguinte» dos criar (era lima; Bugs, 18 out). */}
+          <button type="button" onClick={tryNext} disabled={(nextDisabled && !canExplain) || busy}
+            className={`press ${black} disabled:opacity-40`}>
             {nextLabel || t('steps.next')}
-          </PrimaryButton>
+          </button>
         </div>
       )}
 

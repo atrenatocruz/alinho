@@ -66,6 +66,8 @@ import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
 import { semAcentos } from '../lib/semAcentos'
 import { cancelMixDate } from '../lib/mixCancel'
 import { appOrigin } from '../lib/native'
+import { SkeletonGate, SkBlock, SkLine, SkPill, SkRow, SkWhiteCard } from '../components/Skeleton'
+import StepSkeleton from '../components/steps/StepSkeleton'
 
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
@@ -2672,9 +2674,26 @@ export default function GerirClube() {
   }
 
   if (orgLoading) {
+    // A forma do Gerir em vez da roda (esqueletos, 12 out): o «‹» a sério;
+    // o topo branco com «GERIR» a sério e o resto a cinzento; o separador,
+    // o «Criar» e os eventos a cinzento.
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      <div className="space-y-6">
+        <SkeletonGate frame={<BackBar onBack={goBack} solid />}>
+          <div className="space-y-6">
+            <div className={`!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2 ${TOP_EDGE}`}>
+              <span aria-hidden className="sk relative block h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#ECECE7]" />
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
+                <SkLine size="title" w="62%" className="mt-1.5" />
+                <div className="mt-2 flex gap-1.5"><SkPill w={52} h={20} /><SkPill w={92} h={20} /></div>
+              </div>
+            </div>
+            <SkBlock h={48} rounded="rounded-full" className="!bg-[#D5D7CF]" />
+            <SkBlock h={52} />
+            <div className="space-y-3"><SkWhiteCard /><SkWhiteCard /></div>
+          </div>
+        </SkeletonGate>
       </div>
     )
   }
@@ -2729,7 +2748,7 @@ export default function GerirClube() {
             actions={[
               { key: 'open', label: t('series.open_this'), hint: t('series.open_this_hint'), onClick: () => navigate(`/jogo/${singleSheet.id}`) },
               porComecar && { key: 'edit', label: t('eventactions.edit'), hint: t('eventactions.edit_hint'), onClick: () => abrirEdicaoMix(singleSheet) },
-              (porComecar || singleSheet.status === 'in_progress') && { key: 'cancel', danger: true, label: t('eventactions.cancel_one'), hint: t('eventactions.cancel_one_hint'), onClick: () => setSingleCancel(singleSheet) },
+              (porComecar || singleSheet.status === 'in_progress') && { key: 'cancel', danger: true, link: true, label: t('eventactions.cancel_one'), hint: t('eventactions.cancel_one_hint'), onClick: () => setSingleCancel(singleSheet) },
             ].filter(Boolean)}
             onClose={() => setSingleSheet(null)}
           />
@@ -2797,11 +2816,10 @@ export default function GerirClube() {
     }
     if (daSerie.length === 0) {
       return (
-        <div className="flex items-center justify-center py-16">
-          {gamesError
-            ? <p className="text-sm text-danger font-extrabold">{gamesError}</p>
-            : <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>}
-        </div>
+        gamesError
+          ? <div className="flex items-center justify-center py-16"><p className="text-sm text-danger font-extrabold">{gamesError}</p></div>
+          // A série por editar a carregar: a forma dos passos (esqueletos, 12 out).
+          : <StepSkeleton fallback={`/gerir/${org.slug}`} />
       )
     }
     return (
@@ -2890,9 +2908,8 @@ export default function GerirClube() {
       <div className="space-y-6">
         {aCarregar ? (
           loading || games.length === 0 && !gamesError ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-            </div>
+            // O mix por editar a carregar: a forma dos passos (esqueletos, 12 out).
+            <StepSkeleton fallback={`/gerir/${org.slug}`} />
           ) : (
             <div className="card text-center py-12 px-6">
               <p className="text-muted text-sm mb-4">{t('mixwizard.not_found')}</p>
@@ -2933,27 +2950,6 @@ export default function GerirClube() {
             organizationId={mixScopeId || currentOrganizationId}
             orgName={(mixScopeId && clubGroups.find((g) => g.id === mixScopeId)?.name) || org?.name || ''}
             orgKind={mixScopeId ? 'group' : (org?.kind || 'club')}
-            // «Cancelar o mix» / «Eliminar o mix» no Editar (30 set): o mesmo
-            // cancelMixDate do «Mais ⋯» da página do mix.
-            onDestroy={editingGame ? async () => {
-              const { outcome } = await cancelMixDate(editingGame)
-              setDoneNotice(t(outcome === 'cancel' ? 'gerirclube.mix_cancelled' : 'gerirclube.mix_deleted'))
-              fecharMix()
-              loadGames()
-            } : null}
-            // «Voltar a rascunho» no Editar (Francisco, 6 out): o mesmo
-            // unpublish_mix do «Mais ⋯» — até o mix terminar, também com
-            // inscritos (saem e recebem um aviso). Num rascunho não aparece.
-            // Com a série em pausa, as datas já estão em rascunho (Dev 1, 9 out):
-            // lê-se o estado fresco da lista, e não o do mix que abriu o Editar.
-            onUnpublish={editingGame && !editingGame.recurrence?.is_paused
-              && ['pending', 'open', 'closed', 'in_progress'].includes((games.find((g) => g.id === editingGame.id) || editingGame).status) ? async (leaving) => {
-              const { error } = await supabase.rpc('unpublish_mix', { p_game_id: editingGame.id })
-              if (error) throw error
-              setDoneNotice(leaving > 0 ? t('eventactions.to_draft_done_people', { count: leaving }) : t('eventactions.to_draft_done'))
-              fecharMix()
-              loadGames()
-            } : null}
           />
         )}
         {deleteSheet}
@@ -3089,7 +3085,9 @@ export default function GerirClube() {
               options={[
                 { value: 'all', label: t('gerirclube.kind_all') },
                 { value: 'mix', label: t('gerirclube.kind_mixes'), dot: KIND_COLORS.mix.strong },
-                { value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong },
+                // Os grupos não criam jogos em aberto (só o Club): o filtro
+                // sai deles (REGRAS-BA, 21 out).
+                ...(isGroupOrg ? [] : [{ value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong }]),
                 { value: 'torneio', label: t('gerirclube.kind_tournaments'), dot: KIND_COLORS.tournament.strong },
                 ...(isGroupOrg ? [] : [{ value: 'turma', label: t('gerirclube.kind_series'), dot: KIND_COLORS.lesson.strong }]),
               ]}
@@ -3102,8 +3100,31 @@ export default function GerirClube() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ink-700"></div>
+        // O «＋ Criar» a sério desde o início; os eventos a cinzento, em
+        // cartões brancos (esqueletos, 12 out).
+        <div className="space-y-4">
+          {activeTab === 'events' && !turmaAberta && (
+            <button type="button" onClick={() => setCreatePicker(true)}
+              className="press flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 text-base font-extrabold text-white">
+              <Plus size={18} /> {t('gerirclube.create_button')}
+            </button>
+          )}
+          {/* Como no carregado: o título «A SEGUIR · N» e uma linha baixa por
+              evento, com a data num quadrado e duas linhas (UX, 18 out). */}
+          <SkeletonGate>
+            <div className="space-y-2.5">
+              <SkLine size="label" w="26%" />
+              {[0, 1, 2].map((i) => (
+                <div key={i} aria-hidden className="flex items-center gap-3 rounded-[20px] bg-white p-3 shadow-card">
+                  <span className="sk relative block h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#ECECE7]" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <SkLine size="text" w={`${[62, 54, 70][i]}%`} />
+                    <SkLine size="label" w="40%" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SkeletonGate>
         </div>
       ) : (
         <>
@@ -3135,8 +3156,10 @@ export default function GerirClube() {
                   ['aberto', canPlanEvents && !isGroupOrg],
                   ['amigos', isGroupOrg],
                   ['torneio', canPlanEvents && tournamentsReady],
-                  // A liga é entre clubes: só um clube a cria (não um grupo).
-                  ['liga', org?.kind === 'club'],
+                  // A liga vai pelo plano, como os torneios: clubes e grupos
+                  // Community ou Club (Francisco, 21 out; a base do Dev 3 em
+                  // migration_liga_pelo_plano.sql).
+                  ['liga', canPlanEvents],
                   ['turma', !isGroupOrg && lessonsReady],
                 ].filter(([, mostra]) => mostra).map(([tipo]) => tipo)
                 return (
@@ -3970,7 +3993,12 @@ export default function GerirClube() {
                       detalhe = [item.quando ? quandoCurto(item.quando, false) : null, t('gerirclube.status_cancelled')].filter(Boolean).join(' · ')
                     }
                     if (tipo === 'mix' && !isDraftMix(row)) {
-                      abrir = row.recurrence_id
+                      // Em «Por terminar» abre o próprio mix, para pôr os
+                      // resultados; antes abria o cartão da série (QUINTAS @
+                      // IPC, 23 out).
+                      abrir = itemPorTerminar(item)
+                        ? () => navigate(`/jogo/${row.id}`)
+                        : row.recurrence_id
                         ? () => navigate(`/gerir/${org.slug}/serie/${row.recurrence_id}`, { state: { fromGerir: true } })
                         : () => setSingleSheet(row)
                     }
@@ -4047,7 +4075,7 @@ export default function GerirClube() {
                             <b className="font-mono text-sm font-extrabold uppercase">{String(linha || '').slice(0, 3)}</b>
                           ) : (
                             <>
-                              <b className="font-display text-[22px] font-extrabold leading-none">{dia ? dia.getDate() : '—'}</b>
+                              <b className="font-display text-[22px] font-extrabold leading-none">{dia ? dia.getDate() : '-'}</b>
                               <span className="mt-0.5 font-mono text-[10px] font-bold uppercase">{dia ? dia.toLocaleDateString(i18n.language, { month: 'short' }).replace('.', '') : ''}</span>
                             </>
                           )}
@@ -4550,9 +4578,8 @@ export default function GerirClube() {
 
                   {groupsError && <div className="mb-3"><p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{groupsError}</p></div>}
                   {groupsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-                    </div>
+                    // Os grupos a cinzento (esqueletos, 12 out).
+                    <SkeletonGate><div className="space-y-3 mb-4"><SkRow /><SkRow /></div></SkeletonGate>
                   ) : clubGroups.length > 0 && (
                     <div className="space-y-3 mb-4">
                       {clubGroups.map((group) => {
@@ -4593,9 +4620,7 @@ export default function GerirClube() {
                             {expandedGroupId === group.id && group.can_manage && (
                               <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
                                 {expandedGroupLoading ? (
-                                  <div className="flex items-center justify-center py-6">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-[3px] border-ink-50 border-t-ink-700"></div>
-                                  </div>
+                                  <SkeletonGate><div className="space-y-2.5"><SkLine size="text" w="40%" /><SkLine size="text" w="65%" /><SkLine size="text" w="50%" /></div></SkeletonGate>
                                 ) : (
                                   <>
                                     <Link
@@ -4802,7 +4827,7 @@ export default function GerirClube() {
                 <div className="card space-y-3">
                   <div>
                     <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_owner_label')}</p>
-                    <p className="text-base font-extrabold text-ink-900">{scannedVoucher.user?.name || '—'}</p>
+                    <p className="text-base font-extrabold text-ink-900">{scannedVoucher.user?.name || t('ui.empty_no_name')}</p>
                   </div>
                   <div className="pt-3 border-t border-line">
                     <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_mix_label')}</p>

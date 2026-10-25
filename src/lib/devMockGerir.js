@@ -31,8 +31,10 @@ export const withManyOrgs = (before) => (url) => {
 // «Já jogados» (list_played_events): mixes, um torneio e um jogo entre amigos.
 const daysAgo = (n, h) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(h, 0, 0, 0); return d.toISOString() }
 export const PLAYED_EVENTS = () => ({
-  total: 5,
+  total: 6,
   rows: [
+    // Um mix de ontem que ficou a meio (23 out): «Por terminar».
+    { kind: 'mix', id: 'fake-game-1', title: 'QUINTAS no clube', date: daysAgo(1, 19), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 8, i_played: true, my_points: null, por_terminar: true },
     { kind: 'mix', id: 'fake-game-1', title: 'Padel domingueiro', date: daysAgo(1, 10), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 8, i_played: true, my_points: 12, i_won: true },
     { kind: 'tournament', id: 't-1', slug: 'open-de-teste', title: 'Open de Teste', date: daysAgo(2, 23), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, entries_count: 24, i_played: false, my_points: null },
     { kind: 'mix', id: 'fake-game-1', title: 'Mix de sábado', date: daysAgo(2, 18), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 16, i_played: false, my_points: null },

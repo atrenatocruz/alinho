@@ -7,6 +7,8 @@ import { SiteHeader, SiteFooter } from './components/site/SiteChrome'
 import { PrimaryButton, EmptyState } from './components/ui'
 import Alino from './components/Alino'
 import Layout, { Wordmark } from './components/Layout'
+import { captureAccountOrigin } from './lib/accountOrigin'
+import { POLICY_VERSION } from './lib/contacts'
 import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
@@ -20,6 +22,7 @@ import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import ProfileXp from './pages/ProfileXp'
+import PartnerPage from './pages/PartnerPage'
 import PlayerStats from './pages/PlayerStats'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
@@ -170,6 +173,23 @@ const LoadErrorScreen = ({ onRetry }) => {
   )
 }
 
+// O /instrucoes antigo abre a Ajuda, na mesma parte.
+function InstrucoesToAjuda() {
+  const { hash } = useLocation()
+  return <Navigate to={`/ajuda${hash}`} replace />
+}
+
+// A Ajuda: dentro da app com sessão, a página do site sem ela.
+function AjudaRoute({ showSplash }) {
+  const { user } = useAuth()
+  if (!user && !showSplash) return <Instructions />
+  return (
+    <Guard require="protected" showSplash={showSplash}>
+      <Ajuda />
+    </Guard>
+  )
+}
+
 // Moldura de quem chega sem conta (torneio, Trello #361): o link do torneio
 // anda no WhatsApp e em cartazes, por isso a página abre a toda a gente.
 // Sem sessão não há barra de navegação — só o logótipo e a porta de entrada.
@@ -262,7 +282,11 @@ const Guard = ({ require, showSplash, children }) => {
   // self-selected rating) gets written before consent is on file. Desde o
   // #360 (10 out) também as contas que já existiam passam por aqui uma vez:
   // a migração do Dev 3 deixa de as dar como aceites.
-  if (user && profile && profile.consent_accepted_at === null) {
+  // Aceitar outra vez (Dev 3, 19 out): quem aceitou uma versão mais antiga
+  // vê a caixa uma vez. Sem o campo (migração por correr: undefined), não
+  // se pergunta outra vez.
+  if (user && profile && (profile.consent_accepted_at === null
+    || (typeof profile.consent_policy_version === 'string' && profile.consent_policy_version < POLICY_VERSION))) {
     return <ConsentGate />
   }
 
@@ -362,7 +386,7 @@ function AfterLogin() {
 // app estão fora do índice (robots.txt) e não devem apontar para a landing.
 const PUBLIC_HEAD = {
   '/': { title: 'alinho.pt: mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
-  '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
+  '/ajuda': { title: 'Ajuda do alinho.pt', canonical: 'https://www.alinho.pt/ajuda' },
   // Páginas do site (#619, 10 out): título e descrição próprios, no mesmo estilo.
   '/como-funciona': {
     title: 'Como funciona o alinho.pt: mixes, nível, torneios e WhatsApp',
@@ -403,6 +427,10 @@ function useRouteHead() {
 
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
+  // A origem da conta (?origem=, ?ref= e os links de convite): guarda-se ao
+  // abrir qualquer página, para entregar depois da primeira sessão (19 out).
+  const routeLocation = useLocation()
+  useEffect(() => { captureAccountOrigin(routeLocation.pathname, routeLocation.search) }, [routeLocation.pathname, routeLocation.search])
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
   useRouteHead()
 
@@ -428,9 +456,14 @@ function AppRoutes() {
             renders; redirecting on that would bounce them straight past
             the form they came here to fill in. */}
         <Route path="/redefinir-password" element={<ResetPassword />} />
-        <Route path="/instrucoes" element={<Instructions />} />
+        {/* A Ajuda passou para /ajuda (site arrumado, 18 out): o /instrucoes
+            leva lá, com a mesma âncora (#faq, #whatsapp, #ranking, #xp) —
+            o robô do WhatsApp e links antigos continuam a funcionar. */}
+        <Route path="/instrucoes" element={<InstrucoesToAjuda />} />
         <Route path="/privacidade" element={<PrivacyPolicy />} />
         <Route path="/termos" element={<TermsOfService />} />
+        {/* A página de um parceiro (18 out): sem sessão vai ao login e volta (PO). */}
+        <Route path="/parceiro/:slug" element={<Guard require="protected" showSplash={showSplash}><PartnerPage /></Guard>} />
         {/* Pedido público para apagar a conta (Google Play, «Segurança dos dados»). */}
         <Route path="/apagar-conta" element={<DeleteAccountPage />} />
         {/* Página pública dos planos (Trello #327). */}
@@ -741,14 +774,9 @@ function AppRoutes() {
             sai para a página pública /planos. */}
         {/* A ajuda dentro da app (17 out): o (?) dos Rankings já não sai para a
             página pública /instrucoes. */}
-        <Route
-          path="/ajuda"
-          element={
-            <Guard require="protected" showSplash={showSplash}>
-              <Ajuda />
-            </Guard>
-          }
-        />
+        {/* Com sessão, a ajuda abre dentro da app (Renato, 17 out); sem
+            sessão, a página da Ajuda do site, aberta a toda a gente. */}
+        <Route path="/ajuda" element={<AjudaRoute showSplash={showSplash} />} />
         <Route
           path="/gerir/planos"
           element={

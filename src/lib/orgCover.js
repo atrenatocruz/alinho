@@ -5,6 +5,7 @@
 // A base de dados só aceita estas três (migration_organization_cover.sql).
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import i18n from './i18n'
 import { CLUB_HERO, GROUP_HERO } from './kindColors'
 
 const BUCKET = 'club-logos'
@@ -44,7 +45,7 @@ export const isPresetCover = (url) => !!url && (url.startsWith('/capas/') || url
  * endereço público, para gravar em organizations.cover_url.
  */
 export async function uploadOrgCover(orgId, file, y = 0.5) {
-  if (file.size > 15 * 1024 * 1024) throw new Error('Imagem demasiado grande (máx. 15MB)')
+  if (file.size > 15 * 1024 * 1024) throw new Error(i18n.t('image.too_big'))
   const bmp = await createImageBitmap(file)
   let sw = bmp.width
   let sh = Math.round(bmp.width / 3)
@@ -57,7 +58,7 @@ export async function uploadOrgCover(orgId, file, y = 0.5) {
   canvas.height = Math.round(w / 3)
   canvas.getContext('2d').drawImage(bmp, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
   const blob = await new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Falha ao comprimir a imagem'))), 'image/jpeg', 0.82))
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(i18n.t('image.compress_failed')))), 'image/jpeg', 0.82))
 
   const path = `${orgId}/cover-${Date.now()}.jpg`
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false })

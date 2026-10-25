@@ -90,3 +90,11 @@ export function mixChanges({ beforeIds = [], afterIds = [], beforeTeams = [], af
   }
   return changes
 }
+
+/** Vários de uma vez (#640, Renato 16 out): pela ordem em que foram
+ *  escolhidos, os primeiros entram até encher e os outros ficam suplentes.
+ *  `free` = lugares livres (com o campo novo, se se abrir). */
+export function splitByRoom(ids, free) {
+  const room = Math.max(0, free)
+  return { enter: ids.slice(0, room), wait: ids.slice(room) }
+}
