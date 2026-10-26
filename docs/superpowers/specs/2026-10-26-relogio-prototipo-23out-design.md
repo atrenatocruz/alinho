@@ -112,3 +112,16 @@ nunca a saúde.** Isto precisa de migrações e RLS novas (ver o plano).
 
 Mostrar o jogo a quem está de fora, complicações, espanhol, Android Wear, o formato vir de
 um jogo criado na app.
+
+## Adenda (26 out, à tarde): os formatos passam a ser os do Francisco
+
+Depois desta spec, o Francisco decidiu (Slack #dev-updates, 26 out; SPEC em
+`design-handoff/2026-10-26-set-sem-fim-e-pontos-corridos/SPEC.md`, ainda fora do repo) e o
+Renato mandou seguir essa versão. Substitui a decisão «Pontos passa a ser jogos sem sets»:
+
+- **Pontos corridos** (código `pts`, o antigo «Pontos»): 1, 2, 3… até ao total da ronda,
+  como na Fase 1. Sem 40-40 e sem quem serve. Linha de cima «Pontos corridos · até 24».
+- **Set sem fim** (código novo `ssf`): conta 15-30-40 com o modo dos 40-40 escolhido, o set
+  nunca acaba; o jogo acaba no «Terminar» e ganha quem tiver mais jogos fechados. Linha de
+  cima «Jogos 7-0». Quem serve e trocas de lado como num set.
+- en: «Total points» / «Timed set»; es: «Por puntos» / «Set a tiempo» (Copywriter).
