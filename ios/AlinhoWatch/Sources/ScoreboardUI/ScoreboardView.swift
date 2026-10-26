@@ -34,7 +34,8 @@ struct ScoreboardView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                if !dim { undoPill }
+                // Pulso em baixo: esbatida a 40 %, para nada mudar de sítio ao levantar o pulso.
+                undoPill.opacity(dim ? 0.4 : 1)
             }
         }
         .onChange(of: dim) { _, isDim in
@@ -107,6 +108,7 @@ struct ScoreboardView: View {
         let ink = dim ? Theme.dimText : Theme.ink
         let serving = match.server == team
         let who = Labels.serve(team, serve)
+        let parts = Labels.serveParts(team, serve)
         let name = Text(team == .us ? L.t("Nós") : L.t("Eles"))
             .font(.system(size: 11, weight: .heavy))
             .textCase(.uppercase)
@@ -132,12 +134,18 @@ struct ScoreboardView: View {
                         name.padding(.top, 8)
                         Spacer()
                         if serving {
-                            Circle().fill(ink).frame(width: 10, height: 10)
-                            if let who {
-                                Text(who)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
+                            if let parts {
+                                HStack(spacing: 4) {
+                                    Circle().fill(ink).frame(width: 8, height: 8)
+                                    Text(parts.who).font(.system(size: 11, weight: .bold))
+                                }
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                if let side = parts.side {
+                                    Text(side).font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                                }
+                            } else {
+                                Circle().fill(ink).frame(width: 10, height: 10)
                             }
                         }
                     }

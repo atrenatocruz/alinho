@@ -36,8 +36,8 @@ struct OverlayView: View {
 
     /// Os jogos do set (ou o set que acabou de fechar) e, se se mostra, quem serve.
     private var scoreLine: String {
-        let games = match.games == [0, 0] ? match.sets.last.map { [$0.us, $0.them] } ?? match.games : match.games
-        let score = "\(games[0])-\(games[1])"
+        let shown = match.switchSidesScore
+        let score = "\(shown[0])-\(shown[1])"
         switch match.server {
         case .us?: return L.t("\(score) · Nós servimos")
         case .them?: return L.t("\(score) · Eles servem")

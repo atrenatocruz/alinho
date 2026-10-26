@@ -1140,6 +1140,26 @@
           }
         }
       }
+    },
+    "Tie-break": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tie-break"
+          }
+        }
+      }
+    },
+    "Super tie-break": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Super tie-break"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -65,14 +65,19 @@ enum Labels {
         }
     }
 
-    /// Por baixo da bola de quem serve: «Tu · direita», «Parceiro · esquerda», «Servem».
-    static func serve(_ team: Team, _ info: ServeInfo?) -> String? {
+    /// Quem serve e o lado, em duas partes: lado a lado vão em duas linhas
+    /// («● Parceiro» e por baixo «esquerda»); um por cima do outro, numa
+    /// («Tu · direita»). Na dupla deles só «Servem».
+    static func serveParts(_ team: Team, _ info: ServeInfo?) -> (who: String, side: String?)? {
         guard let info else { return nil }
-        if team == .them { return info.them ? L.t("Servem") : nil }
+        if team == .them { return info.them ? (L.t("Servem"), nil) : nil }
         guard case .player(let p, let side)? = info.us else { return nil }
-        let who = p == .me ? L.t("Tu") : L.t("Parceiro")
-        let where_ = side == .right ? L.t("direita") : L.t("esquerda")
-        return "\(who) · \(where_)"
+        return (p == .me ? L.t("Tu") : L.t("Parceiro"), side == .right ? L.t("direita") : L.t("esquerda"))
+    }
+
+    static func serve(_ team: Team, _ info: ServeInfo?) -> String? {
+        guard let parts = serveParts(team, info) else { return nil }
+        return parts.side.map { "\(parts.who) · \($0)" } ?? parts.who
     }
 
     static func effort(_ e: EffortLabel) -> String {
@@ -104,8 +109,8 @@ enum Labels {
         case .deuce(let n?): L.t("Iguais \(n)")
         case .advantage(nil): L.t("Vantagem")
         case .advantage(let n?): L.t("Vantagem \(n)")
-        case .tieBreak: L.t("Tie-break a 7")
-        case .superTieBreak: L.t("Super tie-break a 10")
+        case .tieBreak: L.t("Tie-break")
+        case .superTieBreak: L.t("Super tie-break")
         case .points(nil): L.t("Pontos corridos")
         case .points(let total?): L.t("Pontos corridos · até \(total)")
         case .gamesRound(let a, let b, nil): L.t("Jogos \(a)-\(b)")

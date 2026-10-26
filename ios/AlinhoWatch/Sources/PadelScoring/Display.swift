@@ -113,6 +113,14 @@ extension MatchState {
         return parts.isEmpty ? "0-0" : parts.joined(separator: " ")
     }
 
+    /// O resultado no aviso «Trocar de lado»: os pontos num tie-break ou super
+    /// tie-break, o set que acabou de fechar, ou os jogos do set a decorrer.
+    public var switchSidesScore: [Int] {
+        if phase == .tieBreak || phase == .superTieBreak { return points }
+        if games == [0, 0], let last = sets.last { return [last.us, last.them] }
+        return games
+    }
+
     /// Tempo de jogo até `date`, sem as pausas.
     public func elapsed(at date: Date) -> TimeInterval {
         let end = endedAt ?? date
