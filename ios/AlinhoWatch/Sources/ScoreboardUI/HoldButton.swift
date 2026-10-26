@@ -57,8 +57,15 @@ struct HoldButton<Label: View>: View {
                         if hypot(value.translation.width, value.translation.height) > 24 { state.slipped = true }
                     }
             )
+            .onChange(of: touch.down) { _, down in
+                if case .block = target { model.blockTouches = max(0, model.blockTouches + (down ? 1 : -1)) }
+            }
             .onChange(of: touch.holding) { _, holding in
                 if holding { begin() } else { cancel() }
+            }
+            // Perdeu o toque (o outro bloco também foi tocado): esvazia.
+            .onChange(of: model.activeHold) { _, active in
+                if active != target, holdTask != nil { cancel() }
             }
             .onDisappear { cancel() }
             .accessibilityAddTraits(.isButton)
@@ -66,6 +73,7 @@ struct HoldButton<Label: View>: View {
     }
 
     private func begin() {
+        if case .block = target, model.blockTouches > 1 { return }
         guard !disabled, model.activeHold == nil,
               WakeGuard.allowsHold(dimmedAtStart: dim, startedAt: Date(), wokeAt: model.wokeAt)
         else { return }

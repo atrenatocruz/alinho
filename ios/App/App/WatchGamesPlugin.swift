@@ -38,6 +38,10 @@ final class WatchGamesStore: NSObject {
         queue.sync { games }
     }
 
+    func isRemoved(_ id: String) -> Bool {
+        queue.sync { removedIDs.contains(id) }
+    }
+
     func remove(id: String) {
         queue.sync {
             games.removeAll { $0["id"] as? String == id }
@@ -113,8 +117,11 @@ extension WatchGamesStore: WCSessionDelegate {
         guard let json = userInfo["game"] as? String,
               let game = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         else { return }
-        let merged = merge(game)
-        NotificationCenter.default.post(name: Self.received, object: nil, userInfo: ["game": merged ?? game])
+        // Apagado no telemóvel: o envio atrasado do relógio não o traz de volta.
+        guard let id = game["id"] as? String, !isRemoved(id) else { return }
+        // Apagado no relógio (`deleted`): a página tira-o da lista.
+        let shown = merge(game) ?? ["id": id, "deleted": true]
+        NotificationCenter.default.post(name: Self.received, object: nil, userInfo: ["game": shown])
     }
 }
 

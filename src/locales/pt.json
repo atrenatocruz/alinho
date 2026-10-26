@@ -6713,5 +6713,6 @@
   "numeros.friends_week_line_one": "{{count}} jogo · {{wins}} vitórias",
   "numeros.friends_week_line_other": "{{count}} jogos · {{wins}} vitórias",
   "numeros.friends_privacy": "Aos amigos só aparecem os jogos, nunca a saúde.",
-  "privatematches.watch_result": "O relógio contou {{result}}."
+  "privatematches.watch_result": "O relógio contou {{result}}.",
+  "numeros.register_score_later": "O jogo ficou registado, mas o resultado não seguiu. Põe-no em Jogos entre amigos."
 }

@@ -57,6 +57,7 @@ final class WorkoutRecorder: NSObject, ObservableObject {
                 attach(recovered, matchID: matchID)
                 return
             }
+            resetStats()   // um jogo novo nunca começa com os números do anterior
             let configuration = HKWorkoutConfiguration()
             configuration.activityType = .paddleSports
             configuration.locationType = .unknown
@@ -88,9 +89,14 @@ final class WorkoutRecorder: NSObject, ObservableObject {
     /// Fecha e grava o treino, com o resultado e, em watchOS 11, o esforço.
     func finish(record: MatchRecord) async {
         wanted = false
-        guard let session, let builder, matchID == record.id else { discard(); return }
+        // A app pode ter fechado depois do fim: o sistema manteve a sessão aberta.
+        if session == nil, let recovered = try? await healthStore.recoverActiveWorkoutSession() {
+            attach(recovered, matchID: record.id)
+        }
+        guard let session, let builder, matchID == record.id else { await discard(); return }
         self.session = nil
         self.builder = nil
+        defer { resetStats() }
         session.end()
         do {
             try await builder.endCollection(at: record.endedAt)
@@ -114,12 +120,19 @@ final class WorkoutRecorder: NSObject, ObservableObject {
     }
 
     /// Jogo sem pontos (ou sem registo): não fica treino nenhum.
-    func discard() {
+    func discard() async {
         wanted = false
+        if session == nil, let recovered = try? await healthStore.recoverActiveWorkoutSession() {
+            attach(recovered, matchID: matchID ?? UUID())
+        }
         session?.end()
         builder?.discardWorkout()
         session = nil
         builder = nil
+        resetStats()
+    }
+
+    private func resetStats() {
         heartRate = nil
         averageHeartRate = nil
         kilocalories = 0
@@ -141,7 +154,7 @@ final class WorkoutRecorder: NSObject, ObservableObject {
                 heartRate = s.mostRecentQuantity().map { Int($0.doubleValue(for: bpm).rounded()) }
                 averageHeartRate = s.averageQuantity().map { Int($0.doubleValue(for: bpm).rounded()) }
             case HKQuantityType(.activeEnergyBurned):
-                kilocalories = s.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? kilocalories
+                kilocalories = s.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
             default:
                 break
             }

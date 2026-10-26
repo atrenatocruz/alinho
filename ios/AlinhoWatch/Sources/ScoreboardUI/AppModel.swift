@@ -27,6 +27,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var session: MatchSession
     @Published var overlay: Overlay?
     @Published var activeHold: HoldTarget?
+    /// Dedos (ou a manga) pousados nos blocos. Com dois ao mesmo tempo nenhum conta,
+    /// e o que já estava a encher pára.
+    var blockTouches = 0 {
+        didSet {
+            if blockTouches > 1, case .block? = activeHold { activeHold = nil }
+        }
+    }
     /// Último bloco que contou um ponto, para o contorno branco piscar.
     @Published var flash: Team?
     /// Página do jogo: 0 = menu do jogo, 1 = marcador, 2 = treino. Abre no marcador.
@@ -102,8 +109,15 @@ final class AppModel: ObservableObject {
         if let record = session.history.first(where: { $0.id == current.id }) {
             await recorder.finish(record: record)
         } else {
-            recorder.discard()
+            await recorder.discard()
         }
+    }
+
+    /// O treino em pausa exatamente quando o jogo está em pausa (um ponto tira a
+    /// pausa; o «Desfazer» pode pô-la de volta).
+    private func syncRecorderPause() {
+        guard let current, !current.isOver else { return }
+        if current.pausedAt == nil { recorder.resume() } else { recorder.pause() }
     }
 
     /// No fim do jogo o treino só pára; os números do Saúde ficam no registo.
@@ -114,7 +128,7 @@ final class AppModel: ObservableObject {
         if recorder.authorized == true {
             session.setHealth(
                 averageHeartRate: recorder.averageHeartRate,
-                kilocalories: Int(recorder.kilocalories.rounded()),
+                kilocalories: recorder.kilocalories > 0 ? Int(recorder.kilocalories.rounded()) : nil,
                 for: id
             )
         }
@@ -139,6 +153,7 @@ final class AppModel: ObservableObject {
     func point(_ team: Team) {
         let events = session.point(team, at: Date())
         guard !events.isEmpty else { return }
+        syncRecorderPause()
         save()
         flash = team
         Task { @MainActor in
@@ -170,8 +185,10 @@ final class AppModel: ObservableObject {
                 finalizedMatchID = nil
                 if recordsWorkouts { Task { await recorder.begin(matchID: current.id) } }
             } else {
-                recorder.resume()
+                syncRecorderPause()
             }
+        } else {
+            syncRecorderPause()
         }
         hideOverlay()
         Haptic.play(.undo)
@@ -214,7 +231,7 @@ final class AppModel: ObservableObject {
 
     func togglePause() {
         session.togglePause(at: Date())
-        if current?.pausedAt != nil { recorder.pause() } else { recorder.resume() }
+        syncRecorderPause()
         page = 1
         save()
     }

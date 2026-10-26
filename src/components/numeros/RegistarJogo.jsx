@@ -6,7 +6,7 @@ import { PlayerOrGuestSlot } from '../../pages/CreatePrivateMatchSlots'
 import { createPrivateMatch, submitPrivateMatchScore } from '../../lib/privateMatches'
 import { setFriendMatchWatchResult } from '../../lib/friendChallenges'
 import { WatchGames } from '../../lib/watchGames'
-import { registrationArgs, scoreFromSets, setsText } from '../../lib/watchRegister'
+import { registerWatchGame, setsText } from '../../lib/watchRegister'
 import { describeError } from '../../lib/errors'
 import { formatDate } from '../../lib/formatDate'
 import { card } from './shared'
@@ -49,11 +49,18 @@ export default function RegistarJogo({ game, onDone, onCancel }) {
     setError('')
     try {
       const trimmed = { ...people, partnerGuest: people.partnerGuest.trim(), opp1Guest: people.opp1Guest.trim(), opp2Guest: people.opp2Guest.trim() }
-      const matchId = await createPrivateMatch(registrationArgs(game, trimmed))
-      await submitPrivateMatchScore(matchId, scoreFromSets(game.format, sets))
-      if (changed) await setFriendMatchWatchResult(matchId, game.resultText)
-      await WatchGames.markRegistered({ id: game.id, friendMatchId: matchId })
-      onDone(matchId)
+      const { matchId, scoreSent } = await registerWatchGame({
+        game,
+        people: trimmed,
+        sets,
+        api: {
+          createPrivateMatch,
+          submitPrivateMatchScore,
+          setFriendMatchWatchResult,
+          markRegistered: (args) => WatchGames.markRegistered(args),
+        },
+      })
+      onDone(matchId, scoreSent)
     } catch (err) {
       setError(describeError(t, err, 'numeros.register_error'))
     } finally {

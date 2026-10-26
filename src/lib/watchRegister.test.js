@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canRegister, scoreFromSets, registrationArgs, setsText } from './watchRegister'
+import { canRegister, scoreFromSets, registrationArgs, setsText, registerWatchGame } from './watchRegister'
 
 const NOW = new Date('2026-10-26T12:00:00Z')
 const game = (over = {}) => ({ id: 'g1', format: 'm3', startedAt: '2026-10-24T18:30:00Z', sets: [[6, 4], [3, 6], [10, 7]], ...over })
@@ -55,5 +55,47 @@ describe('registrationArgs', () => {
 describe('setsText', () => {
   it('formats like the watch', () => {
     expect(setsText([[6, 4], [3, 6]])).toBe('6-4 3-6')
+  })
+})
+
+describe('registerWatchGame', () => {
+  const people = { partner: { id: 'p' }, opp1: { id: 'a' }, opp2: { id: 'b' } }
+  const api = (over = {}) => {
+    const calls = []
+    return {
+      calls,
+      createPrivateMatch: async () => { calls.push('create'); return 'm1' },
+      markRegistered: async () => { calls.push('mark') },
+      submitPrivateMatchScore: async () => { calls.push('score') },
+      setFriendMatchWatchResult: async () => { calls.push('watch') },
+      ...over,
+    }
+  }
+
+  it('marks the watch game right after the match exists, then sends the score', async () => {
+    const a = api()
+    const r = await registerWatchGame({ game: game(), people, sets: [[6, 4], [3, 6], [10, 8]], api: a })
+    expect(a.calls).toEqual(['create', 'mark', 'score', 'watch'])
+    expect(r).toEqual({ matchId: 'm1', scoreSent: true })
+  })
+
+  it('a later failure never leaves the game unmarked (no second match on retry)', async () => {
+    const a = api({
+      submitPrivateMatchScore: async () => { throw new Error('boom') },
+      setFriendMatchWatchResult: async () => { throw new Error('no rpc') },
+    })
+    const r = await registerWatchGame({ game: game(), people, sets: game().sets, api: a })
+    expect(r).toEqual({ matchId: 'm1', scoreSent: false })
+  })
+
+  it('a missing watch-result RPC (migration not run) does not fail the registration', async () => {
+    const a = api({ setFriendMatchWatchResult: async () => { throw new Error('no rpc') } })
+    const r = await registerWatchGame({ game: game(), people, sets: [[6, 0]], api: a })
+    expect(r).toEqual({ matchId: 'm1', scoreSent: true })
+  })
+
+  it('fails only when the match itself could not be created', async () => {
+    const a = api({ createPrivateMatch: async () => { throw new Error('nope') } })
+    await expect(registerWatchGame({ game: game(), people, sets: game().sets, api: a })).rejects.toThrow('nope')
   })
 })

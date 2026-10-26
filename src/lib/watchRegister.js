@@ -48,3 +48,24 @@ export function registrationArgs(game, { partner, partnerGuest, opp1, opp1Guest,
     teamBPlayer2GuestName: opp2Guest || null,
   }
 }
+
+// O registo, por esta ordem: criar o jogo e marcar logo o jogo do relógio como
+// registado (assim um erro a seguir nunca leva a criar um segundo jogo ao
+// tentar outra vez); depois o resultado e, se mudou à mão, o do relógio. Só
+// falha se o jogo não se criar; o resultado que não seguir põe-se nos jogos
+// entre amigos. O resultado do relógio é extra (sem a migração da Fase C a
+// RPC não existe).
+export async function registerWatchGame({ game, people, sets, api }) {
+  const matchId = await api.createPrivateMatch(registrationArgs(game, people))
+  await api.markRegistered({ id: game.id, friendMatchId: matchId })
+  let scoreSent = true
+  try {
+    await api.submitPrivateMatchScore(matchId, scoreFromSets(game.format, sets))
+  } catch {
+    scoreSent = false
+  }
+  if (setsText(sets) !== setsText(game.sets)) {
+    await api.setFriendMatchWatchResult(matchId, game.resultText).catch(() => {})
+  }
+  return { matchId, scoreSent }
+}

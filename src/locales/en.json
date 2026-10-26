@@ -6698,5 +6698,6 @@
   "numeros.friends_week_line_one": "{{count}} game · {{wins}} wins",
   "numeros.friends_week_line_other": "{{count}} games · {{wins}} wins",
   "numeros.friends_privacy": "Friends only see games, never your health.",
-  "privatematches.watch_result": "The watch counted {{result}}."
+  "privatematches.watch_result": "The watch counted {{result}}.",
+  "numeros.register_score_later": "The game was recorded but the result didn't go through. Add it in Friends' games."
 }

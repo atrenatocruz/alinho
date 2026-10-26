@@ -28,6 +28,7 @@ export default function MeusNumeros() {
   const [games, setGames] = useState(null) // null = a carregar
   const [registering, setRegistering] = useState(null) // o jogo a registar
   const [states, setStates] = useState({}) // id do jogo entre amigos → estado
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     let stale = false
@@ -83,9 +84,10 @@ export default function MeusNumeros() {
     )
   }
 
-  const registered = (matchId) => {
+  const registered = (matchId, scoreSent) => {
     setGames((list) => list.map((x) => (x.id === registering.id ? { ...x, registeredMatchId: matchId } : x)))
     setRegistering(null)
+    setNotice(scoreSent ? '' : t('numeros.register_score_later'))
   }
 
   const remove = async (id) => {
@@ -104,6 +106,7 @@ export default function MeusNumeros() {
         value={tab}
         onChange={setTab}
       />
+      {notice && <p className="rounded-ctrl bg-amber-50 p-2 text-[13px] text-ink-900">{notice}</p>}
       {games === null ? (
         <p className="text-sm text-muted">{t('common.loading')}</p>
       ) : tab === 'jogos' && registering ? (
