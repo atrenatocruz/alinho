@@ -1160,6 +1160,186 @@
           }
         }
       }
+    },
+    "Jogos do mix": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mix matches"
+          }
+        }
+      }
+    },
+    "Ronda %lld · Campo %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Round %lld · Court %lld"
+          }
+        }
+      }
+    },
+    "com %@ · contra %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "with %@ · vs %@"
+          }
+        }
+      }
+    },
+    "%@ e %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ and %@"
+          }
+        }
+      }
+    },
+    "Sem jogos do mix a decorrer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No mix matches in progress."
+          }
+        }
+      }
+    },
+    "Abre o alinho no iPhone para ligar o relógio.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Open alinho on your iPhone to connect the watch."
+          }
+        }
+      }
+    },
+    "Sem ligação. Tenta outra vez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No connection. Try again."
+          }
+        }
+      }
+    },
+    "Tentar outra vez": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Try again"
+          }
+        }
+      }
+    },
+    "Este mix não dá para contar no relógio.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "This mix can't be scored on the watch."
+          }
+        }
+      }
+    },
+    "A ser contado por %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Being scored by %@."
+          }
+        }
+      }
+    },
+    "A ser contado por outra pessoa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Being scored by someone else."
+          }
+        }
+      }
+    },
+    "Não deu para começar. Tenta outra vez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Couldn't start. Try again."
+          }
+        }
+      }
+    },
+    "Tu e %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "You and %@"
+          }
+        }
+      }
+    },
+    "contra %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "vs %@"
+          }
+        }
+      }
+    },
+    "A enviar para o mix…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sending to the mix…"
+          }
+        }
+      }
+    },
+    "Gravado no mix ✓": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Saved to the mix ✓"
+          }
+        }
+      }
+    },
+    "O mix já fechou. Pede ao admin para meter o resultado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "The mix is closed. Ask the admin to enter the result."
+          }
+        }
+      }
+    },
+    "O mix recusou o resultado. Pede ao admin para o meter.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "The mix rejected the result. Ask the admin to enter it."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
