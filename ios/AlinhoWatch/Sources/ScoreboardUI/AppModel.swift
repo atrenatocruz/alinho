@@ -38,14 +38,17 @@ final class AppModel: ObservableObject {
     @Published var showHistory = false
 
     private let store: SessionStore?
-    /// Sessão de treino para o ecrã não se apagar; `nil` nas prints dos ecrãs.
-    private let keeper: WorkoutKeeper?
+    /// O treino no Saúde. Nas prints dos ecrãs nunca arranca.
+    let recorder = WorkoutRecorder()
+    private let recordsWorkouts: Bool
+    /// O jogo acabado cujo treino já se gravou (ver `finalizeWorkout`).
+    private var finalizedMatchID: UUID?
     private var overlayTask: Task<Void, Never>?
 
     /// `store == nil`: não grava (prints dos ecrãs).
     init(store: SessionStore? = SessionStore(fileURL: SessionStore.defaultURL), session: MatchSession? = nil) {
         self.store = store
-        self.keeper = store == nil ? nil : WorkoutKeeper()
+        self.recordsWorkouts = store != nil
         self.session = session ?? store?.load() ?? MatchSession()
     }
 
@@ -59,12 +62,40 @@ final class AppModel: ObservableObject {
         model.page = f.page
         model.showHistory = f.showHistory
         model.idlePrompt = f.idle
+        if let h = f.health {
+            model.recorder.preview(heartRate: h.0, averageHeartRate: h.1, kilocalories: h.2, authorized: h.3)
+        }
         return model
     }
 
-    /// Ao abrir a app com um jogo a decorrer.
+    /// Ao abrir a app: com um jogo a decorrer retoma o treino; com um jogo acabado
+    /// grava o treino que tenha ficado por gravar.
     func resumeWorkoutIfNeeded() async {
-        if let current, !current.isOver { await keeper?.begin() }
+        guard let current, recordsWorkouts else { return }
+        if current.isOver { await finalizeWorkout() } else { await recorder.begin(matchID: current.id) }
+    }
+
+    /// Grava (ou deita fora, num jogo sem pontos) o treino do jogo acabado. Uma vez
+    /// gravado, desfazer o fim arranca outro treino.
+    func finalizeWorkout() async {
+        guard let current, current.isOver, finalizedMatchID != current.id else { return }
+        finalizedMatchID = current.id
+        if let record = session.history.first(where: { $0.id == current.id }) {
+            await recorder.finish(record: record)
+        } else {
+            recorder.discard()
+        }
+    }
+
+    /// No fim do jogo o treino só pára; os números do Saúde ficam no registo.
+    private func matchEnded() {
+        recorder.pause()
+        guard let id = current?.id, recorder.authorized == true else { return }
+        session.setHealth(
+            averageHeartRate: recorder.averageHeartRate,
+            kilocalories: Int(recorder.kilocalories.rounded()),
+            for: id
+        )
     }
 
     var current: MatchState? { session.current }
@@ -79,7 +110,7 @@ final class AppModel: ObservableObject {
         page = 1
         idleDismissedAt = nil
         save()
-        Task { await keeper?.begin() }
+        if recordsWorkouts, let id = current?.id { Task { await recorder.begin(matchID: id) } }
     }
 
     func point(_ team: Team) {
@@ -93,7 +124,8 @@ final class AppModel: ObservableObject {
         }
         if events.contains(.matchOver) {
             Haptic.play(.long)
-            keeper?.end()
+            matchEnded()
+            save()
             return
         }
         if events.contains(.setWon) { Haptic.play(.long) } else { Haptic.point(team) }
@@ -107,7 +139,14 @@ final class AppModel: ObservableObject {
     func undo() {
         let wasOver = current?.isOver == true
         guard session.undo() else { return }
-        if wasOver { Task { await keeper?.begin() } }
+        if wasOver, let current {
+            if finalizedMatchID == current.id {
+                finalizedMatchID = nil
+                if recordsWorkouts { Task { await recorder.begin(matchID: current.id) } }
+            } else {
+                recorder.resume()
+            }
+        }
         hideOverlay()
         Haptic.play(.undo)
         save()
@@ -115,21 +154,25 @@ final class AppModel: ObservableObject {
 
     func stop() {
         session.stop(at: Date())
-        keeper?.end()
+        matchEnded()
         hideOverlay()
         Haptic.play(.long)
         save()
     }
 
     func newMatch() {
-        session.clearFinished()
-        save()
+        Task {
+            await finalizeWorkout()
+            session.clearFinished()
+            save()
+        }
     }
 
     // MARK: - Segundo ecrã
 
     func togglePause() {
         session.togglePause(at: Date())
+        if current?.pausedAt != nil { recorder.pause() } else { recorder.resume() }
         page = 1
         save()
     }
@@ -161,7 +204,14 @@ final class AppModel: ObservableObject {
     /// Chamado a cada 2 s com um jogo a decorrer: fora do marcador, 10 s sem mexer
     /// volta ao marcador; 20 min sem pontos pergunta «Ainda estão a jogar?».
     func tick(now: Date = Date()) {
-        guard let current, !current.isOver else { return }
+        guard let current else { return }
+        // Cinco minutos depois do fim o treino grava-se, mesmo sem «Novo jogo».
+        if current.isOver {
+            if let end = current.endedAt, now.timeIntervalSince(end) >= 5 * 60 {
+                Task { await finalizeWorkout() }
+            }
+            return
+        }
         if page != 1 && !inSubscreen && now.timeIntervalSince(lastTouch) >= 10 { page = 1 }
         let quietSince = max(current.lastPointAt ?? current.startedAt, idleDismissedAt ?? .distantPast)
         if !idlePrompt && current.pausedAt == nil && session.isForgotten(at: now)

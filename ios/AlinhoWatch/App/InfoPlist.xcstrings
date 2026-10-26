@@ -7,13 +7,13 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Para o ecrã não se apagar a meio do jogo, o alinho abre uma sessão de treino. Não grava nada."
+            "value": "O alinho grava cada jogo como um treino de padel no Saúde, com a duração e as calorias."
           }
         },
         "en": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "So the screen stays on during the match, alinho starts a workout session. Nothing is saved."
+            "value": "alinho saves each match as a padel workout in Health, with its duration and calories."
           }
         }
       }
@@ -24,13 +24,13 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Para o ecrã não se apagar a meio do jogo, o alinho abre uma sessão de treino. Não grava nada."
+            "value": "O alinho lê a pulsação e as calorias durante o jogo, para as mostrar no relógio e no fim."
           }
         },
         "en": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "So the screen stays on during the match, alinho starts a workout session. Nothing is saved."
+            "value": "alinho reads your heart rate and calories during the match, to show them on the watch and at the end."
           }
         }
       }

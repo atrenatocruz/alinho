@@ -940,6 +940,56 @@
           }
         }
       }
+    },
+    "Sem acesso ao Saúde. O jogo conta na mesma; o treino não fica guardado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No access to Health. The match still counts; the workout is not saved."
+          }
+        }
+      }
+    },
+    "BPM": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "BPM"
+          }
+        }
+      }
+    },
+    "KCAL": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "KCAL"
+          }
+        }
+      }
+    },
+    "BPM MÉDIO": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "AVG BPM"
+          }
+        }
+      }
+    },
+    "Treino": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Workout"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

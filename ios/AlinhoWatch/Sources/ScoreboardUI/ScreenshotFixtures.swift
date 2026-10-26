@@ -11,6 +11,8 @@ enum ScreenshotFixtures {
         var page = 1
         var showHistory = false
         var idle = false
+        /// Pulsação, média, kcal e autorização do Saúde para o ecrã do treino.
+        var health: (Int?, Int?, Double, Bool)? = nil
     }
 
     static var requested: String? { UserDefaults.standard.string(forKey: "screenshot") }
@@ -53,6 +55,10 @@ enum ScreenshotFixtures {
             return Fixture(session: inGame(games: "uuuuuu uuuuu", points: "uuu"))
         case "menu":
             return Fixture(session: inGame(server: .us), page: 0)
+        case "training":
+            return Fixture(session: inGame(), page: 2, health: (138, 131, 412, true))
+        case "trainingDenied":
+            return Fixture(session: inGame(), page: 2, health: (nil, nil, 0, false))
         case "idle":
             return Fixture(session: inGame(), idle: true)
         case "end":

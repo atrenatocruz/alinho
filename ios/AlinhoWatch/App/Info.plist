@@ -36,8 +36,8 @@
 		<string>workout-processing</string>
 	</array>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Para o ecrã não se apagar a meio do jogo, o alinho abre uma sessão de treino. Não grava nada.</string>
+	<string>O alinho grava cada jogo como um treino de padel no Saúde, com a duração e as calorias.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Para o ecrã não se apagar a meio do jogo, o alinho abre uma sessão de treino. Não grava nada.</string>
+	<string>O alinho lê a pulsação e as calorias durante o jogo, para as mostrar no relógio e no fim.</string>
 </dict>
 </plist>

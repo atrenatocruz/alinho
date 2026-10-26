@@ -28,6 +28,10 @@ public struct RootView: View {
                                 ScoreboardView(match: match)
                             }
                             .tag(1)
+                            NavigationStack {
+                                TrainingView(match: match, recorder: model.recorder)
+                            }
+                            .tag(2)
                         }
                         .tabViewStyle(.page(indexDisplayMode: .always))
                         if let overlay = model.overlay {
