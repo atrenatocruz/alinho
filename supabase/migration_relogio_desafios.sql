@@ -46,6 +46,32 @@ $function$;
 REVOKE ALL ON FUNCTION public.set_friend_match_watch_result(UUID, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.set_friend_match_watch_result(UUID, TEXT) TO authenticated;
 
+-- Estado dos jogos registados a partir do relógio, para «Os meus números» e para
+-- o ecrã de aceitar: quantos dos outros jogadores (com conta) já aceitaram e o
+-- resultado do relógio. Só dos jogos em que quem pergunta joga.
+CREATE OR REPLACE FUNCTION public.get_watch_match_states(p_ids UUID[])
+RETURNS TABLE(id UUID, status TEXT, accepted INTEGER, others INTEGER, watch_result TEXT)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+  SELECT m.id, m.status,
+         (SELECT count(*)::int FROM (VALUES
+            (m.team_a_player1_id, m.team_a_player1_status), (m.team_a_player2_id, m.team_a_player2_status),
+            (m.team_b_player1_id, m.team_b_player1_status), (m.team_b_player2_id, m.team_b_player2_status)
+          ) AS t(pid, st) WHERE t.pid IS NOT NULL AND t.pid <> m.creator_id AND t.st IN ('accepted_all', 'accepted_no_ranking')),
+         (SELECT count(*)::int FROM (VALUES
+            (m.team_a_player1_id), (m.team_a_player2_id), (m.team_b_player1_id), (m.team_b_player2_id)
+          ) AS t(pid) WHERE t.pid IS NOT NULL AND t.pid <> m.creator_id),
+         m.watch_result
+    FROM private_matches m
+   WHERE m.id = ANY(p_ids)
+     AND auth.uid() IN (m.team_a_player1_id, m.team_a_player2_id, m.team_b_player1_id, m.team_b_player2_id);
+$function$;
+REVOKE ALL ON FUNCTION public.get_watch_match_states(UUID[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_watch_match_states(UUID[]) TO authenticated;
+
 -- ── 2. Desafios de 7 dias ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS friend_challenges (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -82,7 +108,8 @@ BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Sem sessão';
   END IF;
-  IF p_opponent IS NULL OR p_opponent = v_uid OR NOT are_friends(v_uid, p_opponent) THEN
+  -- «Amigos» = seguem-se os dois (is_mutual_follow, que substituiu o are_friends).
+  IF p_opponent IS NULL OR p_opponent = v_uid OR NOT is_mutual_follow(v_uid, p_opponent) THEN
     RAISE EXCEPTION 'Só se desafia um amigo';
   END IF;
   -- Um desafio ativo (pendente ou aceite, ainda a decorrer) por par.
@@ -173,10 +200,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $function$
   WITH friends AS (
-    SELECT CASE WHEN fr.requester_id = auth.uid() THEN fr.addressee_id ELSE fr.requester_id END AS id
-      FROM friend_requests fr
-     WHERE fr.status = 'accepted'
-       AND auth.uid() IN (fr.requester_id, fr.addressee_id)
+    SELECT f.followed_id AS id
+      FROM follows f
+     WHERE f.follower_id = auth.uid() AND f.status = 'accepted'
+       AND is_mutual_follow(auth.uid(), f.followed_id)
   )
   SELECT f.id, count(*)::int, count(*) FILTER (WHERE s.won)::int
     FROM friends f
