@@ -27,7 +27,8 @@ final class MemoryStore: CredentialStore, @unchecked Sendable {
 
 /// Responde por ordem às respostas preparadas; sem respostas, 200 com `{}`.
 actor FakeTransport: HTTPTransport {
-    enum Reply { case http(Int, String), fail }
+    /// `act`: corre a ação (com o pedido «no ar») e depois responde.
+    enum Reply { case http(Int, String), fail, act(@Sendable () async -> Void, Int, String) }
     private var replies: [Reply]
     private(set) var requests: [URLRequest] = []
 
@@ -37,9 +38,13 @@ actor FakeTransport: HTTPTransport {
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
-        let reply = replies.isEmpty ? .http(200, "{}") : replies.removeFirst()
+        var reply = replies.isEmpty ? .http(200, "{}") : replies.removeFirst()
+        if case let .act(action, status, body) = reply {
+            await action()
+            reply = .http(status, body)
+        }
         switch reply {
-        case .fail:
+        case .fail, .act:
             throw URLError(.notConnectedToInternet)
         case let .http(status, body):
             let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
@@ -189,4 +194,52 @@ func client(_ store: MemoryStore, _ t: FakeTransport) -> SupabaseClient {
     let r = try JSONDecoder().decode(ClaimResult.self, from: Data(json.utf8))
     #expect(r.matchID == UUID(uuidString: "6f1c2a4e-0000-4000-8000-000000000001"))
     #expect(r.mySide == .a)
+}
+
+// MARK: - Falhas passageiras não são recusas do servidor
+
+@Test func testRateLimitIsNetwork() async throws {
+    // 429 (e 408) é «tenta mais tarde», mesmo com uma `message` no corpo.
+    let t = FakeTransport([.http(429, #"{"message":"rate limited"}"#), .http(408, "")])
+    let c = client(MemoryStore(credentials()), t)
+    await #expect(throws: SyncError.network) {
+        let _: AnyReply = try await c.rpc("list_my_watch_mix_matches", [:])
+    }
+    await #expect(throws: SyncError.network) {
+        let _: AnyReply = try await c.rpc("list_my_watch_mix_matches", [:])
+    }
+}
+
+@Test func testClientErrorWithoutPostgrestBodyIsNetwork() async throws {
+    let t = FakeTransport([.http(400, "<html>proxy</html>")])
+    await #expect(throws: SyncError.network) {
+        let _: AnyReply = try await client(MemoryStore(credentials()), t).rpc("list_my_watch_mix_matches", [:])
+    }
+}
+
+@Test func testHTMLSuccessIsNetwork() async throws {
+    // Um portal cativo responde 200 com uma página: não conta como gravado.
+    let t = FakeTransport([.http(200, "<html>Wi-Fi login</html>")])
+    await #expect(throws: SyncError.network) {
+        let _: AnyReply = try await client(MemoryStore(credentials()), t).rpc("list_my_watch_mix_matches", [:])
+    }
+}
+
+@Test func testStaleRefreshKeepsNewerSession() async throws {
+    // O iPhone manda uma sessão nova enquanto o relógio renova a antiga; a
+    // antiga é recusada, mas a nova não se apaga e o pedido segue com ela.
+    let store = MemoryStore(credentials(expiresIn: 30))
+    var newer = credentials()
+    newer.accessToken = "access-new"
+    newer.refreshToken = "refresh-new"
+    let fresh = newer
+    let t = FakeTransport([
+        .act({ store.save(fresh) }, 400, #"{"error":"invalid_grant"}"#),
+        .http(200, "{}"),
+    ])
+    let _: AnyReply = try await client(store, t).rpc("list_my_watch_mix_matches", [:])
+    #expect(store.load() == fresh)
+    let reqs = await t.requests
+    #expect(reqs.count == 2)
+    #expect(reqs[1].value(forHTTPHeaderField: "Authorization") == "Bearer access-new")
 }

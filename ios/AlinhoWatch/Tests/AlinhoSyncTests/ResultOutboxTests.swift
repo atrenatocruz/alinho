@@ -114,3 +114,32 @@ private func tempFile() -> URL {
     await again.flush(using: client(MemoryStore(credentials()), FakeTransport()))
     #expect(await ResultOutbox(fileURL: file).status(matchID) != .pending)
 }
+
+@Test func testOutboxKeepsOnRateLimit() async throws {
+    let t = FakeTransport([.http(429, #"{"message":"rate limited"}"#)])
+    let box = ResultOutbox(fileURL: nil)
+    await box.put(entry(result(9, 7)))
+    await box.flush(using: client(MemoryStore(credentials()), t))
+    #expect(await box.status(matchID) == .pending)
+}
+
+@Test func testOutboxKeepsOnHTMLSuccess() async throws {
+    let t = FakeTransport([.http(200, "<html>Wi-Fi login</html>")])
+    let box = ResultOutbox(fileURL: nil)
+    await box.put(entry(result(9, 7)))
+    await box.flush(using: client(MemoryStore(credentials()), t))
+    #expect(await box.status(matchID) == .pending)
+}
+
+@Test func testOutboxSendsPutDuringFlush() async throws {
+    // Um resultado que chega a meio do envio segue no mesmo `flush`.
+    let other = UUID(uuidString: "6f1c2a4e-0000-4000-8000-000000000009")!
+    let box = ResultOutbox(fileURL: nil)
+    let late = entry(result(6, 3), other)
+    let t = FakeTransport([.act({ await box.put(late) }, 200, "{}"), .http(200, "{}")])
+    await box.put(entry(result(9, 7)))
+    await box.flush(using: client(MemoryStore(credentials()), t))
+    #expect(await box.status(matchID) == .sent)
+    #expect(await box.status(other) == .sent)
+    #expect(await t.requests.count == 2)
+}
