@@ -75,6 +75,9 @@ enum Labels {
         case .points(let total?): L.t("Pontos · até \(total)")
         case .gamesRound(let a, let b, nil): L.t("Jogos \(a)-\(b)")
         case .gamesRound(let a, let b, let total?): L.t("Jogos \(a)-\(b) · até \(total)")
+        case .paused: L.t("Em pausa")
+        case .setPoint: L.t("Ponto de set")
+        case .matchPoint: L.t("Ponto de jogo")
         }
     }
 

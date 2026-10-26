@@ -570,6 +570,36 @@
           }
         }
       }
+    },
+    "Em pausa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Paused"
+          }
+        }
+      }
+    },
+    "Ponto de set": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Set point"
+          }
+        }
+      }
+    },
+    "Ponto de jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Match point"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

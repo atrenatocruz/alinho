@@ -120,6 +120,10 @@ public struct MatchState: Codable, Equatable, Sendable {
     public var lastOurServer: Player?
     public var tieBreakFirstServer: Team?
     public let startedAt: Date
+    /// Em pausa desde; `nil` = a jogar.
+    public var pausedAt: Date? = nil
+    /// Tempo já passado em pausas fechadas.
+    public var pausedSeconds: TimeInterval = 0
     public var endedAt: Date?
     public var endReason: EndReason?
     public var winner: Team?
@@ -161,6 +165,8 @@ extension MatchState {
         lastOurServer = try c.decodeIfPresent(Player.self, forKey: .lastOurServer)
         tieBreakFirstServer = try c.decodeIfPresent(Team.self, forKey: .tieBreakFirstServer)
         startedAt = try c.decode(Date.self, forKey: .startedAt)
+        pausedAt = try c.decodeIfPresent(Date.self, forKey: .pausedAt)
+        pausedSeconds = try c.decodeIfPresent(TimeInterval.self, forKey: .pausedSeconds) ?? 0
         endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
         endReason = try c.decodeIfPresent(EndReason.self, forKey: .endReason)
         winner = try c.decodeIfPresent(Team.self, forKey: .winner)

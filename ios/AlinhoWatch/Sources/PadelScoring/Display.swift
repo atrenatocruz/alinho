@@ -20,6 +20,19 @@ public enum StatusLabel: Equatable, Sendable {
     case points(total: Int?)
     /// Pontos por jogos: «Jogos 5-3 · até 24».
     case gamesRound(us: Int, them: Int, total: Int?)
+    case paused
+    /// O próximo ponto de alguém fecha um set.
+    case setPoint
+    /// O próximo ponto de alguém acaba o jogo todo.
+    case matchPoint
+
+    /// Estados do 40-40, que ganham a tudo menos à pausa.
+    var isDeuceState: Bool {
+        switch self {
+        case .goldenPoint, .starPoint, .deuce, .advantage: true
+        default: false
+        }
+    }
 }
 
 public struct ScoreDisplay: Equatable, Sendable {
@@ -57,6 +70,11 @@ public struct ServeInfo: Equatable, Sendable {
 private let gameValues = ["0", "15", "30", "40"]
 
 /// Duração para o ecrã de fim: «45 min», «1 h 22 min» (mínimo 1 min).
+/// Minutos de jogo na linha de estado: «23 min» (arredonda para baixo).
+public func minutesText(_ seconds: TimeInterval) -> String {
+    "\(Int(max(0, seconds) / 60)) min"
+}
+
 public func durationText(from start: Date, to end: Date) -> String {
     let minutes = max(1, Int((end.timeIntervalSince(start) / 60).rounded()))
     return minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min"
@@ -78,6 +96,30 @@ extension MatchState {
         var parts = sets.map { "\($0.us)-\($0.them)" }
         if endReason == .stopped && (games[0] > 0 || games[1] > 0) { parts.append("\(games[0])-\(games[1])") }
         return parts.isEmpty ? "0-0" : parts.joined(separator: " ")
+    }
+
+    /// Tempo de jogo até `date`, sem as pausas.
+    public func elapsed(at date: Date) -> TimeInterval {
+        let end = endedAt ?? date
+        let open = pausedAt.map { max(0, end.timeIntervalSince($0)) } ?? 0
+        return max(0, end.timeIntervalSince(startedAt) - pausedSeconds - open)
+    }
+
+    /// A linha de estado do marcador. `nil` = mostra `setsLine`.
+    public var statusLine: StatusLabel? {
+        if pausedAt != nil { return .paused }
+        let status = display.status
+        if let status, status.isDeuceState { return status }
+        if !isOver && !isRallyPoints {
+            var setPoint = false
+            for team in [Team.us, .them] {
+                let events = Scoring.point(self, to: team, at: startedAt).events
+                if events.contains(.matchOver) { return .matchPoint }
+                if events.contains(.setWon) { setPoint = true }
+            }
+            if setPoint { return .setPoint }
+        }
+        return status
     }
 
     /// `nil` quando não se mostra quem serve.

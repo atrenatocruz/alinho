@@ -37,7 +37,7 @@ struct ScoreboardView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                topLine(display.status)
+                topLine(match.statusLine)
             }
         }
     }
