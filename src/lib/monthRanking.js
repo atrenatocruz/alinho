@@ -51,6 +51,27 @@ export function splitMonthRanking(rows) {
   }
 }
 
+/** O filtro «Quem sigo» (Francisco, 23 out; BA-ESTATISTICAS-E-SAUDE §4): a
+ *  mesma lista, só com as pessoas que sigo e eu. Serve para o Ranking do mês
+ *  (get_month_ranking) e para o geral (get_global_rankings): as duas já
+ *  trazem toda a gente (perfis privados incluídos; os professores que
+ *  pediram para não aparecer já não vêm). `followingIds` vem do
+ *  list_following (só os seguimentos aceites). Cada linha guarda o lugar do
+ *  ranking inteiro (`place`) e leva `followPlace`, o lugar entre as pessoas
+ *  que sigo (as empatadas no ranking ficam empatadas aqui). As linhas sem
+ *  `place` (ainda sem os 4 jogos) ficam sem `followPlace`. */
+export function followingOnly(rows, followingIds = [], myId = null, { idKey = 'user_id' } = {}) {
+  const keep = new Set([...(followingIds || []), myId].filter(Boolean))
+  const list = (rows || []).filter((r) => keep.has(r[idKey]))
+  const placed = list.filter((r) => r.place != null).sort((a, b) => a.place - b.place)
+  const at = new Map()
+  placed.forEach((r, i) => {
+    const prev = placed[i - 1]
+    at.set(r, prev && prev.place === r.place ? at.get(prev) : i + 1)
+  })
+  return list.map((r) => ({ ...r, followPlace: at.get(r) ?? null }))
+}
+
 /** O mês como «2026-10-01» (o que a função recebe) a partir de uma data. */
 export const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 

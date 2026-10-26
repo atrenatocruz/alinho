@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shortName, monthPoints, monthPointsMuted, splitMonthRanking, monthGender, monthTitle, nextMonthKey, monthName } from './monthRanking'
+import { shortName, monthPoints, monthPointsMuted, splitMonthRanking, monthGender, monthTitle, nextMonthKey, monthName, followingOnly } from './monthRanking'
 import i18n from './i18n'
 
 describe('ranking do mês: textos', () => {
@@ -55,5 +55,25 @@ describe('ranking do mês: pódio, lista e «Tu»', () => {
     expect(out.me.games).toBe(2)
     expect(out.qualifiedCount).toBe(1)
     expect(splitMonthRanking([row(1, 'a')]).me).toBe(null)
+  })
+})
+
+describe('«Quem sigo» (23 out)', () => {
+  const rows = [
+    { user_id: 'a', place: 1 }, { user_id: 'b', place: 2 }, { user_id: 'c', place: 2 },
+    { user_id: 'eu', place: 4 }, { user_id: 'd', place: 5 }, { user_id: 'e', place: null },
+  ]
+  it('só quem sigo e eu, com o lugar do ranking inteiro e o lugar entre eles', () => {
+    const r = followingOnly(rows, ['b', 'c', 'e'], 'eu')
+    expect(r.map((x) => x.user_id)).toEqual(['b', 'c', 'eu', 'e'])
+    expect(r.map((x) => x.place)).toEqual([2, 2, 4, null])
+    expect(r.map((x) => x.followPlace)).toEqual([1, 1, 3, null])
+  })
+  it('sem seguir ninguém, fico só eu', () => {
+    expect(followingOnly(rows, [], 'eu').map((x) => x.user_id)).toEqual(['eu'])
+  })
+  it('o geral usa id em vez de user_id', () => {
+    expect(followingOnly([{ id: 'a', place: 1 }, { id: 'b', place: 2 }], ['b'], null, { idKey: 'id' })[0])
+      .toMatchObject({ id: 'b', followPlace: 1 })
   })
 })
