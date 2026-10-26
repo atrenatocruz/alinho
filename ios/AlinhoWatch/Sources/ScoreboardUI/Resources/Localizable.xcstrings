@@ -1,0 +1,1166 @@
+{
+  "sourceLanguage": "pt-PT",
+  "strings": {
+    "Novo jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "New match"
+          }
+        }
+      }
+    },
+    "Começar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Start"
+          }
+        }
+      }
+    },
+    "Formato": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Format"
+          }
+        }
+      }
+    },
+    "Aos 40-40": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "At 40-40"
+          }
+        }
+      }
+    },
+    "Ponto de ouro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Golden point"
+          }
+        }
+      }
+    },
+    "Star Point": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Star Point"
+          }
+        }
+      }
+    },
+    "Vantagens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Advantages"
+          }
+        }
+      }
+    },
+    "Quem serve": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Serving first"
+          }
+        }
+      }
+    },
+    "Quem serve primeiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Who serves first"
+          }
+        }
+      }
+    },
+    "Não mostrar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Don't show"
+          }
+        }
+      }
+    },
+    "Nós": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Us"
+          }
+        }
+      }
+    },
+    "Eles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Them"
+          }
+        }
+      }
+    },
+    "Desfazer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Undo"
+          }
+        }
+      }
+    },
+    "Iguais": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Deuce"
+          }
+        }
+      }
+    },
+    "Iguais %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Deuce %lld"
+          }
+        }
+      }
+    },
+    "Vantagem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Advantage"
+          }
+        }
+      }
+    },
+    "Vantagem %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Advantage %lld"
+          }
+        }
+      }
+    },
+    "Vant.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ad."
+          }
+        }
+      }
+    },
+    "Tie-break a 7": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tie-break to 7"
+          }
+        }
+      }
+    },
+    "Super tie-break a 10": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Super tie-break to 10"
+          }
+        }
+      }
+    },
+    "Pontos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Points"
+          }
+        }
+      }
+    },
+    "Pontos · até %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Points · to %lld"
+          }
+        }
+      }
+    },
+    "Total: %lld pontos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total: %lld points"
+          }
+        }
+      }
+    },
+    "%lld pontos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%lld points"
+          }
+        }
+      }
+    },
+    "Sem total": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No total"
+          }
+        }
+      }
+    },
+    "Total da ronda": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Round total"
+          }
+        }
+      }
+    },
+    "Trocar de lado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Change ends"
+          }
+        }
+      }
+    },
+    "%@ · Nós servimos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ · We serve"
+          }
+        }
+      }
+    },
+    "%@ · Eles servem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ · They serve"
+          }
+        }
+      }
+    },
+    "Quem recebe escolhe o lado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Receivers choose the side"
+          }
+        }
+      }
+    },
+    "Ganharam Nós": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "We won"
+          }
+        }
+      }
+    },
+    "Ganharam Eles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "They won"
+          }
+        }
+      }
+    },
+    "Empatado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Draw"
+          }
+        }
+      }
+    },
+    "Terminado antes do fim.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ended early."
+          }
+        }
+      }
+    },
+    "O jogo a meio (%@) não conta.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "The game in progress (%@) doesn't count."
+          }
+        }
+      }
+    },
+    "Terminado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ended"
+          }
+        }
+      }
+    },
+    "Últimos jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Recent matches"
+          }
+        }
+      }
+    },
+    "Ainda não há jogos. Acaba um e aparece aqui.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No matches yet. Finish one and it shows up here."
+          }
+        }
+      }
+    },
+    "Terminar o jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "End match"
+          }
+        }
+      }
+    },
+    "Terminar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "End"
+          }
+        }
+      }
+    },
+    "Cancelar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Mantém o dedo para terminar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hold to end"
+          }
+        }
+      }
+    },
+    "Desliza para voltar ao marcador": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Swipe back to the score"
+          }
+        }
+      }
+    },
+    "Melhor de 3 sets": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Best of 3 sets"
+          }
+        }
+      }
+    },
+    "2 sets + super tie-break": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "2 sets + super tie-break"
+          }
+        }
+      }
+    },
+    "Pro set a 9": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pro set to 9"
+          }
+        }
+      }
+    },
+    "1 set": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "1 set"
+          }
+        }
+      }
+    },
+    "Melhor de 3": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Best of 3"
+          }
+        }
+      }
+    },
+    "2 sets + super": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "2 sets + super"
+          }
+        }
+      }
+    },
+    "Aos 40-40 joga-se um ponto só.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "At 40-40 one point decides."
+          }
+        }
+      }
+    },
+    "Duas vantagens; se continuar, um ponto decide.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Two advantages; if still level, one point decides."
+          }
+        }
+      }
+    },
+    "Ganha quem fizer 2 pontos seguidos.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Win two points in a row."
+          }
+        }
+      }
+    },
+    "Se escolheres, o relógio mostra quem serve em cada jogo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "If you choose, the watch shows who serves each game."
+          }
+        }
+      }
+    },
+    "%lld jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%lld games"
+          }
+        }
+      }
+    },
+    "Total: %lld jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total: %lld games"
+          }
+        }
+      }
+    },
+    "Jogos %lld-%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Games %lld-%lld"
+          }
+        }
+      }
+    },
+    "Jogos %lld-%lld · até %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Games %lld-%lld · to %lld"
+          }
+        }
+      }
+    },
+    "Em pausa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Paused"
+          }
+        }
+      }
+    },
+    "Ponto de set": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Set point"
+          }
+        }
+      }
+    },
+    "Ponto de jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Match point"
+          }
+        }
+      }
+    },
+    "Eu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Me"
+          }
+        }
+      }
+    },
+    "O meu parceiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "My partner"
+          }
+        }
+      }
+    },
+    "Lado a lado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Side by side"
+          }
+        }
+      }
+    },
+    "Um por cima do outro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "One above the other"
+          }
+        }
+      }
+    },
+    "Marcador": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Scoreboard"
+          }
+        }
+      }
+    },
+    "Na nossa dupla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "In our pair"
+          }
+        }
+      }
+    },
+    "Na nossa dupla, serve primeiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "In our pair, serving first"
+          }
+        }
+      }
+    },
+    "Se escolheres, o relógio mostra quem serve e de que lado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "If you choose, the watch shows who serves and from which side."
+          }
+        }
+      }
+    },
+    "Com isto, o relógio diz quem serve e de que lado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "With this, the watch tells who serves and from which side."
+          }
+        }
+      }
+    },
+    "Muda só a arrumação. As regras e as cores ficam iguais.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Only the arrangement changes. Rules and colours stay the same."
+          }
+        }
+      }
+    },
+    "Servem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Serving"
+          }
+        }
+      }
+    },
+    "Tu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "You"
+          }
+        }
+      }
+    },
+    "Parceiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Partner"
+          }
+        }
+      }
+    },
+    "direita": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "right"
+          }
+        }
+      }
+    },
+    "esquerda": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "left"
+          }
+        }
+      }
+    },
+    "%@ de jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ played"
+          }
+        }
+      }
+    },
+    "Pausar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Continuar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Resume"
+          }
+        }
+      }
+    },
+    "Acertar o marcador": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fix the score"
+          }
+        }
+      }
+    },
+    "Acertar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fix"
+          }
+        }
+      }
+    },
+    "Quem serve agora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Who serves now"
+          }
+        }
+      }
+    },
+    "Vale do próximo ponto em diante.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Applies from the next point on."
+          }
+        }
+      }
+    },
+    "Mudar quem serve": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Change server"
+          }
+        }
+      }
+    },
+    "Vale a partir do próximo jogo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Applies from the next game."
+          }
+        }
+      }
+    },
+    "Aos 40-40 · a partir do próximo jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "At 40-40 · from the next game"
+          }
+        }
+      }
+    },
+    "Nós · eu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Us · me"
+          }
+        }
+      }
+    },
+    "Nós · o meu parceiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Us · my partner"
+          }
+        }
+      }
+    },
+    "Jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Games"
+          }
+        }
+      }
+    },
+    "Toca num número e roda a coroa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tap a number and turn the crown."
+          }
+        }
+      }
+    },
+    "Guardar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Save"
+          }
+        }
+      }
+    },
+    "Terminar o jogo?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "End the game?"
+          }
+        }
+      }
+    },
+    "Contam os sets e os jogos fechados. O jogo a meio não conta.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Closed sets and games count. The game in progress does not."
+          }
+        }
+      }
+    },
+    "Ainda estão a jogar?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Still playing?"
+          }
+        }
+      }
+    },
+    "Não há pontos há 20 minutos.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No points for 20 minutes."
+          }
+        }
+      }
+    },
+    "Sem acesso ao Saúde. O jogo conta na mesma; o treino não fica guardado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No access to Health. The match still counts; the workout is not saved."
+          }
+        }
+      }
+    },
+    "BPM": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "BPM"
+          }
+        }
+      }
+    },
+    "KCAL": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "KCAL"
+          }
+        }
+      }
+    },
+    "BPM MÉDIO": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "AVG BPM"
+          }
+        }
+      }
+    },
+    "Treino": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Workout"
+          }
+        }
+      }
+    },
+    "Quão duro foi?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "How hard was it?"
+          }
+        }
+      }
+    },
+    "Roda a coroa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Turn the crown"
+          }
+        }
+      }
+    },
+    "Saltar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Skip"
+          }
+        }
+      }
+    },
+    "Fácil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Easy"
+          }
+        }
+      }
+    },
+    "Moderado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Moderate"
+          }
+        }
+      }
+    },
+    "Difícil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hard"
+          }
+        }
+      }
+    },
+    "No limite": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "All out"
+          }
+        }
+      }
+    },
+    "Ganhámos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "We won"
+          }
+        }
+      }
+    },
+    "Ganharam eles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "They won"
+          }
+        }
+      }
+    },
+    "Terminado antes do fim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ended early"
+          }
+        }
+      }
+    },
+    "Para sair, carrega na coroa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "To leave, press the crown."
+          }
+        }
+      }
+    },
+    "esforço %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "effort %lld"
+          }
+        }
+      }
+    },
+    "Set sem fim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Timed set"
+          }
+        }
+      }
+    },
+    "Pontos corridos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total points"
+          }
+        }
+      }
+    },
+    "Pontos corridos · até %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total points · to %lld"
+          }
+        }
+      }
+    },
+    "Tie-break": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tie-break"
+          }
+        }
+      }
+    },
+    "Super tie-break": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Super tie-break"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

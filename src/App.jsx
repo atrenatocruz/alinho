@@ -24,6 +24,7 @@ import PersonalInfo from './pages/PersonalInfo'
 import ProfileXp from './pages/ProfileXp'
 import PartnerPage from './pages/PartnerPage'
 import PlayerStats from './pages/PlayerStats'
+import MeusNumeros from './pages/MeusNumeros'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -667,6 +668,16 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <PlayerStats />
+            </Guard>
+          }
+        />
+        {/* Os jogos do relógio (Apple Watch, Fase B): só na app de iPhone
+            aparece a entrada no Perfil; a página abre vazia noutro lado. */}
+        <Route
+          path="/perfil/numeros"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <MeusNumeros />
             </Guard>
           }
         />

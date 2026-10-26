@@ -1,0 +1,135 @@
+name: Relógio
+
+# Testes e build do marcador do Apple Watch (ios/AlinhoWatch). Não temos Mac
+# local: é aqui que se corre o `swift test` das regras e se compila a app.
+# O repositório é público, por isso os Macs do GitHub Actions são grátis.
+# O TestFlight sai do Codemagic (codemagic.yaml), não daqui.
+on:
+  push:
+    paths:
+      - 'ios/AlinhoWatch/**'
+      - 'ios/App/App.xcodeproj/**'
+      - '.github/workflows/watch.yml'
+      - '.github/scripts/watch-screenshots.sh'
+  workflow_dispatch:
+    inputs:
+      extra:
+        description: 'O que correr além dos testes e da build do relógio'
+        type: choice
+        default: screenshots
+        options:
+          - screenshots
+          - ios-embed
+
+permissions:
+  contents: read
+
+# Um push novo cancela a build anterior do mesmo branch, mas não as corridas à mão.
+concurrency:
+  group: watch-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  scoring:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Testes das regras
+        working-directory: ios/AlinhoWatch
+        run: swift test
+
+  # Compila a app do relógio para o simulador (sem assinatura).
+  watch-app:
+    needs: scoring
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # O Xcode resolve todos os pacotes do projeto, e os do Capacitor estão em
+      # node_modules (ios/App/CapApp-SPM/Package.swift).
+      - name: Pacotes do Capacitor
+        run: npm ci
+
+      # O @capacitor-community/apple-sign-in 7.1.0 pede o capacitor-swift-pm 7 e o
+      # resto do Capacitor pede o 8: o Xcode não resolve os pacotes do projeto.
+      # O relógio não usa esse plugin, por isso aqui tira-se só para compilar.
+      - name: Tirar o Sign in with Apple (conflito de versões do Capacitor)
+        run: sed -i '' '/AppleSignIn/d' ios/App/CapApp-SPM/Package.swift
+
+      - name: Compilar a app do relógio
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme AlinhoWatch \
+            -destination 'generic/platform=watchOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | grep -E "error:|BUILD (SUCCEEDED|FAILED)|The following build commands failed" ; exit ${PIPESTATUS[0]}
+
+  # À mão (Actions → Relógio → Run workflow): prova que a app de iPhone compila
+  # com o relógio lá dentro, como o Codemagic a vai compilar.
+  ios-embed:
+    if: github.event_name == 'workflow_dispatch' && inputs.extra == 'ios-embed'
+    needs: watch-app
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Web app e Capacitor
+        run: npm ci && npm run build && npx cap sync ios
+
+      - name: Compilar a app de iPhone com o relógio
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | grep -E "error:|BUILD (SUCCEEDED|FAILED)|The following build commands failed" ; exit ${PIPESTATUS[0]}
+
+  # À mão (Run workflow → screenshots): prints de cada ecrã em 41/42 mm e 45/46 mm,
+  # em português e inglês, para a UX e o Francisco verem antes do TestFlight.
+  # A app arranca com `-screenshot <nome>` (ScreenshotFixtures.swift).
+  screenshots:
+    if: github.event_name == 'workflow_dispatch' && inputs.extra == 'screenshots'
+    needs: watch-app
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Pacotes do Capacitor
+        run: npm ci && sed -i '' '/AppleSignIn/d' ios/App/CapApp-SPM/Package.swift
+
+      - name: Simuladores e prints
+        run: bash .github/scripts/watch-screenshots.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relogio-prints
+          path: prints/

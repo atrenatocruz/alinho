@@ -20,7 +20,7 @@ const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 // confirm with), which the parent handles by disabling the ranked toggle's
 // meaning, not here — this component only cares about collecting one or
 // the other.
-function PlayerOrGuestSlot({ label, selected, onSelect, onClear, guestName, onGuestNameChange, excludeIds }) {
+export function PlayerOrGuestSlot({ label, selected, onSelect, onClear, guestName, onGuestNameChange, excludeIds }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState('search')
 
