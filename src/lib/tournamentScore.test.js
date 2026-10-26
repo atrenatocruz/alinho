@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { byCourt, countsForRanking, needsDecider, resultProblem, retirementScore, walkoverScore, winnerSide } from './tournamentScore'
+import { byCourt, countsForRanking, needsDecider, resultProblem, retirementScore, walkoverScore, scoringForStage, winnerSide } from './tournamentScore'
 
 describe('falta e desistência (SPEC §7)', () => {
   it('a falta dá o jogo pelo máximo da pontuação', () => {
@@ -125,5 +125,18 @@ describe('empates no torneio', () => {
     ]
     expect(tiedMatch(list)?.id).toBe(3)
     expect(tiedMatch(list.slice(0, 2))).toBe(null)
+  })
+})
+
+describe('pontuação pela fase do jogo (26 out)', () => {
+  it('grupos com a de sempre, eliminatórias com a própria', () => {
+    const rules = { scoring: 'pro_set_9', scoring_knockout: 'melhor_2_sets' }
+    expect(scoringForStage(rules, { stage: 'grupo' })).toBe('pro_set_9')
+    expect(scoringForStage(rules, { stage: 'principal' })).toBe('melhor_2_sets')
+    expect(scoringForStage(rules, '3lugar')).toBe('melhor_2_sets')
+  })
+  it('sem a das eliminatórias, vale a dos grupos (os torneios de antes)', () => {
+    expect(scoringForStage({ scoring: 'melhor_3_sets' }, { stage: 'principal' })).toBe('melhor_3_sets')
+    expect(scoringForStage(null, { stage: 'grupo' })).toBe('pro_set_9')
   })
 })
