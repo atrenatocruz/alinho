@@ -199,6 +199,57 @@ O iPhone recebe os jogos pelo plugin local `WatchGames`
 do `Main.storyboard`). Os jogos e a saúde ficam num ficheiro no telemóvel; ao
 servidor só vai o que se regista como jogo entre amigos e os desafios.
 
+### Jogos do mix no relógio (Fase A)
+
+Desenho: `docs/superpowers/specs/2026-10-26-relogio-mix-a-decorrer-design.md`;
+plano: `docs/superpowers/plans/2026-10-26-relogio-mix-fase-a.md`. Branch
+`feature/relogio-mix`.
+
+**Sessão do relógio.** O relógio fala diretamente com o Supabase, sem o iPhone
+pelo meio. Usa uma sessão própria: a do iPhone não serve, porque a rotação do
+refresh token fazia cair um dos dois.
+
+- A app do iPhone (`src/lib/watchSession.js`, chamado pelo `AuthContext` ao
+  entrar, ao voltar ao primeiro plano e quando o relógio pede) chama a Edge
+  Function `watch-session` (`supabase/functions/watch-session/index.ts`).
+- Essa função cria uma sessão nova para quem chama e devolve-a.
+- O plugin `WatchGames` entrega-a ao relógio por `updateApplicationContext`. A
+  chave é `"session"`, com um texto JSON:
+  `{access_token, refresh_token, expires_at (segundos), user_id, supabase_url,
+  anon_key}`. Ao sair da conta, o valor é `"none"`.
+- O relógio guarda a sessão no Keychain e renova-a sozinho
+  (`ios/AlinhoWatch/Sources/AlinhoSync`).
+- Sem sessão, o relógio pede uma com `transferUserInfo(["kind": "needSession"])`.
+- Contas sem email recebem `no_email` e não conseguem ligar o relógio.
+
+**No servidor (à mão, primeiro no dev e depois em produção, antes de ir para
+`main`):**
+
+1. Correr `supabase/migration_relogio_mix_a.sql` no SQL Editor. A migração cria
+   a tabela `mix_live_scores`, as RPCs `list_my_watch_mix_matches` e
+   `claim_mix_match`, e altera o `save_mix_match_result`. Depois correr o teste
+   `supabase/tests/relogio_mix_a.sql`, com os ids preenchidos: todas as linhas
+   têm de dar `OK`.
+2. Fazer o deploy da função:
+   `npx supabase functions deploy watch-session --project-ref <projeto>`.
+   Verificar com o `curl` do comentário no topo do ficheiro. Tem de dar 200, com
+   um `refresh_token` diferente do da app, e a sessão da app tem de continuar
+   válida.
+
+**Ensaio no dev**, com um mix de 1 campo, 4 contas e pelo menos um relógio:
+
+1. O relógio de um jogador mostra o jogo em «Jogos do mix». Ele carrega
+   «Começar» e o marcador abre no formato do mix.
+2. Outro dos 4 vê «A ser contado por …».
+3. Jogar até ao fim. O resultado aparece no mix, do lado certo (testar
+   também a contar pela equipa B), com «marcado por …».
+4. Carregar em «Desfazer» depois do fim e acabar com outro resultado. O mix
+   mostra o novo.
+5. Com o iPhone em modo de voo, acabar um jogo: aparece «A enviar para o
+   mix…». Tirar o modo de voo: em ≤ 30 s aparece «Gravado no mix ✓».
+6. O admin fecha o mix com um resultado na fila: aparece «O mix já fechou…».
+7. Parar um pro set a meio (por exemplo 7-3) com «Terminar». O mix grava 7-3.
+
 ## Notificações push
 
 Os avisos do sino também chegam como notificação (só nas apps). Desenho:
