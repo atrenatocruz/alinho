@@ -104,3 +104,36 @@ private func bestOf3Record() -> MatchRecord {
     let r = MixResult(record: record(Scoring.stop(s, at: t0)), side: .a)
     #expect(r.scoreA == 21 && r.scoreB == 17 && r.sets == nil)
 }
+
+// MARK: - Jogo terminado a meio
+
+@Test func mixProSetStoppedMidSetUsesOpenGames() {
+    let (p, _) = games(match(.proSet9), "uuuuuuu" + "ttt")
+    let stopped = Scoring.stop(p, at: t0)
+    let a = MixResult(record: record(stopped), side: .a)
+    #expect(a.scoreA == 7 && a.scoreB == 3 && a.sets == nil)
+    let b = MixResult(record: record(stopped), side: .b)
+    #expect(b.scoreA == 3 && b.scoreB == 7 && b.sets == nil)
+}
+
+@Test func mixBestOf3StoppedSendsOnlyClosedSets() {
+    let (s, _) = games(match(.bestOf3), "uuuutttt uu" + "uuu ttt")
+    let r = MixResult(record: record(Scoring.stop(s, at: t0)), side: .a)
+    #expect(r.scoreA == 1 && r.scoreB == 0)
+    #expect(r.sets == [MixSet(score_a: 6, score_b: 4, is_super_tiebreak: false)])
+}
+
+@Test func mixBestOf3StoppedInFirstSetHasNoSets() {
+    let (s, _) = games(match(.bestOf3), "uuu tt")
+    let r = MixResult(record: record(Scoring.stop(s, at: t0)), side: .a)
+    #expect(r.scoreA == 0 && r.scoreB == 0 && r.sets == nil)
+}
+
+@Test func oldRecordWithoutOpenGamesDecodes() throws {
+    let (s, _) = games(match(.proSet9), "uuu")
+    var root = try JSONSerialization.jsonObject(with: JSONEncoder().encode(record(Scoring.stop(s, at: t0)))) as! [String: Any]
+    #expect(root["openGames"] != nil)
+    root.removeValue(forKey: "openGames")
+    let old = try JSONDecoder().decode(MatchRecord.self, from: JSONSerialization.data(withJSONObject: root))
+    #expect(old.openGames == [])
+}

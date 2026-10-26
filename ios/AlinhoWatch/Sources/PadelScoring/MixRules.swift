@@ -51,6 +51,9 @@ public enum MixRules {
 
 /// O resultado de um jogo acabado, como o RPC `save_mix_match_result` o quer:
 /// `sets` só nos formatos por sets; nos outros, `scoreA`/`scoreB` são jogos ou pontos.
+/// Não é o formato do fio: quem chama passa-o a `p_score_a`, `p_score_b` e `p_sets`.
+/// Nos formatos de melhor de 2/3 sets só vão os sets fechados: um set a meio quando
+/// se «Termina» não é enviado (o mix recusa 3-3).
 public struct MixResult: Codable, Equatable, Sendable {
     public let scoreA: Int
     public let scoreB: Int
@@ -67,7 +70,9 @@ public struct MixResult: Codable, Equatable, Sendable {
             scoreA = s.a; scoreB = s.b; sets = nil
         case .proSet9, .oneSet:
             // Um só set: o resultado são os jogos desse set.
-            let s = pair(r.sets.first?.us ?? 0, r.sets.first?.them ?? 0)
+            // Sem set fechado (jogo terminado a meio), valem os jogos em curso.
+            let one = r.sets.first.map { [$0.us, $0.them] } ?? r.openGames
+            let s = pair(one.first ?? 0, one.count > 1 ? one[1] : 0)
             scoreA = s.a; scoreB = s.b; sets = nil
         case .bestOf3, .twoSetsSuperTieBreak:
             let list = r.sets.map { set -> MixSet in
@@ -76,7 +81,7 @@ public struct MixResult: Codable, Equatable, Sendable {
             }
             scoreA = list.filter { $0.score_a > $0.score_b }.count
             scoreB = list.filter { $0.score_b > $0.score_a }.count
-            sets = list
+            sets = list.isEmpty ? nil : list
         }
     }
 }
