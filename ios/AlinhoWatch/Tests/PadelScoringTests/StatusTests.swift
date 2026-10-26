@@ -39,3 +39,14 @@ import Testing
 @Test func minutesTextFloors() {
     #expect(minutesText(59) == "0 min" && minutesText(23 * 60 + 40) == "23 min")
 }
+
+@Test func switchSidesScoreShowsTheRightNumbers() {
+    // Jogo a meio do set: os jogos do set.
+    #expect(games(match(), "uuu").0.switchSidesScore == [3, 0])
+    // Set acabado de fechar (6-3): esse set.
+    #expect(games(match(), "uuuuu ttt u").0.switchSidesScore == [6, 3])
+    // Super tie-break (6 pontos somados): os pontos, não o set anterior.
+    let (s, _) = games(match(.twoSetsSuperTieBreak), "uuuuuu tttttt")
+    #expect(s.phase == .superTieBreak)
+    #expect(play(s, "uuuutt").0.switchSidesScore == [4, 2])
+}
