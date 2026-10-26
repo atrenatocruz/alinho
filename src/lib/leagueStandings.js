@@ -3,14 +3,36 @@
 // status 'oficial'. Ninguém grava a tabela: calcula-se sempre daqui, por isso
 // corrigir um resultado nunca deixa pontos a mais nem a menos.
 //
-// Desempate (spec): pontos → confronto direto (só entre as empatadas) →
-// diferença de partidas → de sets → de jogos → sorteio que dá sempre o mesmo
-// resultado para a mesma categoria.
+// Desempate sem sorteio, como nos torneios (Francisco, 23 out: «sim claro»;
+// design-handoff/2026-10-23-desempate-grupos/LIGA-BA.md):
+//   1. pontos;
+//   2. faltas: quem perdeu mais encontros por falta fica atrás;
+//   3. os encontros entre as empatadas: pontos, diferença de partidas, de
+//      sets e de jogos, e jogos ganhos, só nesses encontros;
+//   4–7. diferença de partidas, de sets e de jogos, e jogos ganhos, em toda a
+//      categoria;
+//   8. o ranking da equipa guardado no início da liga;
+//   9. se mesmo assim ficarem iguais: o desempate gravado pelo organizador
+//      (league_tiebreaks) ou `tiedWith`, e escolhe o organizador. A app nunca
+//      sorteia sozinha.
+// Quando um critério separa parte das empatadas, as que ficam recomeçam do
+// primeiro critério.
 import { encounterTotals } from './leagueResult'
 
-export const TIEBREAK_ORDER = ['points', 'h2h', 'matches', 'sets', 'games', 'lot']
+export const TIEBREAK_ORDER = [
+  'points', 'walkovers',
+  'h2h_points', 'h2h_matches', 'h2h_sets', 'h2h_games', 'h2h_games_won',
+  'matches', 'sets', 'games', 'games_won', 'ranking',
+]
 
-/** FNV-1a de 32 bits: o «sorteio» determinístico. */
+/** O critério como o ecrã o mostra: o passo 3 tem um texto só. */
+const LABEL = {
+  walkovers: 'walkovers', h2h_points: 'h2h', h2h_matches: 'h2h', h2h_sets: 'h2h', h2h_games: 'h2h', h2h_games_won: 'h2h',
+  matches: 'matches', sets: 'sets', games: 'games', games_won: 'games_won', ranking: 'ranking',
+}
+
+/** FNV-1a de 32 bits. Já não decide nada (a liga deixou de sortear a 23
+    out); fica para quem ainda o importa. */
 export function lotKey(seed, teamId) {
   let h = 0x811c9dc5
   const s = `${seed}:${teamId}`
@@ -24,7 +46,7 @@ export function lotKey(seed, teamId) {
 const blank = (team) => ({
   teamId: team.id, name: team.name, played: 0, won: 0, drawn: 0, lost: 0,
   matchesFor: 0, matchesAgainst: 0, setsFor: 0, setsAgainst: 0, gamesFor: 0, gamesAgainst: 0,
-  points: 0, decidedBy: null,
+  points: 0, walkovers: 0, rating: team.rating ?? null, decidedBy: null,
 })
 
 function applyResult(row, r, side, rules) {
@@ -33,6 +55,7 @@ function applyResult(row, r, side, rules) {
   if (r.walkoverTeamId) {
     if (r.walkoverTeamId === row.teamId) {
       row.lost++
+      row.walkovers++
       row.points += rules.walkover
       row.matchesAgainst += r.matchesPerEncounter
     } else {
@@ -62,24 +85,46 @@ function table(teams, results, rules) {
   return rows
 }
 
-export function leagueStandings(teams, results, rules, seed) {
+/** `teams`: [{ id, name, rating? }] — `rating` é o ranking da equipa no
+    início da liga. `tiebreaks`: as escolhas do organizador gravadas para esta
+    categoria ([{ team_ids, ranking }]). `seed` já não é usado. */
+export function leagueStandings(teams, results, rules, seed, { tiebreaks = [] } = {}) {
   const all = table(teams, results, rules)
   const key = {
     points: (row) => row.points,
+    walkovers: (row) => -row.walkovers,
     matches: (row) => row.matchesFor - row.matchesAgainst,
     sets: (row) => row.setsFor - row.setsAgainst,
     games: (row) => row.gamesFor - row.gamesAgainst,
-    lot: (row) => lotKey(seed, row.teamId),
+    games_won: (row) => row.gamesFor,
+    ranking: (row) => (row.rating == null ? -Infinity : Number(row.rating)),
   }
-  const order = (group, idx) => {
-    if (group.length < 2 || idx >= TIEBREAK_ORDER.length) return group
+  const miniKey = {
+    h2h_points: (r) => r.points,
+    h2h_matches: (r) => r.matchesFor - r.matchesAgainst,
+    h2h_sets: (r) => r.setsFor - r.setsAgainst,
+    h2h_games: (r) => r.gamesFor - r.gamesAgainst,
+    h2h_games_won: (r) => r.gamesFor,
+  }
+  const order = (group, idx, label = null) => {
+    if (group.length < 2) return group.map((row) => (label ? { ...row, decidedBy: label } : row))
+    if (idx >= TIEBREAK_ORDER.length) {
+      const ids = group.map((g) => g.teamId)
+      const keyOf = (list) => [...list].sort().join(',')
+      const record = tiebreaks.find((t) => keyOf(t.team_ids || []) === keyOf(ids) && (t.ranking || []).length === ids.length)
+      if (record) {
+        const at = new Map(record.ranking.map((id, i) => [id, i]))
+        return [...group].sort((a, b) => at.get(a.teamId) - at.get(b.teamId)).map((row) => ({ ...row, decidedBy: 'organizer' }))
+      }
+      return group.map((row) => ({ ...row, decidedBy: label, tiedWith: ids.filter((id) => id !== row.teamId) }))
+    }
     const name = TIEBREAK_ORDER[idx]
     let score = key[name]
-    if (name === 'h2h') {
+    if (miniKey[name]) {
       const ids = new Set(group.map((g) => g.teamId))
       const mini = table(group.map((g) => ({ id: g.teamId, name: g.name })),
         results.filter((r) => ids.has(r.homeId) && ids.has(r.awayId)), rules)
-      score = (row) => mini.get(row.teamId).points
+      score = (row) => miniKey[name](mini.get(row.teamId))
     }
     const buckets = new Map()
     for (const row of group) {
@@ -87,11 +132,13 @@ export function leagueStandings(teams, results, rules, seed) {
       if (!buckets.has(k)) buckets.set(k, [])
       buckets.get(k).push(row)
     }
+    if (buckets.size === 1) return order(group, idx + 1, label)
+    // Separar pelos pontos (o primeiro critério) não é um desempate. Os
+    // outros ficam como o critério que separou cada equipa; se um desempate
+    // posterior separar outra vez, fica o último.
+    const next = idx === 0 ? label : LABEL[name]
     const keys = [...buckets.keys()].sort((a, b) => b - a)
-    // Quando o grupo se separa neste critério, cada linha fica com ele; se
-    // um desempate posterior separar outra vez, sobrescreve com o último.
-    if (idx > 0 && keys.length > 1) for (const row of group) row.decidedBy = name
-    return keys.flatMap((k) => order(buckets.get(k), idx + 1))
+    return keys.flatMap((k) => order(buckets.get(k), 0, next))
   }
   return order([...all.values()], 0).map((row, i) => ({ ...row, position: i + 1 }))
 }
