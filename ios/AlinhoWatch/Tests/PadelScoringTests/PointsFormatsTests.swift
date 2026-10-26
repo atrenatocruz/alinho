@@ -70,3 +70,9 @@ private func rep(_ c: Character, _ n: Int) -> String { String(repeating: c, coun
     let draw = Scoring.stop(games(match(.endlessSet), "ut").0, at: t0)
     #expect(draw.winner == nil && draw.resultText == "1-1")
 }
+
+@Test func endlessSetStopIsItsNormalEnd() {
+    // «Terminar» é o fim normal do Set sem fim: não é «Terminado antes do fim».
+    let stopped = Scoring.stop(games(match(.endlessSet), "uut").0, at: t0)
+    #expect(stopped.endReason == .rules && stopped.winner == .us && stopped.resultText == "2-1")
+}
