@@ -56,6 +56,21 @@ enum Labels {
         }
     }
 
+    /// Nas listas do Novo jogo: «Eu», «O meu parceiro».
+    static func player(_ p: Player) -> String {
+        switch p {
+        case .me: L.t("Eu")
+        case .partner: L.t("O meu parceiro")
+        }
+    }
+
+    static func layout(_ l: ScoreLayout) -> String {
+        switch l {
+        case .side: L.t("Lado a lado")
+        case .stack: L.t("Um por cima do outro")
+        }
+    }
+
     static func pointsTotal(_ total: Int?) -> String {
         guard let total else { return L.t("Sem total") }
         return L.t("\(total) jogos")

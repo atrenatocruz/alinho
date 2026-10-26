@@ -18,6 +18,16 @@ enum ScreenshotFixtures {
         switch name {
         case "setup":
             return Fixture(session: MatchSession())
+        case "setupPoints":
+            var s = MatchSession()
+            s.config = MatchConfig(format: .points, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
+            return Fixture(session: s)
+        case "setupServeUs":
+            var s = MatchSession()
+            s.config = MatchConfig(format: .bestOf3, deuceMode: .starPoint, firstServer: .us, pointsTotal: 24)
+            s.config.ourFirstServer = .partner
+            s.config.layout = .stack
+            return Fixture(session: s)
         case "game":
             return Fixture(session: inGame())
         case "golden":

@@ -600,6 +600,106 @@
           }
         }
       }
+    },
+    "Eu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Me"
+          }
+        }
+      }
+    },
+    "O meu parceiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "My partner"
+          }
+        }
+      }
+    },
+    "Lado a lado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Side by side"
+          }
+        }
+      }
+    },
+    "Um por cima do outro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "One above the other"
+          }
+        }
+      }
+    },
+    "Marcador": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Scoreboard"
+          }
+        }
+      }
+    },
+    "Na nossa dupla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "In our pair"
+          }
+        }
+      }
+    },
+    "Na nossa dupla, serve primeiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "In our pair, serving first"
+          }
+        }
+      }
+    },
+    "Se escolheres, o relógio mostra quem serve e de que lado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "If you choose, the watch shows who serves and from which side."
+          }
+        }
+      }
+    },
+    "Com isto, o relógio diz quem serve e de que lado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "With this, the watch tells who serves and from which side."
+          }
+        }
+      }
+    },
+    "Muda só a arrumação. As regras e as cores ficam iguais.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Only the arrangement changes. Rules and colours stay the same."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

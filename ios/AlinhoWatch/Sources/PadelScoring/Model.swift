@@ -62,6 +62,11 @@ public struct SetScore: Codable, Equatable, Sendable {
     }
 }
 
+/// Arrumação dos blocos no marcador. Só muda o desenho, nunca as regras.
+public enum ScoreLayout: String, Codable, Equatable, Sendable, CaseIterable {
+    case side, stack
+}
+
 public struct MatchConfig: Codable, Equatable, Sendable {
     public var format: MatchFormat
     public var deuceMode: DeuceMode
@@ -71,6 +76,7 @@ public struct MatchConfig: Codable, Equatable, Sendable {
     public var pointsTotal: Int?
     /// Na nossa dupla, quem serve primeiro (só conta com `firstServer == .us`).
     public var ourFirstServer: Player = .me
+    public var layout: ScoreLayout = .side
 
     public init(format: MatchFormat, deuceMode: DeuceMode, firstServer: Team?, pointsTotal: Int?) {
         self.format = format
@@ -86,6 +92,7 @@ public struct MatchConfig: Codable, Equatable, Sendable {
         firstServer = try c.decodeIfPresent(Team.self, forKey: .firstServer)
         pointsTotal = try c.decodeIfPresent(Int.self, forKey: .pointsTotal)
         ourFirstServer = try c.decodeIfPresent(Player.self, forKey: .ourFirstServer) ?? .me
+        layout = try c.decodeIfPresent(ScoreLayout.self, forKey: .layout) ?? .side
     }
 
     public static let `default` = MatchConfig(format: .bestOf3, deuceMode: .golden, firstServer: nil, pointsTotal: 24)

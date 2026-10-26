@@ -35,5 +35,5 @@ import Testing
 @Test func configWithoutOurFirstServerDecodes() throws {
     let json = #"{"format":"m3","deuceMode":"ouro","pointsTotal":24}"#
     let c = try JSONDecoder().decode(MatchConfig.self, from: Data(json.utf8))
-    #expect(c.ourFirstServer == .me && c.firstServer == nil)
+    #expect(c.ourFirstServer == .me && c.firstServer == nil && c.layout == .side)
 }
