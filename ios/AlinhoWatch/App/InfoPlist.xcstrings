@@ -1,0 +1,40 @@
+{
+  "sourceLanguage": "pt-PT",
+  "strings": {
+    "NSHealthUpdateUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O alinho grava cada jogo como um treino de padel no Saúde, com a duração e as calorias."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "alinho saves each match as a padel workout in Health, with its duration and calories."
+          }
+        }
+      }
+    },
+    "NSHealthShareUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O alinho lê a pulsação e as calorias durante o jogo, para as mostrar no relógio e no fim."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "alinho reads your heart rate and calories during the match, to show them on the watch and at the end."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
