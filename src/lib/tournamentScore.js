@@ -8,6 +8,18 @@
 import { computeSetsResult } from './scoringLogic'
 import { proSetProblem } from './scoreRules'
 
+/** A pontuação de um jogo pela fase dele (Francisco, 26 out): os grupos
+ *  usam `rules.scoring`; as eliminatórias (quadro principal, quadro B e 3.º
+ *  lugar) usam `rules.scoring_knockout` e, sem ela, a mesma dos grupos — os
+ *  torneios que já existem ficam iguais. É a mesma regra da base de dados
+ *  (tournament_matches_result_guard). `match` pode ser o jogo ou só o
+ *  `stage` dele. */
+export function scoringForStage(rules, match) {
+  const stage = typeof match === 'string' ? match : match?.stage
+  const groups = rules?.scoring || 'pro_set_9'
+  return stage === 'grupo' ? groups : (rules?.scoring_knockout || groups)
+}
+
 /** O jogo dado por ganho vale o máximo da pontuação (SPEC §7: «ex. 9-0»).
  *  `loser` é 'a' ou 'b' — quem faltou ou desistiu. */
 export function walkoverScore(scoring, loser) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigationType } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { Home, Users, Trophy, ClipboardList, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,6 +20,7 @@ import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignu
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
 import LeagueNoticeRow, { LEAGUE_NOTICE_KINDS } from './league/LeagueNoticeRow'
+import PartnerNoticeRow, { PARTNER_NOTICE_KINDS } from './partners/PartnerNoticeRow'
 import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
 import { changesText } from '../lib/mixChanges'
@@ -27,6 +28,7 @@ import AccountDeletionPending from './AccountDeletionPending'
 import AppToast from './AppToast'
 import InstallPrompt from './InstallPrompt'
 import { IS_NATIVE } from '../lib/native'
+import { useSwipeTabs } from '../lib/useSwipeTabs'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 
@@ -370,6 +372,8 @@ export default function Layout({ children }) {
   // Convites para jogos entre amigos (#342): ficam até se responder.
   const [friendNotices, setFriendNotices] = useState([])
   const [leagueNotices, setLeagueNotices] = useState([])
+  // Avisos dos parceiros (códigos do mês para quem gere; prémio para quem ganhou).
+  const [partnerNotices, setPartnerNotices] = useState([])
   // Quem criou conta por causa de um convite por email fica logo com o
   // jogo: junta-se uma vez por sessão do browser (Dev 3, #342).
   useEffect(() => {
@@ -386,6 +390,7 @@ export default function Layout({ children }) {
       setTournamentNotices([])
       setFriendNotices([])
       setLeagueNotices([])
+      setPartnerNotices([])
       return
     }
     let cancelled = false
@@ -397,6 +402,7 @@ export default function Layout({ children }) {
         setTournamentNotices(data.filter((n) => TOURNAMENT_NOTICE_KINDS.includes(n.kind)))
         setFriendNotices(data.filter((n) => FRIEND_NOTICE_KINDS.includes(n.kind)))
         setLeagueNotices(data.filter((n) => LEAGUE_NOTICE_KINDS.includes(n.kind)))
+        setPartnerNotices(data.filter((n) => PARTNER_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {
@@ -428,6 +434,12 @@ export default function Layout({ children }) {
   const openLessonNotice = (notice) => {
     setShowNotifications(false)
     setLessonNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
+  const openPartnerNotice = (notice) => {
+    setShowNotifications(false)
+    setPartnerNotices((list) => list.filter((n) => n.id !== notice.id))
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
@@ -504,7 +516,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length + leagueNotices.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length + leagueNotices.length + partnerNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -551,7 +563,8 @@ export default function Layout({ children }) {
     // where it was (Trello #430, #438).
     if (location.state?.keepScroll) return
 
-    const target = navigationType === 'POP' ? (scrollPositions.current.get(locationKey) ?? 0) : 0
+    // Chegar a um ecrã do menu a deslizar o dedo devolve-o onde estava (swipeTop, useSwipeTabs).
+    const target = navigationType === 'POP' ? (scrollPositions.current.get(locationKey) ?? 0) : (location.state?.swipeTop ?? 0)
     if (target === 0) {
       el.scrollTo(0, 0)
       return
@@ -617,6 +630,21 @@ export default function Layout({ children }) {
   // e outra vez quando a letra acaba de carregar.
   const labelRefs = useRef({})
   const [pillW, setPillW] = useState({})
+  // A pastilha do escolhido é uma só, que desliza de um item para o outro
+  // (220 ms, a curva das folhas), para se perceber de onde para onde se foi
+  // (UX, 21 out; deslizar entre separadores). Segue a caixa do item ativo.
+  const navBoxRef = useRef(null)
+  const pillRef = useRef(null)
+  // Deslizar o dedo para o lado, em cima do menu, muda de separador
+  // (Francisco, 21 out; só no menu, não na página, a 23 out).
+  const contentRef = useRef(null)
+  const navigate = useNavigate()
+  useSwipeTabs({
+    mainRef, contentRef, areaRef: navBoxRef, pillRef, paths: navItems.map((n) => n.path), current: location.pathname,
+    onSwitch: (path, top) => navigate(path, { state: { swipeTop: top } }),
+  })
+  const linkRefs = useRef({})
+  const [pill, setPill] = useState(null)
   const labelsKey = navItems.map((n) => n.label).join('|')
   useLayoutEffect(() => {
     const measure = () => {
@@ -629,6 +657,18 @@ export default function Layout({ children }) {
     measure()
     document.fonts?.ready?.then(measure)
   }, [labelsKey])
+
+  useLayoutEffect(() => {
+    const box = navBoxRef.current
+    const el = linkRefs.current[location.pathname]
+    if (!box || !el) { setPill(null); return }
+    // Os itens mudam de largura com transição (200 ms): mede-se no fim também.
+    const place = () => setPill({ left: el.offsetLeft, width: el.offsetWidth })
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [location.pathname, labelsKey])
 
   // Notificações — só o que sobra do antigo header escuro (o «Sair» passou
   // para o fim do Perfil a 13 out; o
@@ -712,6 +752,9 @@ export default function Layout({ children }) {
                   ))}
                   {leagueNotices.map((notice) => (
                     <LeagueNoticeRow key={notice.id} notice={notice} onOpen={openLeagueNotice} />
+                  ))}
+                  {partnerNotices.map((notice) => (
+                    <PartnerNoticeRow key={notice.id} notice={notice} onOpen={openPartnerNotice} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link
@@ -894,6 +937,7 @@ export default function Layout({ children }) {
             iPhone sem botão) e o pb-28 fixo (7rem) não crescia com ela, por
             isso o último item da lista ficava por baixo. Aqui a mesma conta. */}
         <div
+          ref={contentRef}
           className="max-w-2xl mx-auto px-4 pt-6 animate-fade-up"
           style={{ paddingBottom: 'calc(6rem + var(--nav-bottom))' }}
         >
@@ -918,11 +962,18 @@ export default function Layout({ children }) {
             (Francisco, 13 out — design-handoff/2026-10-13-menu-largura-toda).
             O escolhido tem a largura do texto; os outros repartem o resto. */}
         <div
-          className="pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
+          ref={navBoxRef}
+          // touch-none: o dedo para o lado em cima do menu é nosso (deslizar entre separadores).
+          className="relative touch-none pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10"
         >
+          {pill && (
+            <span ref={pillRef} aria-hidden="true"
+              className="absolute top-1 bottom-1 rounded-full bg-white/15 transition-[left,width] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+              style={{ left: pill.left, width: pill.width }} />
+          )}
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path
             const isPerfil = path === '/perfil'
@@ -930,6 +981,7 @@ export default function Layout({ children }) {
             return (
               <Link
                 key={path}
+                ref={(el) => { linkRefs.current[path] = el }}
                 to={path}
                 onClick={(e) => {
                   // Tocar na Home já lá estando não deve empilhar mais uma
@@ -946,7 +998,7 @@ export default function Layout({ children }) {
                 className={`relative flex flex-col items-center justify-center h-12 rounded-full
                             transition-[min-width,background-color,color] duration-200 motion-reduce:transition-none ${
                   isActive
-                    ? 'bg-white/15 text-lime-400'
+                    ? `${pill ? '' : 'bg-white/15 '}text-lime-400`
                     : 'text-ink-200 hover:text-white'
                 }`}
               >

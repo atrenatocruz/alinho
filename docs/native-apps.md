@@ -142,6 +142,63 @@ Primeira build no TestFlight: 20 out 2026 (build nº 2 do Codemagic, commit `188
 
 O plano gratuito do Codemagic dá 500 minutos/mês em Mac M2; uma build demora ~10–15 min.
 
+## Apple Watch (marcador)
+
+Desenho: `docs/superpowers/specs/2026-10-22-apple-watch-marcador-fase1-design.md`
+(entrega do Francisco em `docs/design-handoff/2026-10-22-relogio/`) e, por cima,
+`docs/superpowers/specs/2026-10-26-relogio-prototipo-23out-design.md` (o protótipo
+aprovado a 23 out: Pontos por jogos, quem serve na dupla, pausa, acertar, treino no
+Saúde, esforço, «Os meus números» no iPhone e o registo como jogo entre amigos).
+
+- **Código**: `ios/AlinhoWatch/`, um Swift Package com `PadelScoring` (regras,
+  desfazer, gravação; testado) e `ScoreboardUI` (ecrãs, vibrações, sessão de
+  treino). O alvo `AlinhoWatch` no `ios/App/App.xcodeproj` só tem
+  `ios/AlinhoWatch/App/` (arranque, ícone, Info.plist, entitlements) e vai
+  embutido na app de iPhone («Embed Watch Content»). Bundle id
+  `pt.alinho.app.watchkitapp`; funciona sem a app do iPhone aberta.
+- **Testes e build**: GitHub Actions, workflow «Relógio» (`.github/workflows/watch.yml`).
+  Cada push que mexa no relógio corre o `swift test` das regras e compila a app
+  para o simulador. À mão (*Run workflow*): `screenshots` tira prints de todos os
+  ecrãs em dois tamanhos e duas línguas (artefacto `relogio-prints`); `ios-embed`
+  compila a app de iPhone com o relógio lá dentro.
+- **Branch**: `feature/apple-watch`. Não juntar ao `dev` enquanto o relógio não
+  puder ir para o público: a próxima versão de iPhone enviada para revisão leva-o.
+
+Configuração única (painéis):
+
+1. **Apple Developer → Identifiers → +**: App ID `pt.alinho.app.watchkitapp`, com
+   **HealthKit** ligado. Cada jogo grava-se como treino de padel no Saúde (duração,
+   pulsação, calorias e, em watchOS 11, o esforço); a sessão de treino é também o
+   que mantém o ecrã ligado durante o jogo. Sem autorização o jogo conta na mesma.
+2. **Apple Developer → Profiles → +** → *App Store Connect*, App ID
+   `pt.alinho.app.watchkitapp`, o mesmo certificado, nome `alinho watch appstore`.
+   No Codemagic: *Fetch profiles* → `alinho watch appstore` → *Download selected*.
+   Se a build ainda disser «No matching profiles» para o relógio, listar os dois
+   perfis em `ios_signing.provisioning_profiles` no `codemagic.yaml`.
+3. **Codemagic**: *Start new build* → `ios-testflight`, branch `feature/apple-watch`.
+4. **Instalar**: TestFlight no iPhone → alinho → a app do relógio instala-se
+   sozinha, ou pela app Watch do iPhone (*Apps disponíveis*).
+
+Jogo de teste (Renato e Francisco), antes de dizer que está pronto: um jogo de
+90 min; cada modo do 40-40; um tie-break e um super tie-break; desfazer a meio de
+um tie-break e depois do fim de um set; pulso em baixo vários minutos (o ecrã não
+pode voltar ao mostrador); bateria antes e depois; o tempo do toque
+(`HoldDuration.seconds`, 0,5 / 0,7 / 0,9 s) com suor; toques acidentais.
+
+E do protótipo de 23 out (com os formatos de 26 out): Pontos corridos até ao
+total; Set sem fim com ponto de ouro e com vantagens, terminado à mão;
+acertar o marcador a meio de um set; pausa de 5 min (o tempo não conta); mudar o
+40-40 a meio (só no jogo seguinte); pulso em baixo e um toque com a manga (só
+acorda); 20 min sem pontos («Ainda estão a jogar?»); recusar e depois aceitar o
+Saúde; o treino na app Atividade com bpm e kcal; o esforço; desfazer depois do fim;
+o jogo a aparecer em Perfil → «Os meus números» no iPhone, e registá-lo com os
+outros três (precisa da `supabase/migration_relogio_desafios.sql` corrida).
+
+O iPhone recebe os jogos pelo plugin local `WatchGames`
+(`ios/App/App/WatchGamesPlugin.swift`, registado no `AlinhoBridgeViewController`
+do `Main.storyboard`). Os jogos e a saúde ficam num ficheiro no telemóvel; ao
+servidor só vai o que se regista como jogo entre amigos e os desafios.
+
 ## Notificações push
 
 Os avisos do sino também chegam como notificação (só nas apps). Desenho:
