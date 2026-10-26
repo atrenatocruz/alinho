@@ -74,3 +74,26 @@ import Testing
     while ses.undo() { #expect(ses.current == snapshots.popLast()) }
     #expect(snapshots.isEmpty)
 }
+
+@Test func correctPointsRoundKeepsGamesAbove12() {
+    var ses = session(started: match(.points, total: 24))
+    ses.correct(games: [14, 9], points: [0, 0])
+    #expect(ses.current!.games == [14, 9] && ses.current!.phase == .points)
+    var open = session(started: match(.points, total: nil))
+    open.correct(games: [40, 3], points: [1, 0])
+    #expect(open.current!.games == [40, 3])
+}
+
+@Test func correctToSixAllEntersTieBreak() {
+    var ses = session(started: match(server: .us))
+    ses.correct(games: [6, 6], points: [3, 2])
+    #expect(ses.current!.phase == .tieBreak && ses.current!.points == [3, 2])
+    #expect(ses.current!.tieBreakFirstServer == .us)   // 12 jogos jogados: par, abre quem abriu o set
+}
+
+@Test func correctOutOfTieBreakGoesBackToGames() {
+    let (tb, _) = games(match(), "ut ut ut ut ut ut")
+    var ses = session(started: tb)
+    ses.correct(games: [6, 5], points: [2, 1])
+    #expect(ses.current!.phase == .game && ses.current!.points == [2, 1] && ses.current!.display.us == .value("30"))
+}
