@@ -35,6 +35,8 @@ public actor ResultOutbox {
     /// O que já saiu da fila nesta execução (enviado ou recusado).
     private var finished: [UUID: OutboxStatus] = [:]
     private var flushing = false
+    /// Houve um `put` durante a volta do `flush` em curso.
+    private var putDuringFlush = false
 
     /// `fileURL == nil`: só em memória.
     public init(fileURL: URL?) {
@@ -57,6 +59,7 @@ public actor ResultOutbox {
         entries.removeAll { $0.mixMatchID == e.mixMatchID }
         entries.append(e)
         finished[e.mixMatchID] = nil
+        if flushing { putDuringFlush = true }
         persist()
     }
 
@@ -66,15 +69,27 @@ public actor ResultOutbox {
     }
 
     /// Tenta enviar tudo o que está na fila. Erros de rede, sessão ou RPC em falta
-    /// deixam a entrada para a próxima; uma recusa do servidor tira-a.
+    /// deixam a entrada para a próxima; uma recusa do servidor tira-a. O que
+    /// chegar com um `put` a meio segue no mesmo `flush` (outra volta), a não
+    /// ser que uma falha tenha deixado entradas à espera.
     public func flush(using client: SupabaseClient) async {
         guard !flushing else { return }
         flushing = true
         defer { flushing = false }
 
+        var failed = false
+        repeat {
+            putDuringFlush = false
+            failed = await flushPass(using: client)
+        } while putDuringFlush && !failed
+    }
+
+    /// Uma volta pela fila; devolve `true` se alguma entrada ficou por falha.
+    private func flushPass(using client: SupabaseClient) async -> Bool {
+        var failed = false
         for entry in entries {
             let body: Data
-            do { body = try Self.body(entry) } catch { continue }
+            do { body = try Self.body(entry) } catch { failed = true; continue }
             let outcome: OutboxStatus
             do {
                 _ = try await client.rpcData("save_mix_match_result", body: body)
@@ -82,14 +97,17 @@ public actor ResultOutbox {
             } catch SyncError.server(let code) {
                 outcome = .dropped(code)
             } catch {
+                failed = true
                 continue
             }
-            // Um `put` durante o envio pode ter trocado o resultado: esse fica na fila.
+            // Um `put` durante o envio pode ter trocado o resultado: esse fica na
+            // fila (e o `putDuringFlush` manda-o na volta seguinte).
             guard let i = entries.firstIndex(of: entry) else { continue }
             entries.remove(at: i)
             finished[entry.mixMatchID] = outcome
             persist()
         }
+        return failed
     }
 
     /// `p_match_id`, `p_score_a`, `p_score_b` e `p_sets` (os sets em JSON, ou `null`).

@@ -94,13 +94,25 @@ public actor SupabaseClient {
         let message: String?
     }
 
+    /// Só é recusa do servidor (`.server`) um erro do PostgREST com `message`:
+    /// a fila deita fora o resultado nesse caso, por isso tudo o que possa ser
+    /// passageiro (408, 429, 5xx, um proxy ou portal cativo a responder HTML)
+    /// é `.network` e fica para a próxima.
     private func check(_ status: Int, _ data: Data) throws {
-        guard !(200..<300).contains(status) else { return }
+        if (200..<300).contains(status) {
+            // Um 200 com uma página (portal cativo do Wi-Fi) não é uma resposta do RPC.
+            if status == 204 && data.isEmpty { return }
+            guard (try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)) != nil
+            else { throw SyncError.network }
+            return
+        }
         let error = try? JSONDecoder().decode(PostgrestError.self, from: data)
         if status == 404 || error?.code == "PGRST202" { throw SyncError.unavailable }
-        // 5xx, ou um 401 que se mantém com o token acabado de renovar: tentar mais tarde.
-        if status >= 500 || status == 401 { throw SyncError.network }
-        throw SyncError.server(error?.message ?? "http_\(status)")
+        // 401 que se mantém com o token acabado de renovar, pedido demorado,
+        // limite de pedidos ou falha do servidor: tentar mais tarde.
+        if status == 401 || status == 408 || status == 429 || status >= 500 { throw SyncError.network }
+        guard let message = error?.message else { throw SyncError.network }
+        throw SyncError.server(message)
     }
 
     // MARK: - Sessão
@@ -145,6 +157,10 @@ public actor SupabaseClient {
 
         let (data, response) = try await send(request)
         if response.statusCode == 400 || response.statusCode == 401 {
+            // Se entretanto chegou outra sessão (o iPhone mandou uma nova), a
+            // recusa é só da antiga: segue com a nova em vez de a apagar.
+            guard let stored = store.load() else { throw SyncError.signedOut }
+            if stored.refreshToken != creds.refreshToken { return stored }
             store.save(nil)
             throw SyncError.signedOut
         }
@@ -160,6 +176,9 @@ public actor SupabaseClient {
         } else {
             fresh.expiresAt = now().addingTimeInterval(token.expires_in ?? 3600)
         }
+        // O mesmo: se a sessão mudou durante a renovação, a guardada ganha.
+        guard let stored = store.load() else { throw SyncError.signedOut }
+        if stored.refreshToken != creds.refreshToken { return stored }
         store.save(fresh)
         return fresh
     }
