@@ -41,9 +41,7 @@ enum ScreenshotFixtures {
         case "decisive":
             return Fixture(session: inGame(points: "uuuttt"), overlay: .decisive(.goldenPoint))
         case "scoreStack":
-            var s = inGame(server: .us)
-            s.config.layout = .stack
-            return Fixture(session: restarted(s, layout: .stack))
+            return Fixture(session: inGame(server: .us, layout: .stack))
         case "scoreServeSide":
             return Fixture(session: inGame(server: .us))
         case "scorePaused":
@@ -90,21 +88,18 @@ enum ScreenshotFixtures {
         games seq: String = "uuuutttt uu uuu tt",
         points: String = "uu t"
     ) -> MatchSession {
-        var s = session(.bestOf3, mode, server: server, minutesAgo: 40)
-        s.config.layout = layout
-        s.start(at: Date().addingTimeInterval(-40 * 60))
+        var s = session(.bestOf3, mode, server: server, minutesAgo: 40, layout: layout)
         games(&s, seq)
         feed(&s, points)
         return s
     }
 
-    private static func restarted(_ s: MatchSession, layout: ScoreLayout) -> MatchSession {
-        inGame(server: .us, layout: layout)
-    }
-
-    private static func session(_ format: MatchFormat, _ mode: DeuceMode, server: Team?, minutesAgo: Double) -> MatchSession {
+    private static func session(
+        _ format: MatchFormat, _ mode: DeuceMode, server: Team?, minutesAgo: Double, layout: ScoreLayout = .side
+    ) -> MatchSession {
         var s = MatchSession()
         s.config = MatchConfig(format: format, deuceMode: mode, firstServer: server, pointsTotal: 24)
+        s.config.layout = layout
         s.start(at: Date().addingTimeInterval(-minutesAgo * 60))
         return s
     }

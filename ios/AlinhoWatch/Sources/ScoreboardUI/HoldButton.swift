@@ -1,4 +1,5 @@
 #if os(watchOS)
+import PadelScoring
 import SwiftUI
 
 enum HoldDuration {
