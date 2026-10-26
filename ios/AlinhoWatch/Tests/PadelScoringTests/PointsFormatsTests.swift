@@ -27,9 +27,10 @@ private func rep(_ c: Character, _ n: Int) -> String { String(repeating: c, coun
     #expect(match(.points, server: .us).server == nil)
 }
 
-@Test func runningPointsLastPointIsMatchPoint() {
+@Test func runningPointsTopLineAlwaysShowsTheTotal() {
+    // Como no protótipo: nos Pontos corridos não há «Ponto de jogo».
     let (s, _) = play(match(.points, total: 24), rep("u", 12) + rep("t", 11))
-    #expect(s.statusLine == .matchPoint)
+    #expect(s.statusLine == .points(total: 24))
 }
 
 @Test func phase1RunningPointsMatchKeepsGoingAfterUpdate() throws {

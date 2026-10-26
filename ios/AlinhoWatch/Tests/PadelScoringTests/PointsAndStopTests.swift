@@ -27,8 +27,8 @@ private func rep(_ c: Character, _ n: Int) -> String { String(repeating: c, coun
     #expect(stopped.resultText == "6-4 6-6" && stopped.winner == .us)
 }
 
-@Test func stopPointsByGames() {
-    let stopped = Scoring.stop(games(match(.points, total: nil), "ttu").0, at: t0)
+@Test func stopPointsByPoints() {
+    let stopped = Scoring.stop(play(match(.points, total: nil), "ttu").0, at: t0)
     #expect(stopped.winner == .them && stopped.resultText == "1-2")
 }
 
