@@ -6619,7 +6619,7 @@
   "numeros.format_stb": "2 sets + super",
   "numeros.format_pro9": "Pro set a 9",
   "numeros.format_s1": "1 set",
-  "numeros.format_pts": "Pontos",
+  "numeros.format_pts": "Pontos corridos",
   "numeros.minutes_one": "{{count}} min",
   "numeros.minutes_other": "{{count}} min",
   "numeros.effort_line": "Esforço {{value}} · {{label}}",
@@ -6714,5 +6714,6 @@
   "numeros.friends_week_line_other": "{{count}} jogos · {{wins}} vitórias",
   "numeros.friends_privacy": "Aos amigos só aparecem os jogos, nunca a saúde.",
   "privatematches.watch_result": "O relógio contou {{result}}.",
-  "numeros.register_score_later": "O jogo ficou registado, mas o resultado não seguiu. Põe-no em Jogos entre amigos."
+  "numeros.register_score_later": "O jogo ficou registado, mas o resultado não seguiu. Põe-no em Jogos entre amigos.",
+  "numeros.format_ssf": "Set sem fim"
 }

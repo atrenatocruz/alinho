@@ -185,7 +185,8 @@ um tie-break e depois do fim de um set; pulso em baixo vários minutos (o ecrã 
 pode voltar ao mostrador); bateria antes e depois; o tempo do toque
 (`HoldDuration.seconds`, 0,5 / 0,7 / 0,9 s) com suor; toques acidentais.
 
-E do protótipo de 23 out: Pontos com ponto de ouro e com vantagens até ao total;
+E do protótipo de 23 out (com os formatos de 26 out): Pontos corridos até ao
+total; Set sem fim com ponto de ouro e com vantagens, terminado à mão;
 acertar o marcador a meio de um set; pausa de 5 min (o tempo não conta); mudar o
 40-40 a meio (só no jogo seguinte); pulso em baixo e um toque com a manga (só
 acorda); 20 min sem pontos («Ainda estão a jogar?»); recusar e depois aceitar o

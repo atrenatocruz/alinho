@@ -6604,7 +6604,7 @@
   "numeros.format_stb": "2 sets + super",
   "numeros.format_pro9": "Pro set to 9",
   "numeros.format_s1": "1 set",
-  "numeros.format_pts": "Points",
+  "numeros.format_pts": "Total points",
   "numeros.minutes_one": "{{count}} min",
   "numeros.minutes_other": "{{count}} min",
   "numeros.effort_line": "Effort {{value}} · {{label}}",
@@ -6699,5 +6699,6 @@
   "numeros.friends_week_line_other": "{{count}} games · {{wins}} wins",
   "numeros.friends_privacy": "Friends only see games, never your health.",
   "privatematches.watch_result": "The watch counted {{result}}.",
-  "numeros.register_score_later": "The game was recorded but the result didn't go through. Add it in Friends' games."
+  "numeros.register_score_later": "The game was recorded but the result didn't go through. Add it in Friends' games.",
+  "numeros.format_ssf": "Timed set"
 }
