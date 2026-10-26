@@ -47,10 +47,9 @@ BEGIN
                   WHERE table_schema = 'public' AND table_name = 'games' AND column_name = 'scoring_format') THEN
     RAISE EXCEPTION 'Falta games.scoring_format: correr primeiro migration_set_scoring.sql.';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                  WHERE table_schema = 'public' AND table_name = 'games' AND column_name = 'deuce_mode') THEN
-    RAISE EXCEPTION 'Falta games.deuce_mode: correr primeiro migration_aos_40_40.sql.';
-  END IF;
+  -- games.deuce_mode (migration_aos_40_40.sql) não é obrigatório: a produção
+  -- de 26 out ainda não o tem. Sem ele, a lista diz 'ponto_de_ouro', que é o
+  -- valor por omissão dessa migração.
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                   WHERE table_schema = 'public' AND table_name = 'games' AND column_name = 'tiebreak_8_8') THEN
     RAISE EXCEPTION 'Falta games.tiebreak_8_8: correr primeiro migration_580_mix_tiebreak_e_series_contagem.sql.';
@@ -106,7 +105,7 @@ BEGIN
                                  END,
                'format',         g.format,
                'scoring_format', g.scoring_format,
-               'deuce_mode',     g.deuce_mode,
+               'deuce_mode',     COALESCE(to_jsonb(g)->>'deuce_mode', 'ponto_de_ouro'),
                'tiebreak_8_8',   g.tiebreak_8_8,
                'scorer_id',      ls.scorer_id,
                'scorer_name',    ps.name,
