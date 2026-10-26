@@ -64,6 +64,16 @@ enum Labels {
         }
     }
 
+    /// Por baixo da bola de quem serve: «Tu · direita», «Parceiro · esquerda», «Servem».
+    static func serve(_ team: Team, _ info: ServeInfo?) -> String? {
+        guard let info else { return nil }
+        if team == .them { return info.them ? L.t("Servem") : nil }
+        guard case .player(let p, let side)? = info.us else { return nil }
+        let who = p == .me ? L.t("Tu") : L.t("Parceiro")
+        let where_ = side == .right ? L.t("direita") : L.t("esquerda")
+        return "\(who) · \(where_)"
+    }
+
     static func layout(_ l: ScoreLayout) -> String {
         switch l {
         case .side: L.t("Lado a lado")

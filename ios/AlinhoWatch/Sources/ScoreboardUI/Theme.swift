@@ -8,6 +8,7 @@ public enum Theme {
     static let themGrey = Color(hex: 0xD9DCE0)
     static let ink = Color(hex: 0x040404)
     static let red = Color(hex: 0xFF6B5E)
+    static let amber = Color(hex: 0xF5B83D)
     static let listBg = Color(hex: 0x1D1E21)
     static let muted = Color(hex: 0x9EA3AA)
     static let topLine = Color(hex: 0xC9CCD1)

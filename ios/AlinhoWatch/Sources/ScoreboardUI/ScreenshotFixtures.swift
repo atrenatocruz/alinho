@@ -40,6 +40,18 @@ enum ScreenshotFixtures {
             return Fixture(session: inGame(points: ""), overlay: .switchSides)
         case "decisive":
             return Fixture(session: inGame(points: "uuuttt"), overlay: .decisive(.goldenPoint))
+        case "scoreStack":
+            var s = inGame(server: .us)
+            s.config.layout = .stack
+            return Fixture(session: restarted(s, layout: .stack))
+        case "scoreServeSide":
+            return Fixture(session: inGame(server: .us))
+        case "scorePaused":
+            var s = inGame()
+            s.togglePause(at: Date())
+            return Fixture(session: s)
+        case "scoreMatchPoint":
+            return Fixture(session: inGame(games: "uuuuuu uuuuu", points: "uuu"))
         case "menu":
             return Fixture(session: inGame(), page: 1)
         case "end":
@@ -73,13 +85,21 @@ enum ScreenshotFixtures {
     /// Jogo a 6-4 · 3-2 e 30-15, com Nós a servir (como na proposta).
     private static func inGame(
         _ mode: DeuceMode = .golden,
+        server: Team = .them,
+        layout: ScoreLayout = .side,
         games seq: String = "uuuutttt uu uuu tt",
         points: String = "uu t"
     ) -> MatchSession {
-        var s = session(.bestOf3, mode, server: .them, minutesAgo: 40)
+        var s = session(.bestOf3, mode, server: server, minutesAgo: 40)
+        s.config.layout = layout
+        s.start(at: Date().addingTimeInterval(-40 * 60))
         games(&s, seq)
         feed(&s, points)
         return s
+    }
+
+    private static func restarted(_ s: MatchSession, layout: ScoreLayout) -> MatchSession {
+        inGame(server: .us, layout: layout)
     }
 
     private static func session(_ format: MatchFormat, _ mode: DeuceMode, server: Team?, minutesAgo: Double) -> MatchSession {

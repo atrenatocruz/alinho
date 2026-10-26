@@ -700,6 +700,56 @@
           }
         }
       }
+    },
+    "Servem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Serving"
+          }
+        }
+      }
+    },
+    "Tu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "You"
+          }
+        }
+      }
+    },
+    "Parceiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Partner"
+          }
+        }
+      }
+    },
+    "direita": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "right"
+          }
+        }
+      }
+    },
+    "esquerda": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "left"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

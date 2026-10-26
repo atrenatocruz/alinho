@@ -12,7 +12,7 @@ SMALL=$(echo "$SIZES" | head -1)
 LARGE=$(echo "$SIZES" | tail -1)
 echo "Relógios: $SMALL / $LARGE"
 
-SCREENS="setup setupPoints setupServeUs game golden star tiebreak switch decisive menu end stopped history"
+SCREENS="setup setupPoints setupServeUs game golden star tiebreak switch decisive scoreStack scoreServeSide scorePaused scoreMatchPoint menu end stopped history"
 mkdir -p prints
 
 for TYPE in "$SMALL" "$LARGE"; do

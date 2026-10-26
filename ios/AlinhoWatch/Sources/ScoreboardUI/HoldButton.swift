@@ -19,6 +19,7 @@ struct HoldButton<Label: View>: View {
     @ViewBuilder let label: () -> Label
 
     @EnvironmentObject private var model: AppModel
+    @Environment(\.isLuminanceReduced) private var dim
     @State private var progress: CGFloat = 0
     @State private var holdTask: Task<Void, Never>?
     /// O dedo está pousado e ainda não escorregou. É `@GestureState` porque volta
@@ -52,7 +53,7 @@ struct HoldButton<Label: View>: View {
                     .updating($touch) { value, state, _ in
                         state.down = true
                         // Depois de escorregar já não volta a contar, mesmo que o dedo regresse.
-                        if hypot(value.translation.width, value.translation.height) > 12 { state.slipped = true }
+                        if hypot(value.translation.width, value.translation.height) > 24 { state.slipped = true }
                     }
             )
             .onChange(of: touch.holding) { _, holding in
@@ -64,7 +65,9 @@ struct HoldButton<Label: View>: View {
     }
 
     private func begin() {
-        guard !disabled, model.activeHold == nil else { return }
+        guard !disabled, model.activeHold == nil,
+              WakeGuard.allowsHold(dimmedAtStart: dim, startedAt: Date(), wokeAt: model.wokeAt)
+        else { return }
         model.activeHold = target
         Haptic.play(.touch)
         withAnimation(.linear(duration: HoldDuration.seconds)) { progress = 1 }

@@ -26,6 +26,8 @@ final class AppModel: ObservableObject {
     @Published var flash: Team?
     /// Página do jogo: 0 = marcador, 1 = menu do jogo.
     @Published var page = 0
+    /// Quando o ecrã acordou do pulso em baixo (ver `WakeGuard`).
+    @Published var wokeAt: Date?
     /// Só nas prints: abre logo nos «Últimos jogos».
     @Published var showHistory = false
 
@@ -86,7 +88,7 @@ final class AppModel: ObservableObject {
             keeper?.end()
             return
         }
-        Haptic.play(events.contains(.setWon) ? .long : .counted)
+        if events.contains(.setWon) { Haptic.play(.long) } else { Haptic.point(team) }
         if events.contains(.switchSides) {
             show(.switchSides, doubleAfter: .milliseconds(250))
         } else if events.contains(.decisivePoint), let status = current?.display.status {
