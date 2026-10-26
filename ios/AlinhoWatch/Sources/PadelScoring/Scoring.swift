@@ -15,6 +15,8 @@ public enum Scoring {
             pointsScoring: .games,
             deuceCount: 0,
             server: config.firstServer,
+            ourServer: config.firstServer == .us ? config.ourFirstServer : nil,
+            lastOurServer: config.firstServer == .us ? config.ourFirstServer : nil,
             tieBreakFirstServer: nil,
             startedAt: date,
             endedAt: nil,
@@ -103,7 +105,7 @@ public enum Scoring {
         st.points = [0, 0]
         st.deuceCount = 0
         ev.insert(.gameWon)
-        st.server = st.server?.other
+        st.passServe(to: st.server?.other)
         if st.phase == .points {
             // Pontos: a ronda soma jogos e acaba quando a soma chega ao total.
             if let total = st.config.pointsTotal, st.games[0] + st.games[1] >= total {
@@ -134,7 +136,7 @@ public enum Scoring {
         let played = st.points[0] + st.points[1]
         // 1.º ponto: quem calhava; depois muda a cada 2 pontos (1, 2, 2, 2…).
         if st.server != nil, let first = st.tieBreakFirstServer {
-            st.server = ((played + 1) / 2) % 2 == 0 ? first : first.other
+            st.passServe(to: ((played + 1) / 2) % 2 == 0 ? first : first.other)
         }
         let target = st.phase == .tieBreak ? 7 : 10
         guard st.points[me] >= target && st.points[me] - st.points[op] >= 2 else {
@@ -146,7 +148,7 @@ public enum Scoring {
             // primeiro quem recebeu o 1.º ponto do tie-break.
             st.games[me] += 1
             ev.insert(.gameWon)
-            if st.server != nil { st.server = st.tieBreakFirstServer?.other }
+            st.passServe(to: st.tieBreakFirstServer?.other)
             closeSet(&st, SetScore(st.games[0], st.games[1], .tieBreak), &ev)
         } else {
             closeSet(&st, SetScore(st.points[0], st.points[1], .superTieBreak), &ev)

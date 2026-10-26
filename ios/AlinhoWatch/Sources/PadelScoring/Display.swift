@@ -34,6 +34,26 @@ public struct ScoreDisplay: Equatable, Sendable {
     }
 }
 
+public enum Side: Equatable, Sendable {
+    case right, left
+}
+
+public enum ServeLabel: Equatable, Sendable {
+    case player(Player, Side)
+}
+
+/// Quem serve, para o bloco: na nossa dupla, quem e de que lado («Tu · direita»);
+/// na deles, só «Servem».
+public struct ServeInfo: Equatable, Sendable {
+    public let us: ServeLabel?
+    public let them: Bool
+
+    public init(us: ServeLabel?, them: Bool) {
+        self.us = us
+        self.them = them
+    }
+}
+
 private let gameValues = ["0", "15", "30", "40"]
 
 /// Duração para o ecrã de fim: «45 min», «1 h 22 min» (mínimo 1 min).
@@ -58,6 +78,14 @@ extension MatchState {
         var parts = sets.map { "\($0.us)-\($0.them)" }
         if endReason == .stopped && (games[0] > 0 || games[1] > 0) { parts.append("\(games[0])-\(games[1])") }
         return parts.isEmpty ? "0-0" : parts.joined(separator: " ")
+    }
+
+    /// `nil` quando não se mostra quem serve.
+    public var serveInfo: ServeInfo? {
+        guard let server else { return nil }
+        if server == .them { return ServeInfo(us: nil, them: true) }
+        let side: Side = (points[0] + points[1]) % 2 == 0 ? .right : .left
+        return ServeInfo(us: .player(ourServer ?? config.ourFirstServer, side), them: false)
     }
 
     public var display: ScoreDisplay {

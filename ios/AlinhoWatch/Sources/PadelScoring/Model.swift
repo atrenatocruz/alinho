@@ -8,6 +8,13 @@ public enum Team: Int, Codable, Equatable, Sendable {
     public var other: Team { self == .us ? .them : .us }
 }
 
+/// Quem da nossa dupla serve. Os códigos são os do protótipo.
+public enum Player: String, Codable, Equatable, Sendable, CaseIterable {
+    case me = "eu", partner = "parceiro"
+
+    public var other: Player { self == .me ? .partner : .me }
+}
+
 /// Os códigos são os do protótipo (`m3`, `stb`, …), que é a referência das regras.
 public enum MatchFormat: String, Codable, Equatable, Sendable, CaseIterable {
     case bestOf3 = "m3"
@@ -62,12 +69,23 @@ public struct MatchConfig: Codable, Equatable, Sendable {
     public var firstServer: Team?
     /// Só nos Pontos; `nil` = sem total.
     public var pointsTotal: Int?
+    /// Na nossa dupla, quem serve primeiro (só conta com `firstServer == .us`).
+    public var ourFirstServer: Player = .me
 
     public init(format: MatchFormat, deuceMode: DeuceMode, firstServer: Team?, pointsTotal: Int?) {
         self.format = format
         self.deuceMode = deuceMode
         self.firstServer = firstServer
         self.pointsTotal = pointsTotal
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        format = try c.decode(MatchFormat.self, forKey: .format)
+        deuceMode = try c.decode(DeuceMode.self, forKey: .deuceMode)
+        firstServer = try c.decodeIfPresent(Team.self, forKey: .firstServer)
+        pointsTotal = try c.decodeIfPresent(Int.self, forKey: .pointsTotal)
+        ourFirstServer = try c.decodeIfPresent(Player.self, forKey: .ourFirstServer) ?? .me
     }
 
     public static let `default` = MatchConfig(format: .bestOf3, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
@@ -96,6 +114,10 @@ public struct MatchState: Codable, Equatable, Sendable {
     /// Star Point: quantas vezes já se chegou a iguais neste jogo.
     public var deuceCount: Int
     public var server: Team?
+    /// Quem da nossa dupla serve quando `server == .us`.
+    public var ourServer: Player?
+    /// Quem da nossa dupla serviu da última vez, para alternar.
+    public var lastOurServer: Player?
     public var tieBreakFirstServer: Team?
     public let startedAt: Date
     public var endedAt: Date?
@@ -108,6 +130,17 @@ public struct MatchState: Codable, Equatable, Sendable {
     var isGamePhase: Bool { phase == .game || (phase == .points && pointsScoring == .games) }
     /// Pontos da Fase 1, que somam 1 a cada ponto.
     var isRallyPoints: Bool { phase == .points && pointsScoring == .rally }
+
+    /// Passa o serviço para `team`. Quando voltamos a servir, serve o outro da
+    /// nossa dupla (na primeira vez, quem se escolheu no Novo jogo).
+    mutating func passServe(to team: Team?) {
+        guard server != nil, let team else { return }
+        if team == .us && server != .us {
+            ourServer = lastOurServer?.other ?? config.ourFirstServer
+            lastOurServer = ourServer
+        }
+        server = team
+    }
 }
 
 extension MatchState {
@@ -124,6 +157,8 @@ extension MatchState {
         pointsScoring = try c.decodeIfPresent(PointsScoring.self, forKey: .pointsScoring) ?? .rally
         deuceCount = try c.decode(Int.self, forKey: .deuceCount)
         server = try c.decodeIfPresent(Team.self, forKey: .server)
+        ourServer = try c.decodeIfPresent(Player.self, forKey: .ourServer)
+        lastOurServer = try c.decodeIfPresent(Player.self, forKey: .lastOurServer)
         tieBreakFirstServer = try c.decodeIfPresent(Team.self, forKey: .tieBreakFirstServer)
         startedAt = try c.decode(Date.self, forKey: .startedAt)
         endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
