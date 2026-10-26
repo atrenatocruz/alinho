@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket } from 'lucide-react'
+import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, Watch } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
@@ -28,6 +28,7 @@ import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
+import { hasWatchGames } from '../lib/watchGames'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
 
 // A coleção animada das conquistas (2026-10-12): só se carrega ao abrir
@@ -995,6 +996,26 @@ export default function Profile() {
               )
             })()}
           </div>
+        )}
+
+        {/* Os jogos do relógio (Apple Watch): só na app de iPhone. */}
+        {hasWatchGames && (
+          <button
+            type="button"
+            onClick={() => navigate('/perfil/numeros')}
+            className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+          >
+            <span className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <Watch size={20} className="text-ink-700" />
+                <span>
+                  <span className="block text-lg text-ink-900">{t('profile.numeros_heading')}</span>
+                  <span className="block text-sm text-muted">{t('profile.numeros_body')}</span>
+                </span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-muted" />
+            </span>
+          </button>
         )}
 
         {/* Informação pessoal: resumo aqui, detalhe e edição em página
