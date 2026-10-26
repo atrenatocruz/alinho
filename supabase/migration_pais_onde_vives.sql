@@ -37,6 +37,9 @@ BEGIN
     ALTER TABLE public.profiles ADD CONSTRAINT profiles_country_check CHECK (country ~ '^[A-Z]{2}$');
   END IF;
 END $$;
+-- O profiles dá UPDATE coluna a coluna: sem isto, mudar o país no Perfil
+-- dava 42501 (SI, 26 out). A idade trava-a o gatilho abaixo.
+GRANT UPDATE (country) ON public.profiles TO authenticated;
 
 -- ── 2. A idade mínima por país ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.country_min_age (
@@ -128,3 +131,4 @@ COMMIT;
 --   SELECT country_min_age_for('PT'), country_min_age_for('ES'), country_min_age_for('FR');   → 13, 14, 16
 --   SELECT position('country' IN prosrc) > 0 FROM pg_proc WHERE proname = 'handle_new_user';   → true
 --   SELECT count(*) FROM pg_trigger WHERE tgname = 'profiles_country_age_guard';   → 1
+--   SELECT has_column_privilege('authenticated', 'public.profiles', 'country', 'UPDATE');   → true
