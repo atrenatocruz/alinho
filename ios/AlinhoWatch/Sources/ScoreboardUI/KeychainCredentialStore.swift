@@ -7,8 +7,9 @@ import Security
 /// Fica legível depois do primeiro desbloqueio, para a fila do resultado poder
 /// enviar com o ecrã apagado.
 struct KeychainCredentialStore: CredentialStore {
-    /// Resumo do último contexto do iPhone aplicado (ver `WatchLink.applySession`).
-    /// Apagar a sessão esquece-o, para o mesmo contexto poder voltar a entrar.
+    /// Resumo do último contexto do iPhone aplicado. Só o `WatchLink.applySession`
+    /// lhe mexe: apagar a sessão aqui (o refresh recusado) NÃO o esquece, senão o
+    /// mesmo contexto, com um `refresh_token` já gasto, voltava a entrar.
     static let appliedContextKey = "alinho.watch.appliedSessionDigest"
 
     private let service = "pt.alinho.watch.session"
@@ -36,7 +37,6 @@ struct KeychainCredentialStore: CredentialStore {
     func save(_ c: WatchCredentials?) {
         guard let c, let data = try? JSONEncoder().encode(c) else {
             SecItemDelete(query as CFDictionary)
-            UserDefaults.standard.removeObject(forKey: Self.appliedContextKey)
             return
         }
         let update: [String: Any] = [kSecValueData as String: data]

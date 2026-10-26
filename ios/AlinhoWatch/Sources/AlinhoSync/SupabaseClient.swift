@@ -49,6 +49,11 @@ public actor SupabaseClient {
         self.now = now
     }
 
+    /// O user da sessão guardada (`nil` sem sessão).
+    public nonisolated func currentUserID() -> UUID? {
+        store.load()?.userID
+    }
+
     /// Chama `POST /rest/v1/rpc/{name}` com `args` como corpo JSON e descodifica a resposta.
     public nonisolated func rpc<T: Decodable>(_ name: String, _ args: [String: Any]) async throws -> T {
         let body: Data

@@ -60,14 +60,18 @@ final class WatchLink: NSObject {
     /// cada arranque (`receivedApplicationContext`): aplicá-lo outra vez repunha
     /// um `refresh_token` que o relógio já gastou ao renovar, e a sessão morria.
     /// Por isso só se aplica um contexto diferente do último (pelo SHA-256).
+    /// O resumo só se guarda se o Keychain ficou mesmo com o que veio: se a
+    /// escrita falhar, o mesmo contexto volta a tentar-se no próximo arranque.
     fileprivate func applySession(_ value: String) {
         let key = KeychainCredentialStore.appliedContextKey
         let digest = SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
         guard UserDefaults.standard.string(forKey: key) != digest else { return }
         if value == "none" {
             credentials.save(nil)
+            guard credentials.load() == nil else { return }
         } else if let creds = WatchCredentials.fromPhoneContext(value) {
             credentials.save(creds)
+            guard credentials.load() == creds else { return }
         } else {
             return
         }

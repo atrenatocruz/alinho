@@ -178,7 +178,7 @@ final class AppModel: ObservableObject {
         setConfig(c)
         start()
         if let id = current?.id {
-            mix.setLink(MixLink(localMatchID: id, mixMatchID: m.matchID, side: side, title: m.gameName))
+            mix.setLink(MixLink(localMatchID: id, mixMatchID: m.matchID, side: side, title: m.gameName, userID: mix.userID))
         }
     }
 

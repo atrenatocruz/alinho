@@ -10,6 +10,29 @@ struct MixLink: Codable, Equatable {
     let mixMatchID: UUID
     let side: MixSide
     let title: String
+    /// Quem ficou com o jogo. `nil` num vínculo de uma versão antiga: o user atual.
+    let userID: UUID?
+
+    init(localMatchID: UUID, mixMatchID: UUID, side: MixSide, title: String, userID: UUID? = nil) {
+        self.localMatchID = localMatchID
+        self.mixMatchID = mixMatchID
+        self.side = side
+        self.title = title
+        self.userID = userID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case localMatchID, mixMatchID, side, title, userID
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        localMatchID = try c.decode(UUID.self, forKey: .localMatchID)
+        mixMatchID = try c.decode(UUID.self, forKey: .mixMatchID)
+        side = try c.decode(MixSide.self, forKey: .side)
+        title = try c.decode(String.self, forKey: .title)
+        userID = try c.decodeIfPresent(UUID.self, forKey: .userID)
+    }
 }
 
 /// Credenciais fixas, só para as prints dos ecrãs.
@@ -158,7 +181,11 @@ final class MixModel: ObservableObject {
     private func sessionChanged() {
         hasCredentials = credentials.load() != nil
         if hasCredentials {
+            // Sessão nova: se voltar a cair, pode pedir-se outra.
+            askedForSession = false
             refresh()
+            // O que ficou na fila por falta de sessão segue já.
+            Task { await flush() }
         } else {
             matches = []
             state = .signedOut
@@ -190,7 +217,8 @@ final class MixModel: ObservableObject {
     /// entra na fila, por cima de um anterior do mesmo jogo, e segue logo.
     func submit(_ record: MatchRecord) {
         guard let link = mixLink(for: record.id) else { return }
-        let entry = OutboxEntry(mixMatchID: link.mixMatchID, result: MixResult(record: record, side: link.side), createdAt: Date())
+        let entry = OutboxEntry(mixMatchID: link.mixMatchID, result: MixResult(record: record, side: link.side),
+                                createdAt: Date(), userID: link.userID)
         sendStatus = .pending
         Task {
             await outbox.put(entry)
@@ -201,7 +229,8 @@ final class MixModel: ObservableObject {
     func flush() async {
         guard live else { return }
         lastFlush = Date()
-        await outbox.flush(using: client)
+        // Sem sessão a meio do envio: como na lista, fica «sem sessão» e pede outra.
+        if await outbox.flush(using: client) { signedOut() }
         await updateStatus()
     }
 

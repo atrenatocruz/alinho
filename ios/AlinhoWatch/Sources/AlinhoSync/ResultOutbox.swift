@@ -6,11 +6,27 @@ public struct OutboxEntry: Codable, Equatable, Sendable {
     public let mixMatchID: UUID
     public let result: MixResult
     public let createdAt: Date
+    /// De quem é o resultado (quem tinha o jogo). `nil` = «o user atual»: é o
+    /// que vem de uma fila gravada por uma versão antiga, sem o campo.
+    public let userID: UUID?
 
-    public init(mixMatchID: UUID, result: MixResult, createdAt: Date) {
+    public init(mixMatchID: UUID, result: MixResult, createdAt: Date, userID: UUID? = nil) {
         self.mixMatchID = mixMatchID
         self.result = result
         self.createdAt = createdAt
+        self.userID = userID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case mixMatchID, result, createdAt, userID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        mixMatchID = try c.decode(UUID.self, forKey: .mixMatchID)
+        result = try c.decode(MixResult.self, forKey: .result)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        userID = try c.decodeIfPresent(UUID.self, forKey: .userID)
     }
 }
 
@@ -72,22 +88,36 @@ public actor ResultOutbox {
     /// deixam a entrada para a próxima; uma recusa do servidor tira-a. O que
     /// chegar com um `put` a meio segue no mesmo `flush` (outra volta), a não
     /// ser que uma falha tenha deixado entradas à espera.
-    public func flush(using client: SupabaseClient) async {
-        guard !flushing else { return }
+    ///
+    /// Só se mandam as entradas do user da sessão atual (ou sem user, de uma
+    /// versão antiga): as de outra conta ficam à espera e nunca vão com a
+    /// sessão de outra pessoa.
+    ///
+    /// Devolve `true` se o relógio ficou sem sessão (`.signedOut`): quem chama
+    /// deve pedir outra ao iPhone.
+    @discardableResult
+    public func flush(using client: SupabaseClient) async -> Bool {
+        guard !flushing else { return false }
         flushing = true
         defer { flushing = false }
 
-        var failed = false
+        var pass: (failed: Bool, signedOut: Bool) = (false, false)
         repeat {
             putDuringFlush = false
-            failed = await flushPass(using: client)
-        } while putDuringFlush && !failed
+            pass = await flushPass(using: client)
+        } while putDuringFlush && !pass.failed
+        return pass.signedOut
     }
 
-    /// Uma volta pela fila; devolve `true` se alguma entrada ficou por falha.
-    private func flushPass(using client: SupabaseClient) async -> Bool {
+    /// Uma volta pela fila: se alguma entrada ficou por falha, e se foi por
+    /// falta de sessão.
+    private func flushPass(using client: SupabaseClient) async -> (failed: Bool, signedOut: Bool) {
+        guard !entries.isEmpty else { return (false, false) }
+        guard let me = client.currentUserID() else { return (true, true) }
         var failed = false
         for entry in entries {
+            // De outra conta: fica à espera, sem contar como falha.
+            if let owner = entry.userID, owner != me { continue }
             let body: Data
             do { body = try Self.body(entry) } catch { failed = true; continue }
             let outcome: OutboxStatus
@@ -96,6 +126,9 @@ public actor ResultOutbox {
                 outcome = .sent
             } catch SyncError.server(let code) {
                 outcome = .dropped(code)
+            } catch SyncError.signedOut {
+                // Sem sessão nenhuma das outras vai: fica tudo para depois.
+                return (true, true)
             } catch {
                 failed = true
                 continue
@@ -107,7 +140,7 @@ public actor ResultOutbox {
             finished[entry.mixMatchID] = outcome
             persist()
         }
-        return failed
+        return (failed, false)
     }
 
     /// `p_match_id`, `p_score_a`, `p_score_b` e `p_sets` (os sets em JSON, ou `null`).

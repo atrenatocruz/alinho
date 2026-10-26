@@ -143,3 +143,77 @@ private func tempFile() -> URL {
     #expect(await box.status(other) == .sent)
     #expect(await t.requests.count == 2)
 }
+
+// MARK: - De quem é o resultado, e sem sessão
+
+private let me = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+private let someoneElse = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+@Test func testOutboxOldFileWithoutUserStillSends() async throws {
+    // Uma fila gravada por uma versão antiga não tem `userID`: conta como do user atual.
+    let file = tempFile()
+    defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let old = #"[{"mixMatchID":"\#(matchID.uuidString)","result":{"scoreA":9,"scoreB":7,"sets":null},"createdAt":0}]"#
+    try Data(old.utf8).write(to: file)
+    let box = ResultOutbox(fileURL: file)
+    #expect(await box.status(matchID) == .pending)
+    let t = FakeTransport()
+    let signedOut = await box.flush(using: client(MemoryStore(credentials()), t))
+    #expect(!signedOut)
+    #expect(await box.status(matchID) == .sent)
+    #expect(await t.requests.count == 1)
+}
+
+@Test func testOutboxSendsOwnUser() async throws {
+    let t = FakeTransport()
+    let box = ResultOutbox(fileURL: nil)
+    await box.put(OutboxEntry(mixMatchID: matchID, result: result(9, 7), createdAt: syncNow, userID: me))
+    await box.flush(using: client(MemoryStore(credentials()), t))
+    #expect(await box.status(matchID) == .sent)
+    #expect(await t.requests.count == 1)
+}
+
+@Test func testOutboxKeepsOtherUsersEntry() async throws {
+    // Trocou de conta no iPhone: o resultado da outra conta nunca vai com esta sessão.
+    let t = FakeTransport()
+    let box = ResultOutbox(fileURL: nil)
+    await box.put(OutboxEntry(mixMatchID: matchID, result: result(9, 7), createdAt: syncNow, userID: someoneElse))
+    let signedOut = await box.flush(using: client(MemoryStore(credentials()), t))
+    #expect(!signedOut)
+    #expect(await box.status(matchID) == .pending)
+    #expect(await t.requests.isEmpty)
+}
+
+@Test func testOutboxPersistsUserID() async throws {
+    let file = tempFile()
+    defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+    let box = ResultOutbox(fileURL: file)
+    await box.put(OutboxEntry(mixMatchID: matchID, result: result(9, 7), createdAt: syncNow, userID: someoneElse))
+    let again = ResultOutbox(fileURL: file)
+    let t = FakeTransport()
+    await again.flush(using: client(MemoryStore(credentials()), t))
+    #expect(await again.status(matchID) == .pending)
+    #expect(await t.requests.isEmpty)
+}
+
+@Test func testOutboxReportsSignedOut() async throws {
+    let box = ResultOutbox(fileURL: nil)
+    await box.put(entry(result(9, 7)))
+    #expect(await box.flush(using: client(MemoryStore(nil), FakeTransport())))
+    #expect(await box.status(matchID) == .pending)
+}
+
+@Test func testOutboxReportsRefusedRefreshAsSignedOut() async throws {
+    // O token está a acabar e o Supabase recusa renovar: a sessão caiu a meio do envio.
+    let t = FakeTransport([.http(400, #"{"error":"invalid_grant"}"#)])
+    let box = ResultOutbox(fileURL: nil)
+    await box.put(entry(result(9, 7)))
+    #expect(await box.flush(using: client(MemoryStore(credentials(expiresIn: 30)), t)))
+    #expect(await box.status(matchID) == .pending)
+}
+
+@Test func testOutboxEmptyIsNotSignedOut() async throws {
+    let box = ResultOutbox(fileURL: nil)
+    #expect(!(await box.flush(using: client(MemoryStore(nil), FakeTransport()))))
+}
