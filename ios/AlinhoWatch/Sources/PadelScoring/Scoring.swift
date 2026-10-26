@@ -54,7 +54,8 @@ public enum Scoring {
     public static func stop(_ s: MatchState, at date: Date) -> MatchState {
         guard !s.isOver else { return s }
         var st = s
-        finish(&st, .stopped)
+        // No Set sem fim, «Terminar» é o fim normal (não há outro).
+        finish(&st, st.config.format == .endlessSet ? .rules : .stopped)
         st.endedAt = date
         return st
     }
