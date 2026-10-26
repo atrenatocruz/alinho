@@ -5,11 +5,13 @@ import { formatDate } from './formatDate'
 export function categoryRows(page, categoryId) {
   const cat = page.categories.find((c) => c.id === categoryId)
   if (!cat) return []
-  const teams = page.teams.filter((t) => t.category_id === categoryId && t.status === 'aprovada').map((t) => ({ id: t.id, name: t.name }))
+  // O ranking de cada equipa no início da liga (passo 8 do desempate, 23 out).
+  const teams = page.teams.filter((t) => t.category_id === categoryId && t.status === 'aprovada')
+    .map((t) => ({ id: t.id, name: t.name, rating: t.start_rating ?? null }))
   const results = resultsFromEncounters(page.encounters.filter((e) => e.category_id === categoryId), cat.matches_per_encounter)
   return leagueStandings(teams, results, {
     win: cat.points_win, draw: cat.points_draw, loss: cat.points_loss, walkover: cat.points_walkover,
-  }, categoryId)
+  }, categoryId, { tiebreaks: (page.tiebreaks || []).filter((t) => t.category_id === categoryId) })
 }
 
 const DONE = new Set(['oficial', 'cancelado', 'submetido', 'contestado'])

@@ -3,7 +3,7 @@ import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockL
 import { withManyOrgs, PLAYED_EVENTS } from './devMockGerir'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
-  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS,
+  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS, TOURNAMENT_HORARIO_TABLE_MOCKS,
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 import { CLUB_PAGE_RPC_MOCKS, CLUB_PAGE_TABLE_MOCKS } from './devMockClubPage'
@@ -145,7 +145,42 @@ const ACHIEVEMENTS_CATALOG = [
   { key: 'embaixador_da_bola', category: 'antiguidade', rarity: 'epico', sort: 1027 },
 ]
 
+const PLAN_RPC_MOCKS = {
+  // localStorage.mockPlanState = 'pedido' | 'pago' | 'gratis' | 'acaba' | 'usado'
+  // → o estado do plano do grupo nos Planos e no Gerir (#723). Sem ele: o
+  // Community sem pedido nem experiência.
+  get_group_plan_status: () => {
+    const st = localStorage.getItem('mockPlanState') || ''
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+    const base = {
+      organization_id: '00000000-0000-0000-0000-0000000000aa', plan_tier: localStorage.getItem('mockPlanTier') || 'plus',
+      billing: null, open_request: null, last_invoice: { invoice_name: 'Maré Alta Padel, Lda', invoice_nif: '509123456' },
+      trial: null, trials_used: st === 'usado' ? ['pro', 'club'] : [], trial_days: 90,
+      prices: { plus: { monthly: 4.99, yearly: 49.9 }, pro: { monthly: 14.99, yearly: 149.9 }, club: { monthly: 29.99, yearly: 299.9 } },
+      billing_info: { company_name: 'Exemplo Desporto, Lda', company_nif: '500000000', company_address: 'Rua Exemplo, Lisboa' },
+      billing_info_provisional: true,
+    }
+    if (st === 'pedido' || st === 'pago') {
+      base.open_request = { request_id: 'req-1', tier: 'pro', period: 'monthly', kind: 'new', amount: 14.99, reference: 'ALN-7K4Q',
+        created_at: new Date().toISOString(), paid_claimed_at: st === 'pago' ? new Date().toISOString() : null }
+      base.billing_info = { ...base.billing_info, iban: 'PT50 0000 0000 0000 0000 0000 0', mbway: '912 345 678' }
+    }
+    if (st === 'gratis' || st === 'acaba') {
+      base.plan_tier = 'pro'
+      base.trial = { trial_id: 'tr-1', tier: 'pro', ends_on: day(st === 'acaba' ? 1 : 89), previous_tier: 'plus' }
+      base.trials_used = ['pro']
+    }
+    return base
+  },
+  request_plan: () => ({ ok: true, request_id: 'req-1', reference: 'ALN-7K4Q', amount: 14.99, kind: 'new', period: 'monthly' }),
+  mark_plan_request_paid: () => ({ ok: true }),
+  cancel_plan_request: () => ({ ok: true }),
+  start_plan_trial: () => ({ ok: true, trial_id: 'tr-1', days: 90 }),
+  stop_plan_trial: () => ({ ok: true }),
+}
+
 const RPC_MOCKS = {
+  ...PLAN_RPC_MOCKS,
   // Aprovar quem entra (2 out): o mix tem 8 lugares — com o mix cheio fica suplente.
   accept_mix_request: () => (localStorage.getItem('mockEventCount') && Number(localStorage.getItem('mockEventCount')) < 8 ? 'confirmed' : 'waitlisted'),
   decline_mix_request: () => null,
@@ -2198,7 +2233,7 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Obje
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS), ...Object.entries(VOUCHER_TABLE_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_HORARIO_TABLE_MOCKS), ...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS), ...Object.entries(VOUCHER_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }

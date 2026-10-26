@@ -26,17 +26,21 @@ import { dayKeyInTz, hhmmInTz } from './tournamentDay'
 export async function getCategoryBoard(categoryId) {
   if (!categoryId) return { groups: [], entries: {}, matches: [] }
 
-  const [groupRows, entryRows, matchRows, hidingRows] = await Promise.all([
+  const [groupRows, entryRows, matchRows, hidingRows, tiebreakRows] = await Promise.all([
     supabase.from('tournament_public_groups').select('*').eq('category_id', categoryId),
     supabase.from('tournament_public_entries').select('*').eq('category_id', categoryId),
     supabase.from('tournament_public_matches').select('*').eq('category_id', categoryId),
     // Duplas com alguém que esconde os resultados (partilha nas redes: aí
     // aparecem como «Dupla M4»). Sem a função ainda viva, ninguém esconde.
     supabase.rpc('tournament_entries_hiding_results', { p_category_id: categoryId }),
+    // Os desempates jogados no campo (passo 8, 23 out). Sem a vista ainda
+    // viva, não há nenhum.
+    supabase.from('tournament_public_tiebreaks').select('*').eq('category_id', categoryId),
   ])
   const firstError = groupRows.error || entryRows.error || matchRows.error
   if (firstError) throw firstError
   const hiding = new Set(hidingRows.error ? [] : (hidingRows.data || []))
+  const tiebreaks = tiebreakRows?.error ? [] : (tiebreakRows?.data || [])
 
   // A vista dos grupos vem uma linha por dupla; junta-se por grupo.
   const byGroup = new Map()
@@ -46,8 +50,18 @@ export async function getCategoryBoard(categoryId) {
     }
     if (row.entry_id) byGroup.get(row.id).teams.push({ id: row.entry_id, position: row.position })
   }
+  // O ranking de cada dupla no dia do sorteio (passo 7 do desempate, 23 out)
+  // vai com o grupo: assim a tabela usa-o sem o ecrã ter de o passar.
+  const ratingOf = new Map((entryRows.data || []).map((e) => [e.id, e.draw_rating ?? null]))
   const groups = [...byGroup.values()]
-    .map((g) => ({ ...g, teams: g.teams.sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((x) => x.id) }))
+    .map((g) => {
+      const teams = g.teams.sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((x) => x.id)
+      return {
+        ...g, teams,
+        ratings: Object.fromEntries(teams.map((id) => [id, ratingOf.get(id) ?? null])),
+        tiebreaks: tiebreaks.filter((t) => t.group_id === g.id),
+      }
+    })
     .sort((a, b) => a.number - b.number)
 
   const entries = {}
@@ -64,17 +78,20 @@ export async function getCategoryBoard(categoryId) {
       ].filter((p) => p.name),
       team_name: e.team_name || null,
       seed: e.seed_number || null,
+      draw_rating: e.draw_rating ?? null,
       status: e.status,
       hides_results: hiding.has(e.id),
     }
   }
 
-  return { groups, entries, matches: matchRows.data || [] }
+  // Os desempates entre grupos (melhores terceiros) não têm grupo.
+  return { groups, entries, matches: matchRows.data || [], tiebreaks: tiebreaks.filter((t) => !t.group_id) }
 }
 
-/** A tabela de um grupo, já ordenada pelo desempate da FPP
- *  (`TIEBREAK_DEFAULT`, #592). `matches` são as linhas da vista; aqui só se
- *  traduz para o que as contas esperam. */
+/** A tabela de um grupo, já ordenada pelo desempate (`TIEBREAK_DEFAULT`,
+ *  23 out). `matches` são as linhas da vista; aqui só se traduz para o que
+ *  as contas esperam. O ranking do sorteio vem em `group.ratings`
+ *  (getCategoryBoard). */
 export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
   const mine = matches
     .filter((m) => m.stage === 'grupo' && m.group_id === group.id)
@@ -98,7 +115,7 @@ export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
           ? (winnerSide === 'a' ? 'b' : 'a') : null,
       }
     })
-  return groupStandings(group.teams, mine, { tiebreak })
+  return groupStandings(group.teams, mine, { tiebreak, ratings: group.ratings || null, tiebreaks: group.tiebreaks || [] })
 }
 
 /** Os pontos de uma dupla na tabela do grupo: 3 por vitória, 0 por derrota
@@ -171,8 +188,13 @@ export async function clearBracketFromGroups(categoryId) {
 
 /** Quantas duplas passam de cada grupo, pelo formato guardado na categoria.
  *  Sem formato guardado (sorteio à mão), assume-se 2 — o do desenho. */
-export const qualifiersPerGroup = (category) =>
-  Number(category?.format?.qualifiers_per_group) || 2
+// 0 é a sério: o grupo único não leva ninguém a um quadro (BA, 23 out). Só
+// sem valor nenhum (categorias antigas) é que vale o 2 de sempre.
+export const qualifiersPerGroup = (category) => {
+  const v = category?.format?.qualifiers_per_group
+  if (v === 0 || v === '0') return 0
+  return Number(v) || 2
+}
 
 /** Os jogos de eliminatória por ronda, na ordem do quadro. */
 export function bracketRounds(matches, stage = 'principal') {

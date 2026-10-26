@@ -558,14 +558,21 @@ export function poolRoundsPlayed(matches, poolTeamIds) {
   return poolRoundNumbers(matches, poolTeamIds).length
 }
 
-/** Classificação da fase de grupos (Francisco, 28 set, «#592», como a
- *  FPP): vitórias → confronto direto → diferença de pontos → pontos
- *  marcados. O confronto direto são as vitórias nos jogos entre as
- *  empatadas (entre duas, o jogo entre elas; entre três ou mais, a
- *  mini-tabela). A diferença e os pontos são de todos os jogos. Quando um
- *  critério separa parte das empatadas, as que ficam recomeçam pelas
- *  vitórias (FPP RG 2026, 10.10.2). Quem continua empatado fica na ordem em
- *  que veio. */
+/** Classificação da fase de grupos, como no futebol (Francisco, 23 out;
+ *  SPEC em design-handoff/2026-10-23-desempate-grupos). Nos mixes não há
+ *  sets nem faltas, por isso:
+ *    1. vitórias;
+ *    2. só nos jogos entre as empatadas: vitórias (com duas, o jogo entre as
+ *       duas), diferença de pontos, pontos marcados;
+ *    3. em todos os jogos: diferença de pontos, depois pontos marcados;
+ *    4. o ranking da dupla no início do mix (`team.seed_ranking`).
+ *  Quando um critério separa parte das empatadas, as que ficam recomeçam
+ *  pelas vitórias. Quem continua empatado fica na ordem em que veio e leva
+ *  `tiedWith` (os ids das outras equipas): escolhe o organizador.
+ *  Quem ficou à frente por um desempate leva `decidedBy` (o critério) e
+ *  `decidedAmong` (quantas estavam empatadas), para a etiqueta da tabela. */
+export const MIX_TIEBREAK = ['vitorias', 'vitorias_entre', 'diferenca_entre', 'marcados_entre', 'diferenca', 'marcados', 'ranking']
+
 export function standings(teams, matches) {
   const table = Object.fromEntries(
     teams.map(t => [t.id, { team: t, wins: 0, diff: 0, scored: 0, played: 0 }])
@@ -584,25 +591,52 @@ export function standings(teams, matches) {
     table[m.winner_team_id].wins += 1
   }
 
-  const headToHead = (row, tied) => counted.filter(m =>
-    m.winner_team_id === row.team.id && tied.has(m.team_a_id) && tied.has(m.team_b_id)).length
-  const criteria = [
-    (r) => r.wins,
-    (r, tied) => headToHead(r, tied),
-    (r) => r.diff,
-    (r) => r.scored,
-  ]
-  const order = (group, depth) => {
-    if (group.length <= 1 || depth >= criteria.length) return group
+  // Os jogos entre as empatadas, do ponto de vista de `row`.
+  const among = (row, tied) => {
+    let wins = 0
+    let diff = 0
+    let scored = 0
+    for (const m of counted) {
+      if (!tied.has(m.team_a_id) || !tied.has(m.team_b_id)) continue
+      const isA = m.team_a_id === row.team.id
+      if (!isA && m.team_b_id !== row.team.id) continue
+      const mine = isA ? (m.score_a ?? 0) : (m.score_b ?? 0)
+      const theirs = isA ? (m.score_b ?? 0) : (m.score_a ?? 0)
+      if (m.winner_team_id === row.team.id) wins += 1
+      diff += mine - theirs
+      scored += mine
+    }
+    return { wins, diff, scored }
+  }
+  const value = (r, criterion, tied) => {
+    switch (criterion) {
+      case 'vitorias': return r.wins
+      case 'vitorias_entre': return among(r, tied).wins
+      case 'diferenca_entre': return among(r, tied).diff
+      case 'marcados_entre': return among(r, tied).scored
+      case 'diferenca': return r.diff
+      case 'marcados': return r.scored
+      case 'ranking': return r.team.seed_ranking == null ? -Infinity : Number(r.team.seed_ranking)
+      default: return 0
+    }
+  }
+  const order = (group, depth, label = null) => {
+    if (group.length <= 1) return group.map((r) => (label ? { ...r, ...label } : r))
+    if (depth >= MIX_TIEBREAK.length) {
+      const ids = group.map((r) => r.team.id)
+      return group.map((r) => ({ ...r, tiedWith: ids.filter((id) => id !== r.team.id) }))
+    }
+    const criterion = MIX_TIEBREAK[depth]
     const tied = new Set(group.map(r => r.team.id))
     const byValue = new Map()
     for (const r of group) {
-      const v = criteria[depth](r, tied)
+      const v = value(r, criterion, tied)
       if (!byValue.has(v)) byValue.set(v, [])
       byValue.get(v).push(r)
     }
-    if (byValue.size === 1) return order(group, depth + 1)
-    return [...byValue.entries()].sort((x, y) => y[0] - x[0]).flatMap(([, sub]) => order(sub, 0))
+    if (byValue.size === 1) return order(group, depth + 1, label)
+    const next = depth === 0 ? label : { decidedBy: criterion, decidedAmong: group.length }
+    return [...byValue.entries()].sort((x, y) => y[0] - x[0]).flatMap(([, sub]) => order(sub, 0, next))
   }
   return order(Object.values(table), 0)
 }

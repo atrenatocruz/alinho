@@ -26,10 +26,10 @@ describe('tabela', () => {
     expect(s[2].decidedBy).toBeNull()
   })
 
-  it('empate a três com confronto direto igual passa à diferença de partidas', () => {
+  it('empate a três com os pontos entre elas iguais: decide a diferença de partidas nesses encontros (23 out)', () => {
     const s = leagueStandings(teams('A', 'B', 'C'), [res('A', 'C', 3, 0), res('B', 'A', 2, 1), res('C', 'B', 2, 1)], R, 'cat')
     expect(s.map((r) => r.teamId)).toEqual(['A', 'B', 'C'])
-    expect(s.every((r) => r.decidedBy === 'matches')).toBe(true)
+    expect(s.every((r) => r.decidedBy === 'h2h')).toBe(true)
   })
 
   it('decidedBy mostra o critério que separou cada equipa, não o primeiro que dividiu o grupo', () => {
@@ -54,11 +54,35 @@ describe('tabela', () => {
     expect(s.find((r) => r.teamId === 'B')).toMatchObject({ points: -1, matchesAgainst: 3 })
   })
 
-  it('tudo igual: sorteio sempre igual para a mesma categoria', () => {
-    const a = leagueStandings(teams('A', 'B', 'C'), [], R, 'x').map((r) => r.teamId)
-    const b = leagueStandings(teams('C', 'A', 'B'), [], R, 'x').map((r) => r.teamId)
-    expect(a).toEqual(b)
+  it('tudo igual: decide o ranking da equipa no início da liga', () => {
+    const s = leagueStandings([{ id: 'A', name: 'A', rating: 1200 }, { id: 'B', name: 'B', rating: 1350 }], [], R, 'x')
+    expect(s.map((r) => r.teamId)).toEqual(['B', 'A'])
+    expect(s[0].decidedBy).toBe('ranking')
+  })
+
+  it('tudo igual e sem ranking: não há sorteio, fica para o organizador (tiedWith)', () => {
+    const s = leagueStandings(teams('A', 'B', 'C'), [], R, 'x')
+    expect(s.map((r) => r.teamId)).toEqual(['A', 'B', 'C'])
+    expect(s[0].tiedWith).toEqual(['B', 'C'])
     expect(lotKey('x', 'A')).toBe(lotKey('x', 'A'))
+  })
+
+  it('a escolha do organizador, quando gravada, decide', () => {
+    const s = leagueStandings(teams('A', 'B'), [], R, 'x', { tiebreaks: [{ team_ids: ['A', 'B'], ranking: ['B', 'A'] }] })
+    expect(s.map((r) => r.teamId)).toEqual(['B', 'A'])
+    expect(s[0]).toMatchObject({ decidedBy: 'organizer' })
+    expect(s[0].tiedWith).toBeUndefined()
+  })
+
+  it('faltas: com os mesmos pontos, quem faltou fica atrás', () => {
+    // A e B com 3 pontos (o D tem 6 e fica em 1.º); o A faltou contra o D.
+    const R2 = { win: 3, draw: 1, loss: 0, walkover: 0 }
+    const s = leagueStandings(teams('A', 'B', 'C', 'D'), [
+      res('A', 'C', 2, 1), { ...res('A', 'D', 0, 0), walkoverTeamId: 'A' },
+      res('B', 'C', 2, 1), res('D', 'B', 2, 1),
+    ], R2, 'x')
+    expect(s.map((r) => r.teamId).slice(0, 3)).toEqual(['D', 'B', 'A'])
+    expect(s[1].decidedBy).toBe('walkovers')
   })
 })
 

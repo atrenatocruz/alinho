@@ -60,6 +60,7 @@ import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { weekdayShort, weekdayLong, isMasculineWeekday, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
+import PlanStatusLine from '../components/gerir/PlanStatusLine'
 import { districtOptions } from '../lib/leagueDistricts'
 import { Realce } from '../components/SearchField'
 import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
@@ -3061,6 +3062,10 @@ export default function GerirClube() {
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
+      {/* O pedido de plano ou a experiência grátis em curso, por cima dos
+          separadores (#723). Mudar o plano (terminar a experiência) relê as
+          organizações, para o Gerir saber o plano novo. */}
+      {activeTab !== 'redeem' && <PlanStatusLine org={org} onChanged={() => refreshMemberships?.()} />}
       {activeTab !== 'redeem' && (
         // O separador único da app (Trello #528). Três, só texto — a fila de
         // cinco que deslizava, com a seta a dizer que havia mais, acabou com
@@ -3085,7 +3090,9 @@ export default function GerirClube() {
               options={[
                 { value: 'all', label: t('gerirclube.kind_all') },
                 { value: 'mix', label: t('gerirclube.kind_mixes'), dot: KIND_COLORS.mix.strong },
-                { value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong },
+                // Os grupos não criam jogos em aberto (só o Club): o filtro
+                // sai deles (REGRAS-BA, 21 out).
+                ...(isGroupOrg ? [] : [{ value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong }]),
                 { value: 'torneio', label: t('gerirclube.kind_tournaments'), dot: KIND_COLORS.tournament.strong },
                 ...(isGroupOrg ? [] : [{ value: 'turma', label: t('gerirclube.kind_series'), dot: KIND_COLORS.lesson.strong }]),
               ]}
@@ -3154,8 +3161,10 @@ export default function GerirClube() {
                   ['aberto', canPlanEvents && !isGroupOrg],
                   ['amigos', isGroupOrg],
                   ['torneio', canPlanEvents && tournamentsReady],
-                  // A liga é entre clubes: só um clube a cria (não um grupo).
-                  ['liga', org?.kind === 'club'],
+                  // A liga vai pelo plano, como os torneios: clubes e grupos
+                  // Community ou Club (Francisco, 21 out; a base do Dev 3 em
+                  // migration_liga_pelo_plano.sql).
+                  ['liga', canPlanEvents],
                   ['turma', !isGroupOrg && lessonsReady],
                 ].filter(([, mostra]) => mostra).map(([tipo]) => tipo)
                 return (
@@ -3989,7 +3998,12 @@ export default function GerirClube() {
                       detalhe = [item.quando ? quandoCurto(item.quando, false) : null, t('gerirclube.status_cancelled')].filter(Boolean).join(' · ')
                     }
                     if (tipo === 'mix' && !isDraftMix(row)) {
-                      abrir = row.recurrence_id
+                      // Em «Por terminar» abre o próprio mix, para pôr os
+                      // resultados; antes abria o cartão da série (QUINTAS @
+                      // IPC, 23 out).
+                      abrir = itemPorTerminar(item)
+                        ? () => navigate(`/jogo/${row.id}`)
+                        : row.recurrence_id
                         ? () => navigate(`/gerir/${org.slug}/serie/${row.recurrence_id}`, { state: { fromGerir: true } })
                         : () => setSingleSheet(row)
                     }
