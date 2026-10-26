@@ -9,7 +9,8 @@ enum HoldDuration {
 
 /// Dedo pousado: o véu enche durante `HoldDuration.seconds`; se o dedo sair antes
 /// (ou escorregar), esvazia e não conta. Só um alvo de cada vez (`AppModel.activeHold`).
-/// Usa um `DragGesture` simultâneo para não roubar o deslizar entre páginas.
+/// O toque vem de um toque comprido que nunca chega ao fim (só `onPressingChanged`):
+/// um `DragGesture`, mesmo simultâneo, roubava o deslizar entre páginas por cima dos blocos.
 struct HoldButton<Label: View>: View {
     let target: HoldTarget
     var fillFromBottom = true
@@ -23,16 +24,11 @@ struct HoldButton<Label: View>: View {
     @Environment(\.isLuminanceReduced) private var dim
     @State private var progress: CGFloat = 0
     @State private var holdTask: Task<Void, Never>?
-    /// O dedo está pousado e ainda não escorregou. É `@GestureState` porque volta
-    /// sozinho a `false` quando o sistema cancela o gesto (o deslizar entre páginas,
-    /// o pulso a baixar, uma notificação), coisa que o `onEnded` não apanha.
-    @GestureState private var touch = Touch()
-
-    private struct Touch: Equatable {
-        var down = false
-        var slipped = false
-        var holding: Bool { down && !slipped }
-    }
+    /// O dedo está pousado e ainda não escorregou. O `onPressingChanged` volta a
+    /// `false` ao levantar, ao escorregar mais de 24 pt e quando o sistema cancela o
+    /// gesto (o deslizar entre páginas, o pulso a baixar, uma notificação). Depois de
+    /// escorregar já não volta a contar, mesmo que o dedo regresse.
+    @State private var holding = false
 
     var body: some View {
         label()
@@ -49,18 +45,11 @@ struct HoldButton<Label: View>: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($touch) { value, state, _ in
-                        state.down = true
-                        // Depois de escorregar já não volta a contar, mesmo que o dedo regresse.
-                        if hypot(value.translation.width, value.translation.height) > 24 { state.slipped = true }
-                    }
-            )
-            .onChange(of: touch.down) { _, down in
-                if case .block = target { model.blockTouches = max(0, model.blockTouches + (down ? 1 : -1)) }
+            .onLongPressGesture(minimumDuration: 3600, maximumDistance: 24, perform: {}) { pressing in
+                holding = pressing
             }
-            .onChange(of: touch.holding) { _, holding in
+            .onChange(of: holding) { _, holding in
+                if case .block = target { model.blockTouches = max(0, model.blockTouches + (holding ? 1 : -1)) }
                 if holding { begin() } else { cancel() }
             }
             // Perdeu o toque (o outro bloco também foi tocado): esvazia.
