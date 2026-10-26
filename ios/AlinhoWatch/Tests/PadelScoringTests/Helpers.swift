@@ -42,7 +42,7 @@ func games(_ s: MatchState, _ seq: String) -> (MatchState, [Set<MatchEvent>]) {
 }
 
 /// Uma sessão como a Fase 1 a gravava: Pontos a meio, com pontos corridos e sem
-/// a chave `pointsScoring` (que só existe desde os Pontos por jogos).
+/// os campos que vieram depois (`pointsScoring`, `hasPoints`, …).
 func legacyPointsSessionJSON(points: [Int]) throws -> Data {
     var s = MatchSession()
     s.config = MatchConfig(format: .points, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
@@ -51,7 +51,11 @@ func legacyPointsSessionJSON(points: [Int]) throws -> Data {
     var current = root["current"] as! [String: Any]
     current["points"] = points
     current["server"] = nil
-    current.removeValue(forKey: "pointsScoring")
+    // Campos que a Fase 1 ainda não gravava.
+    for key in ["pointsScoring", "deuceMode", "nextDeuceMode", "ourServer", "lastOurServer",
+                "pausedAt", "pausedSeconds", "lastPointAt", "hasPoints"] {
+        current.removeValue(forKey: key)
+    }
     root["current"] = current
     return try JSONSerialization.data(withJSONObject: root)
 }
