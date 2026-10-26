@@ -75,13 +75,18 @@ import Testing
     #expect(snapshots.isEmpty)
 }
 
-@Test func correctPointsRoundKeepsGamesAbove12() {
+@Test func correctEndlessSetKeepsGamesAbove12() {
+    var ses = session(started: match(.endlessSet))
+    ses.correct(games: [40, 3], points: [1, 0])
+    #expect(ses.current!.games == [40, 3] && ses.current!.points == [1, 0])
+}
+
+@Test func correctRunningPointsStaysBelowTotal() {
     var ses = session(started: match(.points, total: 24))
-    ses.correct(games: [14, 9], points: [0, 0])
-    #expect(ses.current!.games == [14, 9] && ses.current!.phase == .points)
-    var open = session(started: match(.points, total: nil))
-    open.correct(games: [40, 3], points: [1, 0])
-    #expect(open.current!.games == [40, 3])
+    ses.correct(games: [0, 0], points: [15, 8])
+    #expect(ses.current!.points == [15, 8] && !ses.current!.isOver)
+    ses.correct(games: [0, 0], points: [30, 2])
+    #expect(ses.current!.points == [23, 2])
 }
 
 @Test func correctToSixAllEntersTieBreak() {

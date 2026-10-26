@@ -11,10 +11,9 @@ import Testing
     #expect(play(m, "uuu").0.statusLine == .matchPoint)
 }
 
-@Test func matchPointInPointsRound() {
-    let (s, _) = games(match(.points, total: 24), String(repeating: "ut", count: 11) + "u")
-    #expect(play(s, "uuu").0.statusLine == .matchPoint)
-    #expect(s.statusLine == .gamesRound(us: 12, them: 11, total: 24))
+@Test func endlessSetHasNoMatchPoint() {
+    let (s, _) = games(match(.endlessSet), String(repeating: "ut", count: 11) + "u")
+    #expect(play(s, "uuu").0.statusLine == .gamesRound(us: 12, them: 11, total: nil))
 }
 
 @Test func deuceLabelBeatsSetPoint() {

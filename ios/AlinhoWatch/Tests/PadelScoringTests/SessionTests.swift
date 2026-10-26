@@ -57,7 +57,7 @@ private func session(_ format: MatchFormat, _ mode: DeuceMode = .golden, server:
     for i in 0..<21 {
         s.start(at: t0)
         lastID = s.current!.id
-        feedGames(&s, String(repeating: i % 2 == 0 ? "u" : "t", count: 16))
+        feed(&s, String(repeating: i % 2 == 0 ? "u" : "t", count: 16))
         s.clearFinished()
     }
     #expect(s.history.count == MatchSession.historyLimit)
@@ -67,7 +67,7 @@ private func session(_ format: MatchFormat, _ mode: DeuceMode = .golden, server:
 
 @Test func pointIgnoredWhenOver() {
     var s = session(.points, total: 16)
-    feedGames(&s, String(repeating: "u", count: 16))
+    feed(&s, String(repeating: "u", count: 16))
     let done = s
     let events = s.point(.them, at: t0)
     #expect(events.isEmpty && s == done)

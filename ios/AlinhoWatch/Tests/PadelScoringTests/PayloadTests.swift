@@ -22,9 +22,16 @@ private func finished(_ format: MatchFormat, _ seq: String) -> MatchRecord {
     #expect(p.winner == "us" && p.sets == [[6, 0], [6, 0]] && p.effort == 7 && !p.deleted)
 }
 
-@Test func pointsPayloadCarriesGames() {
-    let p = WatchGamePayload(finished(.points, String(repeating: "u", count: 13) + String(repeating: "t", count: 11)), updatedAt: t0)
-    #expect(p.sets == [[13, 11]] && p.format == "pts" && p.resultText == "13-11")
+@Test func endlessSetPayloadCarriesGames() {
+    let p = WatchGamePayload(finished(.endlessSet, String(repeating: "u", count: 13) + String(repeating: "t", count: 11)), updatedAt: t0)
+    #expect(p.sets == [[13, 11]] && p.format == "ssf" && p.resultText == "13-11")
+}
+
+@Test func runningPointsPayloadCarriesPoints() {
+    var ses = session(started: match(.points, total: 24))
+    for c in String(repeating: "u", count: 15) + String(repeating: "t", count: 9) { ses.point(c == "u" ? .us : .them, at: t0) }
+    let p = WatchGamePayload(ses.history[0], updatedAt: t0)
+    #expect(p.sets == [[15, 9]] && p.format == "pts" && p.resultText == "15-9")
 }
 
 @Test func payloadHasVersion2() {
