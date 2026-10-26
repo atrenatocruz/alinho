@@ -142,10 +142,13 @@ Primeira build no TestFlight: 20 out 2026 (build nº 2 do Codemagic, commit `188
 
 O plano gratuito do Codemagic dá 500 minutos/mês em Mac M2; uma build demora ~10–15 min.
 
-## Apple Watch (marcador, fase 1)
+## Apple Watch (marcador)
 
 Desenho: `docs/superpowers/specs/2026-10-22-apple-watch-marcador-fase1-design.md`
-(entrega do Francisco em `docs/design-handoff/2026-10-22-relogio/`).
+(entrega do Francisco em `docs/design-handoff/2026-10-22-relogio/`) e, por cima,
+`docs/superpowers/specs/2026-10-26-relogio-prototipo-23out-design.md` (o protótipo
+aprovado a 23 out: Pontos por jogos, quem serve na dupla, pausa, acertar, treino no
+Saúde, esforço, «Os meus números» no iPhone e o registo como jogo entre amigos).
 
 - **Código**: `ios/AlinhoWatch/`, um Swift Package com `PadelScoring` (regras,
   desfazer, gravação; testado) e `ScoreboardUI` (ecrãs, vibrações, sessão de
@@ -164,8 +167,9 @@ Desenho: `docs/superpowers/specs/2026-10-22-apple-watch-marcador-fase1-design.md
 Configuração única (painéis):
 
 1. **Apple Developer → Identifiers → +**: App ID `pt.alinho.app.watchkitapp`, com
-   **HealthKit** ligado (a sessão de treino mantém o ecrã ligado durante o jogo;
-   não se grava nada no Saúde).
+   **HealthKit** ligado. Cada jogo grava-se como treino de padel no Saúde (duração,
+   pulsação, calorias e, em watchOS 11, o esforço); a sessão de treino é também o
+   que mantém o ecrã ligado durante o jogo. Sem autorização o jogo conta na mesma.
 2. **Apple Developer → Profiles → +** → *App Store Connect*, App ID
    `pt.alinho.app.watchkitapp`, o mesmo certificado, nome `alinho watch appstore`.
    No Codemagic: *Fetch profiles* → `alinho watch appstore` → *Download selected*.
@@ -180,6 +184,19 @@ Jogo de teste (Renato e Francisco), antes de dizer que está pronto: um jogo de
 um tie-break e depois do fim de um set; pulso em baixo vários minutos (o ecrã não
 pode voltar ao mostrador); bateria antes e depois; o tempo do toque
 (`HoldDuration.seconds`, 0,5 / 0,7 / 0,9 s) com suor; toques acidentais.
+
+E do protótipo de 23 out: Pontos com ponto de ouro e com vantagens até ao total;
+acertar o marcador a meio de um set; pausa de 5 min (o tempo não conta); mudar o
+40-40 a meio (só no jogo seguinte); pulso em baixo e um toque com a manga (só
+acorda); 20 min sem pontos («Ainda estão a jogar?»); recusar e depois aceitar o
+Saúde; o treino na app Atividade com bpm e kcal; o esforço; desfazer depois do fim;
+o jogo a aparecer em Perfil → «Os meus números» no iPhone, e registá-lo com os
+outros três (precisa da `supabase/migration_relogio_desafios.sql` corrida).
+
+O iPhone recebe os jogos pelo plugin local `WatchGames`
+(`ios/App/App/WatchGamesPlugin.swift`, registado no `AlinhoBridgeViewController`
+do `Main.storyboard`). Os jogos e a saúde ficam num ficheiro no telemóvel; ao
+servidor só vai o que se regista como jogo entre amigos e os desafios.
 
 ## Notificações push
 

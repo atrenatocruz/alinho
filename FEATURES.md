@@ -96,6 +96,15 @@ Clubs compete against each other in a league, round by round. Spec: `docs/superp
 - **Where it shows up.** No tab of its own: the public league page `/liga/:slug` (readable without an account — names and level bands only, never emails, phones or exact ratings), encounter pages, a roster page, the organizer page, «Liga» in Gerir's «＋ Criar», encounter cards and «Para ti» rows on the Home (saved «all kinds» filters gain the league automatically), and notifications in the bell. A daily `pg_cron` job reminds both clubs two days before a round's window ends.
 - **Security.** Every league table is read-only for `authenticated` and closed to `anon`; all writes go through `SECURITY DEFINER` RPCs with `SET search_path = public, pg_temp`; anon can only call `get_league_page` and `get_league_encounter`.
 
+## Apple Watch scorer (on branch `feature/apple-watch`, not yet on `dev`)
+
+A padel scorer on the wrist, embedded in the iPhone app (`pt.alinho.app.watchkitapp`). Specs: `docs/superpowers/specs/2026-10-22-apple-watch-marcador-fase1-design.md` and `docs/superpowers/specs/2026-10-26-relogio-prototipo-23out-design.md`; plans in `docs/superpowers/plans/`. Runbook: `docs/native-apps.md` → «Apple Watch».
+
+- **Scoring** (`ios/AlinhoWatch/Sources/PadelScoring`, tested with `swift test` in CI): best of 3, 2 sets + super tie-break, pro set to 9, 1 set and **Pontos** — games of 0-15-30-40 with no sets, the round ends when the games reach 16/24/32 (or never). 40-40 as golden point, Star Point or advantages; tie-breaks, side changes, who serves per player and side («Tu · direita»), set point / match point, undo of every point and menu action.
+- **On the wrist**: long press (0.7 s) to score, one buzz for us and two for them, the first tap with the wrist down only wakes the screen; pause, fix the score with the crown, change server, change the 40-40 rule from the next game; «Ainda estão a jogar?» after 20 min without points; workout saved to Health (heart rate, calories, effort 1–10).
+- **On the iPhone**: each finished game reaches the app through WatchConnectivity and the local `WatchGames` Capacitor plugin. Perfil → «Os meus números» shows Jogos, Estatísticas (month by month, trends, WHO minutes, effort) and Desafios (monthly goal, streak, pause). Health data stays on the phone.
+- **Registering** a watch game (within 7 days) creates a private friends' match with the existing RPCs; the other three accept. 7-day challenges between mutual followers and «Amigos esta semana» count confirmed friends' games only (`supabase/migration_relogio_desafios.sql`, not yet run).
+
 ## UI/UX
 
 - **Bilingual: Portuguese (pt-PT) and English**, via `react-i18next`. Portuguese is the default and the fallback. A signed-in player's choice lives on `profiles.language` and is set from Profile → personal info; a pre-auth visitor can switch from Landing/Login and the choice is stashed in `localStorage` (cleared on sign-out, so a shared device doesn't leak it between accounts). Dates and times are locale-aware (`en` maps to en-GB, not en-US).
