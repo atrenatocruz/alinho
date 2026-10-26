@@ -8,6 +8,9 @@ import { Browser } from '@capacitor/browser'
 import { SignInWithApple } from '@capacitor-community/apple-sign-in'
 import { IS_NATIVE, NATIVE_AUTH_CALLBACK, appHref, appOrigin } from '../lib/native'
 import { enablePush, disablePush } from '../lib/push'
+import { syncWatchSession, clearWatchSession } from '../lib/watchSession'
+import { WatchGames, hasWatchGames } from '../lib/watchGames'
+import { App as CapacitorApp } from '@capacitor/app'
 
 const AuthContext = createContext({})
 
@@ -167,6 +170,8 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Saiu da conta: o relógio fica sem sessão (só na app de iPhone).
+      if (_event === 'SIGNED_OUT') clearWatchSession()
       setUser(session?.user ?? null)
       if (session?.user) {
         loadProfile(session.user.id)
@@ -190,6 +195,27 @@ export const AuthProvider = ({ children }) => {
   const userId = user?.id
   useEffect(() => {
     if (userId) enablePush()
+  }, [userId])
+
+  // App de iPhone: a sessão própria do relógio (src/lib/watchSession.js), no
+  // arranque, ao entrar e ao voltar à app — o pedido do relógio
+  // («needSession») chega quase sempre com a app em segundo plano; com a app
+  // aberta, chega o evento `sessionNeeded`. No site não faz nada.
+  useEffect(() => {
+    if (!userId) return
+    syncWatchSession(userId)
+    if (!hasWatchGames) return
+    let removed = false
+    const handles = []
+    const keep = (p) => p
+      .then((h) => { if (removed) h.remove(); else handles.push(h) })
+      .catch(() => {})
+    keep(CapacitorApp.addListener('resume', () => syncWatchSession(userId)))
+    keep(WatchGames.addListener('sessionNeeded', () => syncWatchSession(userId)))
+    return () => {
+      removed = true
+      handles.forEach((h) => h.remove())
+    }
   }, [userId])
 
   // Welcome email on the first session. Strictly `=== null`: the column only
@@ -551,6 +577,9 @@ export const AuthProvider = ({ children }) => {
     // Antes de sair: este telemóvel deixa de receber os avisos da conta (só
     // na app das lojas; precisa da sessão, por isso vem primeiro).
     await disablePush()
+    // O relógio também sai (o SIGNED_OUT faz o mesmo, mas não chega quando
+    // a chave tem de ser apagada à mão, mais abaixo).
+    await clearWatchSession()
     const { error } = await supabase.auth.signOut()
     let forced = false
     if (error) {
