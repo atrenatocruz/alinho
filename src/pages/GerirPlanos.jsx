@@ -8,6 +8,7 @@ import { PLANS } from './Landing'
 import { planName } from '../lib/plans'
 import { formatCurrency } from '../lib/formatDate'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
+import { useFeatureFlag } from '../lib/useFeatureFlag'
 import {
   PLAN_RANK, getGroupPlanStatus, requestPlan, cancelPlanRequest, markPlanRequestPaid, startPlanTrial,
   planErrorMessage, lisbonToday, addDaysIso, shortDay,
@@ -83,15 +84,19 @@ export default function GerirPlanos() {
   const org = (memberships || []).find((m) => m.organization?.slug === params.get('org') && m.is_admin)?.organization || null
   const isSub = !!org?.parent_organization_id
 
+  // Os planos pagos só com o interruptor «planos_pagos» ligado (PO, 24 out:
+  // os dados de pagamento ainda são provisórios). Sem linha conta como
+  // desligado: fica o «Pedir o plano» pelo WhatsApp de antes.
+  const { on: paidOn } = useFeatureFlag('planos_pagos')
   const [status, setStatus] = useState(null)
   const [loadError, setLoadError] = useState('')
   const load = useCallback(async () => {
-    if (!org?.id) return
+    if (!org?.id || !paidOn) return
     try { setStatus(await getGroupPlanStatus(org.id)); setLoadError('') } catch (err) {
       console.error('Error loading plan status:', err)
       setLoadError(planErrorMessage(t, err))
     }
-  }, [org?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [org?.id, paidOn]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [load])
 
   const current = status?.plan_tier || (org ? (org.plan_tier || 'free') : null)
@@ -99,7 +104,7 @@ export default function GerirPlanos() {
   const trial = status?.trial || null
   const used = status?.trials_used || []
   const days = status?.trial_days || 90
-  const canAct = !!org && !isSub && !!status
+  const canAct = paidOn && !!org && !isSub && !!status
 
   // As folhas: pedir (com os dados da fatura), experimentar, cancelar.
   const [asking, setAsking] = useState(null) // tier

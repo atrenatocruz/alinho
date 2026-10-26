@@ -5,6 +5,7 @@ import { Clock, Gift, Hourglass } from 'lucide-react'
 import { ConfirmSheet } from '../ui'
 import { planName } from '../../lib/plans'
 import { getGroupPlanStatus, stopPlanTrial, planErrorMessage, daysUntil, shortDay } from '../../lib/planBilling'
+import { useFeatureFlag } from '../../lib/useFeatureFlag'
 
 /* A linha do plano no Gerir do grupo, por cima dos separadores (#723,
    design-handoff/2026-10-21-pedir-plano-e-robo, aprovado a 21 out):
@@ -17,20 +18,24 @@ import { getGroupPlanStatus, stopPlanTrial, planErrorMessage, daysUntil, shortDa
 export default function PlanStatusLine({ org, onChanged }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
+  // Os planos pagos só com o interruptor «planos_pagos» ligado (PO, 24 out:
+  // os dados de pagamento ainda são provisórios). Sem linha conta como
+  // desligado: fica o «Pedir o plano» pelo WhatsApp de antes.
+  const { on: paidOn } = useFeatureFlag('planos_pagos')
   const [status, setStatus] = useState(null)
   const [stopping, setStopping] = useState(false)
 
   const load = useCallback(async () => {
-    if (!org?.id) return
+    if (!org?.id || !paidOn) return
     try { setStatus(await getGroupPlanStatus(org.id)) } catch (err) {
       // Sem a função (app nova antes da migração) ou sem permissão: não mostra nada.
       console.error('Error loading plan status:', err)
       setStatus(null)
     }
-  }, [org?.id])
+  }, [org?.id, paidOn])
   useEffect(() => { load() }, [load])
 
-  if (!status) return null
+  if (!paidOn || !status) return null
   const req = status.open_request
   const trial = status.trial
   const plansHref = `/gerir/planos?org=${org.slug}`

@@ -1852,6 +1852,8 @@ const TABLE_MOCKS = {
     // localStorage.mockFriendInvites = 'true' liga o jogo entre amigos novo (#342).
     { key: 'friend_invites', enabled: localStorage.getItem('mockFriendInvites') === 'true' },
     { key: 'parceiros', enabled: localStorage.getItem('mockParceiros') === 'true' },
+    // localStorage.mockPlanosPagos = 'true' liga os planos pagos (#723).
+    { key: 'planos_pagos', enabled: localStorage.getItem('mockPlanosPagos') === 'true' },
   ],
   // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
   // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).
