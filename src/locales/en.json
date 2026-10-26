@@ -2324,6 +2324,8 @@
   "clubprofile.of_group": "From the group",
   "clubprofile.about_invite": "Tell people what the club is about",
   "clubprofile.about_invite_group": "Tell people what the group is about",
+  "clubprofile.superadmin_view_note": "Superadmin mode: you see everything, but you're not a member of this club.",
+  "clubprofile.superadmin_view_note_group": "Superadmin mode: you see everything, but you're not a member of this group.",
   "clubprofile.write_in_gerir": "Write it in Manage",
   "clubprofile.call": "Call",
   "clubprofile.website": "Website",

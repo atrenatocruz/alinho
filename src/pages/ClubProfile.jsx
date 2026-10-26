@@ -90,6 +90,11 @@ export default function ClubProfile() {
   // O superadmin conta como quem organiza, mesmo sem ser membro (superadmins
   // escondidos, 18 out).
   const isAdmin = !!club && (memberships.some((m) => m.organization_id === club.id && m.is_admin) || profile?.is_platform_admin === true)
+  // O superadmin com o modo ligado, num clube ou grupo onde não é membro, vê
+  // tudo como quem organiza: sem «Entrar», com «Já jogados», os grupos e os
+  // jogos entre amigos (Francisco, 23 out: «Continuo sem ver nada»). Com o
+  // modo desligado, is_platform_admin vem falso e fica tudo como para todos.
+  const superadminView = !!club && profile?.is_platform_admin === true && club.my_status !== 'member'
   const isFavorite = club ? memberships.find((m) => m.organization_id === club.id)?.is_favorite === true : false
 
   // Pessoas: a lista de membros vem logo (antes só abria ao tocar no
@@ -105,12 +110,12 @@ export default function ClubProfile() {
   // Only a club member can see its groups (list_club_groups' own gate is
   // club membership) — no point calling it otherwise.
   useEffect(() => {
-    if (club?.kind === 'club' && club.my_status === 'member') {
+    if (club?.kind === 'club' && (club.my_status === 'member' || superadminView)) {
       listClubGroups(club.id).then(setGroups).catch((err) => console.error('Error loading club groups:', err))
     } else {
       setGroups([])
     }
-  }, [club?.id, club?.kind, club?.my_status])
+  }, [club?.id, club?.kind, club?.my_status, superadminView])
 
   // Professores só como pessoas (seguir), sem aulas: as aulas estão
   // escondidas até 11 out, mas quem ensina no clube vê-se.
@@ -320,6 +325,8 @@ export default function ClubProfile() {
         onToggleFavorite={handleToggleFavorite}
         onBack={goBack}
         onShare={shareClub}
+        superadmin={superadminView}
+        gerirHref={club ? `/gerir/${club.slug}` : null}
       />
       <div>
         {club.kind === 'group' && club.parent_slug && (
@@ -335,7 +342,7 @@ export default function ClubProfile() {
       {/* «A decorrer agora no clube» por cima dos próximos (27 set). */}
       <LiveStrip organizationId={club.id} orgKind={club.kind} />
 
-      <ClubEvents club={club} events={events} isAdmin={isAdmin} gerirHref={gerirHref} />
+      <ClubEvents club={club} events={events} isAdmin={isAdmin} gerirHref={gerirHref} superadmin={superadminView} />
 
       <ClubPeople
         club={club}
@@ -376,7 +383,7 @@ export default function ClubProfile() {
 
       {/* Jogo dentro do grupo/clube (Trello #239) — qualquer membro pode
           criar/ver. «Jogos entre amigos» em grupos e clubes (Francisco, 27 set). */}
-      {club.my_status === 'member' && (
+      {(club.my_status === 'member' || superadminView) && (
         <section className={BLOCK}>
           <h3 className={BLOCK_TITLE}>{t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}</h3>
           <Link to={`/clube/${slug}/jogos`} className={`${ROW} press min-h-[48px]`}>
