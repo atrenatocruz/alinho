@@ -7,12 +7,12 @@ func match(
     _ format: MatchFormat = .bestOf3,
     _ mode: DeuceMode = .golden,
     server: Team? = nil,
+    first: Player = .me,
     total: Int? = 24
 ) -> MatchState {
-    Scoring.newMatch(
-        MatchConfig(format: format, deuceMode: mode, firstServer: server, pointsTotal: total),
-        at: t0
-    )
+    var config = MatchConfig(format: format, deuceMode: mode, firstServer: server, pointsTotal: total)
+    config.ourFirstServer = first
+    return Scoring.newMatch(config, at: t0)
 }
 
 /// Joga uma sequência de pontos: `u` = Nós, `t` = Eles; espaços ignorados.
