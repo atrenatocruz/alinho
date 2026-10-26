@@ -72,6 +72,28 @@ $function$;
 REVOKE ALL ON FUNCTION public.get_watch_match_states(UUID[]) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_watch_match_states(UUID[]) TO authenticated;
 
+-- Jogos entre amigos confirmados de uma pessoa, entre duas datas, com as
+-- vitórias. Conta todos os confirmados, também com convidados ou sem ranking
+-- (o private_match_stats só tem os que contaram para o ranking). Só para usar
+-- dentro das funções abaixo.
+CREATE OR REPLACE FUNCTION public.confirmed_friend_games(p_uid UUID, p_from TIMESTAMPTZ, p_to TIMESTAMPTZ)
+RETURNS TABLE(games INTEGER, wins INTEGER)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+  SELECT count(*)::int,
+         count(*) FILTER (WHERE
+           (m.winner_team = 'a' AND p_uid IN (m.team_a_player1_id, m.team_a_player2_id))
+        OR (m.winner_team = 'b' AND p_uid IN (m.team_b_player1_id, m.team_b_player2_id)))::int
+    FROM private_matches m
+   WHERE m.status = 'confirmed'
+     AND m.played_at >= p_from AND m.played_at < p_to
+     AND p_uid IN (m.team_a_player1_id, m.team_a_player2_id, m.team_b_player1_id, m.team_b_player2_id);
+$function$;
+REVOKE ALL ON FUNCTION public.confirmed_friend_games(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+
 -- ── 2. Desafios de 7 dias ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS friend_challenges (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -175,15 +197,9 @@ BEGIN
     RAISE EXCEPTION 'Desafio não encontrado';
   END IF;
   RETURN QUERY
-    SELECT u.id, (
-      SELECT count(*)::int
-        FROM private_match_stats s
-        JOIN private_matches m ON m.id = s.private_match_id
-       WHERE s.user_id = u.id
-         AND m.status = 'confirmed'
-         AND m.played_at >= c.starts_at AND m.played_at < c.ends_at
-    )
-    FROM (VALUES (c.challenger_id), (c.opponent_id)) AS u(id);
+    SELECT u.id, g.games
+      FROM (VALUES (c.challenger_id), (c.opponent_id)) AS u(id)
+      CROSS JOIN LATERAL confirmed_friend_games(u.id, c.starts_at, c.ends_at) g;
 END;
 $function$;
 REVOKE ALL ON FUNCTION public.friend_challenge_scores(UUID) FROM PUBLIC, anon;
@@ -205,15 +221,12 @@ AS $function$
      WHERE f.follower_id = auth.uid() AND f.status = 'accepted'
        AND is_mutual_follow(auth.uid(), f.followed_id)
   )
-  SELECT f.id, count(*)::int, count(*) FILTER (WHERE s.won)::int
+  SELECT f.id, g.games, g.wins
     FROM friends f
-    JOIN private_match_stats s ON s.user_id = f.id
-    JOIN private_matches m ON m.id = s.private_match_id
+    CROSS JOIN LATERAL confirmed_friend_games(f.id, now() - interval '7 days', now()) g
    WHERE auth.uid() IS NOT NULL
-     AND m.status = 'confirmed'
-     AND m.played_at >= now() - interval '7 days'
-     AND played_history_visible(f.id)
-   GROUP BY f.id;
+     AND g.games > 0
+     AND played_history_visible(f.id);
 $function$;
 REVOKE ALL ON FUNCTION public.friends_week_games() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.friends_week_games() TO authenticated;
