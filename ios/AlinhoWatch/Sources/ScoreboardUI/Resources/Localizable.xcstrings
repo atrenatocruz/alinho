@@ -750,6 +750,196 @@
           }
         }
       }
+    },
+    "%@ de jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ played"
+          }
+        }
+      }
+    },
+    "Pausar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Continuar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Resume"
+          }
+        }
+      }
+    },
+    "Acertar o marcador": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fix the score"
+          }
+        }
+      }
+    },
+    "Acertar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fix"
+          }
+        }
+      }
+    },
+    "Quem serve agora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Who serves now"
+          }
+        }
+      }
+    },
+    "Vale do próximo ponto em diante.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Applies from the next point on."
+          }
+        }
+      }
+    },
+    "Mudar quem serve": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Change server"
+          }
+        }
+      }
+    },
+    "Vale a partir do próximo jogo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Applies from the next game."
+          }
+        }
+      }
+    },
+    "Aos 40-40 · a partir do próximo jogo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "At 40-40 · from the next game"
+          }
+        }
+      }
+    },
+    "Nós · eu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Us · me"
+          }
+        }
+      }
+    },
+    "Nós · o meu parceiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Us · my partner"
+          }
+        }
+      }
+    },
+    "Jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Games"
+          }
+        }
+      }
+    },
+    "Toca num número e roda a coroa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tap a number and turn the crown."
+          }
+        }
+      }
+    },
+    "Guardar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Save"
+          }
+        }
+      }
+    },
+    "Terminar o jogo?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "End the game?"
+          }
+        }
+      }
+    },
+    "Contam os sets e os jogos fechados. O jogo a meio não conta.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Closed sets and games count. The game in progress does not."
+          }
+        }
+      }
+    },
+    "Ainda estão a jogar?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Still playing?"
+          }
+        }
+      }
+    },
+    "Não há pontos há 20 minutos.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No points for 20 minutes."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

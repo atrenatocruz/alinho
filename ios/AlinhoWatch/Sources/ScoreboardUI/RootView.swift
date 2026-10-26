@@ -1,8 +1,8 @@
 #if os(watchOS)
 import SwiftUI
 
-/// Sem jogo: «Novo jogo». Jogo a decorrer: marcador e, a deslizar para o lado, o
-/// menu do jogo. Jogo acabado: o ecrã de fim.
+/// Sem jogo: «Novo jogo». Jogo a decorrer: o menu do jogo (deslizar para a direita),
+/// o marcador e o treino (deslizar para a esquerda). Jogo acabado: o ecrã de fim.
 public struct RootView: View {
     @StateObject private var model = AppModel.launch()
 
@@ -21,11 +21,11 @@ public struct RootView: View {
                     ZStack {
                         TabView(selection: $model.page) {
                             NavigationStack {
-                                ScoreboardView(match: match)
+                                GameMenuView(match: match)
                             }
                             .tag(0)
                             NavigationStack {
-                                GameMenuView(match: match)
+                                ScoreboardView(match: match)
                             }
                             .tag(1)
                         }
@@ -37,6 +37,7 @@ public struct RootView: View {
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: model.overlay)
+                    .fullScreenCover(isPresented: $model.idlePrompt) { IdleView() }
                 }
             } else {
                 SetupView()
@@ -44,6 +45,13 @@ public struct RootView: View {
         }
         .environmentObject(model)
         .task { await model.resumeWorkoutIfNeeded() }
+        .task {
+            // Regresso ao marcador (10 s) e jogo esquecido (20 min).
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                model.tick()
+            }
+        }
     }
 }
 #endif

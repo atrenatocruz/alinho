@@ -8,8 +8,9 @@ enum ScreenshotFixtures {
     struct Fixture {
         var session: MatchSession
         var overlay: Overlay? = nil
-        var page = 0
+        var page = 1
         var showHistory = false
+        var idle = false
     }
 
     static var requested: String? { UserDefaults.standard.string(forKey: "screenshot") }
@@ -51,7 +52,9 @@ enum ScreenshotFixtures {
         case "scoreMatchPoint":
             return Fixture(session: inGame(games: "uuuuuu uuuuu", points: "uuu"))
         case "menu":
-            return Fixture(session: inGame(), page: 1)
+            return Fixture(session: inGame(server: .us), page: 0)
+        case "idle":
+            return Fixture(session: inGame(), idle: true)
         case "end":
             var s = session(.twoSetsSuperTieBreak, .golden, server: nil, minutesAgo: 82)
             games(&s, "uuuutttt uu ttttuuuu tt")

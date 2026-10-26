@@ -24,8 +24,14 @@ final class AppModel: ObservableObject {
     @Published var activeHold: HoldTarget?
     /// Último bloco que contou um ponto, para o contorno branco piscar.
     @Published var flash: Team?
-    /// Página do jogo: 0 = marcador, 1 = menu do jogo.
-    @Published var page = 0
+    /// Página do jogo: 0 = menu do jogo, 1 = marcador, 2 = treino. Abre no marcador.
+    @Published var page = 1 { didSet { touch() } }
+    /// «Ainda estão a jogar?» (20 min sem pontos).
+    @Published var idlePrompt = false
+    /// Há um ecrã aberto por cima do menu (acertar, listas): não volta sozinho ao marcador.
+    var inSubscreen = false { didSet { touch() } }
+    private var lastTouch = Date()
+    private var idleDismissedAt: Date?
     /// Quando o ecrã acordou do pulso em baixo (ver `WakeGuard`).
     @Published var wokeAt: Date?
     /// Só nas prints: abre logo nos «Últimos jogos».
@@ -52,6 +58,7 @@ final class AppModel: ObservableObject {
         model.overlay = f.overlay
         model.page = f.page
         model.showHistory = f.showHistory
+        model.idlePrompt = f.idle
         return model
     }
 
@@ -69,7 +76,8 @@ final class AppModel: ObservableObject {
 
     func start() {
         session.start(at: Date())
-        page = 0
+        page = 1
+        idleDismissedAt = nil
         save()
         Task { await keeper?.begin() }
     }
@@ -116,6 +124,62 @@ final class AppModel: ObservableObject {
     func newMatch() {
         session.clearFinished()
         save()
+    }
+
+    // MARK: - Segundo ecrã
+
+    func togglePause() {
+        session.togglePause(at: Date())
+        page = 1
+        save()
+    }
+
+    func setServer(_ team: Team, player: Player?) {
+        session.setServer(team, player: player)
+        page = 1
+        save()
+    }
+
+    func setNextDeuceMode(_ mode: DeuceMode) {
+        session.setNextDeuceMode(mode)
+        save()
+    }
+
+    func correct(games: [Int], points: [Int]) {
+        session.correct(games: games, points: points)
+        page = 1
+        save()
+    }
+
+    // MARK: - Regressos sozinhos
+
+    /// Qualquer toque ou mudança de página: adia o regresso ao marcador.
+    func touch() {
+        lastTouch = Date()
+    }
+
+    /// Chamado a cada 2 s com um jogo a decorrer: fora do marcador, 10 s sem mexer
+    /// volta ao marcador; 20 min sem pontos pergunta «Ainda estão a jogar?».
+    func tick(now: Date = Date()) {
+        guard let current, !current.isOver else { return }
+        if page != 1 && !inSubscreen && now.timeIntervalSince(lastTouch) >= 10 { page = 1 }
+        let quietSince = max(current.lastPointAt ?? current.startedAt, idleDismissedAt ?? .distantPast)
+        if !idlePrompt && current.pausedAt == nil && session.isForgotten(at: now)
+            && now.timeIntervalSince(quietSince) >= 20 * 60 {
+            idlePrompt = true
+            Haptic.play(.touch)
+        }
+    }
+
+    func keepPlaying() {
+        idleDismissedAt = Date()
+        idlePrompt = false
+        page = 1
+    }
+
+    func stopFromIdle() {
+        idlePrompt = false
+        stop()
     }
 
     private func show(_ o: Overlay, doubleAfter delay: Duration) {
