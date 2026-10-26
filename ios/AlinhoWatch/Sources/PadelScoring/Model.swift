@@ -111,6 +111,10 @@ public struct MatchState: Codable, Equatable, Sendable {
     public var phase: Phase
     /// Só conta nos Pontos. Um jogo gravado sem este campo é da Fase 1 (`rally`).
     public var pointsScoring: PointsScoring
+    /// O modo do 40-40 a valer agora (começa no da configuração).
+    public var deuceMode: DeuceMode
+    /// Escolhido a meio do jogo; passa a valer no jogo seguinte.
+    public var nextDeuceMode: DeuceMode? = nil
     /// Star Point: quantas vezes já se chegou a iguais neste jogo.
     public var deuceCount: Int
     public var server: Team?
@@ -124,6 +128,11 @@ public struct MatchState: Codable, Equatable, Sendable {
     public var pausedAt: Date? = nil
     /// Tempo já passado em pausas fechadas.
     public var pausedSeconds: TimeInterval = 0
+    /// Último ponto marcado, para o aviso do jogo esquecido.
+    public var lastPointAt: Date? = nil
+    /// Já houve pelo menos um ponto (ou se acertou o marcador). Sem isso o jogo
+    /// não vai para os últimos jogos.
+    public var hasPoints = false
     public var endedAt: Date?
     public var endReason: EndReason?
     public var winner: Team?
@@ -134,6 +143,13 @@ public struct MatchState: Codable, Equatable, Sendable {
     var isGamePhase: Bool { phase == .game || (phase == .points && pointsScoring == .games) }
     /// Pontos da Fase 1, que somam 1 a cada ponto.
     var isRallyPoints: Bool { phase == .points && pointsScoring == .rally }
+
+    /// Fecha a pausa a decorrer, somando-a a `pausedSeconds`.
+    mutating func resume(at date: Date) {
+        guard let p = pausedAt else { return }
+        pausedSeconds += max(0, date.timeIntervalSince(p))
+        pausedAt = nil
+    }
 
     /// Passa o serviço para `team`. Quando voltamos a servir, serve o outro da
     /// nossa dupla (na primeira vez, quem se escolheu no Novo jogo).
@@ -159,6 +175,8 @@ extension MatchState {
         points = try c.decode([Int].self, forKey: .points)
         phase = try c.decode(Phase.self, forKey: .phase)
         pointsScoring = try c.decodeIfPresent(PointsScoring.self, forKey: .pointsScoring) ?? .rally
+        deuceMode = try c.decodeIfPresent(DeuceMode.self, forKey: .deuceMode) ?? config.deuceMode
+        nextDeuceMode = try c.decodeIfPresent(DeuceMode.self, forKey: .nextDeuceMode)
         deuceCount = try c.decode(Int.self, forKey: .deuceCount)
         server = try c.decodeIfPresent(Team.self, forKey: .server)
         ourServer = try c.decodeIfPresent(Player.self, forKey: .ourServer)
@@ -167,6 +185,9 @@ extension MatchState {
         startedAt = try c.decode(Date.self, forKey: .startedAt)
         pausedAt = try c.decodeIfPresent(Date.self, forKey: .pausedAt)
         pausedSeconds = try c.decodeIfPresent(TimeInterval.self, forKey: .pausedSeconds) ?? 0
+        lastPointAt = try c.decodeIfPresent(Date.self, forKey: .lastPointAt)
+        hasPoints = try c.decodeIfPresent(Bool.self, forKey: .hasPoints)
+            ?? (points != [0, 0] || games != [0, 0] || !sets.isEmpty)
         endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
         endReason = try c.decodeIfPresent(EndReason.self, forKey: .endReason)
         winner = try c.decodeIfPresent(Team.self, forKey: .winner)

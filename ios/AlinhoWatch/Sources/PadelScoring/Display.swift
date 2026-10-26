@@ -153,9 +153,9 @@ extension MatchState {
             return ScoreDisplay(us: .value(gameValues[min(a, 3)]), them: .value(gameValues[min(b, 3)]), status: fallback)
         }
         let forty = PointMark.value("40")
-        let count: Int? = config.deuceMode == .starPoint ? deuceCount : nil
+        let count: Int? = deuceMode == .starPoint ? deuceCount : nil
         if a == b {
-            let status: StatusLabel = switch config.deuceMode {
+            let status: StatusLabel = switch deuceMode {
             case .golden: .goldenPoint
             case .starPoint where deuceCount >= 3: .starPoint
             default: .deuce(count)

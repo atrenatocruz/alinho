@@ -13,6 +13,7 @@ public enum Scoring {
             points: [0, 0],
             phase: isPoints ? .points : .game,
             pointsScoring: .games,
+            deuceMode: config.deuceMode,
             deuceCount: 0,
             server: config.firstServer,
             ourServer: config.firstServer == .us ? config.ourFirstServer : nil,
@@ -30,6 +31,9 @@ public enum Scoring {
         guard !s.isOver else { return PointResult(state: s, events: []) }
         var st = s
         var ev: Set<MatchEvent> = [.point]
+        st.resume(at: date)
+        st.lastPointAt = date
+        st.hasPoints = true
         switch st.phase {
         case .game: gamePoint(&st, team, &ev)
         case .tieBreak, .superTieBreak: tieBreakPoint(&st, team, &ev)
@@ -54,6 +58,44 @@ public enum Scoring {
         return st
     }
 
+    // MARK: - Acertar o marcador
+
+    /// «Acertar o marcador»: jogos e pontos do set (ou ronda) a decorrer, dentro do
+    /// que é possível; quem serve recalcula-se pelo número de jogos já jogados.
+    public static func correct(_ s: MatchState, games: [Int], points: [Int]) -> MatchState {
+        guard !s.isOver, !s.isRallyPoints else { return s }
+        var st = s
+        st.games = games.map { min(12, max(0, $0)) }
+        if st.phase == .tieBreak || st.phase == .superTieBreak {
+            st.points = points.map { min(40, max(0, $0)) }
+        } else {
+            var p = points.map { min(4, max(0, $0)) }
+            if p[0] == 4 && p[1] == 4 { p = [3, 3] }
+            for i in 0...1 where p[i] == 4 && p[1 - i] < 3 { p[i] = 3 }
+            st.points = p
+            if p == [3, 3] {
+                if st.deuceMode == .starPoint && st.deuceCount == 0 { st.deuceCount = 1 }
+            } else if p[0] < 3 || p[1] < 3 {
+                st.deuceCount = 0
+            }
+        }
+        st.hasPoints = true
+        reServe(&st)
+        return st
+    }
+
+    /// Quem serve depois de acertar, pelo número de jogos jogados desde o início
+    /// (um super tie-break conta como 1). Só nos jogos.
+    private static func reServe(_ st: inout MatchState) {
+        guard st.server != nil, st.isGamePhase, let first = st.config.firstServer else { return }
+        let n = st.sets.reduce(0) { $0 + ($1.kind == .superTieBreak ? 1 : $1.us + $1.them) } + st.games[0] + st.games[1]
+        st.server = n % 2 == 0 ? first : first.other
+        guard st.server == .us else { return }
+        let ours = first == .us ? (n + 1) / 2 : n / 2       // jogos que já servimos
+        st.ourServer = ours % 2 == 0 ? st.config.ourFirstServer : st.config.ourFirstServer.other
+        st.lastOurServer = st.ourServer
+    }
+
     // MARK: - Pontos da Fase 1 (cada ponto soma 1; só para jogos gravados antes)
 
     private static func rallyPoint(_ st: inout MatchState, _ t: Team) {
@@ -69,7 +111,7 @@ public enum Scoring {
         let me = t.rawValue, op = t.other.rawValue
         let a = st.points[me], b = st.points[op]
         if a >= 3 && b >= 3 {
-            let mode = st.config.deuceMode
+            let mode = st.deuceMode
             if mode == .golden || a > b || (a == b && mode == .starPoint && st.deuceCount >= 3) {
                 winGame(&st, t, &ev)
             } else if a == b {
@@ -92,7 +134,7 @@ public enum Scoring {
     /// 40-40 em que o ponto seguinte decide: ponto de ouro, ou Star Point ao terceiro iguais.
     static func isDecisive(_ st: MatchState) -> Bool {
         guard st.isGamePhase, st.points == [3, 3] else { return false }
-        switch st.config.deuceMode {
+        switch st.deuceMode {
         case .golden: return true
         case .starPoint: return st.deuceCount >= 3
         case .advantage: return false
@@ -105,6 +147,10 @@ public enum Scoring {
         st.points = [0, 0]
         st.deuceCount = 0
         ev.insert(.gameWon)
+        if let next = st.nextDeuceMode {
+            st.deuceMode = next
+            st.nextDeuceMode = nil
+        }
         st.passServe(to: st.server?.other)
         if st.phase == .points {
             // Pontos: a ronda soma jogos e acaba quando a soma chega ao total.

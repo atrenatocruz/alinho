@@ -20,7 +20,7 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
     init(_ s: MatchState) {
         id = s.id
         format = s.config.format
-        deuceMode = s.config.deuceMode
+        deuceMode = s.deuceMode
         sets = s.sets
         let isPoints = s.config.format == .points
         points = isPoints && s.pointsScoring == .rally ? s.points : []
@@ -64,6 +64,10 @@ public struct MatchSession: Codable, Equatable, Sendable {
 
     public init() {}
 
+    init(current: MatchState) {
+        self.current = current
+    }
+
     public var canUndo: Bool { current != nil && !undoStack.isEmpty }
 
     public mutating func start(at date: Date) {
@@ -93,9 +97,52 @@ public struct MatchSession: Codable, Equatable, Sendable {
     public mutating func stop(at date: Date) {
         guard let s = current, !s.isOver else { return }
         undoStack.append(s)
-        let stopped = Scoring.stop(s, at: date)
+        var stopped = s
+        stopped.resume(at: date)
+        stopped = Scoring.stop(stopped, at: date)
         current = stopped
         archive(stopped)
+    }
+
+    // MARK: - Segundo ecrã (cada ação desfaz-se com o «Desfazer»)
+
+    public mutating func togglePause(at date: Date) {
+        change { st in
+            if st.pausedAt != nil { st.resume(at: date) } else { st.pausedAt = date }
+        }
+    }
+
+    /// «Mudar quem serve»: vale do próximo ponto em diante. `player` só com `.us`.
+    public mutating func setServer(_ team: Team, player: Player?) {
+        change { st in
+            st.server = team
+            if team == .us {
+                st.ourServer = player ?? st.ourServer ?? st.config.ourFirstServer
+                st.lastOurServer = st.ourServer
+            }
+        }
+    }
+
+    /// «Aos 40-40» a meio: passa a valer no jogo seguinte.
+    public mutating func setNextDeuceMode(_ mode: DeuceMode) {
+        change { st in st.nextDeuceMode = mode == st.deuceMode ? nil : mode }
+    }
+
+    public mutating func correct(games: [Int], points: [Int]) {
+        change { st in st = Scoring.correct(st, games: games, points: points) }
+    }
+
+    /// 20 minutos sem pontos (e sem pausa): «Ainda estão a jogar?».
+    public func isForgotten(at date: Date) -> Bool {
+        guard let s = current, !s.isOver, s.pausedAt == nil else { return false }
+        return date.timeIntervalSince(s.lastPointAt ?? s.startedAt) >= 20 * 60
+    }
+
+    private mutating func change(_ apply: (inout MatchState) -> Void) {
+        guard var st = current, !st.isOver else { return }
+        undoStack.append(st)
+        apply(&st)
+        current = st
     }
 
     /// Um jogo de Pontos da Fase 1 (pontos corridos) a meio quando a app atualizou:
@@ -116,6 +163,7 @@ public struct MatchSession: Codable, Equatable, Sendable {
     }
 
     private mutating func archive(_ s: MatchState) {
+        guard s.hasPoints else { return }
         history.insert(MatchRecord(s), at: 0)
         if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
     }
