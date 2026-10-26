@@ -36,7 +36,8 @@ const saveLast = (how) => { try { localStorage.setItem(LAST_KEY, how) } catch { 
 
 // Mesmo padrão do Layout.jsx, sem perfil: muda já e fica guardado.
 function toggleLanguage() {
-  const next = i18n.language === 'en' ? 'pt' : 'en'
+  // Três línguas (26 out): pt → en → es → pt.
+  const next = { pt: 'en', en: 'es', es: 'pt' }[(i18n.language || 'pt').slice(0, 2)] || 'pt'
   i18n.changeLanguage(next)
   try {
     localStorage.setItem('preferredLanguage', next)
@@ -125,7 +126,7 @@ function CreamTop({ children, compact = false }) {
     <div className={`relative px-6 text-center ${compact ? 'pt-12 pb-6' : 'pt-12 pb-8'}`} style={{ background: CREAM }}>
       <button type="button" onClick={toggleLanguage} title={t('layout.toggle_language')}
         className="absolute right-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-sm font-extrabold text-ink-900 hover:bg-black/5">
-        {i18n.language === 'en' ? 'PT' : 'EN'}
+        {({ pt: 'EN', en: 'ES', es: 'PT' })[(i18n.language || 'pt').slice(0, 2)] || 'EN'}
       </button>
       {/* O logótipo leva à página inicial: sem sessão, o Login não tinha outra saída (15 set). */}
       <Link to="/" className="inline-block leading-none" aria-label="alinho.pt">

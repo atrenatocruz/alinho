@@ -255,6 +255,7 @@ export default function PersonalInfo() {
             options={[
               { value: 'pt', label: t('profile.language_portuguese') },
               { value: 'en', label: t('profile.language_english') },
+              { value: 'es', label: t('profile.language_spanish') },
             ]} />
         </Row>
       </div>

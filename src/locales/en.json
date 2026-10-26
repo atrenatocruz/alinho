@@ -7165,5 +7165,6 @@
   "country.cant_change_text_es": "In Spain you can only have an account from age {{age}}. If you've moved, write to us at support@alinho.pt.",
   "country.cant_change_text_other": "{{country}}: you can only have an account from age {{age}}. If you've moved, write to us at support@alinho.pt.",
   "country.write_us": "Write to alinho",
-  "country.email_subject": "Change the country I live in"
+  "country.email_subject": "Change the country I live in",
+  "profile.language_spanish": "Español"
 }

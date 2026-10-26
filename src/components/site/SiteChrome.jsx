@@ -135,9 +135,10 @@ export function SiteHeader({ sticky = true }) {
         </div>
         <span className="hidden flex-1 sm:block" />
         <nav className="hidden items-center gap-[30px] sm:flex" aria-label={t('site.nav_label')}>{nav}</nav>
-        <button type="button" onClick={() => setSiteLanguage(i18n.language === 'en' ? 'pt' : 'en')} title={t('layout.toggle_language')}
+        <button type="button" onClick={() => setSiteLanguage({ pt: 'en', en: 'es', es: 'pt' }[(i18n.language || 'pt').slice(0, 2)] || 'pt')} title={t('layout.toggle_language')}
           className="hidden min-h-[44px] items-center font-display text-sm font-semibold text-[#4F535A] hover:text-ink-900 sm:inline-flex">
-          {i18n.language === 'en' ? 'PT' : 'EN'}
+          {/* Mostra a língua para onde vai: PT → EN → ES → PT. */}
+          {({ pt: 'EN', en: 'ES', es: 'PT' })[(i18n.language || 'pt').slice(0, 2)] || 'EN'}
         </button>
         <Link to={cta.to} className="hidden rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white sm:inline-block">
           {cta.label}
@@ -153,7 +154,7 @@ export function SiteFooter() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
   const year = new Date().getFullYear()
-  const lang = i18n.language === 'en' ? 'en' : 'pt'
+  const lang = ['en', 'es'].includes((i18n.language || '').slice(0, 2)) ? i18n.language.slice(0, 2) : 'pt'
   const pill = (on) => `rounded-full border px-[13px] py-2 font-display text-[13px] font-semibold leading-none ${
     on ? 'border-white bg-white text-ink-900' : 'border-[#2E3137] text-[#C4C8CF] hover:text-white'}`
   return (
@@ -170,6 +171,7 @@ export function SiteFooter() {
         <div className="flex gap-1.5" role="group" aria-label={t('layout.toggle_language')}>
           <button type="button" aria-pressed={lang === 'pt'} onClick={() => setSiteLanguage('pt')} className={pill(lang === 'pt')}>{t('profile.language_portuguese')}</button>
           <button type="button" aria-pressed={lang === 'en'} onClick={() => setSiteLanguage('en')} className={pill(lang === 'en')}>{t('profile.language_english')}</button>
+          <button type="button" aria-pressed={lang === 'es'} onClick={() => setSiteLanguage('es')} className={pill(lang === 'es')}>{t('profile.language_spanish')}</button>
         </div>
         <p className="font-sans text-[13px] text-[#7B818C]">&copy; {year} alinho.pt</p>
       </div>
