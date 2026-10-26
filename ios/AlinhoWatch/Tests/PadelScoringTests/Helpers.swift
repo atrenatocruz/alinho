@@ -55,3 +55,8 @@ func legacyPointsSessionJSON(points: [Int]) throws -> Data {
     root["current"] = current
     return try JSONSerialization.data(withJSONObject: root)
 }
+
+/// Uma sessão com `m` a decorrer e a pilha de desfazer vazia.
+func session(started m: MatchState) -> MatchSession {
+    MatchSession(current: m)
+}
