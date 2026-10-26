@@ -10,7 +10,8 @@
 -- O QUE FAZ
 --   · Conquista nova «podio_do_mes» (rara, categoria 'xp'): ficar nos 3
 --     primeiros do Ranking do mês da tua zona («Todos»), em todas as zonas,
---     haja ou não prémio. Dá-se no fecho do mês (close_due_ranking_months
+--     haja ou não prémio, a partir do ranking de novembro de 2026 (o de
+--     outubro não dá). Dá-se no fecho do mês (close_due_ranking_months
 --     chama award_month_podium). Fica com o dia (event_on = o último dia do
 --     mês), event_kind 'ranking_mes' e a zona em event_label; o
 --     get_player_achievements_v2 devolve a zona em event_title. Como as
@@ -66,6 +67,9 @@ DECLARE
   v_n     INTEGER := 0;
   v_k     INTEGER;
 BEGIN
+  -- Só a partir do ranking de novembro (Francisco, 26 out: «só a partir de
+  -- novembro. Anunciamos e damos os prémios no final do mês de nov.»).
+  IF v_month < DATE '2026-11-01' THEN RETURN 0; END IF;
   FOR v_d IN SELECT DISTINCT o.district FROM organizations o WHERE o.district IS NOT NULL AND NOT COALESCE(o.is_global, FALSE) LOOP
     WITH top AS (
       SELECT t.user_id, t.place FROM ranking_month_zone_table(v_month, v_d, 'todos') t
