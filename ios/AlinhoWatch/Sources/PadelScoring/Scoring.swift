@@ -4,7 +4,8 @@ import Foundation
 /// uma recebe um estado e devolve outro, para o desfazer ser só guardar estados.
 public enum Scoring {
     public static func newMatch(_ config: MatchConfig, id: UUID = UUID(), at date: Date) -> MatchState {
-        let isPoints = config.format == .points
+        let isPoints = config.format == .points || config.format == .endlessSet
+        let server = config.format == .points ? nil : config.firstServer
         return MatchState(
             id: id,
             config: config,
@@ -12,12 +13,12 @@ public enum Scoring {
             games: [0, 0],
             points: [0, 0],
             phase: isPoints ? .points : .game,
-            pointsScoring: .games,
+            pointsScoring: config.format == .endlessSet ? .games : .rally,
             deuceMode: config.deuceMode,
             deuceCount: 0,
-            server: config.firstServer,
-            ourServer: config.firstServer == .us ? config.ourFirstServer : nil,
-            lastOurServer: config.firstServer == .us ? config.ourFirstServer : nil,
+            server: server,
+            ourServer: server == .us ? config.ourFirstServer : nil,
+            lastOurServer: server == .us ? config.ourFirstServer : nil,
             tieBreakFirstServer: nil,
             startedAt: date,
             endedAt: nil,
@@ -64,14 +65,20 @@ public enum Scoring {
     /// que é possível. A fase segue os jogos (6-6 entra no tie-break; sair de 6-6
     /// volta aos jogos) e quem serve recalcula-se pelo número de jogos já jogados.
     public static func correct(_ s: MatchState, games: [Int], points: [Int]) -> MatchState {
-        guard !s.isOver, !s.isRallyPoints else { return s }
+        guard !s.isOver else { return s }
         var st = s
         let format = st.config.format
+        if st.isRallyPoints {
+            // Pontos corridos: só os pontos, e cada lado abaixo do total.
+            let top = st.config.pointsTotal.map { max(0, $0 - 1) } ?? 999
+            st.points = points.map { min(top, max(0, $0)) }
+            st.hasPoints = true
+            return st
+        }
         switch st.phase {
         case .points:
-            // A ronda acaba quando a soma chega ao total: cada lado fica abaixo dele.
-            let top = st.config.pointsTotal.map { max(0, $0 - 1) } ?? 999
-            st.games = games.map { min(top, max(0, $0)) }
+            // Set sem fim: os jogos não têm limite.
+            st.games = games.map { min(999, max(0, $0)) }
         case .superTieBreak:
             st.games = games.map { min(12, max(0, $0)) }
         case .game, .tieBreak:
@@ -172,12 +179,8 @@ public enum Scoring {
         }
         st.passServe(to: st.server?.other)
         if st.phase == .points {
-            // Pontos: a ronda soma jogos e acaba quando a soma chega ao total.
-            if let total = st.config.pointsTotal, st.games[0] + st.games[1] >= total {
-                finish(&st, .rules)
-            } else if (st.games[0] + st.games[1]) % 2 == 1 {
-                ev.insert(.switchSides)
-            }
+            // Set sem fim: soma jogos, nunca acaba sozinho; troca-se nos ímpares.
+            if (st.games[0] + st.games[1]) % 2 == 1 { ev.insert(.switchSides) }
             return
         }
         let mine = st.games[t.rawValue], theirs = st.games[t.other.rawValue]

@@ -16,9 +16,9 @@ public enum StatusLabel: Equatable, Sendable {
     case advantage(Int?)
     case tieBreak
     case superTieBreak
-    /// Pontos da Fase 1 (só em jogos gravados antes dos Pontos por jogos).
+    /// Pontos corridos: «Pontos corridos · até 24».
     case points(total: Int?)
-    /// Pontos por jogos: «Jogos 5-3 · até 24».
+    /// Set sem fim: «Jogos 7-0» (`total` fica sempre `nil`).
     case gamesRound(us: Int, them: Int, total: Int?)
     case paused
     /// O próximo ponto de alguém fecha um set.
@@ -105,8 +105,9 @@ extension MatchState {
     /// Resultado no fim e nos últimos jogos: «6-4 3-6 10-7»; terminado antes do fim
     /// junta os jogos do set a decorrer («6-4 4-6 3-3»); nos Pontos «15-9».
     public var resultText: String {
-        if config.format == .points && pointsScoring == .rally { return "\(points[0])-\(points[1])" }
-        if config.format == .points { return "\(games[0])-\(games[1])" }
+        if phase == .points || config.format == .points || config.format == .endlessSet {
+            return pointsScoring == .rally ? "\(points[0])-\(points[1])" : "\(games[0])-\(games[1])"
+        }
         var parts = sets.map { "\($0.us)-\($0.them)" }
         if endReason == .stopped && (games[0] > 0 || games[1] > 0) { parts.append("\(games[0])-\(games[1])") }
         return parts.isEmpty ? "0-0" : parts.joined(separator: " ")
@@ -150,7 +151,7 @@ extension MatchState {
         case .points where pointsScoring == .rally:
             return ScoreDisplay(us: .value("\(a)"), them: .value("\(b)"), status: .points(total: config.pointsTotal))
         case .points:
-            return gameDisplay(fallback: .gamesRound(us: games[0], them: games[1], total: config.pointsTotal))
+            return gameDisplay(fallback: .gamesRound(us: games[0], them: games[1], total: nil))
         case .tieBreak:
             return ScoreDisplay(us: .value("\(a)"), them: .value("\(b)"), status: .tieBreak)
         case .superTieBreak:

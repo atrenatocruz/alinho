@@ -26,6 +26,15 @@ enum ScreenshotFixtures {
             var s = MatchSession()
             s.config = MatchConfig(format: .points, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
             return Fixture(session: s)
+        case "setupEndless":
+            var s = MatchSession()
+            s.config = MatchConfig(format: .endlessSet, deuceMode: .golden, firstServer: .us, pointsTotal: 24)
+            return Fixture(session: s)
+        case "scoreEndless":
+            var s = session(.endlessSet, .golden, server: .them, minutesAgo: 50)
+            games(&s, String(repeating: "u", count: 7))
+            feed(&s, "uu t")
+            return Fixture(session: s)
         case "setupServeUs":
             var s = MatchSession()
             s.config = MatchConfig(format: .bestOf3, deuceMode: .starPoint, firstServer: .us, pointsTotal: 24)
@@ -72,8 +81,9 @@ enum ScreenshotFixtures {
             games(&s, "uuuuuu tttttt uuuuuu")
             return Fixture(session: s, endStep: .effort)
         case "endWithHealth":
-            var s = session(.points, .golden, server: nil, minutesAgo: 70)
+            var s = session(.endlessSet, .golden, server: nil, minutesAgo: 70)
             games(&s, String(repeating: "u", count: 13) + String(repeating: "t", count: 11))
+            s.stop(at: Date())
             if let id = s.current?.id {
                 s.setHealth(averageHeartRate: 142, kilocalories: 610, for: id)
                 s.setEffort(7, for: id)
@@ -89,7 +99,12 @@ enum ScreenshotFixtures {
             var s = MatchSession()
             s.config = MatchConfig(format: .points, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
             s.start(at: Date().addingTimeInterval(-3600))
-            games(&s, String(repeating: "u", count: 13) + String(repeating: "t", count: 11))
+            feed(&s, String(repeating: "u", count: 15) + String(repeating: "t", count: 9))
+            s.clearFinished()
+            s.config = MatchConfig(format: .endlessSet, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
+            s.start(at: Date().addingTimeInterval(-4000))
+            games(&s, String(repeating: "u", count: 7) + String(repeating: "t", count: 5))
+            s.stop(at: Date())
             s.clearFinished()
             s.config = .default
             s.start(at: Date().addingTimeInterval(-5400))

@@ -1110,6 +1110,36 @@
           }
         }
       }
+    },
+    "Set sem fim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Timed set"
+          }
+        }
+      }
+    },
+    "Pontos corridos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total points"
+          }
+        }
+      }
+    },
+    "Pontos corridos · até %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total points · to %lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

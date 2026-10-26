@@ -27,7 +27,9 @@ struct CorrectScoreView: View {
     }
 
     /// Tie-break e super tie-break contam pontos; o resto 0, 15, 30, 40, Vant.
-    private var countsRawPoints: Bool { match.phase == .tieBreak || match.phase == .superTieBreak }
+    private var countsRawPoints: Bool { match.phase == .tieBreak || match.phase == .superTieBreak || isRunningPoints }
+    /// Pontos corridos: só há pontos, sem jogos.
+    private var isRunningPoints: Bool { match.phase == .points && match.pointsScoring == .rally }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -37,10 +39,12 @@ struct CorrectScoreView: View {
                     header(L.t("Nós"))
                     header(L.t("Eles"))
                 }
-                GridRow {
-                    rowTitle(L.t("Jogos"))
-                    cell(.init(row: .games, team: .us), "\(games[0])")
-                    cell(.init(row: .games, team: .them), "\(games[1])")
+                if !isRunningPoints {
+                    GridRow {
+                        rowTitle(L.t("Jogos"))
+                        cell(.init(row: .games, team: .us), "\(games[0])")
+                        cell(.init(row: .games, team: .them), "\(games[1])")
+                    }
                 }
                 GridRow {
                     rowTitle(L.t("Pontos"))
@@ -75,9 +79,12 @@ struct CorrectScoreView: View {
         return ["0", "15", "30", "40"][min(a, 3)]
     }
 
-    /// Nos Pontos a ronda vai até ao total (cada lado fica abaixo dele); nos sets, 12.
-    private var gamesTop: Int {
-        guard match.phase == .points else { return 12 }
+    /// No Set sem fim os jogos não têm limite; nos sets, 12.
+    private var gamesTop: Int { match.phase == .points ? 999 : 12 }
+
+    /// Pontos corridos: cada lado abaixo do total; tie-breaks até 40.
+    private var pointsTop: Int {
+        guard isRunningPoints else { return 40 }
         return match.config.pointsTotal.map { max(0, $0 - 1) } ?? 999
     }
 
@@ -89,7 +96,7 @@ struct CorrectScoreView: View {
         case .games:
             games[i] = min(gamesTop, max(0, games[i] + step))
         case .points:
-            let top = countsRawPoints ? 40 : 4
+            let top = countsRawPoints ? pointsTop : 4
             points[i] = min(top, max(0, points[i] + step))
             guard !countsRawPoints else { return }
             if points[i] == 4 && points[o] < 3 { points[i] = 3 }

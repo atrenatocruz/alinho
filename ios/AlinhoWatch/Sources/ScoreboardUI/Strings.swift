@@ -16,7 +16,8 @@ extension MatchFormat {
         case .twoSetsSuperTieBreak: L.t("2 sets + super tie-break")
         case .proSet9: L.t("Pro set a 9")
         case .oneSet: L.t("1 set")
-        case .points: L.t("Pontos")
+        case .endlessSet: L.t("Set sem fim")
+        case .points: L.t("Pontos corridos")
         }
     }
 
@@ -92,7 +93,7 @@ enum Labels {
 
     static func pointsTotal(_ total: Int?) -> String {
         guard let total else { return L.t("Sem total") }
-        return L.t("\(total) jogos")
+        return L.t("\(total) pontos")
     }
 
     static func status(_ s: StatusLabel) -> String {
@@ -105,8 +106,8 @@ enum Labels {
         case .advantage(let n?): L.t("Vantagem \(n)")
         case .tieBreak: L.t("Tie-break a 7")
         case .superTieBreak: L.t("Super tie-break a 10")
-        case .points(nil): L.t("Pontos")
-        case .points(let total?): L.t("Pontos · até \(total)")
+        case .points(nil): L.t("Pontos corridos")
+        case .points(let total?): L.t("Pontos corridos · até \(total)")
         case .gamesRound(let a, let b, nil): L.t("Jogos \(a)-\(b)")
         case .gamesRound(let a, let b, let total?): L.t("Jogos \(a)-\(b) · até \(total)")
         case .paused: L.t("Em pausa")

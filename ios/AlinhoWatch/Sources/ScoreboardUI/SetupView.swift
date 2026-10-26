@@ -38,6 +38,7 @@ struct SetupView: View {
                             row(totalLine, L.t("Total da ronda"))
                         }
                     }
+                    if !isPoints {
                     NavigationLink {
                         OptionListView(
                             title: L.t("Aos 40-40"),
@@ -63,7 +64,8 @@ struct SetupView: View {
                     } label: {
                         row(Labels.server(config.firstServer), L.t("Quem serve"))
                     }
-                    if config.firstServer == .us {
+                    }
+                    if !isPoints && config.firstServer == .us {
                         NavigationLink {
                             ourFirstList
                         } label: {
@@ -129,7 +131,7 @@ struct SetupView: View {
 
     private var totalLine: String {
         guard let total = config.pointsTotal else { return L.t("Sem total") }
-        return L.t("Total: \(total) jogos")
+        return L.t("Total: \(total) pontos")
     }
 
     /// Devolve um `onPick` que altera um campo da configuração e grava.

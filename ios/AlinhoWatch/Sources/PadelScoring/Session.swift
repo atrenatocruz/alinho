@@ -33,9 +33,9 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
         format = s.config.format
         deuceMode = s.deuceMode
         sets = s.sets
-        let isPoints = s.config.format == .points
-        points = isPoints && s.pointsScoring == .rally ? s.points : []
-        games = isPoints && s.pointsScoring == .games ? s.games : []
+        let noSets = s.config.format == .points || s.config.format == .endlessSet
+        points = noSets && s.pointsScoring == .rally ? s.points : []
+        games = noSets && s.pointsScoring == .games ? s.games : []
         winner = s.winner
         endReason = s.endReason ?? .rules
         startedAt = s.startedAt
@@ -183,16 +183,6 @@ public struct MatchSession: Codable, Equatable, Sendable {
         undoStack.append(st)
         apply(&st)
         current = st
-    }
-
-    /// Um jogo de Pontos da Fase 1 (pontos corridos) a meio quando a app atualizou:
-    /// termina-se como estava e vai para os últimos jogos, em vez de se continuar
-    /// com regras que já não são as dele.
-    public mutating func retireLegacyPoints(at date: Date) {
-        guard let s = current, !s.isOver, s.isRallyPoints else { return }
-        archive(Scoring.stop(s, at: date))
-        current = nil
-        undoStack = []
     }
 
     /// «Novo jogo» no ecrã de fim: o jogo acabado sai do ecrã (fica nos últimos jogos).

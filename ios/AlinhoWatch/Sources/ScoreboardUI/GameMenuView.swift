@@ -34,7 +34,7 @@ struct GameMenuView: View {
                 } label: {
                     menuRow(L.t("Acertar o marcador"))
                 }
-                if match.server != nil {
+                if match.server != nil && !(match.phase == .points && match.pointsScoring == .rally) {
                     NavigationLink {
                         OptionListView(
                             title: L.t("Quem serve agora"),
@@ -48,6 +48,7 @@ struct GameMenuView: View {
                         menuRow(L.t("Mudar quem serve"))
                     }
                 }
+                if !(match.phase == .points && match.pointsScoring == .rally) {
                 NavigationLink {
                     OptionListView(
                         title: L.t("Aos 40-40"),
@@ -62,6 +63,7 @@ struct GameMenuView: View {
                         shownDeuceMode.title,
                         match.nextDeuceMode == nil ? L.t("Aos 40-40") : L.t("Aos 40-40 · a partir do próximo jogo")
                     )
+                }
                 }
                 NavigationLink {
                     HistoryView().subscreen(model)
@@ -99,7 +101,7 @@ struct GameMenuView: View {
         let d = match.display
         let points = "\(Labels.mark(d.us))-\(Labels.mark(d.them))"
         if match.phase == .points && match.pointsScoring == .rally { return match.setsLine }
-        if match.phase == .points { return L.t("Jogos \(match.games[0])-\(match.games[1])") + " · " + points }
+        if match.phase == .points { return L.t("Jogos \(match.games[0])-\(match.games[1])") + " · " + points }  // Set sem fim
         return match.setsLine + " · " + points
     }
 

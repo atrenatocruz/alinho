@@ -31,7 +31,7 @@ public struct WatchGamePayload: Codable, Equatable, Sendable {
         self.updatedAt = updatedAt
         format = r.format.rawValue
         resultText = r.resultText
-        if r.format == .points {
+        if r.format == .points || r.format == .endlessSet {
             sets = [r.games.isEmpty ? r.points : r.games]
         } else {
             sets = r.sets.map { [$0.us, $0.them] }

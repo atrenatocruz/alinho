@@ -21,6 +21,10 @@ public enum MatchFormat: String, Codable, Equatable, Sendable, CaseIterable {
     case twoSetsSuperTieBreak = "stb"
     case proSet9 = "pro9"
     case oneSet = "s1"
+    /// «Set sem fim» (Francisco, 26 out): 15-30-40, o set nunca acaba; acaba no
+    /// «Terminar» e ganha quem tiver mais jogos fechados.
+    case endlessSet = "ssf"
+    /// «Pontos corridos»: 1, 2, 3… até ao total da ronda.
     case points = "pts"
 
     public var gamesPerSet: Int { self == .proSet9 ? 9 : 6 }
@@ -39,9 +43,9 @@ public enum Phase: String, Codable, Equatable, Sendable {
     case game, tieBreak, superTieBreak, points
 }
 
-/// Como se contam os Pontos. `rally` é a Fase 1 (cada ponto soma 1) e só existe
-/// para ler jogos gravados por essa versão; os jogos novos são `games`: cada jogo
-/// conta-se 0, 15, 30, 40 e a ronda soma jogos, sem sets.
+/// Como se conta uma ronda sem sets (fase `.points`): `rally` são os Pontos
+/// corridos (cada ponto soma 1); `games` é o Set sem fim (cada jogo conta-se 0,
+/// 15, 30, 40 e a ronda soma jogos). Um jogo gravado sem o campo é `rally`.
 public enum PointsScoring: String, Codable, Equatable, Sendable {
     case rally, games
 }
