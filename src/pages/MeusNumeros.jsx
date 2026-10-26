@@ -6,6 +6,10 @@ import { WatchGames, mergeGame } from '../lib/watchGames'
 import JogosTab from '../components/numeros/JogosTab'
 import StatsTab from '../components/numeros/StatsTab'
 import DesafiosTab from '../components/numeros/DesafiosTab'
+import RegistarJogo from '../components/numeros/RegistarJogo'
+import FriendsChallenge from '../components/numeros/FriendsChallenge'
+import { getWatchMatchStates } from '../lib/friendChallenges'
+import { canRegister } from '../lib/watchRegister'
 
 /* ════════════════════════════════════════════════════════════════════════
    «Os meus números» (relógio, Fase B — docs/superpowers/specs/
@@ -22,6 +26,8 @@ export default function MeusNumeros() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('jogos')
   const [games, setGames] = useState(null) // null = a carregar
+  const [registering, setRegistering] = useState(null) // o jogo a registar
+  const [states, setStates] = useState({}) // id do jogo entre amigos → estado
 
   useEffect(() => {
     let stale = false
@@ -36,6 +42,51 @@ export default function MeusNumeros() {
       Promise.resolve(sub).then((s) => s?.remove?.())
     }
   }, [])
+
+  // O estado dos jogos já registados (aceites e confirmação). Sem a migração
+  // da Fase C corrida, fica só o «registado».
+  const registeredIds = (games ?? []).map((g) => g.registeredMatchId).filter(Boolean)
+  const registeredKey = registeredIds.join()
+  useEffect(() => {
+    if (!registeredKey) return
+    let stale = false
+    getWatchMatchStates(registeredKey.split(','))
+      .then((rows) => { if (!stale) setStates(Object.fromEntries(rows.map((r) => [r.id, r]))) })
+      .catch(() => {})
+    return () => { stale = true }
+  }, [registeredKey])
+
+  const actions = (g) => {
+    const st = g.registeredMatchId ? states[g.registeredMatchId] : null
+    if (g.registeredMatchId) {
+      return (
+        <p className={`mt-2 rounded-ctrl p-2 text-[13px] ${st?.status === 'confirmed' ? 'bg-lime-100 text-ink-900' : 'bg-amber-50 text-ink-900'}`}>
+          {st?.status === 'confirmed'
+            ? t('numeros.registered_ok')
+            : st ? t('numeros.registered_pending', { accepted: st.accepted, others: st.others }) : t('numeros.registered')}
+        </p>
+      )
+    }
+    return (
+      <div className="mt-2 space-y-1.5">
+        {canRegister(g, new Date()) ? (
+          <button type="button" onClick={() => setRegistering(g)} className="h-[38px] w-full rounded-ctrl border border-line bg-white text-sm font-extrabold text-ink-900">
+            {t('numeros.register')}
+          </button>
+        ) : (
+          <p className="text-[13px] text-muted">{t('numeros.register_too_late')}</p>
+        )}
+        <button type="button" onClick={() => remove(g.id)} className="block w-full text-center text-[13px] font-extrabold text-muted underline">
+          {t('numeros.delete')}
+        </button>
+      </div>
+    )
+  }
+
+  const registered = (matchId) => {
+    setGames((list) => list.map((x) => (x.id === registering.id ? { ...x, registeredMatchId: matchId } : x)))
+    setRegistering(null)
+  }
 
   const remove = async (id) => {
     if (!window.confirm(t('numeros.delete_confirm'))) return
@@ -55,12 +106,16 @@ export default function MeusNumeros() {
       />
       {games === null ? (
         <p className="text-sm text-muted">{t('common.loading')}</p>
+      ) : tab === 'jogos' && registering ? (
+        <RegistarJogo game={registering} onDone={registered} onCancel={() => setRegistering(null)} />
       ) : tab === 'jogos' ? (
-        <JogosTab games={games} onRemove={remove} />
+        <JogosTab games={games} onRemove={remove} renderActions={actions} />
       ) : tab === 'stats' ? (
         <StatsTab games={games} />
       ) : (
-        <DesafiosTab games={games} />
+        <DesafiosTab games={games}>
+          <FriendsChallenge />
+        </DesafiosTab>
       )}
     </div>
   )

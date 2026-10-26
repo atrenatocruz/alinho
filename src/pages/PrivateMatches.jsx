@@ -20,6 +20,7 @@ import FriendSessionCard, { FriendsMonthLine, FriendsEmpty } from '../components
 import { ScoreEntrySimple, ScoreEntrySets } from '../components/friends/FriendScoreEntry'
 import { appOrigin } from '../lib/native'
 import { SkeletonGate, SkLine, SkWhiteCard } from '../components/Skeleton'
+import { getWatchMatchStates } from '../lib/friendChallenges'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
 // name-only guest — team_a_player1 is always the creator, always a real
@@ -158,6 +159,9 @@ export default function PrivateMatches() {
   // jogo, para o cartão dizer «6-4 6-3».
   const [noTeams, setNoTeams] = useState([])
   const [setsById, setSetsById] = useState({})
+  // Jogos registados a partir do relógio com o resultado mudado à mão: o que o
+  // relógio contou, para quem aceita ver os dois (relógio, Fase C).
+  const [watchResults, setWatchResults] = useState({})
   const [loading, setLoading] = useState(true)
   // Pending matches whose already-submitted score is being corrected.
   const [editingScoreIds, setEditingScoreIds] = useState(new Set())
@@ -201,6 +205,9 @@ export default function PrivateMatches() {
       loadSetsByGame(data.filter((m) => m.score_a != null).map((m) => m.id))
         .then(setSetsById)
         .catch((error) => console.error('Error loading sets:', error))
+      getWatchMatchStates(data.filter((m) => m.status === 'pending').map((m) => m.id))
+        .then((rows) => setWatchResults(Object.fromEntries(rows.filter((r) => r.watch_result).map((r) => [r.id, r.watch_result]))))
+        .catch(() => {})
     } catch (error) {
       console.error('Error loading private matches:', error)
     } finally {
@@ -457,6 +464,9 @@ export default function PrivateMatches() {
                               : t('privatematches.resubmit_needed'))
                           : ''}
                       </p>
+                      {watchResults[m.id] && (
+                        <p className="text-sm text-muted mt-1">{t('privatematches.watch_result', { result: watchResults[m.id] })}</p>
+                      )}
                       <button
                         type="button"
                         onClick={() => toggleEditScore(m)}
