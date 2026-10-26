@@ -4,20 +4,6 @@ import Testing
 
 private func rep(_ c: Character, _ n: Int) -> String { String(repeating: c, count: n) }
 
-@Test func pointsEndsAtTotal() {
-    let (s, ev) = play(match(.points, total: 24), rep("u", 15) + rep("t", 9))
-    #expect(s.isOver && s.winner == .us && s.resultText == "15-9")
-    #expect(ev.last!.contains(.matchOver))
-    #expect(s.display == ScoreDisplay(us: .value("15"), them: .value("9"), status: .points(total: 24)))
-    let (tie, _) = play(match(.points, total: 24), rep("u", 12) + rep("t", 12))
-    #expect(tie.isOver && tie.winner == nil)
-}
-
-@Test func pointsWithoutTotalNeverEnds() {
-    let (s, _) = play(match(.points, total: nil), rep("u", 120) + rep("t", 80))
-    #expect(!s.isOver && s.points == [120, 80])
-}
-
 @Test func stopAtStartIsDraw() {
     let s = Scoring.stop(match(), at: t0)
     #expect(s.isOver && s.endReason == .stopped && s.winner == nil && s.resultText == "0-0")
@@ -41,8 +27,8 @@ private func rep(_ c: Character, _ n: Int) -> String { String(repeating: c, coun
     #expect(stopped.resultText == "6-4 6-6" && stopped.winner == .us)
 }
 
-@Test func stopPointsByPoints() {
-    let stopped = Scoring.stop(play(match(.points, total: nil), "ttu").0, at: t0)
+@Test func stopPointsByGames() {
+    let stopped = Scoring.stop(games(match(.points, total: nil), "ttu").0, at: t0)
     #expect(stopped.winner == .them && stopped.resultText == "1-2")
 }
 
