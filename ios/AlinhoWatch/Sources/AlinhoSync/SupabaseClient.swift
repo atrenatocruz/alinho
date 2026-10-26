@@ -43,7 +43,7 @@ public actor SupabaseClient {
     /// porque o `refresh_token` só se pode usar uma vez.
     private var refreshing: Task<WatchCredentials, Error>?
 
-    public init(store: CredentialStore, transport: HTTPTransport, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(store: CredentialStore, transport: HTTPTransport, now: @escaping @Sendable () -> Date = { Date() }) {
         self.store = store
         self.transport = transport
         self.now = now
