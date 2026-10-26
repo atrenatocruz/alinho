@@ -990,6 +990,126 @@
           }
         }
       }
+    },
+    "Quão duro foi?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "How hard was it?"
+          }
+        }
+      }
+    },
+    "Roda a coroa": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Turn the crown"
+          }
+        }
+      }
+    },
+    "Saltar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Skip"
+          }
+        }
+      }
+    },
+    "Fácil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Easy"
+          }
+        }
+      }
+    },
+    "Moderado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Moderate"
+          }
+        }
+      }
+    },
+    "Difícil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hard"
+          }
+        }
+      }
+    },
+    "No limite": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "All out"
+          }
+        }
+      }
+    },
+    "Ganhámos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "We won"
+          }
+        }
+      }
+    },
+    "Ganharam eles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "They won"
+          }
+        }
+      }
+    },
+    "Terminado antes do fim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ended early"
+          }
+        }
+      }
+    },
+    "Para sair, carrega na coroa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "To leave, press the crown."
+          }
+        }
+      }
+    },
+    "esforço %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "effort %lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -9,6 +9,11 @@ enum Overlay: Equatable {
     case decisive(StatusLabel)
 }
 
+/// Depois do fim: primeiro «Quão duro foi?» (se houve pontos), depois o resumo.
+enum EndStep: Equatable {
+    case effort, summary
+}
+
 /// O que está a receber o dedo pousado. Só um de cada vez: a manga a tocar nos
 /// dois blocos não pode dar dois pontos.
 enum HoldTarget: Equatable {
@@ -26,6 +31,8 @@ final class AppModel: ObservableObject {
     @Published var flash: Team?
     /// Página do jogo: 0 = menu do jogo, 1 = marcador, 2 = treino. Abre no marcador.
     @Published var page = 1 { didSet { touch() } }
+    /// Jogo acabado: o ecrã a mostrar. `nil` (ao abrir a app) = o resumo.
+    @Published var endStep: EndStep?
     /// «Ainda estão a jogar?» (20 min sem pontos).
     @Published var idlePrompt = false
     /// Há um ecrã aberto por cima do menu (acertar, listas): não volta sozinho ao marcador.
@@ -62,6 +69,7 @@ final class AppModel: ObservableObject {
         model.page = f.page
         model.showHistory = f.showHistory
         model.idlePrompt = f.idle
+        model.endStep = f.endStep
         if let h = f.health {
             model.recorder.preview(heartRate: h.0, averageHeartRate: h.1, kilocalories: h.2, authorized: h.3)
         }
@@ -89,6 +97,7 @@ final class AppModel: ObservableObject {
 
     /// No fim do jogo o treino só pára; os números do Saúde ficam no registo.
     private func matchEnded() {
+        endStep = current?.hasPoints == true ? .effort : .summary
         recorder.pause()
         guard let id = current?.id, recorder.authorized == true else { return }
         session.setHealth(
@@ -139,6 +148,7 @@ final class AppModel: ObservableObject {
     func undo() {
         let wasOver = current?.isOver == true
         guard session.undo() else { return }
+        if current?.isOver != true { endStep = nil }
         if wasOver, let current {
             if finalizedMatchID == current.id {
                 finalizedMatchID = nil
@@ -163,9 +173,22 @@ final class AppModel: ObservableObject {
     func newMatch() {
         Task {
             await finalizeWorkout()
+            endStep = nil
             session.clearFinished()
             save()
         }
+    }
+
+    // MARK: - Esforço
+
+    func saveEffort(_ value: Int) {
+        if let id = current?.id { session.setEffort(value, for: id) }
+        endStep = .summary
+        save()
+    }
+
+    func skipEffort() {
+        endStep = .summary
     }
 
     // MARK: - Segundo ecrã

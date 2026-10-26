@@ -13,6 +13,7 @@ enum ScreenshotFixtures {
         var idle = false
         /// Pulsação, média, kcal e autorização do Saúde para o ecrã do treino.
         var health: (Int?, Int?, Double, Bool)? = nil
+        var endStep: EndStep? = nil
     }
 
     static var requested: String? { UserDefaults.standard.string(forKey: "screenshot") }
@@ -66,6 +67,18 @@ enum ScreenshotFixtures {
             games(&s, "uuuutttt uu ttttuuuu tt")
             feed(&s, "ttttttt uuuuuuuuuu")
             return Fixture(session: s)
+        case "effort":
+            var s = session(.bestOf3, .golden, server: nil, minutesAgo: 75)
+            games(&s, "uuuuuu tttttt uuuuuu")
+            return Fixture(session: s, endStep: .effort)
+        case "endWithHealth":
+            var s = session(.points, .golden, server: nil, minutesAgo: 70)
+            games(&s, String(repeating: "u", count: 13) + String(repeating: "t", count: 11))
+            if let id = s.current?.id {
+                s.setHealth(averageHeartRate: 142, kilocalories: 610, for: id)
+                s.setEffort(7, for: id)
+            }
+            return Fixture(session: s, endStep: .summary)
         case "stopped":
             var s = session(.bestOf3, .golden, server: nil, minutesAgo: 90)
             games(&s, "uuuutttt uu ttttuuuu tt uuuttt")

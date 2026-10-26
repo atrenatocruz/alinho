@@ -74,6 +74,15 @@ enum Labels {
         return "\(who) · \(where_)"
     }
 
+    static func effort(_ e: EffortLabel) -> String {
+        switch e {
+        case .easy: L.t("Fácil")
+        case .moderate: L.t("Moderado")
+        case .hard: L.t("Difícil")
+        case .max: L.t("No limite")
+        }
+    }
+
     static func layout(_ l: ScoreLayout) -> String {
         switch l {
         case .side: L.t("Lado a lado")
@@ -116,8 +125,8 @@ enum Labels {
     static func winner(_ team: Team?) -> String {
         switch team {
         case nil: L.t("Empatado")
-        case .us?: L.t("Ganharam Nós")
-        case .them?: L.t("Ganharam Eles")
+        case .us?: L.t("Ganhámos")
+        case .them?: L.t("Ganharam eles")
         }
     }
 }

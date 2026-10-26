@@ -14,8 +14,12 @@ public struct RootView: View {
                 NavigationStack { HistoryView() }
             } else if let match = model.current {
                 if match.isOver {
-                    NavigationStack {
-                        EndView(match: match)
+                    if model.endStep == .effort {
+                        EffortView()
+                    } else {
+                        NavigationStack {
+                            EndView(match: match)
+                        }
                     }
                 } else {
                     ZStack {

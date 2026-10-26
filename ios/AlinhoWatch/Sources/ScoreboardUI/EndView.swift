@@ -2,13 +2,15 @@
 import PadelScoring
 import SwiftUI
 
-/// Fim (PDF p. 6): quem ganhou, o resultado em grande, formato e duração (ou a
-/// nota de terminado antes do fim) e «Novo jogo». Por baixo, «↺ Desfazer» até
-/// se começar outro jogo (proposta nossa, por confirmar com o Francisco).
+/// Fim (protótipo de 23 out): quem ganhou, o resultado em grande, formato e duração
+/// (ou a nota de terminado antes do fim), o treino e o esforço; «Novo jogo»,
+/// «Últimos jogos» e «↺ Desfazer» até se começar outro jogo.
 struct EndView: View {
     let match: MatchState
 
     @EnvironmentObject private var model: AppModel
+
+    private var record: MatchRecord? { model.session.history.first { $0.id == match.id } }
 
     var body: some View {
         ScrollView {
@@ -20,13 +22,22 @@ struct EndView: View {
                     .font(Theme.number(30))
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.5)
-                Text(note)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
+                Group {
+                    Text(note)
+                    if let health = healthLine { Text(health) }
+                }
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
                 Button(L.t("Novo jogo")) { model.newMatch() }
                     .buttonStyle(LimeButtonStyle())
                     .padding(.top, 6)
+                NavigationLink {
+                    HistoryView()
+                } label: {
+                    Text(L.t("Últimos jogos"))
+                }
+                .buttonStyle(OutlineButtonStyle())
                 if model.session.canUndo {
                     HoldButton(
                         target: .undo,
@@ -42,20 +53,39 @@ struct EndView: View {
                             .overlay(Capsule().strokeBorder(.white, lineWidth: 1.5))
                     }
                 }
+                Text(L.t("Para sair, carrega na coroa."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
             }
         }
     }
 
     private var note: String {
         guard match.endReason == .stopped else {
-            return "\(match.config.format.title) · \(durationText(from: match.startedAt, to: match.endedAt ?? match.startedAt))"
+            let end = match.endedAt ?? match.startedAt
+            let played = durationText(from: match.startedAt, to: match.startedAt.addingTimeInterval(match.elapsed(at: end)))
+            return "\(match.config.format.shortTitle) · \(played)"
         }
-        var text = L.t("Terminado antes do fim.")
+        var text = L.t("Terminado antes do fim")
         if !(match.phase == .points && match.pointsScoring == .rally) && match.points != [0, 0] {
             let d = match.display
             text += "\n" + L.t("O jogo a meio (\(Labels.mark(d.us))-\(Labels.mark(d.them))) não conta.")
         }
         return text
+    }
+
+    /// «♥ 142 bpm · 610 kcal · esforço 7», só com o que houver.
+    private var healthLine: String? {
+        guard let record else { return nil }
+        var parts: [String] = []
+        if let bpm = record.averageHeartRate {
+            parts.append("♥ \(bpm) bpm")
+            if let kcal = record.activeKilocalories { parts.append("\(kcal) kcal") }
+        }
+        if let effort = record.effort { parts.append(L.t("esforço \(effort)")) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 #endif
