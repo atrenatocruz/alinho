@@ -60,6 +60,7 @@ import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { weekdayShort, weekdayLong, isMasculineWeekday, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
+import PlanStatusLine from '../components/gerir/PlanStatusLine'
 import { districtOptions } from '../lib/leagueDistricts'
 import { Realce } from '../components/SearchField'
 import { CLUB_AVATAR, GROUP_AVATAR, KIND_COLORS } from '../lib/kindColors'
@@ -3061,6 +3062,10 @@ export default function GerirClube() {
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
+      {/* O pedido de plano ou a experiência grátis em curso, por cima dos
+          separadores (#723). Mudar o plano (terminar a experiência) relê as
+          organizações, para o Gerir saber o plano novo. */}
+      {activeTab !== 'redeem' && <PlanStatusLine org={org} onChanged={() => refreshMemberships?.()} />}
       {activeTab !== 'redeem' && (
         // O separador único da app (Trello #528). Três, só texto — a fila de
         // cinco que deslizava, com a seta a dizer que havia mais, acabou com
