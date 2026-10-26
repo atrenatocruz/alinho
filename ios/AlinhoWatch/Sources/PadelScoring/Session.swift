@@ -7,8 +7,10 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
     public let format: MatchFormat
     public let deuceMode: DeuceMode
     public let sets: [SetScore]
-    /// Só nos Pontos.
+    /// Só nos Pontos da Fase 1 (pontos corridos).
     public let points: [Int]
+    /// Só nos Pontos por jogos: os jogos da ronda.
+    public let games: [Int]
     public let winner: Team?
     public let endReason: EndReason
     public let startedAt: Date
@@ -20,12 +22,32 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
         format = s.config.format
         deuceMode = s.config.deuceMode
         sets = s.sets
-        points = s.config.format == .points ? s.points : []
+        let isPoints = s.config.format == .points
+        points = isPoints && s.pointsScoring == .rally ? s.points : []
+        games = isPoints && s.pointsScoring == .games ? s.games : []
         winner = s.winner
         endReason = s.endReason ?? .rules
         startedAt = s.startedAt
         endedAt = s.endedAt ?? s.startedAt
         resultText = s.resultText
+    }
+}
+
+extension MatchRecord {
+    // Campos novos com `decodeIfPresent`: os registos da Fase 1 continuam a abrir.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        format = try c.decode(MatchFormat.self, forKey: .format)
+        deuceMode = try c.decode(DeuceMode.self, forKey: .deuceMode)
+        sets = try c.decode([SetScore].self, forKey: .sets)
+        points = try c.decode([Int].self, forKey: .points)
+        games = try c.decodeIfPresent([Int].self, forKey: .games) ?? []
+        winner = try c.decodeIfPresent(Team.self, forKey: .winner)
+        endReason = try c.decode(EndReason.self, forKey: .endReason)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        endedAt = try c.decode(Date.self, forKey: .endedAt)
+        resultText = try c.decode(String.self, forKey: .resultText)
     }
 }
 
@@ -74,6 +96,16 @@ public struct MatchSession: Codable, Equatable, Sendable {
         let stopped = Scoring.stop(s, at: date)
         current = stopped
         archive(stopped)
+    }
+
+    /// Um jogo de Pontos da Fase 1 (pontos corridos) a meio quando a app atualizou:
+    /// termina-se como estava e vai para os últimos jogos, em vez de se continuar
+    /// com regras que já não são as dele.
+    public mutating func retireLegacyPoints(at date: Date) {
+        guard let s = current, !s.isOver, s.isRallyPoints else { return }
+        archive(Scoring.stop(s, at: date))
+        current = nil
+        undoStack = []
     }
 
     /// «Novo jogo» no ecrã de fim: o jogo acabado sai do ecrã (fica nos últimos jogos).

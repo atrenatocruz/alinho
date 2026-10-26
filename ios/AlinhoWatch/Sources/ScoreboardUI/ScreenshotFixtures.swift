@@ -47,7 +47,7 @@ enum ScreenshotFixtures {
             var s = MatchSession()
             s.config = MatchConfig(format: .points, deuceMode: .golden, firstServer: nil, pointsTotal: 24)
             s.start(at: Date().addingTimeInterval(-3600))
-            feed(&s, String(repeating: "u", count: 15) + String(repeating: "t", count: 9))
+            games(&s, String(repeating: "u", count: 13) + String(repeating: "t", count: 11))
             s.clearFinished()
             s.config = .default
             s.start(at: Date().addingTimeInterval(-5400))

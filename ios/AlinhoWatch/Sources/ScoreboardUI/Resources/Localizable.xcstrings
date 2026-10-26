@@ -530,6 +530,46 @@
           }
         }
       }
+    },
+    "%lld jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%lld games"
+          }
+        }
+      }
+    },
+    "Total: %lld jogos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Total: %lld games"
+          }
+        }
+      }
+    },
+    "Jogos %lld-%lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Games %lld-%lld"
+          }
+        }
+      }
+    },
+    "Jogos %lld-%lld · até %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Games %lld-%lld · to %lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

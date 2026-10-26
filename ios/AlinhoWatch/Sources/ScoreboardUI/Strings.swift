@@ -58,7 +58,7 @@ enum Labels {
 
     static func pointsTotal(_ total: Int?) -> String {
         guard let total else { return L.t("Sem total") }
-        return L.t("\(total) pontos")
+        return L.t("\(total) jogos")
     }
 
     static func status(_ s: StatusLabel) -> String {
@@ -73,6 +73,8 @@ enum Labels {
         case .superTieBreak: L.t("Super tie-break a 10")
         case .points(nil): L.t("Pontos")
         case .points(let total?): L.t("Pontos · até \(total)")
+        case .gamesRound(let a, let b, nil): L.t("Jogos \(a)-\(b)")
+        case .gamesRound(let a, let b, let total?): L.t("Jogos \(a)-\(b) · até \(total)")
         }
     }
 

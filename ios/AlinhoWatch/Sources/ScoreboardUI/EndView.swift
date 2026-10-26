@@ -51,7 +51,7 @@ struct EndView: View {
             return "\(match.config.format.title) · \(durationText(from: match.startedAt, to: match.endedAt ?? match.startedAt))"
         }
         var text = L.t("Terminado antes do fim.")
-        if match.phase != .points && match.points != [0, 0] {
+        if !(match.phase == .points && match.pointsScoring == .rally) && match.points != [0, 0] {
             let d = match.display
             text += "\n" + L.t("O jogo a meio (\(Labels.mark(d.us))-\(Labels.mark(d.them))) não conta.")
         }

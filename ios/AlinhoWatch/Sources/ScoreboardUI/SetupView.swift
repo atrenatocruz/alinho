@@ -72,7 +72,7 @@ struct SetupView: View {
 
     private var totalLine: String {
         guard let total = config.pointsTotal else { return L.t("Sem total") }
-        return L.t("Total: \(total) pontos")
+        return L.t("Total: \(total) jogos")
     }
 
     /// Devolve um `onPick` que altera um campo da configuração e grava.

@@ -32,6 +32,13 @@ public enum Phase: String, Codable, Equatable, Sendable {
     case game, tieBreak, superTieBreak, points
 }
 
+/// Como se contam os Pontos. `rally` é a Fase 1 (cada ponto soma 1) e só existe
+/// para ler jogos gravados por essa versão; os jogos novos são `games`: cada jogo
+/// conta-se 0, 15, 30, 40 e a ronda soma jogos, sem sets.
+public enum PointsScoring: String, Codable, Equatable, Sendable {
+    case rally, games
+}
+
 public enum SetKind: String, Codable, Equatable, Sendable {
     case normal, tieBreak, superTieBreak
 }
@@ -84,6 +91,8 @@ public struct MatchState: Codable, Equatable, Sendable {
     /// Num jogo vão até `[3, 3]` (40-40); a vantagem é `[4, 3]`.
     public var points: [Int]
     public var phase: Phase
+    /// Só conta nos Pontos. Um jogo gravado sem este campo é da Fase 1 (`rally`).
+    public var pointsScoring: PointsScoring
     /// Star Point: quantas vezes já se chegou a iguais neste jogo.
     public var deuceCount: Int
     public var server: Team?
@@ -94,6 +103,33 @@ public struct MatchState: Codable, Equatable, Sendable {
     public var winner: Team?
 
     public var isOver: Bool { endReason != nil }
+
+    /// Pontos de 0, 15, 30, 40 a decorrer: num jogo de um set, ou nos Pontos por jogos.
+    var isGamePhase: Bool { phase == .game || (phase == .points && pointsScoring == .games) }
+    /// Pontos da Fase 1, que somam 1 a cada ponto.
+    var isRallyPoints: Bool { phase == .points && pointsScoring == .rally }
+}
+
+extension MatchState {
+    // Os campos novos lêem-se com `decodeIfPresent`, para um jogo gravado por uma
+    // versão anterior da app continuar a abrir.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        config = try c.decode(MatchConfig.self, forKey: .config)
+        sets = try c.decode([SetScore].self, forKey: .sets)
+        games = try c.decode([Int].self, forKey: .games)
+        points = try c.decode([Int].self, forKey: .points)
+        phase = try c.decode(Phase.self, forKey: .phase)
+        pointsScoring = try c.decodeIfPresent(PointsScoring.self, forKey: .pointsScoring) ?? .rally
+        deuceCount = try c.decode(Int.self, forKey: .deuceCount)
+        server = try c.decodeIfPresent(Team.self, forKey: .server)
+        tieBreakFirstServer = try c.decodeIfPresent(Team.self, forKey: .tieBreakFirstServer)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
+        endReason = try c.decodeIfPresent(EndReason.self, forKey: .endReason)
+        winner = try c.decodeIfPresent(Team.self, forKey: .winner)
+    }
 }
 
 public enum MatchEvent: Hashable, Sendable {

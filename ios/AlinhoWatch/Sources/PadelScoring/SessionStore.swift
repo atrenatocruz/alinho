@@ -20,7 +20,9 @@ public struct SessionStore: Sendable {
         guard let data = try? Data(contentsOf: fileURL),
               let session = try? JSONDecoder().decode(MatchSession.self, from: data)
         else { return MatchSession() }
-        return session
+        var loaded = session
+        loaded.retireLegacyPoints(at: Date())
+        return loaded
     }
 
     public func save(_ session: MatchSession) throws {

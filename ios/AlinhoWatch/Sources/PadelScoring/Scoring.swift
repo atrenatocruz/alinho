@@ -12,8 +12,9 @@ public enum Scoring {
             games: [0, 0],
             points: [0, 0],
             phase: isPoints ? .points : .game,
+            pointsScoring: .games,
             deuceCount: 0,
-            server: isPoints ? nil : config.firstServer,
+            server: config.firstServer,
             tieBreakFirstServer: nil,
             startedAt: date,
             endedAt: nil,
@@ -30,7 +31,8 @@ public enum Scoring {
         switch st.phase {
         case .game: gamePoint(&st, team, &ev)
         case .tieBreak, .superTieBreak: tieBreakPoint(&st, team, &ev)
-        case .points: pointsPoint(&st, team)
+        case .points where st.pointsScoring == .games: gamePoint(&st, team, &ev)
+        case .points: rallyPoint(&st, team)
         }
         if st.isOver {
             st.endedAt = date
@@ -50,9 +52,9 @@ public enum Scoring {
         return st
     }
 
-    // MARK: - Pontos (Americano)
+    // MARK: - Pontos da Fase 1 (cada ponto soma 1; só para jogos gravados antes)
 
-    private static func pointsPoint(_ st: inout MatchState, _ t: Team) {
+    private static func rallyPoint(_ st: inout MatchState, _ t: Team) {
         st.points[t.rawValue] += 1
         if let total = st.config.pointsTotal, st.points[0] + st.points[1] >= total {
             finish(&st, .rules)
@@ -87,7 +89,7 @@ public enum Scoring {
 
     /// 40-40 em que o ponto seguinte decide: ponto de ouro, ou Star Point ao terceiro iguais.
     static func isDecisive(_ st: MatchState) -> Bool {
-        guard st.phase == .game, st.points == [3, 3] else { return false }
+        guard st.isGamePhase, st.points == [3, 3] else { return false }
         switch st.config.deuceMode {
         case .golden: return true
         case .starPoint: return st.deuceCount >= 3
@@ -102,6 +104,15 @@ public enum Scoring {
         st.deuceCount = 0
         ev.insert(.gameWon)
         st.server = st.server?.other
+        if st.phase == .points {
+            // Pontos: a ronda soma jogos e acaba quando a soma chega ao total.
+            if let total = st.config.pointsTotal, st.games[0] + st.games[1] >= total {
+                finish(&st, .rules)
+            } else if (st.games[0] + st.games[1]) % 2 == 1 {
+                ev.insert(.switchSides)
+            }
+            return
+        }
         let mine = st.games[t.rawValue], theirs = st.games[t.other.rawValue]
         if mine >= format.gamesPerSet && mine - theirs >= 2 {
             closeSet(&st, SetScore(st.games[0], st.games[1], .normal), &ev)
@@ -171,8 +182,10 @@ public enum Scoring {
     private static func finish(_ st: inout MatchState, _ reason: EndReason) {
         st.endReason = reason
         func leader(_ x: [Int]) -> Team? { x[0] > x[1] ? .us : x[1] > x[0] ? .them : nil }
-        if st.phase == .points {
+        if st.isRallyPoints {
             st.winner = leader(st.points)
+        } else if st.phase == .points {
+            st.winner = leader(st.games)
         } else {
             // Com os sets empatados, ganha quem tem mais jogos no set a decorrer.
             st.winner = leader(setsWon(st.sets)) ?? (reason == .stopped ? leader(st.games) : nil)
