@@ -75,13 +75,19 @@ struct CorrectScoreView: View {
         return ["0", "15", "30", "40"][min(a, 3)]
     }
 
+    /// Nos Pontos a ronda vai até ao total (cada lado fica abaixo dele); nos sets, 12.
+    private var gamesTop: Int {
+        guard match.phase == .points else { return 12 }
+        return match.config.pointsTotal.map { max(0, $0 - 1) } ?? 999
+    }
+
     /// Os mesmos limites do pacote (`Scoring.correct`), para a grelha nunca mostrar
     /// um marcador que não se pode guardar.
     private func bump(_ step: Int) {
         let i = selected.team.rawValue, o = 1 - i
         switch selected.row {
         case .games:
-            games[i] = min(12, max(0, games[i] + step))
+            games[i] = min(gamesTop, max(0, games[i] + step))
         case .points:
             let top = countsRawPoints ? 40 : 4
             points[i] = min(top, max(0, points[i] + step))

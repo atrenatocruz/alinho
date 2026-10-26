@@ -61,13 +61,32 @@ public enum Scoring {
     // MARK: - Acertar o marcador
 
     /// «Acertar o marcador»: jogos e pontos do set (ou ronda) a decorrer, dentro do
-    /// que é possível; quem serve recalcula-se pelo número de jogos já jogados.
+    /// que é possível. A fase segue os jogos (6-6 entra no tie-break; sair de 6-6
+    /// volta aos jogos) e quem serve recalcula-se pelo número de jogos já jogados.
     public static func correct(_ s: MatchState, games: [Int], points: [Int]) -> MatchState {
         guard !s.isOver, !s.isRallyPoints else { return s }
         var st = s
-        st.games = games.map { min(12, max(0, $0)) }
+        let format = st.config.format
+        switch st.phase {
+        case .points:
+            // A ronda acaba quando a soma chega ao total: cada lado fica abaixo dele.
+            let top = st.config.pointsTotal.map { max(0, $0 - 1) } ?? 999
+            st.games = games.map { min(top, max(0, $0)) }
+        case .superTieBreak:
+            st.games = games.map { min(12, max(0, $0)) }
+        case .game, .tieBreak:
+            st.games = games.map { min(12, max(0, $0)) }
+            st.phase = st.games == [format.tieBreakAt, format.tieBreakAt] ? .tieBreak : .game
+        }
+        reServe(&st)
         if st.phase == .tieBreak || st.phase == .superTieBreak {
             st.points = points.map { min(40, max(0, $0)) }
+            st.deuceCount = 0
+            if s.phase != .tieBreak && st.phase == .tieBreak { st.tieBreakFirstServer = st.server }
+            if st.server != nil, let first = st.tieBreakFirstServer {
+                let played = st.points[0] + st.points[1]
+                st.passServe(to: played == 0 ? first : (((played + 1) / 2) % 2 == 0 ? first : first.other))
+            }
         } else {
             var p = points.map { min(4, max(0, $0)) }
             if p[0] == 4 && p[1] == 4 { p = [3, 3] }
@@ -80,14 +99,14 @@ public enum Scoring {
             }
         }
         st.hasPoints = true
-        reServe(&st)
         return st
     }
 
     /// Quem serve depois de acertar, pelo número de jogos jogados desde o início
-    /// (um super tie-break conta como 1). Só nos jogos.
+    /// (um super tie-break conta como 1): quem serve o jogo seguinte, ou abre o
+    /// tie-break. No super tie-break não muda.
     private static func reServe(_ st: inout MatchState) {
-        guard st.server != nil, st.isGamePhase, let first = st.config.firstServer else { return }
+        guard st.server != nil, st.phase != .superTieBreak, let first = st.config.firstServer else { return }
         let n = st.sets.reduce(0) { $0 + ($1.kind == .superTieBreak ? 1 : $1.us + $1.them) } + st.games[0] + st.games[1]
         st.server = n % 2 == 0 ? first : first.other
         guard st.server == .us else { return }
