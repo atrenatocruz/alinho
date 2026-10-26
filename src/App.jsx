@@ -24,6 +24,7 @@ import PersonalInfo from './pages/PersonalInfo'
 import ProfileXp from './pages/ProfileXp'
 import PartnerPage from './pages/PartnerPage'
 import PlayerStats from './pages/PlayerStats'
+import MeusNumeros from './pages/MeusNumeros'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -94,6 +95,7 @@ const LeagueResultPage = lazyPage(() => import('./pages/LeagueResultPage'))
 const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
+const PartnerManage = lazyPage(() => import('./pages/PartnerManage'))
 const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
 const Novidades = lazyPage(() => import('./pages/Novidades'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
@@ -464,6 +466,8 @@ function AppRoutes() {
         <Route path="/termos" element={<TermsOfService />} />
         {/* A página de um parceiro (18 out): sem sessão vai ao login e volta (PO). */}
         <Route path="/parceiro/:slug" element={<Guard require="protected" showSplash={showSplash}><PartnerPage /></Guard>} />
+        {/* Quem gere um parceiro (a Rita): códigos e ficha (UX, 22 out). */}
+        <Route path="/gerir/parceiro/:slug" element={<Guard require="protected" showSplash={showSplash}><PartnerManage /></Guard>} />
         {/* Pedido público para apagar a conta (Google Play, «Segurança dos dados»). */}
         <Route path="/apagar-conta" element={<DeleteAccountPage />} />
         {/* Página pública dos planos (Trello #327). */}
@@ -667,6 +671,16 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <PlayerStats />
+            </Guard>
+          }
+        />
+        {/* Os jogos do relógio (Apple Watch, Fase B): só na app de iPhone
+            aparece a entrada no Perfil; a página abre vazia noutro lado. */}
+        <Route
+          path="/perfil/numeros"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <MeusNumeros />
             </Guard>
           }
         />

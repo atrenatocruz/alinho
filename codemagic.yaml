@@ -20,6 +20,8 @@ workflows:
         - alinho_prod
       ios_signing:
         distribution_type: app_store
+        # Apanha também o perfil do relógio (pt.alinho.app.watchkitapp), se já
+        # tiver sido feito «Fetch profiles» dele. Ver docs/native-apps.md, «Apple Watch».
         bundle_identifier: pt.alinho.app
     triggering:
       events:
@@ -29,6 +31,8 @@ workflows:
     scripts:
       - name: Dependências
         script: npm ci
+      - name: Regras do relógio (testes)
+        script: cd ios/AlinhoWatch && swift test
       - name: Build da app (BD de produção)
         # As variáveis do grupo alinho_prod têm prioridade sobre os .env.
         script: npm run build:native:prod

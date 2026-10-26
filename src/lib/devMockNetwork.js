@@ -310,6 +310,24 @@ const RPC_MOCKS = {
       : [],
     prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal',
   } : null),
+  // A página de quem gere um parceiro (Dev 3, 22 out). localStorage.mockPartnerManager
+  // = 'true' faz a conta de teste gerir a RM. mockRedeem = '<erro>' faz o
+  // partner_redeem_voucher recusar com esse erro.
+  my_managed_partners: () => (localStorage.getItem('mockPartnerManager') === 'true'
+    ? [{ id: 'pt-rm', slug: 'rm-terapias', name: 'RM Terapias', logo_url: '/parceiros/rm-logotipo.jpg' }] : []),
+  partner_list_vouchers: (params) => {
+    const month = params?.p_month || `${new Date().toISOString().slice(0, 7)}-01`
+    const end = new Date(new Date(`${month}T12:00:00`).getFullYear(), new Date(`${month}T12:00:00`).getMonth() + 2, 0).toISOString().slice(0, 10)
+    return [
+      { voucher_id: 'pv-1', code: 'RM-7K2P9', prize_place: 1, discount_pct: 15, prize_month: month, prize_district: 'Setúbal', status: 'usado', valid_until: end, used_at: `${month.slice(0, 8)}12T10:30:00Z`, created_at: `${month}T00:05:00Z` },
+      { voucher_id: 'pv-2', code: 'RM-Q4M8T', prize_place: 2, discount_pct: 10, prize_month: month, prize_district: 'Setúbal', status: 'por_usar', valid_until: end, used_at: null, created_at: `${month}T00:05:00Z` },
+      { voucher_id: 'pv-3', code: 'RM-H2X5N', prize_place: 3, discount_pct: 5, prize_month: month, prize_district: 'Setúbal', status: 'expirado', valid_until: `${month.slice(0, 8)}20`, used_at: null, created_at: `${month}T00:05:00Z` },
+    ]
+  },
+  partner_redeem_voucher: () => (localStorage.getItem('mockRedeem')
+    ? { __error: localStorage.getItem('mockRedeem') }
+    : { ok: true, discount_pct: 10, prize_place: 2, prize_month: `${new Date().toISOString().slice(0, 7)}-01`, valid_until: `${new Date().getFullYear()}-12-31` }),
+  update_partner_profile: (params) => ({ ...RPC_MOCKS.get_partner({ p_slug: 'rm-terapias' }), ...(params?.p_tagline ? { tagline: params.p_tagline } : {}) }),
   get_head_to_head_summary: () => [localStorage.getItem('mockNoH2h') === 'true' ? { wins: 0, losses: 0, matches_played: 0 } : { wins: 2, losses: 1, matches_played: 3 }],
   get_head_to_head_matches: () => (localStorage.getItem('mockNoH2h') === 'true' ? [] : [
     { match_id: 'm1', label: 'Mix de Segunda-feira', match_date: '2026-09-01', player_score: 6, opponent_score: 4, won: true },
@@ -1711,7 +1729,13 @@ const TABLE_MOCKS = {
   ...TOURNAMENT_TABLE_MOCKS,
   ...TOURNAMENT_DRAW_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
-  notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
+  // mockPartnerNotices = 'true': os dois avisos dos parceiros (Dev 3, 22 out).
+  notifications: () => (localStorage.getItem('mockPartnerNotices') === 'true' ? [
+    { id: 'pn1', kind: 'partner_month_vouchers', created_at: new Date().toISOString(),
+      data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', month: '2026-11-01', issued: 3 } },
+    { id: 'pn2', kind: 'partner_prize_won', created_at: new Date().toISOString(),
+      data: { voucher_id: 'pv-2', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', prize_place: 2, discount_pct: 10, prize_month: '2026-11-01', valid_until: '2026-12-31' } },
+  ] : localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
     { id: 'n2', kind: 'mix_joined', game_id: 'fake-game-1', created_at: new Date().toISOString(),

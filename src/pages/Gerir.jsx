@@ -20,6 +20,7 @@ import KindHero from '../components/KindHero'
 import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 import { coverOf } from '../lib/orgCover'
 import SuperadminModeCard from '../components/gerir/SuperadminModeCard'
+import ManagedPartnersSection from '../components/partners/ManagedPartnersSection'
 
 
 export default function Gerir() {
@@ -465,6 +466,9 @@ export default function Gerir() {
           })}
         </div>
       )}
+
+      {/* Parceiros que esta conta gere (a Rita, da RM Terapias; UX, 22 out). */}
+      <ManagedPartnersSection />
 
       {/* O Gerir serve primeiro para escolher o grupo: o «Criar outro
           grupo» vem por baixo da lista (UX, 12 out). */}
