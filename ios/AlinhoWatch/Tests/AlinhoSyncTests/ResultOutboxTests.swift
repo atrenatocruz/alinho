@@ -100,7 +100,7 @@ private func tempFile() -> URL {
 
 @Test func testOutboxUnknownMatchIsNone() async {
     let box = ResultOutbox(fileURL: nil)
-    #expect(await box.status(UUID()) == .none)
+    #expect(await box.status(UUID()) == OutboxStatus.none)
 }
 
 @Test func testOutboxPersists() async throws {
