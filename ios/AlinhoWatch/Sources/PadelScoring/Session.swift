@@ -3,6 +3,10 @@ import Foundation
 /// Um jogo acabado, como aparece em «Últimos jogos». Guarda já o que a Fase 2
 /// vai mandar à app (formato, modo do 40-40, resultado, dia, hora e duração).
 public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
+    /// 1 = Fase 1; 2 = com minutos, esforço e treino.
+    public static let currentVersion = 2
+
+    public let version: Int
     public let id: UUID
     public let format: MatchFormat
     public let deuceMode: DeuceMode
@@ -16,8 +20,15 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
     public let startedAt: Date
     public let endedAt: Date
     public let resultText: String
+    /// Minutos de jogo, sem as pausas (mínimo 1).
+    public let minutes: Int
+    /// «Quão duro foi?», de 1 a 10; `nil` = saltou.
+    public internal(set) var effort: Int?
+    public internal(set) var averageHeartRate: Int?
+    public internal(set) var activeKilocalories: Int?
 
     init(_ s: MatchState) {
+        version = Self.currentVersion
         id = s.id
         format = s.config.format
         deuceMode = s.deuceMode
@@ -30,6 +41,14 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
         startedAt = s.startedAt
         endedAt = s.endedAt ?? s.startedAt
         resultText = s.resultText
+        minutes = Self.minutes(s.elapsed(at: endedAt))
+        effort = nil
+        averageHeartRate = nil
+        activeKilocalories = nil
+    }
+
+    static func minutes(_ seconds: TimeInterval) -> Int {
+        max(1, Int((seconds / 60).rounded()))
     }
 }
 
@@ -37,6 +56,7 @@ extension MatchRecord {
     // Campos novos com `decodeIfPresent`: os registos da Fase 1 continuam a abrir.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         id = try c.decode(UUID.self, forKey: .id)
         format = try c.decode(MatchFormat.self, forKey: .format)
         deuceMode = try c.decode(DeuceMode.self, forKey: .deuceMode)
@@ -48,6 +68,11 @@ extension MatchRecord {
         startedAt = try c.decode(Date.self, forKey: .startedAt)
         endedAt = try c.decode(Date.self, forKey: .endedAt)
         resultText = try c.decode(String.self, forKey: .resultText)
+        minutes = try c.decodeIfPresent(Int.self, forKey: .minutes)
+            ?? Self.minutes(endedAt.timeIntervalSince(startedAt))
+        effort = try c.decodeIfPresent(Int.self, forKey: .effort)
+        averageHeartRate = try c.decodeIfPresent(Int.self, forKey: .averageHeartRate)
+        activeKilocalories = try c.decodeIfPresent(Int.self, forKey: .activeKilocalories)
     }
 }
 
@@ -130,6 +155,21 @@ public struct MatchSession: Codable, Equatable, Sendable {
 
     public mutating func correct(games: [Int], points: [Int]) {
         change { st in st = Scoring.correct(st, games: games, points: points) }
+    }
+
+    // MARK: - Depois do fim
+
+    /// «Quão duro foi?»: de 1 a 10; fora disso não muda nada.
+    public mutating func setEffort(_ value: Int, for id: UUID) {
+        guard (1...10).contains(value), let i = history.firstIndex(where: { $0.id == id }) else { return }
+        history[i].effort = value
+    }
+
+    /// Pulsação média e calorias do treino, quando o Saúde as dá.
+    public mutating func setHealth(averageHeartRate: Int?, kilocalories: Int?, for id: UUID) {
+        guard let i = history.firstIndex(where: { $0.id == id }) else { return }
+        history[i].averageHeartRate = averageHeartRate
+        history[i].activeKilocalories = kilocalories
     }
 
     /// 20 minutos sem pontos (e sem pausa): «Ainda estão a jogar?».

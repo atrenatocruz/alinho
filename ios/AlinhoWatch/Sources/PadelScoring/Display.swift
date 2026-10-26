@@ -70,6 +70,20 @@ public struct ServeInfo: Equatable, Sendable {
 private let gameValues = ["0", "15", "30", "40"]
 
 /// Duração para o ecrã de fim: «45 min», «1 h 22 min» (mínimo 1 min).
+public enum EffortLabel: Equatable, Sendable {
+    case easy, moderate, hard, max
+}
+
+/// 1-3 Fácil, 4-6 Moderado, 7-8 Difícil, 9-10 No limite.
+public func effortLabel(_ value: Int) -> EffortLabel {
+    switch value {
+    case ...3: .easy
+    case ...6: .moderate
+    case ...8: .hard
+    default: .max
+    }
+}
+
 /// Minutos de jogo na linha de estado: «23 min» (arredonda para baixo).
 public func minutesText(_ seconds: TimeInterval) -> String {
     "\(Int(max(0, seconds) / 60)) min"
