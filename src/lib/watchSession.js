@@ -21,7 +21,8 @@ const NO_EMAIL_KEY = 'watchSession.noEmail'
 // Manda-se uma sessão se há relógio com a app, há user, e ou o relógio pediu
 // ou a última foi para outro user (ou nenhuma). `lastFailure` é o desta conta:
 // 'no_email' (a conta não tem email, o servidor não consegue criar a sessão)
-// não se volta a tentar.
+// não se volta a tentar. 'email_unconfirmed' nunca se guarda: a conta pode
+// confirmar o email a seguir, e então a próxima tentativa já dá.
 export function shouldSendWatchSession({ installed, sentUserId, needsSession, userId, lastFailure }) {
   if (!installed || !userId) return false
   if (lastFailure === 'no_email') return false
@@ -47,15 +48,23 @@ async function errorCode(error) {
 }
 
 let inFlight = null
+// Sobe a cada clearWatchSession (saiu da conta). Um pedido que começou antes
+// já não manda nada: senão uma sessão pedida antes de sair chegava ao relógio
+// depois do "none".
+let generation = 0
 
 // Nunca lança: só console.error (sem tokens).
 export function syncWatchSession(userId) {
   if (!hasWatchGames || !userId) return Promise.resolve()
   // Arranque, login e voltar à app podem calhar juntos: um pedido de cada vez.
   // Mesmo user: espera pelo que já vai. Outro user: corre a seguir.
+  // Um pedido de antes de sair da conta já não manda: corre outro a seguir.
   if (inFlight) {
-    return inFlight.userId === userId ? inFlight.promise : inFlight.promise.then(() => syncWatchSession(userId))
+    return inFlight.userId === userId && inFlight.gen === generation
+      ? inFlight.promise
+      : inFlight.promise.then(() => syncWatchSession(userId))
   }
+  const gen = generation
   const promise = (async () => {
     try {
       const status = await WatchGames.watchSessionStatus()
@@ -72,6 +81,8 @@ export function syncWatchSession(userId) {
       // A sessão do telemóvel mudou entretanto (saiu ou trocou de conta).
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user?.id !== userId || data?.user_id !== userId) return
+      // Saiu da conta enquanto se pedia a sessão: o relógio fica com o "none".
+      if (gen !== generation) return
 
       await WatchGames.sendWatchSession({
         session: {
@@ -89,13 +100,14 @@ export function syncWatchSession(userId) {
       inFlight = null
     }
   })()
-  inFlight = { userId, promise }
+  inFlight = { userId, gen, promise }
   return promise
 }
 
 // Saiu da conta: o relógio fica sem sessão ("none"). Nunca lança.
 export async function clearWatchSession() {
   if (!hasWatchGames) return
+  generation += 1
   try {
     await WatchGames.clearWatchSession()
   } catch (e) {

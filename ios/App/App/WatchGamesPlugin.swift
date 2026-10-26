@@ -29,6 +29,11 @@ final class WatchGamesStore: NSObject {
     // não ficam aqui: só vão no applicationContext.
     private var sentUserId: String?
     private var needsSession = false
+    /// Saiu da conta mas o "none" ainda não chegou ao applicationContext
+    /// (relógio por ativar, ou o envio falhou). Fica guardado e tenta-se outra
+    /// vez em `activationDidCompleteWith`; enquanto estiver marcado, nunca se
+    /// manda uma sessão.
+    private var pendingClear = false
     private let sessionFileURL: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("alinho-relogio/watch-session.json")
@@ -126,6 +131,8 @@ final class WatchGamesStore: NSObject {
     /// Entrega ao relógio a sessão (`json`, já no formato de cima) do `userId`.
     func sendSession(json: String, userId: String) throws {
         guard WCSession.isSupported() else { throw WatchSessionError.unsupported }
+        // Há um "none" por mandar: primeiro ele; se ainda não der, não se manda nada.
+        try flushPendingClear()
         try WCSession.default.updateApplicationContext(["session": json])
         queue.sync {
             sentUserId = userId
@@ -134,14 +141,29 @@ final class WatchGamesStore: NSObject {
         }
     }
 
-    /// O relógio fica sem sessão ("none").
+    /// O relógio fica sem sessão ("none"). Se não der já, fica pendente.
     func clearSession() throws {
         queue.sync {
+            pendingClear = true
+            saveSessionState()
+        }
+        try flushPendingClear()
+    }
+
+    /// Manda o "none" pendente. Só larga `sentUserId` e `pendingClear` quando
+    /// o applicationContext ficou mesmo atualizado.
+    func flushPendingClear() throws {
+        guard queue.sync(execute: { pendingClear }) else { return }
+        if WCSession.isSupported() {
+            guard WCSession.default.activationState == .activated else { throw WatchSessionError.notActivated }
+            try WCSession.default.updateApplicationContext(["session": "none"])
+        }
+        // Sem WatchConnectivity (iPad) não há relógio: nada a mandar.
+        queue.sync {
+            pendingClear = false
             sentUserId = nil
             saveSessionState()
         }
-        guard WCSession.isSupported() else { return }
-        try WCSession.default.updateApplicationContext(["session": "none"])
     }
 
     func markSessionNeeded() {
@@ -157,11 +179,12 @@ final class WatchGamesStore: NSObject {
         else { return }
         sentUserId = root["sentUserId"] as? String
         needsSession = root["needsSession"] as? Bool ?? false
+        pendingClear = root["pendingClear"] as? Bool ?? false
     }
 
     /// Só dentro da `queue`.
     private func saveSessionState() {
-        var root: [String: Any] = ["needsSession": needsSession]
+        var root: [String: Any] = ["needsSession": needsSession, "pendingClear": pendingClear]
         if let sentUserId { root["sentUserId"] = sentUserId }
         guard let data = try? JSONSerialization.data(withJSONObject: root) else { return }
         try? FileManager.default.createDirectory(at: sessionFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -186,7 +209,11 @@ final class WatchGamesStore: NSObject {
 }
 
 extension WatchGamesStore: WCSessionDelegate {
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    // Um "none" que ficou por mandar (saiu da conta com o relógio por ativar).
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        guard activationState == .activated else { return }
+        try? flushPendingClear()
+    }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
 
@@ -216,6 +243,7 @@ extension WatchGamesStore: WCSessionDelegate {
 
 enum WatchSessionError: Error {
     case unsupported
+    case notActivated
 }
 
 /// `WatchGames` na app web: `list()`, `remove({ id })`, `markRegistered({ id,
@@ -310,7 +338,8 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func clearWatchSession(_ call: CAPPluginCall) {
-        // Sem relógio ativo não há nada a limpar lá; aqui já ficou limpo.
+        // Se o relógio não estiver ativo, o "none" fica pendente e vai quando
+        // ativar; até lá não se manda nenhuma sessão.
         try? WatchGamesStore.shared.clearSession()
         call.resolve()
     }
