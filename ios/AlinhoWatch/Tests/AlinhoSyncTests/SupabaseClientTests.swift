@@ -243,3 +243,10 @@ func client(_ store: MemoryStore, _ t: FakeTransport) -> SupabaseClient {
     #expect(reqs.count == 2)
     #expect(reqs[1].value(forHTTPHeaderField: "Authorization") == "Bearer access-new")
 }
+
+@Test func testDecodeMixMatchHasResult() throws {
+    let base = #"{"match_id":"6f1c2a4e-0000-4000-8000-000000000001","game_id":"6f1c2a4e-0000-4000-8000-000000000002","game_name":"Mix","round_number":1,"court_number":1,"my_side":"a","partner_name":"Rita","opponent_names":["Ana","Rui"],"format":"sobe_desce","scoring_format":"pro_set_9","deuce_mode":"ponto_de_ouro","tiebreak_8_8":null,"scorer_id":null,"scorer_name":null"#
+    // Sem o campo (migração antiga): sem resultado.
+    #expect(try JSONDecoder().decode(MixMatch.self, from: Data((base + "}").utf8)).hasResult == false)
+    #expect(try JSONDecoder().decode(MixMatch.self, from: Data((base + #","has_result":true}"#).utf8)).hasResult == true)
+}

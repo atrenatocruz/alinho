@@ -57,7 +57,8 @@ struct MixGamesView: View {
 }
 
 /// Um jogo do mix: o formato, as duplas e «Começar» (se o relógio souber
-/// contar este jogo e ninguém o tiver começado).
+/// contar este jogo, ninguém o tiver começado e ainda não tiver resultado).
+/// Com resultado mostra «Já gravado.»: um novo «Começar» reescrevia-o.
 struct MixMatchView: View {
     let initial: MixMatch
 
@@ -67,6 +68,8 @@ struct MixMatchView: View {
     @State private var failed = false
     /// O `claim` disse `taken`: outro dos quatro já está a contar.
     @State private var taken = false
+    /// O `claim` disse `has_result`: o jogo já tem resultado.
+    @State private var claimSawResult = false
 
     /// A versão mais recente do jogo (a lista pode ter recarregado).
     private var m: MixMatch { mix.matches.first { $0.id == initial.id } ?? initial }
@@ -74,6 +77,9 @@ struct MixMatchView: View {
     private var config: MatchConfig? {
         MixRules.config(gameFormat: m.format, scoringFormat: m.scoringFormat, deuceMode: m.deuceMode, tiebreak88: m.tiebreak88)
     }
+
+    /// O jogo já tem resultado no mix.
+    private var saved: Bool { claimSawResult || m.hasResult }
 
     /// Outro dos quatro está a contar.
     private var otherScorer: Bool {
@@ -106,6 +112,8 @@ struct MixMatchView: View {
 
                 if config == nil {
                     note(L.t("Este mix não dá para contar no relógio."))
+                } else if saved {
+                    note(L.t("Já gravado."))
                 } else if otherScorer {
                     note(scorerText)
                 } else {
@@ -150,6 +158,9 @@ struct MixMatchView: View {
                 model.start(mix: match, config: config, side: claim.mySide)
             } catch SyncError.server("taken") {
                 taken = true
+                await mix.reload()
+            } catch SyncError.server("has_result") {
+                claimSawResult = true
                 await mix.reload()
             } catch {
                 failed = true

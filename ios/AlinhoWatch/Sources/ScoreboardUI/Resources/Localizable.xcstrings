@@ -1271,6 +1271,16 @@
         }
       }
     },
+    "Já gravado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Already saved."
+          }
+        }
+      }
+    },
     "Não deu para começar. Tenta outra vez.": {
       "localizations": {
         "en": {
