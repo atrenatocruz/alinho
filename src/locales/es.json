@@ -2328,6 +2328,8 @@
   "clubprofile.of_group": "Del grupo",
   "clubprofile.about_invite": "Cuenta a la gente qué es el club",
   "clubprofile.about_invite_group": "Cuenta a la gente qué es el grupo",
+  "clubprofile.superadmin_view_note": "Modo superadmin: lo ves todo, pero no eres miembro de este club.",
+  "clubprofile.superadmin_view_note_group": "Modo superadmin: lo ves todo, pero no eres miembro de este grupo.",
   "clubprofile.write_in_gerir": "Escribirlo en Gestionar",
   "clubprofile.call": "Llamar",
   "clubprofile.website": "Web",
