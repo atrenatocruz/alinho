@@ -9,10 +9,118 @@ import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 import { EmptyState } from '../ui'
 import RuleHint from '../RuleHint'
-import { Me } from './TournamentBits'
+import { Me, MonoLabel } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
 import { PanelSkeleton } from './TournamentSkeleton'
+import { shortName } from './shareData'
+
+const GROUP_DONE = ['terminado', 'falta', 'desistencia']
+// As medalhas da «Tabela final» do grupo único (UX, 23 out).
+const MEDALS = ['#F5C518', '#C7CCD1', '#D08C55']
+
+// O apelido: a última palavra, sem o que está entre parênteses; um nome que
+// acaba num número («Jogador 7») fica inteiro, como no shortName.
+function surname(name) {
+  const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/).filter(Boolean)
+  if (parts.length < 2 || /\d/.test(parts.at(-1))) return parts.join(' ')
+  return parts.at(-1)
+}
+/** No grupo único (UX, 23 out): o nome de equipa, ou os dois apelidos
+ *  («Figueira / Lopes»), e por baixo os dois abreviados («Rita F. · Ana L.»). */
+function pairLines(team) {
+  const players = (team?.players || []).filter(Boolean)
+  return {
+    name: team?.team_name || (players.length ? players.map(surname).join(' / ') : team?.name || ''),
+    players: players.length ? players.map(shortName).join(' · ') : '',
+  }
+}
+// A última palavra presa ao «tu» e ao «=»: nunca ficam sozinhos numa linha.
+function NameWithTags({ text, children }) {
+  const i = text.lastIndexOf(' ')
+  return (
+    <span className="text-xs font-bold text-ink-900">
+      {i > 0 ? `${text.slice(0, i)} ` : ''}
+      <span className="whitespace-nowrap">{i > 0 ? text.slice(i + 1) : text}{children}</span>
+    </span>
+  )
+}
+
+/** «Um grupo só, todos contra todos» (aprovado pelo Francisco a 23 out;
+ *  design-handoff/2026-10-23-torneio-um-grupo-so): uma tabela só, sem
+ *  quadro nem final, e ganha o 1.º. As colunas, o «tu» e o «?» do desempate
+ *  são os da tabela dos grupos. No fim, «Tabela final» com medalhas. Um
+ *  empate no 1.º que o desempate da FPP não separa fica marcado com «=» e a
+ *  categoria não fecha: a regra está em revisão (Francisco, 23 out). */
+function SingleGroup({ group, matches, entries, myEntryId, category, t }) {
+  const rows = standingsOf(group, matches)
+  const mine = matches.filter((m) => m.stage === 'grupo' && m.group_id === group.id)
+  const played = mine.filter((m) => m.score_a != null).length
+  const done = mine.length > 0 && mine.every((m) => GROUP_DONE.includes(m.status) || m.winner_entry_id)
+  const closed = category?.status === 'terminada'
+  // Empate no 1.º que as regras não desfazem: só com o grupo acabado.
+  const tiedTop = done && rows[0]?.tiedWith?.length ? [rows[0].id, ...rows[0].tiedWith] : []
+  const isTied = (id) => tiedTop.includes(id)
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <MonoLabel>{closed ? t('tournament.single.final_table') : t('tournament.single.heading', { count: rows.length })}</MonoLabel>
+        <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-ink-500">{t('tournament.draw.played_of', { played, total: mine.length })}</span>
+      </div>
+
+      <section className="card mb-3 !p-0 overflow-hidden">
+        <table className="w-full table-fixed border-collapse text-xs">
+          <thead>
+            <tr className="text-xs uppercase tracking-wide text-muted">
+              <th className="w-8 py-1.5 text-center font-semibold">#</th>
+              <th className="py-1.5 text-left font-semibold">{t('tournament.draw.col_team')}</th>
+              <th className="w-6 py-1.5 text-center font-semibold" title={t('tournament.draw.col_played_full')}>{t('tournament.draw.col_played')}</th>
+              <th className="w-6 py-1.5 text-center font-semibold" title={t('tournament.draw.col_wins_full')}>{t('tournament.draw.col_wins')}</th>
+              <th className="w-9 py-1.5 text-center font-semibold" title={t('tournament.draw.col_diff_full')}>{t('tournament.draw.col_diff')}</th>
+              <th className="w-8 py-1.5 text-center font-semibold" title={t('tournament.draw.col_games_won_full')}>{t('tournament.draw.col_games_won')}</th>
+              <th className="w-9 py-1.5 pr-2 text-center font-semibold text-ink-900" title={t('tournament.draw.col_points_full')}>{t('tournament.draw.col_points')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const team = entries[row.id]
+              const me = myEntryId && row.id === myEntryId
+              const place = isTied(row.id) && !closed ? 1 : i + 1
+              const medal = closed && i < 3
+              return (
+                <tr key={row.id} className={`border-t border-ink-50 ${me ? 'bg-[#E9F7D2]' : ''}`}>
+                  <td className="py-2 text-center">
+                    <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full font-mono text-xs font-bold text-ink-900"
+                      style={medal ? { background: MEDALS[i] } : undefined}>
+                      {place}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-1.5">
+                    <NameWithTags text={pairLines(team).name || t('ui.empty_tbd')}>
+                      {me ? <Me>{t('tournament.draw.you')}</Me> : null}
+                      {isTied(row.id) && !closed && <span className="ml-1 rounded-full bg-[#FFF4D6] px-1.5 font-mono text-[10px] font-bold text-[#8A5E00]">=</span>}
+                    </NameWithTags>
+                    {pairLines(team).players && <span className="block truncate text-[11px] text-muted">{pairLines(team).players}</span>}
+                  </td>
+                  <td className="py-2 text-center font-mono text-xs text-muted">{row.played}</td>
+                  <td className="py-2 text-center font-mono text-xs text-muted">{row.wins}</td>
+                  <td className="py-2 text-center font-mono text-xs text-muted">{row.diff > 0 ? `+${row.diff}` : row.diff}</td>
+                  <td className="py-2 text-center font-mono text-xs text-muted">{row.gamesWon}</td>
+                  <td className="py-2 pr-2 text-center font-mono text-sm font-extrabold text-ink-900">{groupPoints(row)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <p className="border-t border-ink-50 px-3 pt-1.5 text-[12px] leading-snug text-muted">{t('tournament.draw.legend')}</p>
+        <p className="px-3 py-1.5 text-xs text-muted">{t('tournament.single.note')}</p>
+        <RuleHint className="px-3 pb-1.5" label={t('tournament.draw.points_hint')} note={t('tournament.draw.points_hint_note')} />
+        <RuleHint className="px-3 pb-1.5" label={t('tournament.draw.tiebreak_hint')}
+          items={[1, 2, 3, 4, 5].map((n) => t(`tournament.draw.tiebreak_hint_${n}`))} note={t('tournament.draw.tiebreak_hint_note')} />
+      </section>
+    </div>
+  )
+}
 
 /** Uma tabela de grupo. As duplas que passam ficam marcadas à esquerda e
  *  com o lugar em destaque — é o que se lê de relance no telemóvel. */
@@ -136,7 +244,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
   )
 }
 
-export default function GroupsPanel({ category, my , emptyPose }) {
+export default function GroupsPanel({ category, my, emptyPose }) {
   const { t } = useTranslation()
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
 
@@ -156,6 +264,11 @@ export default function GroupsPanel({ category, my , emptyPose }) {
   }
 
   const qualifiers = qualifiersPerGroup(category)
+  // Um grupo só, sem ninguém a passar: a tabela é o torneio todo.
+  if (groups.length === 1 && qualifiers === 0) {
+    return <SingleGroup group={groups[0]} matches={matches} entries={entries} myEntryId={my?.entry_id}
+      category={category} t={t} />
+  }
 
   return (
     <div>

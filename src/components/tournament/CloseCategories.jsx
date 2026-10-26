@@ -63,6 +63,10 @@ export function closeStatus(category, board) {
   // mostra no separador dos jogos, com o mesmo desempate.
   if (groups.length === 1) {
     const table = standingsOf(groups[0], matches)
+    // Um grupo só com o 1.º empatado depois do desempate da FPP: a app não
+    // escolhe e a categoria não fecha, até haver a regra nova (Francisco,
+    // 23 out: o desempate dos grupos está em revisão).
+    if (table[0]?.tiedWith?.length) return { kind: 'tied_top' }
     const ids = table.slice(0, 3).map((r) => r.id)
     return { kind: 'ready', fromBracket: false, podium: [ids[0] || null, ids[1] || null, ids[2] || null] }
   }
@@ -198,6 +202,7 @@ function CategoryRow({ category, board, slug, onClosed }) {
     pending: <span className="text-xs text-ink-500">{t('tournament.close.pending', { count: status.pending })}</span>,
     final_unplayed: <span className="text-xs text-ink-500">{t('tournament.close.final_unplayed')}</span>,
     tied: null,
+    tied_top: <span className="text-xs font-bold text-warning">{t('tournament.close.tied_top')}</span>,
     ready: !open && (
       <button type="button" onClick={() => setOpen(true)}
         className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
