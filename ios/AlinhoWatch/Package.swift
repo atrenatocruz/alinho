@@ -1,7 +1,8 @@
 // swift-tools-version: 5.10
 // Marcador do Apple Watch. PadelScoring tem as regras e testa-se em macOS com
 // `swift test`; ScoreboardUI tem os ecrãs e só compila de facto em watchOS
-// (o código está dentro de `#if os(watchOS)`). Ver
+// (o código está dentro de `#if os(watchOS)`). AlinhoSync fala com o Supabase
+// (jogos do mix e fila do resultado) e também se testa em macOS. Ver
 // docs/superpowers/specs/2026-10-22-apple-watch-marcador-fase1-design.md.
 import PackageDescription
 
@@ -15,11 +16,13 @@ let package = Package(
     ],
     targets: [
         .target(name: "PadelScoring"),
+        .target(name: "AlinhoSync", dependencies: ["PadelScoring"]),
         .target(
             name: "ScoreboardUI",
-            dependencies: ["PadelScoring"],
+            dependencies: ["PadelScoring", "AlinhoSync"],
             resources: [.process("Resources")]
         ),
         .testTarget(name: "PadelScoringTests", dependencies: ["PadelScoring"]),
+        .testTarget(name: "AlinhoSyncTests", dependencies: ["AlinhoSync", "PadelScoring"]),
     ]
 )
