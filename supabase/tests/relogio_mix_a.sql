@@ -6,13 +6,16 @@
 -- primeira linha do resultado confirma). O scoring_format do mix tem de aceitar
 -- 6–4 / 4–6 (pontos_simples, pontos_corridos, set_sem_fim ou pro_set_9; não os
 -- melhor_*_sets). Tudo acaba em ROLLBACK: nada fica gravado.
+-- A meio, troca B1 por M na equipa b de J (como superuser) e depois desfaz.
+-- Antes de correr a migração, isto falha logo com
+--   relation "mix_live_scores" does not exist
 BEGIN;
 CREATE TEMP TABLE _r (ok boolean, label text);
-CREATE TEMP TABLE _ctx (admin UUID, m UUID, j UUID, g UUID, org UUID,
+CREATE TEMP TABLE _ctx (admin UUID, m UUID, j UUID, g UUID, org UUID, tb UUID,
   a1 UUID, a2 UUID, b1 UUID, b2 UUID, b1_name TEXT, b2_name TEXT);
 INSERT INTO _ctx (admin, m, j)
 VALUES ('<admin do clube do mix>', '<membro M que não joga J>', '<jogo J (matches.id), sem resultado>');
-UPDATE _ctx SET g = mt.game_id, org = gm.organization_id,
+UPDATE _ctx SET g = mt.game_id, org = gm.organization_id, tb = mt.team_b_id,
        a1 = ta.player1_id, a2 = ta.player2_id, b1 = tb.player1_id, b2 = tb.player2_id
   FROM matches mt JOIN games gm ON gm.id = mt.game_id
   JOIN teams ta ON ta.id = mt.team_a_id JOIN teams tb ON tb.id = mt.team_b_id
@@ -40,8 +43,9 @@ INSERT INTO _r SELECT EXISTS (
     SELECT 1 FROM jsonb_array_elements(list_my_watch_mix_matches()) x, _ctx c
      WHERE (x->>'match_id')::uuid = c.j AND x->>'my_side' = 'b' AND jsonb_typeof(x->'scorer_id') = 'null'
        AND x->>'partner_name' = c.b2_name AND jsonb_array_length(x->'opponent_names') = 2
-       AND (x->>'game_id')::uuid = c.g AND x ? 'scoring_format' AND x ? 'deuce_mode' AND x ? 'tiebreak_8_8'),
-  'B1 vê J na lista: lado b, sem dono, com o parceiro e os 2 adversários';
+       AND (x->>'game_id')::uuid = c.g AND x ? 'scoring_format' AND x ? 'deuce_mode' AND x ? 'tiebreak_8_8'
+       AND x->'has_result' = 'false'::jsonb),
+  'B1 vê J na lista: lado b, sem dono, sem resultado, com o parceiro e os 2 adversários';
 
 -- M não joga J.
 SELECT pg_temp.as_user(m) FROM _ctx;
@@ -75,26 +79,64 @@ DO $$ BEGIN PERFORM save_mix_match_result((SELECT j FROM _ctx), 6, 4, NULL);
   INSERT INTO _r VALUES (false, 'A1 gravou sem ter o jogo');
 EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM = 'not_allowed', 'A1: save dá not_allowed (deu ' || SQLERRM || ')'); END $$;
 
+-- Trocam B1 por M na equipa b de J: B1 continua dono mas já não joga.
+RESET ROLE;
+UPDATE teams SET player1_id = CASE WHEN player1_id = c.b1 THEN c.m ELSE player1_id END,
+                 player2_id = CASE WHEN player2_id = c.b1 THEN c.m ELSE player2_id END
+  FROM _ctx c WHERE teams.id = c.tb;
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.as_user(b1) FROM _ctx;
+DO $$ BEGIN PERFORM save_mix_match_result((SELECT j FROM _ctx), 6, 4, NULL);
+  INSERT INTO _r VALUES (false, 'B1 gravou depois de sair do jogo');
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM = 'not_allowed', 'B1 fora do jogo: save dá not_allowed (deu ' || SQLERRM || ')'); END $$;
+SELECT pg_temp.as_user(a1) FROM _ctx;
+INSERT INTO _r SELECT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(list_my_watch_mix_matches()) x, _ctx c
+     WHERE (x->>'match_id')::uuid = c.j AND jsonb_typeof(x->'scorer_id') = 'null'),
+  'A1 vê J sem dono (o dono já não joga)';
+SELECT pg_temp.as_user(m) FROM _ctx;
+DO $$ BEGIN
+  INSERT INTO _r SELECT claim_mix_match(j)->>'my_side' = 'b', 'M, agora na equipa b, fica com J' FROM _ctx;
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (false, 'M (agora a jogar) não ficou com J: ' || SQLERRM); END $$;
+RESET ROLE;
+INSERT INTO _r SELECT ls.scorer_id = c.m, 'mix_live_scores: J passou para M'
+  FROM _ctx c JOIN mix_live_scores ls ON ls.match_id = c.j;
+-- Desfazer a troca: B1 volta à equipa e ao jogo.
+UPDATE teams SET player1_id = CASE WHEN player1_id = c.m THEN c.b1 ELSE player1_id END,
+                 player2_id = CASE WHEN player2_id = c.m THEN c.b1 ELSE player2_id END
+  FROM _ctx c WHERE teams.id = c.tb;
+UPDATE mix_live_scores SET scorer_id = c.b1 FROM _ctx c WHERE match_id = c.j;
+SET LOCAL ROLE authenticated;
+
 -- B1 tem o jogo: grava.
 SELECT pg_temp.as_user(b1) FROM _ctx;
 DO $$ BEGIN PERFORM save_mix_match_result((SELECT j FROM _ctx), 4, 6, NULL);
   INSERT INTO _r VALUES (true, 'B1 grava 4–6');
 EXCEPTION WHEN others THEN INSERT INTO _r VALUES (false, 'B1 não gravou: ' || SQLERRM); END $$;
--- Com resultado, J continua na lista de B1 (é dele).
+-- Com resultado, J continua na lista de B1 (é dele), com has_result.
 INSERT INTO _r SELECT EXISTS (
-    SELECT 1 FROM jsonb_array_elements(list_my_watch_mix_matches()) x, _ctx c WHERE (x->>'match_id')::uuid = c.j),
-  'B1 continua a ver J depois de gravar';
+    SELECT 1 FROM jsonb_array_elements(list_my_watch_mix_matches()) x, _ctx c
+     WHERE (x->>'match_id')::uuid = c.j AND x->'has_result' = 'true'::jsonb),
+  'B1 continua a ver J depois de gravar, com has_result';
+-- Nem o dono volta a ficar com um jogo gravado (não se reescreve o resultado).
+DO $$ BEGIN PERFORM claim_mix_match((SELECT j FROM _ctx));
+  INSERT INTO _r VALUES (false, 'B1 voltou a ficar com J já gravado');
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM = 'has_result', 'B1: claim de J já gravado dá has_result (deu ' || SQLERRM || ')'); END $$;
+-- Mas volta a gravar (depois de «Desfazer» o relógio grava sem novo claim).
+DO $$ BEGIN PERFORM save_mix_match_result((SELECT j FROM _ctx), 4, 6, NULL);
+  INSERT INTO _r VALUES (true, 'B1 volta a gravar 4–6 sem novo claim');
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (false, 'B1 não voltou a gravar: ' || SQLERRM); END $$;
 RESET ROLE;
 INSERT INTO _r SELECT mt.score_a = 4 AND mt.score_b = 6 AND mt.scored_by = c.b1 AND mt.winner_team_id = mt.team_b_id,
   'matches: 4–6, scored_by = B1, ganha a equipa b'
   FROM _ctx c JOIN matches mt ON mt.id = c.j;
 SET LOCAL ROLE authenticated;
 
--- B2: o jogo continua de B1 → taken.
+-- B2: J tem resultado (e é de B1) → has_result.
 SELECT pg_temp.as_user(b2) FROM _ctx;
 DO $$ BEGIN PERFORM claim_mix_match((SELECT j FROM _ctx));
   INSERT INTO _r VALUES (false, 'B2 ficou com o jogo de B1');
-EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM = 'taken', 'B2: claim dá taken (deu ' || SQLERRM || ')'); END $$;
+EXCEPTION WHEN others THEN INSERT INTO _r VALUES (SQLERRM = 'has_result', 'B2: claim de J gravado e de B1 dá has_result (deu ' || SQLERRM || ')'); END $$;
 -- Jogo com resultado e sem dono → has_result.
 RESET ROLE;
 DELETE FROM mix_live_scores WHERE match_id = (SELECT j FROM _ctx);
