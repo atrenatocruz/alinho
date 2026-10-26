@@ -6,6 +6,7 @@ import SwiftUI
 /// «Últimos jogos». No jogo seguinte é só «Começar».
 struct SetupView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var mix: MixModel
     /// Escolher «Nós» em «Quem serve» abre logo «Na nossa dupla».
     @State private var askOurFirst = false
 
@@ -88,6 +89,15 @@ struct SetupView: View {
                         .padding(.leading, 12)
                         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.listBg))
                     }
+                    if mix.showsEntry {
+                        NavigationLink {
+                            MixGamesView()
+                        } label: {
+                            Text(L.t("Jogos do mix"))
+                        }
+                        .buttonStyle(OutlineButtonStyle())
+                        .padding(.top, 4)
+                    }
                     Button(L.t("Começar")) { model.start() }
                         .buttonStyle(LimeButtonStyle())
                         .padding(.top, 4)
@@ -107,6 +117,7 @@ struct SetupView: View {
                 .buttonStyle(.plain)
             }
             .navigationTitle(L.t("Novo jogo"))
+            .task { mix.setupAppeared() }
             .navigationDestination(isPresented: $askOurFirst) { ourFirstList }
         }
     }

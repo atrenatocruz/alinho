@@ -9,6 +9,10 @@ export const WatchGames = registerPlugin('WatchGames', {
     list: async () => ({ games: [] }),
     remove: async () => {},
     markRegistered: async () => {},
+    // A sessão do relógio (src/lib/watchSession.js): sem relógio, sem efeito.
+    watchSessionStatus: async () => ({ installed: false, sentUserId: null, needsSession: false }),
+    sendWatchSession: async () => {},
+    clearWatchSession: async () => {},
     addListener: async () => ({ remove: async () => {} }),
   }),
 })

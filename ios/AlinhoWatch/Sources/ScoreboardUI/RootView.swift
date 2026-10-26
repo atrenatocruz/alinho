@@ -12,6 +12,13 @@ public struct RootView: View {
         Group {
             if model.showHistory {
                 NavigationStack { HistoryView() }
+            } else if let screen = model.mixScreen {
+                NavigationStack {
+                    switch screen {
+                    case .list: MixGamesView()
+                    case .match(let m): MixMatchView(initial: m)
+                    }
+                }
             } else if let match = model.current {
                 if match.isOver {
                     if model.endStep == .effort {
@@ -52,12 +59,17 @@ public struct RootView: View {
             }
         }
         .environmentObject(model)
+        .environmentObject(model.mix)
         .task { await model.resumeWorkoutIfNeeded() }
+        // O resultado de um jogo do mix que tenha ficado na fila.
+        .task { await model.mix.flush() }
         .task {
-            // Regresso ao marcador (10 s) e jogo esquecido (20 min).
+            // Regresso ao marcador (10 s), jogo esquecido (20 min) e, de 30 em
+            // 30 s, a fila do resultado do mix.
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 model.tick()
+                model.mix.tick()
             }
         }
     }
