@@ -12,7 +12,8 @@
 // obter o hashed_token → com o cliente anon troca-o por sessão
 // (auth.verifyOtp type 'magiclink'). Devolve só
 // {access_token, refresh_token, expires_at (segundos desde epoch), user_id}.
-// Erros: 401 unauthorized · 422 no_email · 500 server_error. Nunca se
+// Erros: 401 unauthorized · 422 no_email · 422 email_unconfirmed ·
+// 500 server_error. Nunca se
 // registam nem se devolvem tokens ou mensagens internas.
 //
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY são
@@ -26,10 +27,12 @@
 //     https://<dev>.supabase.co/functions/v1/watch-session
 //   -> 200 com refresh_token DIFERENTE do da app;
 //   com uma conta sem email -> 422 {"error":"no_email"};
+//   com uma conta de email por confirmar -> 422 {"error":"email_unconfirmed"};
 //   sem/com JWT inválido -> 401 {"error":"unauthorized"};
 //   e a sessão da app continua válida (recarregar a página).
 
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+// Versão exata (não a @2 flutuante): esta função cria sessões.
+import { createClient } from 'jsr:@supabase/supabase-js@2.117.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,6 +76,11 @@ Deno.serve(async (req) => {
     const user = userData.user
     if (!user.email) {
       return jsonResponse({ error: 'no_email' }, 422)
+    }
+    // Verificar um magic link confirma o email de quem ainda não o confirmou:
+    // esta função nunca pode ser o caminho para isso.
+    if (!user.email_confirmed_at) {
+      return jsonResponse({ error: 'email_unconfirmed' }, 422)
     }
 
     // Não envia email: só gera o hashed_token.
