@@ -59,7 +59,9 @@ function Symbol({ club, size = 'w-14 h-14 text-lg' }) {
    seguir» de antes); com o pedido feito, a cinzenta «⏳ Pedido enviado» e
    «Cancelar pedido». O favorito saiu de ao lado do botão (nunca lado a
    lado). Só aspeto: as ações são as de antes. */
-export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite, onBack = null, onShare = null }) {
+// `superadmin`: o superadmin com o modo ligado num clube ou grupo onde não é
+// membro vê-o como quem organiza: «Gerir» no lugar de «Entrar» (Francisco, 23 out).
+export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite, onBack = null, onShare = null, superadmin = false, gerirHref = null }) {
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [asking, setAsking] = useState(false)
@@ -130,6 +132,15 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
               className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F8DC] py-3 font-display text-[14px] font-extrabold leading-none text-[#3F6212] disabled:opacity-40">
               <Check size={15} /> {t('clubprofile.is_member')}
             </button>
+          ) : superadmin && gerirHref ? (
+            <div>
+              <Link to={gerirHref}
+                className="flex min-h-[48px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white text-base font-extrabold text-ink-900">
+                {t('gerirclube.manage_label')}
+              </Link>
+              {/* Porque vê o «Gerir» sem ser membro, e que o modo está ligado (UX, 25 out). */}
+              <p className="mt-1.5 text-[13px] text-[#4B5563]">{t(kk('clubprofile.superadmin_view_note'))}</p>
+            </div>
           ) : club.my_status === 'pending' ? (
             <div>
               <span className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-[#F4F5F1] py-3 font-display text-[14px] font-extrabold leading-none text-ink-500">
@@ -346,11 +357,12 @@ function EventDays({ events, member }) {
   )
 }
 
-export function ClubEvents({ club, events, isAdmin, gerirHref }) {
+export function ClubEvents({ club, events, isAdmin, gerirHref, superadmin = false }) {
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [all, setAll] = useState(false)
-  const member = club.my_status === 'member'
+  // O superadmin com o modo ligado vê como um membro (Francisco, 23 out).
+  const member = club.my_status === 'member' || superadmin
   const shown = all ? events : events.slice(0, SHOW)
   const blockedGames = !member && events.some((e) => !e.tournament)
   // «Eventos» com o separador «O que vem aí · Já jogados» (design-handoff/
