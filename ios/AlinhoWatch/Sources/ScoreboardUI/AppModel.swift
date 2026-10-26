@@ -57,6 +57,17 @@ final class AppModel: ObservableObject {
         self.store = store
         self.recordsWorkouts = store != nil
         self.session = session ?? store?.load() ?? MatchSession()
+        if recordsWorkouts { WatchLink.shared.activate() }
+    }
+
+    /// Manda ao iPhone o registo do jogo `id` (ou que foi apagado).
+    private func sendToPhone(_ id: UUID) {
+        guard recordsWorkouts else { return }
+        if let record = session.history.first(where: { $0.id == id }) {
+            WatchLink.shared.send(WatchGamePayload(record, updatedAt: Date()))
+        } else {
+            WatchLink.shared.send(.deleted(id: id, at: Date()))
+        }
     }
 
     /// O modelo da app; com `-screenshot <nome>`, um estado fixo que não grava.
@@ -99,12 +110,15 @@ final class AppModel: ObservableObject {
     private func matchEnded() {
         endStep = current?.hasPoints == true ? .effort : .summary
         recorder.pause()
-        guard let id = current?.id, recorder.authorized == true else { return }
-        session.setHealth(
-            averageHeartRate: recorder.averageHeartRate,
-            kilocalories: Int(recorder.kilocalories.rounded()),
-            for: id
-        )
+        guard let id = current?.id, current?.hasPoints == true else { return }
+        if recorder.authorized == true {
+            session.setHealth(
+                averageHeartRate: recorder.averageHeartRate,
+                kilocalories: Int(recorder.kilocalories.rounded()),
+                for: id
+            )
+        }
+        sendToPhone(id)
     }
 
     var current: MatchState? { session.current }
@@ -147,7 +161,9 @@ final class AppModel: ObservableObject {
 
     func undo() {
         let wasOver = current?.isOver == true
+        let endedID = wasOver ? current?.id : nil
         guard session.undo() else { return }
+        if let endedID, current?.hasPoints == true { sendToPhone(endedID) }
         if current?.isOver != true { endStep = nil }
         if wasOver, let current {
             if finalizedMatchID == current.id {
@@ -182,7 +198,10 @@ final class AppModel: ObservableObject {
     // MARK: - Esforço
 
     func saveEffort(_ value: Int) {
-        if let id = current?.id { session.setEffort(value, for: id) }
+        if let id = current?.id {
+            session.setEffort(value, for: id)
+            sendToPhone(id)
+        }
         endStep = .summary
         save()
     }
