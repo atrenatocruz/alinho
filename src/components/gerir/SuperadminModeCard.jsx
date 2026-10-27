@@ -30,7 +30,7 @@ export default function SuperadminModeCard() {
           <span className="mt-0.5 block text-sm font-extrabold text-ink-900">{t('gerir.sa_mode_title')}</span>
           <span className="block text-xs text-muted">{t(on ? 'gerir.sa_mode_on' : 'gerir.sa_mode_off')}</span>
         </span>
-        <input type="checkbox" role="switch" checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} className="peer sr-only" />
+        <input type="checkbox" role="switch" checked={on} aria-checked={on} disabled={busy} onChange={(e) => toggle(e.target.checked)} className="peer sr-only" />
         <span aria-hidden="true" className={SWITCH_TRACK} />
       </label>
       {error && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{error}</p>}

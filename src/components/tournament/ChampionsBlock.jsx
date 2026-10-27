@@ -43,7 +43,9 @@ export default function ChampionsBlock({ tournament, category, isAdmin = false }
 
   const hides = new Set(hidingIds)
   const name = (team) => pairShort(hides.has(team.entry_id) ? { ...team, hides_results: true } : team, `${t('tshare.pair_hidden')} ${c.code}`)
-  const thirds = thirdsOf(c)
+  // No grupo único o 3.º é uma dupla só, a 3.ª da tabela (UX, 23 out).
+  const singleFormat = Number(category?.format?.groups) === 1 && Number(category?.format?.qualifiers_per_group) === 0
+  const thirds = singleFormat ? (c.third ? [c.third] : thirdsOf(c).slice(0, 1)) : thirdsOf(c)
   // Quem organiza e ficou no pódio desta categoria escolhe em nome de quem
   // partilha, como no pódio de «Os meus jogos» (QA, 12 out: quem organiza
   // não tem o separador «Os meus jogos» à mão; SPEC 2026-10-12-partilhar-
@@ -55,6 +57,9 @@ export default function ChampionsBlock({ tournament, category, isAdmin = false }
     [2, c.runner_up],
     [3, thirds.length ? thirds : null],
   ].filter(([, team]) => team)
+  // Um grupo só (23 out): não houve final, por isso o 1.º diz «4 vitórias em
+  // 4», das contas de quem ficou em 1.º.
+  const winner = singleFormat ? (c.podium_players || []).find((p) => p.final_position === 1) : null
 
   return (
     <div className="card border-2 border-ink-900 !bg-white">
@@ -68,6 +73,9 @@ export default function ChampionsBlock({ tournament, category, isAdmin = false }
             <b className={`w-7 shrink-0 ${place === 1 ? 'text-base' : 'text-sm'} text-ink-900`}>{place}.º</b>
             <span className={`min-w-0 ${place === 1 ? 'text-base font-extrabold' : 'text-sm'} text-ink-900`}>
               {Array.isArray(team) ? team.map(name).join(' · ') : name(team)}
+              {place === 1 && winner && (
+                <span className="block text-xs font-semibold text-ink-500">{t('tournament.podium.wins_of', { won: winner.matches_won, played: winner.matches_played })}</span>
+              )}
             </span>
           </li>
         ))}

@@ -19,7 +19,7 @@ import { describeError } from '../../lib/errors'
 import { MonoLabel, StatePill } from './TournamentBits'
 import {
   listCategoriesAdmin, listCategorySeeding, closeCategoryEntries, reopenCategoryEntries,
-  saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload,
+  saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload, qualifiersPerGroup,
 } from '../../lib/tournamentDraw'
 import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords } from '../../lib/tournamentFormat'
 import { listTournamentClashes } from '../../lib/tournamentApi'
@@ -172,12 +172,21 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
       // dizer que cabe.
       availableHours: days.length ? availableCourtHours(days) : null,
       thirdPlaceMatch: thirdPlace,
-    })
+      // «Um grupo só, todos contra todos» de 3 a 7 duplas (aprovado pelo
+      // Francisco a 23 out; design-handoff/2026-10-23-torneio-um-grupo-so).
+      singleGroup: true,
+    // O grupo único vem primeiro, como no desenho; com 3 duplas é a única
+    // opção (UX, 23 out).
+    }).filter((o, _, all) => teamCount !== 3 || o.kind === 'grupo_unico' || !all.some((x) => x.kind === 'grupo_unico'))
+      .sort((x, y) => (y.kind === 'grupo_unico') - (x.kind === 'grupo_unico'))
   }, [dayRows, rules, teamCount, thirdPlace])
 
   const best = useMemo(() => recommendFormat(options), [options])
   const [pick, setPick] = useState(null)
   const chosen = pick || best?.key
+  // Sem final não há 3.º lugar: com o grupo único escolhido, a caixa sai.
+  const single = options.find((o) => o.key === chosen)?.kind === 'grupo_unico'
+  const onlySingle = options.length === 1 && options[0].kind === 'grupo_unico'
 
   const save = async () => {
     const option = options.find((o) => o.key === chosen)
@@ -190,7 +199,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
         groups: option.groupCount,
         qualifiers_per_group: option.qualifiersPerGroup,
         qualifiers: option.qualifiers,
-        third_place: thirdPlace,
+        third_place: single ? false : thirdPlace,
       })
       onDone()
     } catch (e) {
@@ -208,7 +217,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
   return (
     <div>
       <p className="mb-2 text-sm text-ink-700">
-        {t('tournament.draw.format_intro', { teams: teamCount })}
+        {onlySingle ? t('tournament.draw.format_intro_single', { teams: teamCount }) : t('tournament.draw.format_intro', { teams: teamCount })}
       </p>
 
       {options.map((o) => {
@@ -240,6 +249,9 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
                 phases: t('tournament.n.phases', { count: o.phases }),
               })}
             </p>
+            {o.kind === 'grupo_unico' && (
+              <p className="mt-1 text-[12.5px] text-ink-700">{t('tournament.draw.opt_single_note')}</p>
+            )}
             {o.fits === false && (
               <p className="mt-0.5 text-xs text-danger">
                 {t('tournament.draw.opt_no_fit', { hours: Math.round(o.hours) })}
@@ -251,10 +263,13 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
 
       {/* Linha inteira a 44 px e a caixa a 22 px: à beira do campo, com o
           telemóvel numa mão, a caixa de 13 px não se acertava (#512). */}
-      <label className="mb-2 mt-1 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink-700">
-        <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} className="h-[22px] w-[22px] shrink-0 accent-ink-900" />
-        {t('tournament.draw.third_place')}
-      </label>
+      {!single && (
+        <label className="mb-2 mt-1 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink-700">
+          <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} className="h-[22px] w-[22px] shrink-0 accent-ink-900" />
+          {t('tournament.draw.third_place')}
+        </label>
+      )}
+      {single && <div className="mb-3" />}
 
       {error && <p className="mb-2 text-xs text-danger">{error}</p>}
       <PrimaryButton onClick={save} disabled={busy || !chosen}>
@@ -281,7 +296,9 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
   // Só eliminatória: sem grupos, o quadro sai direto das cabeças de série
   // (Trello #455 — antes `!groupCount` matava o sorteio e não havia saída).
   const knockoutOnly = groupCount === 0
-  const perGroup = Number(format.qualifiers_per_group) || 2
+  // 0 é a sério no grupo único: ninguém passa a um quadro (Dev 3, 23 out).
+  const perGroup = qualifiersPerGroup(category)
+  const singleGroup = groupCount === 1 && perGroup === 0
 
   useEffect(() => {
     let cancelled = false
@@ -395,6 +412,8 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
 
   return (
     <div>
+      {/* Num grupo só não há cabeças de série: todos jogam contra todos. */}
+      {!singleGroup && (<>
       <MonoLabel className="mb-1">{t('tournament.draw.seeds_label')}</MonoLabel>
       <p className="mb-1.5 text-xs text-muted">{t('tournament.draw.seeds_note_swap')}</p>
       <div className="mb-1 card !p-0 overflow-hidden">
@@ -427,6 +446,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
           {t('tournament.draw.seeds_reset')}
         </button>
       ) : <div className="mb-3" />}
+      </>)}
 
       {swapIndex != null && (
         <Sheet title={t('tournament.draw.seed_sheet_title', { n: swapIndex + 1 })} onClose={() => setSwapIndex(null)}>
@@ -470,14 +490,17 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
           {g.teams.map((id, i) => (
             <p key={id} className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-900">
               <span className="truncate">{byId[id]?.name || id}</span>
-              {i === 0 && <span className="shrink-0 rounded-full bg-kind-tournament-light px-2 py-0.5 text-xs font-extrabold text-kind-tournament-dark">{t('tournament.draw.seed_tag')}</span>}
+              {i === 0 && !singleGroup && <span className="shrink-0 rounded-full bg-kind-tournament-light px-2 py-0.5 text-xs font-extrabold text-kind-tournament-dark">{t('tournament.draw.seed_tag')}</span>}
             </p>
           ))}
         </div>
       ))}
 
       <p className="mb-2 text-xs text-muted">
-        {t('tournament.draw.preview_summary', {
+        {singleGroup ? t('tournament.draw.preview_summary_single', {
+          matches: payload.group_matches.length,
+          guaranteed: Math.max(0, (payload.groups[0]?.teams.length || 1) - 1),
+        }) : t('tournament.draw.preview_summary', {
           groupMatches: payload.group_matches.length,
           // O jogo do 3.º lugar não vem na lista do quadro: cria-o o servidor.
           bracket: payload.bracket.length + (payload.third_place ? 1 : 0),
