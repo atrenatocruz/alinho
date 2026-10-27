@@ -57,7 +57,7 @@ import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
-import { weekdayShort, weekdayLong, isMasculineWeekday, launchDate } from '../lib/launchDay'
+import { weekdayShort, weekdayLong, isMasculineWeekday, launchDate, launchOffsetSeconds, launchAtFromOffset } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import CreateKindSheet from '../components/gerir/CreateKindSheet'
 import PlanStatusLine from '../components/gerir/PlanStatusLine'
@@ -1340,14 +1340,16 @@ export default function GerirClube() {
     launchDate.setDate(launchDate.getDate() - parseInt(daysBefore, 10))
     const [hh, mm] = launchTime.split(':').map(Number)
     launchDate.setHours(hh, mm, 0, 0)
-    return Math.round((mixDate.getTime() - launchDate.getTime()) / 1000)
+    // Segundos de relógio (hora de Lisboa), como a base: com a mudança da
+    // hora pelo meio, «às 13:00» continua a dar 13:00 (bug de 27 out).
+    return launchOffsetSeconds(mixDate, launchDate)
   }
 
   // Inverse of computeLaunchOffsetSeconds — used to populate the edit form
   // from a stored mix_offset_seconds value.
   const deriveLaunchFields = (mixDateStr, mixOffsetSeconds) => {
     const mixDate = new Date(mixDateStr)
-    const launchDate = new Date(mixDate.getTime() - mixOffsetSeconds * 1000)
+    const launchDate = launchAtFromOffset(mixDate, mixOffsetSeconds)
     const mixMidnight = new Date(mixDate.getFullYear(), mixDate.getMonth(), mixDate.getDate())
     const launchMidnight = new Date(launchDate.getFullYear(), launchDate.getMonth(), launchDate.getDate())
     const daysBefore = Math.round((mixMidnight.getTime() - launchMidnight.getTime()) / 86400000)
@@ -1485,7 +1487,7 @@ export default function GerirClube() {
       .from('games')
       .insert([pendingOccurrenceRow(game, {
         nextDate,
-        launchAt: new Date(nextDate.getTime() - mixOffsetSeconds * 1000),
+        launchAt: launchAtFromOffset(nextDate, mixOffsetSeconds),
         userId,
         recurrenceId: newRecurrence.id,
         organizationId: game.organization_id || currentOrganizationId,
@@ -1703,7 +1705,7 @@ export default function GerirClube() {
 
     const { error: launchUpdateError } = await supabase
       .from('games')
-      .update({ launch_at: new Date(new Date(pendingGame.date).getTime() - mixOffsetSeconds * 1000).toISOString() })
+      .update({ launch_at: launchAtFromOffset(pendingGame.date, mixOffsetSeconds).toISOString() })
       .eq('id', pendingGame.id)
 
     if (launchUpdateError) {
@@ -1837,7 +1839,7 @@ export default function GerirClube() {
       // mix launches at the wrong moment relative to what the admin sees.
       const pendingLaunchUpdate =
         editingGame.status === 'pending' && editingGame.recurrence
-          ? { launch_at: new Date(newDate.getTime() - editingGame.recurrence.mix_offset_seconds * 1000).toISOString() }
+          ? { launch_at: launchAtFromOffset(newDate, editingGame.recurrence.mix_offset_seconds).toISOString() }
           : {}
 
       const payload = {
@@ -2654,7 +2656,7 @@ export default function GerirClube() {
       // os dias antes e a hora, a partir do launch_at (#586, ponto 1.2).
       launch: game.status === 'pending' && !hasActiveRecurrence && game.launch_at
         ? (() => {
-            const f = deriveLaunchFields(game.date, (new Date(game.date).getTime() - new Date(game.launch_at).getTime()) / 1000)
+            const f = deriveLaunchFields(game.date, launchOffsetSeconds(game.date, game.launch_at))
             return { daysBefore: String(f.daysBefore), time: f.launchTime }
           })()
         : { daysBefore: '0', time: '10:00' },

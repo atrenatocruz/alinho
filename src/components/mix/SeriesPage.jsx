@@ -21,7 +21,7 @@ import { cancelMixDate } from '../../lib/mixCancel'
 import { describeError } from '../../lib/errors'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { SectionLabel } from '../gerir/PastEvents'
-import { weekdayShort, weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
+import { weekdayShort, weekdayLong, isMasculineWeekday, launchAtFromOffset } from '../../lib/launchDay'
 import { mixCapacity, formatLabelKey } from '../../lib/mixLogic'
 
 const DONE = ['finished', 'completed', 'cancelled']
@@ -78,7 +78,7 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
   // «Inscrições abrem à quinta, às 10:00» — a partir do intervalo da série.
   const opensLabel = (() => {
     if (!rec?.mix_offset_seconds) return null
-    const d = new Date(baseDate.getTime() - rec.mix_offset_seconds * 1000)
+    const d = launchAtFromOffset(baseDate, rec.mix_offset_seconds)
     return t(isMasculineWeekday(d) ? 'series.opens_m' : 'series.opens_f', {
       day: weekdayLong(d, lang), time: formatTime(d, lang, { hour: '2-digit', minute: '2-digit' }),
     })
