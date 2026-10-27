@@ -37,6 +37,39 @@ function writeNoEmail(userId) {
   try { localStorage.setItem(NO_EMAIL_KEY, userId) } catch { /* sem localStorage: tenta-se outra vez */ }
 }
 
+// Para o diagnóstico em «Os meus números»: o que aconteceu na última tentativa
+// ('sent', 'not_installed', 'already_sent', 'no_email' ou 'error:<código>').
+// Nunca leva tokens.
+const LAST_KEY = 'watchSession.last'
+
+function writeLast(result) {
+  try { localStorage.setItem(LAST_KEY, JSON.stringify({ result, at: new Date().toISOString() })) } catch { /* só diagnóstico */ }
+}
+
+function readLast() {
+  try { return JSON.parse(localStorage.getItem(LAST_KEY)) } catch { return null }
+}
+
+// Porque é que não se mandou (ou null se é para mandar).
+function skipReason({ installed, sentUserId, needsSession, userId, lastFailure }) {
+  if (!userId) return 'no_user'
+  if (!installed) return 'not_installed'
+  if (lastFailure === 'no_email') return 'no_email'
+  if (!needsSession && sentUserId === userId) return 'already_sent'
+  return null
+}
+
+// O estado da ligação ao relógio e a última tentativa. Fora da app de iPhone: null.
+export async function watchSessionDiagnostics() {
+  if (!hasWatchGames) return null
+  try {
+    const status = await WatchGames.watchSessionStatus()
+    return { ...status, last: readLast() }
+  } catch (e) {
+    return { error: e?.message ?? 'unknown', last: readLast() }
+  }
+}
+
 // O corpo de um erro da função (FunctionsHttpError traz a Response em `context`).
 async function errorCode(error) {
   try {
@@ -69,12 +102,18 @@ export function syncWatchSession(userId) {
     try {
       const status = await WatchGames.watchSessionStatus()
       const lastFailure = readNoEmail() === userId ? 'no_email' : null
-      if (!shouldSendWatchSession({ ...status, userId, lastFailure })) return
+      if (!shouldSendWatchSession({ ...status, userId, lastFailure })) {
+        // 'already_sent' é o normal: não apaga uma tentativa que falhou antes.
+        const reason = skipReason({ ...status, userId, lastFailure })
+        if (reason !== 'already_sent') writeLast(reason)
+        return
+      }
 
       const { data, error } = await supabase.functions.invoke('watch-session')
       if (error) {
         const code = await errorCode(error)
         if (code === 'no_email') writeNoEmail(userId)
+        writeLast(`error:${code ?? 'function'}`)
         console.error('Watch session not created:', code ?? error.message ?? 'unknown')
         return
       }
@@ -94,7 +133,9 @@ export function syncWatchSession(userId) {
         supabaseUrl,
         anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       })
+      writeLast('sent')
     } catch (e) {
+      writeLast('error:watch')
       console.error('Watch session not sent:', e?.message ?? 'unknown')
     } finally {
       inFlight = null

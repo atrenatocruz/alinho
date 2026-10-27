@@ -14,6 +14,9 @@ final class WatchGamesStore: NSObject {
     static let received = Notification.Name("alinho.watchGames.received")
     /// O relógio pediu uma sessão (`["kind": "needSession"]`).
     static let sessionNeeded = Notification.Name("alinho.watchGames.sessionNeeded")
+    /// A ligação ao relógio ficou ativa ou mudou (emparelhado, app instalada):
+    /// a página volta a ver se tem de mandar a sessão.
+    static let stateChanged = Notification.Name("alinho.watchGames.stateChanged")
 
     private let queue = DispatchQueue(label: "alinho.watchGames")
     private var games: [[String: Any]] = []
@@ -34,6 +37,8 @@ final class WatchGamesStore: NSObject {
     /// vez em `activationDidCompleteWith`; enquanto estiver marcado, nunca se
     /// manda uma sessão.
     private var pendingClear = false
+    /// O último erro ao entregar a sessão ao relógio (só para o diagnóstico).
+    private var lastSendError: String?
     private let sessionFileURL: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("alinho-relogio/watch-session.json")
@@ -112,20 +117,33 @@ final class WatchGamesStore: NSObject {
     //   - "none": sem sessão (saiu da conta no telemóvel).
     // Pede outra com transferUserInfo ["kind": "needSession"]. Nunca registar os tokens.
 
-    /// `installed`: há relógio emparelhado com a app instalada.
+    /// `installed`: há relógio emparelhado com a app instalada. Um pedido do
+    /// relógio (`needsSession`) também prova que a app lá está, mesmo que o
+    /// `isWatchAppInstalled` ainda diga que não. `activated`, `paired`,
+    /// `appInstalled` e `lastError` são só para o diagnóstico.
     func sessionStatus() -> [String: Any] {
-        var installed = false
+        var activated = false, paired = false, appInstalled = false
         if WCSession.isSupported() {
             let wc = WCSession.default
-            installed = wc.activationState == .activated && wc.isPaired && wc.isWatchAppInstalled
+            activated = wc.activationState == .activated
+            paired = activated && wc.isPaired
+            appInstalled = activated && wc.isWatchAppInstalled
         }
         return queue.sync {
             [
-                "installed": installed,
+                "installed": paired && (appInstalled || needsSession),
                 "sentUserId": sentUserId.map { $0 as Any } ?? NSNull(),
                 "needsSession": needsSession,
+                "activated": activated,
+                "paired": paired,
+                "appInstalled": appInstalled,
+                "lastError": lastSendError.map { $0 as Any } ?? NSNull(),
             ] as [String: Any]
         }
+    }
+
+    func recordSendError(_ error: Error?) {
+        queue.sync { lastSendError = error.map { String(describing: $0) } }
     }
 
     /// Entrega ao relógio a sessão (`json`, já no formato de cima) do `userId`.
@@ -213,6 +231,14 @@ extension WatchGamesStore: WCSessionDelegate {
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         guard activationState == .activated else { return }
         try? flushPendingClear()
+        // No arranque a página pergunta antes de a ligação estar ativa (e
+        // desiste): agora já pode mandar.
+        NotificationCenter.default.post(name: Self.stateChanged, object: nil)
+    }
+
+    // Emparelhou outro relógio, ou a app do relógio foi instalada/apagada.
+    func sessionWatchStateDidChange(_ session: WCSession) {
+        NotificationCenter.default.post(name: Self.stateChanged, object: nil)
     }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
@@ -265,6 +291,7 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private var observer: NSObjectProtocol?
     private var sessionObserver: NSObjectProtocol?
+    private var stateObserver: NSObjectProtocol?
 
     override public func load() {
         observer = NotificationCenter.default.addObserver(
@@ -278,11 +305,17 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
         ) { [weak self] _ in
             self?.notifyListeners("sessionNeeded", data: [:])
         }
+        stateObserver = NotificationCenter.default.addObserver(
+            forName: WatchGamesStore.stateChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.notifyListeners("watchStateChanged", data: [:])
+        }
     }
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         if let sessionObserver { NotificationCenter.default.removeObserver(sessionObserver) }
+        if let stateObserver { NotificationCenter.default.removeObserver(stateObserver) }
     }
 
     @objc func list(_ call: CAPPluginCall) {
@@ -331,8 +364,10 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
         else { return call.reject("sessão inválida") }
         do {
             try WatchGamesStore.shared.sendSession(json: json, userId: userId)
+            WatchGamesStore.shared.recordSendError(nil)
             call.resolve()
         } catch {
+            WatchGamesStore.shared.recordSendError(error)
             call.reject("relógio indisponível")
         }
     }
