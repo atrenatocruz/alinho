@@ -85,3 +85,13 @@ test('um repost de tudo (edição de um mix) junto com um «In» noutro mix não
   await wait(4500)
   assert.ok(sent.some((m) => m.includes('Mix m2 editado')), 'a edição do m2 tem de sair no repost que juntou os dois pedidos')
 })
+
+test('cardHash: os pontos entre parênteses não contam; os números de dupla e o resto contam', async () => {
+  const { cardHash } = await import('../src/sync.js')
+  const a = '1. Renato Cruz (1249) (1)\n2. João (1001) (1)\n3. Luis Silva (987)'
+  const b = '1. Renato Cruz (1262) (1)\n2. João (995) (1)\n3. Luis Silva (1003)'
+  assert.equal(cardHash(a), cardHash(b))
+  assert.notEqual(cardHash(a), cardHash('1. Renato Cruz (1249) (2)\n2. João (1001) (1)\n3. Luis Silva (987)'))
+  assert.notEqual(cardHash(a), cardHash('1. Renato Cruz (1249) (1)\n2. João (1001) (1)\n3. Ana Lopes (987)'))
+})
+
