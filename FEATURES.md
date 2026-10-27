@@ -117,6 +117,13 @@ A padel scorer on the wrist, embedded in the iPhone app (`pt.alinho.app.watchkit
   - Spec: `docs/superpowers/specs/2026-10-26-relogio-mix-a-decorrer-design.md`.
   - Phases B (live points in «A decorrer agora») and C (hand the match to another watch) are not built.
 
+## Escolhe a tua raquete (on `dev`, not live until set up)
+
+Perfil → «Escolhe a tua raquete»: 11 one-tap questions (side, hand and level come from the profile), then 3 real rackets from the Street Padel catalogue with photo, today's price, specs, why it suits the player, pros and cons, and a plain link to buy (no affiliate tag). The result is saved; the profile card then shows «As tuas raquetes» with the 3 photos and the result page has «Refazer as perguntas». Spec: `docs/superpowers/specs/2026-10-27-escolher-raquete-design.md`.
+
+- **How it picks:** a daily copy of the catalogue (`rackets`, Edge Function `sync-raquetes`, pg_cron). `recomendar-raquete` keeps only rackets in stock and within budget, sends a shortlist to Gemini Flash (free tier) and rejects any id that wasn't on it. Specs the store doesn't state show as «não indicado». Limit: 3 per player per Lisbon day. Nothing personal (name, email, id) goes to Google.
+- **Not live until:** `supabase/migration_escolher_raquete.sql` is run, both functions are deployed and the `GEMINI_API_KEY` / `GEMINI_MODEL` / `SYNC_RAQUETES_SECRET` secrets are set, on dev and then production. Runbook: `docs/raquete.md`.
+
 ## UI/UX
 
 - **Bilingual: Portuguese (pt-PT) and English**, via `react-i18next`. Portuguese is the default and the fallback. A signed-in player's choice lives on `profiles.language` and is set from Profile → personal info; a pre-auth visitor can switch from Landing/Login and the choice is stashed in `localStorage` (cleared on sign-out, so a shared device doesn't leak it between accounts). Dates and times are locale-aware (`en` maps to en-GB, not en-US).
