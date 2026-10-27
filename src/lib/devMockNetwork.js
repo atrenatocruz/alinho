@@ -69,6 +69,10 @@ const COMMUNITY_ORGS = [
 
 const ACHIEVEMENTS_CATALOG = [
   { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 10 },
+  // Objetivo de jogos por mês (migration_objetivo_mensal.sql).
+  { key: 'goal_streak_3', category: 'jogo', rarity: 'raro', sort: 1033 },
+  { key: 'goal_streak_6', category: 'jogo', rarity: 'epico', sort: 1034 },
+  { key: 'goal_streak_12', category: 'jogo', rarity: 'lendario', sort: 1035 },
   { key: 'areia_nos_tenis', category: 'jogo', rarity: 'comum', sort: 11 },
   { key: 'cliente_da_casa', category: 'jogo', rarity: 'comum', sort: 12 },
   { key: 'residente', category: 'jogo', rarity: 'raro', sort: 13 },
