@@ -102,14 +102,24 @@ export const RESPONSE_SCHEMA = {
 
 const LANG_NAME = { pt: 'português de Portugal', en: 'English', es: 'español' }
 
+// As marcas conhecidas (Renato, 27 out: «nox, bullpadel, adidas, head, etc»; a
+// Babolat é a outra das marcas do questionário). Só desempatam: quando duas
+// raquetes servem o jogador de forma parecida, fica a da marca conhecida.
+export const POPULAR_BRANDS = ['nox', 'bullpadel', 'adidas', 'head', 'babolat']
+
+const brandKey = (b) => String(b ?? '').trim().toLowerCase()
+export const isPopularBrand = (b) => POPULAR_BRANDS.includes(brandKey(b))
+
 // Nunca leva nome, email nem id do jogador: só respostas, perfil de jogo e raquetes.
 export function buildPrompt({ answers, profile, candidates, lang }) {
   const list = candidates.map((r) => ({
-    id: r.store_id, name: r.name, brand: r.brand, price_eur: r.price, specs: r.specs, description: r.description,
+    id: r.store_id, name: r.name, brand: r.brand, popular: isPopularBrand(r.brand), price_eur: r.price, specs: r.specs, description: r.description,
   }))
   return [
     'És um especialista em raquetes de padel. Escolhe exatamente 3 raquetes desta lista para este jogador, usando só os ids da lista.',
+    'As 3 raquetes têm de ser de 3 marcas diferentes.',
     'Dá prioridade à adequação ao jogador, ao conforto e ao desempenho, não à popularidade da marca nem só ao preço.',
+    'Mas se duas raquetes servem este jogador de forma parecida, escolhe a de uma marca conhecida ("popular": true) em vez da menos conhecida.',
     'Não recomendes automaticamente uma raquete avançada ou cara só porque tem melhores specs técnicas.',
     'Se o jogador tem dores (cotovelo, pulso, ombro), dá prioridade ao conforto.',
     'hardness e sweet_spot: só o que a descrição da raquete diz; se não diz, deixa vazio (""). Não inventes números nem specs.',
@@ -134,7 +144,9 @@ function grounded(value, description, re) {
 }
 
 // `descriptions`: store_id → descrição da loja (para a dureza e o ponto doce).
-export function validatePicks(json, allowedIds, descriptions = {}) {
+// `brands`: store_id → marca. As 3 têm de ser de marcas diferentes, a não ser
+// que a lista toda tenha menos de 3 marcas.
+export function validatePicks(json, allowedIds, descriptions = {}, brands = {}) {
   if (!json || typeof json !== 'object') return { ok: false, reason: 'not_object' }
   const { best, picks } = json
   if (!Array.isArray(picks) || picks.length !== 3) return { ok: false, reason: 'not_three' }
@@ -142,6 +154,10 @@ export function validatePicks(json, allowedIds, descriptions = {}) {
   if (ids.some((id) => typeof id !== 'string' || !allowedIds.includes(id))) return { ok: false, reason: 'unknown_id' }
   if (new Set(ids).size !== 3) return { ok: false, reason: 'repeated' }
   if (!ids.includes(best)) return { ok: false, reason: 'bad_best' }
+  const brandsOffered = new Set(allowedIds.map((id) => brandKey(brands[id])).filter(Boolean))
+  if (brandsOffered.size >= 3 && new Set(ids.map((id) => brandKey(brands[id]))).size !== 3) {
+    return { ok: false, reason: 'same_brand' }
+  }
   const clean = picks.map((p) => ({
     id: p.id,
     why: String(p.why ?? ''),

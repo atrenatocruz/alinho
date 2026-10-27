@@ -65,6 +65,37 @@ describe('validatePicks', () => {
   })
 })
 
+describe('3 marcas diferentes (Renato, 27 out)', () => {
+  const pick = (id) => ({ id, why: 'x', pros: [], cons: [], hardness: '', sweet_spot: '' })
+  const json = { best: 'a', picks: ['a', 'b', 'c'].map(pick) }
+  it('recusa duas da mesma marca quando a lista tem 3 marcas ou mais', () => {
+    const brands = { a: 'Royal Padel', b: 'Royal Padel', c: 'Nox', d: 'Head' }
+    expect(validatePicks(json, ['a', 'b', 'c', 'd'], {}, brands)).toMatchObject({ ok: false, reason: 'same_brand' })
+  })
+  it('a marca compara sem maiúsculas nem espaços à volta', () => {
+    const brands = { a: 'NOX', b: ' nox ', c: 'Head', d: 'Siux' }
+    expect(validatePicks(json, ['a', 'b', 'c', 'd'], {}, brands).ok).toBe(false)
+  })
+  it('aceita marcas repetidas se a lista só tem menos de 3 marcas', () => {
+    const brands = { a: 'Nox', b: 'Nox', c: 'Head' }
+    expect(validatePicks(json, ['a', 'b', 'c'], {}, brands).ok).toBe(true)
+  })
+  it('3 marcas diferentes passam', () => {
+    expect(validatePicks(json, ['a', 'b', 'c'], {}, { a: 'Nox', b: 'Head', c: 'Siux' }).ok).toBe(true)
+  })
+})
+
+describe('buildPrompt: marcas', () => {
+  const candidates = [{ store_id: 'a', name: 'X', brand: 'Bullpadel', price: 200, specs: {}, description: '' }, { store_id: 'b', name: 'Y', brand: 'Royal Padel', price: 200, specs: {}, description: '' }]
+  const p = buildPrompt({ answers: {}, profile: {}, candidates, lang: 'pt' })
+  it('pede 3 marcas diferentes', () => expect(p).toMatch(/3 marcas diferentes/))
+  it('em empate, prefere as marcas conhecidas, e marca-as na lista', () => {
+    expect(p).toMatch(/marca conhecida/)
+    expect(p).toMatch(/"brand":"Bullpadel","popular":true/)
+    expect(p).toMatch(/"brand":"Royal Padel","popular":false/)
+  })
+})
+
 describe('shortlist sem repetidos', () => {
   it('o mesmo store_id só entra uma vez', () => {
     const r = { store_id: 'a', price: 70, available: true, brand: 'Nox', specs: {} }

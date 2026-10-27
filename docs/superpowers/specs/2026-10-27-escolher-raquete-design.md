@@ -173,3 +173,13 @@ Rotas sugeridas: `/perfil/raquete` (resultado ou início) e `/perfil/raquete/per
 - O prompt (dentro das regras acima) e o esquema JSON da resposta.
 - Os componentes visuais, desde que sigam os mockups v2 e o `DESIGN.md`.
 - A hora do sync diário.
+
+## Adenda (Renato, 27 out, depois de testar no dev)
+
+- **As 3 raquetes são de 3 marcas diferentes.** Garantido no código (`validatePicks` recusa
+  `same_brand` e a IA tenta outra vez), a não ser que a lista curta tenha menos de 3 marcas.
+- **Em empate, marca conhecida.** A regra «não à popularidade da marca» continua, mas quando
+  duas raquetes servem o jogador de forma parecida fica a de uma marca conhecida
+  (`POPULAR_BRANDS` em `_shared/raquetes.js`: Nox, Bullpadel, Adidas, Head, Babolat). Isto é
+  pedido à IA no prompt (cada raquete vai marcada `popular: true/false`); não é um filtro.
+- Origem: ao testar com 200–300 €, a IA recomendava quase sempre Royal Padel.

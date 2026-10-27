@@ -165,13 +165,16 @@ Deno.serve(async (req) => {
     const descriptions = Object.fromEntries(
       candidates.map((r: { store_id: string; description: string | null }) => [r.store_id, r.description ?? '']),
     )
+    const brands = Object.fromEntries(
+      candidates.map((r: { store_id: string; brand: string | null }) => [r.store_id, r.brand ?? '']),
+    )
 
     // Uma tentativa falhada não conta para o limite: só se gasta com resultado.
     const refund = () => db.rpc('refund_racket_run', { p_user: userId })
     let result
     try {
-      result = validatePicks(await askGemini(prompt), ids, descriptions)
-      if (!result.ok) result = validatePicks(await askGemini(prompt), ids, descriptions)
+      result = validatePicks(await askGemini(prompt), ids, descriptions, brands)
+      if (!result.ok) result = validatePicks(await askGemini(prompt), ids, descriptions, brands)
     } catch (e) {
       await refund()
       throw e
