@@ -1,4 +1,5 @@
 #if os(watchOS)
+import AlinhoSync
 import Foundation
 import PadelScoring
 import SwiftUI
@@ -50,8 +51,12 @@ final class AppModel: ObservableObject {
     @Published var wokeAt: Date?
     /// Só nas prints: abre logo nos «Últimos jogos».
     @Published var showHistory = false
+    /// Só nas prints: abre logo nos «Jogos do mix» (ou num jogo da lista).
+    @Published var mixScreen: MixScreen?
 
     private let store: SessionStore?
+    /// «Jogos do mix»: a lista, o vínculo do jogo em curso e a fila do resultado.
+    let mix: MixModel
     /// O treino no Saúde. Nas prints dos ecrãs nunca arranca.
     let recorder = WorkoutRecorder()
     private let recordsWorkouts: Bool
@@ -60,16 +65,22 @@ final class AppModel: ObservableObject {
     private var overlayTask: Task<Void, Never>?
 
     /// `store == nil`: não grava (prints dos ecrãs).
-    init(store: SessionStore? = SessionStore(fileURL: SessionStore.defaultURL), session: MatchSession? = nil) {
+    init(store: SessionStore? = SessionStore(fileURL: SessionStore.defaultURL), session: MatchSession? = nil, mix: MixModel? = nil) {
         self.store = store
         self.recordsWorkouts = store != nil
         self.session = session ?? store?.load() ?? MatchSession()
+        self.mix = mix ?? (store != nil ? MixModel() : MixModel(preview: []))
+        // Um vínculo de um jogo que já não está no ecrã já não serve.
+        if let link = self.mix.link, link.localMatchID != self.session.current?.id {
+            self.mix.setLink(nil)
+        }
         if recordsWorkouts { WatchLink.shared.activate() }
     }
 
     /// Manda ao iPhone o registo do jogo `id` (ou que foi apagado).
+    /// Um jogo do mix nunca vai: não pode aparecer também como jogo entre amigos.
     private func sendToPhone(_ id: UUID) {
-        guard recordsWorkouts else { return }
+        guard recordsWorkouts, mix.mixLink(for: id) == nil else { return }
         if let record = session.history.first(where: { $0.id == id }) {
             WatchLink.shared.send(WatchGamePayload(record, updatedAt: Date()))
         } else {
@@ -82,12 +93,13 @@ final class AppModel: ObservableObject {
         guard let name = ScreenshotFixtures.requested, let f = ScreenshotFixtures.make(name) else {
             return AppModel()
         }
-        let model = AppModel(store: nil, session: f.session)
+        let model = AppModel(store: nil, session: f.session, mix: f.mix)
         model.overlay = f.overlay
         model.page = f.page
         model.showHistory = f.showHistory
         model.idlePrompt = f.idle
         model.endStep = f.endStep
+        model.mixScreen = f.mixScreen
         if let h = f.health {
             model.recorder.preview(heartRate: h.0, averageHeartRate: h.1, kilocalories: h.2, authorized: h.3)
         }
@@ -132,7 +144,13 @@ final class AppModel: ObservableObject {
                 for: id
             )
         }
-        sendToPhone(id)
+        // Jogo do mix: o resultado vai para o mix (fila) em vez de ir ao iPhone.
+        // Depois de um «Desfazer», acabar outra vez põe o resultado novo por cima.
+        if mix.mixLink(for: id) != nil, let record = session.history.first(where: { $0.id == id }) {
+            mix.submit(record)
+        } else {
+            sendToPhone(id)
+        }
     }
 
     var current: MatchState? { session.current }
@@ -143,11 +161,25 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
+        mix.setLink(nil)
         session.start(at: Date())
         page = 1
         idleDismissedAt = nil
         save()
         if recordsWorkouts, let id = current?.id { Task { await recorder.begin(matchID: id) } }
+    }
+
+    /// Começa um jogo do mix: o formato vem do mix (o marcador, lado a lado ou
+    /// um por cima do outro, continua o da última escolha) e o resultado final
+    /// fica ligado ao jogo do mix.
+    func start(mix m: MixMatch, config: MatchConfig, side: MixSide) {
+        var c = config
+        c.layout = session.config.layout
+        setConfig(c)
+        start()
+        if let id = current?.id {
+            mix.setLink(MixLink(localMatchID: id, mixMatchID: m.matchID, side: side, title: m.gameName, userID: mix.userID))
+        }
     }
 
     func point(_ team: Team) {
@@ -208,6 +240,7 @@ final class AppModel: ObservableObject {
             await finalizeWorkout()
             endStep = nil
             session.clearFinished()
+            mix.setLink(nil)
             save()
         }
     }

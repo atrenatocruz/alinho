@@ -52,13 +52,13 @@ const CARD_UNCHANGED_MS = 5 * 60 * 1000
 /** Este cartão saiu há menos de 5 min com EXATAMENTE este texto? */
 export function cardUnchangedRecently(groupJid, gameId, text, now = Date.now()) {
   const entry = groupState.get(groupJid)?.mixes.get(gameId)
-  return Boolean(entry?.sentAt && now - entry.sentAt < CARD_UNCHANGED_MS && entry.hash === hash(text))
+  return Boolean(entry?.sentAt && now - entry.sentAt < CARD_UNCHANGED_MS && entry.hash === cardHash(text))
 }
 
 /** O «mix» acabou de enviar este cartão: conta como o último anúncio do mix
  *  (mesmo hash que o repost calcula), para a reconciliação não o repetir. */
 export function noteCardSent(groupJid, gameId, text, messageId) {
-  stateFor(groupJid).mixes.set(gameId, { hash: hash(text), messageId, sentAt: Date.now() })
+  stateFor(groupJid).mixes.set(gameId, { hash: cardHash(text), messageId, sentAt: Date.now() })
 }
 
 /** Só para testes: esquece o estado por grupo. */
@@ -112,6 +112,17 @@ function hash(str) {
   return h
 }
 
+// Os pontos de cada jogador entre parênteses («Ana Moreira (912)») não
+// contam para saber se o cartão mudou: quando o ranking é recalculado no fim
+// de um mix, os pontos mexem e o robô repostava os cartões de todos os mixes
+// abertos em todos os grupos (Francisco, 26 out: «isso não pode acontecer»).
+// Os pontos novos aparecem no repost seguinte que tenha uma mudança a sério
+// (um In, um Out, uma vaga). Os números de dupla «(1)» têm 1-2 algarismos e
+// ficam; os pontos têm 3 ou mais.
+export function cardHash(text) {
+  return hash(text.replace(/ \(\d{3,}\)/g, ''))
+}
+
 /**
  * One WhatsApp message per currently-open (and level-visible) mix in this
  * group — a fresh send whenever that mix's own content changed since the
@@ -155,7 +166,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     // promo-prefixed text would make that tick look "different" from an
     // otherwise-unchanged mix and re-send it minus the callout.
     const baseText = buildMixMessage(state, { label, fresh: group.newMessages })
-    const nextHash = hash(baseText)
+    const nextHash = cardHash(baseText)
     const prev = st.mixes.get(gameId)
     if (prev && prev.hash === nextHash) continue
 
@@ -186,7 +197,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const batch = await loadOpenSlotBatch(batchId)
     if (batch.games.length === 0) continue
     const baseText = buildOpenSlotsMessage(batch, { fresh: group.newMessages })
-    const nextHash = hash(baseText)
+    const nextHash = cardHash(baseText)
     const prev = st.openSlotBatches.get(batchId)
     if (prev && prev.hash === nextHash) continue
 
@@ -309,14 +320,17 @@ async function primeGroupHashes() {
         // No messageId — a reply to a message sent before this restart
         // can't be resolved via roster.js's map; it just falls back to
         // text-based matching in commands.js, same as an unknown stanzaId.
-        st.mixes.set(state.game.id, { hash: hash(buildMixMessage(state, { label })), messageId: null, sentAt: 0 })
+        // Mesmo texto que o repost calcula, com o interruptor das mensagens
+        // novas do clube: sem o «fresh», os grupos com as mensagens novas
+        // ficavam com um hash diferente e o primeiro tick repostava tudo.
+        st.mixes.set(state.game.id, { hash: cardHash(buildMixMessage(state, { label, fresh: group.newMessages })), messageId: null, sentAt: 0 })
       }
 
       const batchIds = new Set(openSlotMixes.map((m) => m.open_batch_id).filter(Boolean))
       for (const batchId of batchIds) {
         const batch = await loadOpenSlotBatch(batchId)
         if (batch.games.length === 0) continue
-        st.openSlotBatches.set(batchId, { hash: hash(buildOpenSlotsMessage(batch)), messageId: null })
+        st.openSlotBatches.set(batchId, { hash: cardHash(buildOpenSlotsMessage(batch, { fresh: group.newMessages })), messageId: null })
       }
     } catch (err) {
       console.error(`Failed to prime roster hash for ${group.groupJid}:`, err)

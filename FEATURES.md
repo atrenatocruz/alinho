@@ -104,6 +104,18 @@ A padel scorer on the wrist, embedded in the iPhone app (`pt.alinho.app.watchkit
 - **On the wrist**: long press (0.7 s) to score, one buzz for us and two for them, the first tap with the wrist down only wakes the screen; pause, fix the score with the crown, change server, change the 40-40 rule from the next game; «Ainda estão a jogar?» after 20 min without points; workout saved to Health (heart rate, calories, effort 1–10).
 - **On the iPhone**: each finished game reaches the app through WatchConnectivity and the local `WatchGames` Capacitor plugin. Perfil → «Os meus números» shows Jogos, Estatísticas (month by month, trends, WHO minutes, effort) and Desafios (monthly goal, streak, pause). Health data stays on the phone.
 - **Registering** a watch game (within 7 days) creates a private friends' match with the existing RPCs; the other three accept. 7-day challenges between mutual followers and «Amigos esta semana» count confirmed friends' games only (`supabase/migration_relogio_desafios.sql`, not yet run).
+- **«Jogos do mix» (Fase A, on branch `feature/relogio-mix`, not live anywhere yet)**. The watch lists the player's matches in mixes that are `in_progress`. The first of the 4 players to tap «Começar» owns the match (`claim_mix_match`), and the other three see «A ser contado por …». The format comes from the mix (`MixRules`):
+  - Set sem fim: `pontos_simples` outside the Americano, and `set_sem_fim` in the Americano.
+  - Pontos corridos: `pontos_corridos`, and `pontos_simples` in the Americano.
+  - Pro set to 9: only with a tie-break to 7 at 8-8.
+  - 2 sets + super tie-break.
+  - Best of 3.
+  - Anything else shows «Este mix não dá para contar no relógio».
+
+  At the end the result goes through `save_mix_match_result`, the same path as typing it in by hand, and stays final. The admin can correct it as usual. With no network the result waits in a queue on the watch. A mix game is not also sent to the iPhone as a friends' game. Only the 4 players of that match can save, only while the mix is in progress, and only after claiming it. The watch has its own Supabase session, handed over by the iPhone.
+  - Needs `supabase/migration_relogio_mix_a.sql` (not run yet) and the Edge Function `watch-session` (not deployed yet).
+  - Spec: `docs/superpowers/specs/2026-10-26-relogio-mix-a-decorrer-design.md`.
+  - Phases B (live points in «A decorrer agora») and C (hand the match to another watch) are not built.
 
 ## UI/UX
 

@@ -1,4 +1,5 @@
 #if os(watchOS)
+import AlinhoSync
 import PadelScoring
 import SwiftUI
 
@@ -9,6 +10,7 @@ struct EndView: View {
     let match: MatchState
 
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var mix: MixModel
 
     private var record: MatchRecord? { model.session.history.first { $0.id == match.id } }
 
@@ -22,6 +24,13 @@ struct EndView: View {
                     .font(Theme.number(30))
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.5)
+                if let line = mixLine {
+                    Text(line)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(mixColor)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Group {
                     Text(note)
                     if let health = healthLine { Text(health) }
@@ -59,6 +68,21 @@ struct EndView: View {
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
             }
+        }
+        .task(id: match.id) { await mix.updateStatus() }
+    }
+
+    /// Só nos jogos do mix: em que ponto está o envio do resultado.
+    private var mixLine: String? {
+        guard mix.mixLink(for: match.id) != nil else { return nil }
+        return MixText.status(mix.sendStatus)
+    }
+
+    private var mixColor: Color {
+        switch mix.sendStatus {
+        case .sent: Theme.lime
+        case .dropped: Theme.amber
+        default: Theme.muted
         }
     }
 

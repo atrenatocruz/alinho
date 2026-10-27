@@ -15,6 +15,9 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
     public let points: [Int]
     /// Só nos Pontos por jogos: os jogos da ronda.
     public let games: [Int]
+    /// Só nos formatos por sets: os jogos do set a decorrer quando o jogo acabou
+    /// (`[nós, eles]`); vazio se não havia nenhum. Não entra no `WatchGamePayload`.
+    public let openGames: [Int]
     public let winner: Team?
     public let endReason: EndReason
     public let startedAt: Date
@@ -36,6 +39,7 @@ public struct MatchRecord: Codable, Equatable, Identifiable, Sendable {
         let noSets = s.config.format == .points || s.config.format == .endlessSet
         points = noSets && s.pointsScoring == .rally ? s.points : []
         games = noSets && s.pointsScoring == .games ? s.games : []
+        openGames = !noSets && s.games != [0, 0] ? s.games : []
         winner = s.winner
         endReason = s.endReason ?? .rules
         startedAt = s.startedAt
@@ -63,6 +67,7 @@ extension MatchRecord {
         sets = try c.decode([SetScore].self, forKey: .sets)
         points = try c.decode([Int].self, forKey: .points)
         games = try c.decodeIfPresent([Int].self, forKey: .games) ?? []
+        openGames = try c.decodeIfPresent([Int].self, forKey: .openGames) ?? []
         winner = try c.decodeIfPresent(Team.self, forKey: .winner)
         endReason = try c.decode(EndReason.self, forKey: .endReason)
         startedAt = try c.decode(Date.self, forKey: .startedAt)

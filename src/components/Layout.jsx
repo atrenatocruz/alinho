@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, ClipboardList, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
+import { Home, Users, Trophy, ClipboardList, Phone, X, Bell, UserCheck, Swords, Shuffle, UserPlus, Check, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
@@ -14,6 +14,7 @@ import { getMyPrivateMatches, privateMatchActions, claimFriendMatchInvitesByEmai
 import { describeError } from '../lib/errors'
 import ConfirmPhoneCard from './ConfirmPhoneCard'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
+import { claimDay } from '../lib/guestClaims'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
 import { useNoOverlayOpen } from '../lib/useNoOverlayOpen'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
@@ -468,6 +469,18 @@ export default function Layout({ children }) {
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
+  // «Sou eu» (SPEC 2026-10-21-sou-eu): título a negrito e uma linha por baixo.
+  const GUEST_CLAIM_KINDS = ['mix_guest_claim', 'mix_guest_claim_accepted', 'mix_guest_claim_declined']
+  const guestClaimNotice = (notice) => {
+    const d = notice.data || {}
+    const vars = {
+      name: d.user_name, guest: d.guest_name,
+      mix: d.game_title || t('layout.mix_notice_fallback_title'),
+      day: claimDay(d.game_date, i18n.language, t),
+    }
+    return { title: t(`layout.${notice.kind}_title`, vars), line: t(`layout.${notice.kind}_line`, vars) }
+  }
+
   const mixNoticeText = (notice) => {
     const d = notice.data || {}
     // Quem fez, quando não é a própria pessoa: o actor_id é coluna do aviso
@@ -773,7 +786,24 @@ export default function Layout({ children }) {
                       <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
                     </Link>
                   ))}
-                  {mixNotices.map((notice) => (
+                  {mixNotices.map((notice) => GUEST_CLAIM_KINDS.includes(notice.kind) ? (
+                    <Link
+                      key={notice.id}
+                      // O pedido abre o mix na linha do convidado (?convidado=).
+                      to={notice.game_id ? `/jogo/${notice.game_id}${notice.kind === 'mix_guest_claim' && notice.data?.guest_id ? `?convidado=${notice.data.guest_id}` : ''}` : '/'}
+                      onClick={() => openMixNotice(notice)}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                    >
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${notice.kind === 'mix_guest_claim_declined' ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
+                        {notice.kind === 'mix_guest_claim' ? <UserPlus size={16} /> : notice.kind === 'mix_guest_claim_accepted' ? <Check size={16} /> : <XCircle size={16} />}
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        <span className="block font-extrabold">{guestClaimNotice(notice).title}</span>
+                        <span className="block text-ink-700">{guestClaimNotice(notice).line}</span>
+                      </p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
+                  ) : (
                     <Link
                       key={notice.id}
                       to={notice.game_id ? `/jogo/${notice.game_id}` : '/'}

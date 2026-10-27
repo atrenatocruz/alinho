@@ -12,6 +12,8 @@ import WatchConnectivity
 final class WatchGamesStore: NSObject {
     static let shared = WatchGamesStore()
     static let received = Notification.Name("alinho.watchGames.received")
+    /// O relógio pediu uma sessão (`["kind": "needSession"]`).
+    static let sessionNeeded = Notification.Name("alinho.watchGames.sessionNeeded")
 
     private let queue = DispatchQueue(label: "alinho.watchGames")
     private var games: [[String: Any]] = []
@@ -22,9 +24,25 @@ final class WatchGamesStore: NSObject {
         return base.appendingPathComponent("alinho-relogio/watch-games.json")
     }()
 
+    // A sessão do relógio (Relógio no mix, Fase A; src/lib/watchSession.js):
+    // para que user se mandou a última e se o relógio pediu outra. Os tokens
+    // não ficam aqui: só vão no applicationContext.
+    private var sentUserId: String?
+    private var needsSession = false
+    /// Saiu da conta mas o "none" ainda não chegou ao applicationContext
+    /// (relógio por ativar, ou o envio falhou). Fica guardado e tenta-se outra
+    /// vez em `activationDidCompleteWith`; enquanto estiver marcado, nunca se
+    /// manda uma sessão.
+    private var pendingClear = false
+    private let sessionFileURL: URL = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("alinho-relogio/watch-session.json")
+    }()
+
     override init() {
         super.init()
         load()
+        loadSessionState()
     }
 
     /// Chamar no arranque da app, para receber mesmo sem a página aberta.
@@ -86,6 +104,93 @@ final class WatchGamesStore: NSObject {
         }
     }
 
+    // MARK: Sessão do relógio
+    //
+    // O relógio lê no applicationContext a chave "session", sempre uma string:
+    //   - um JSON {access_token, refresh_token, expires_at (segundos), user_id,
+    //     supabase_url, anon_key}, ou
+    //   - "none": sem sessão (saiu da conta no telemóvel).
+    // Pede outra com transferUserInfo ["kind": "needSession"]. Nunca registar os tokens.
+
+    /// `installed`: há relógio emparelhado com a app instalada.
+    func sessionStatus() -> [String: Any] {
+        var installed = false
+        if WCSession.isSupported() {
+            let wc = WCSession.default
+            installed = wc.activationState == .activated && wc.isPaired && wc.isWatchAppInstalled
+        }
+        return queue.sync {
+            [
+                "installed": installed,
+                "sentUserId": sentUserId.map { $0 as Any } ?? NSNull(),
+                "needsSession": needsSession,
+            ] as [String: Any]
+        }
+    }
+
+    /// Entrega ao relógio a sessão (`json`, já no formato de cima) do `userId`.
+    func sendSession(json: String, userId: String) throws {
+        guard WCSession.isSupported() else { throw WatchSessionError.unsupported }
+        // Há um "none" por mandar: primeiro ele; se ainda não der, não se manda nada.
+        try flushPendingClear()
+        try WCSession.default.updateApplicationContext(["session": json])
+        queue.sync {
+            sentUserId = userId
+            needsSession = false
+            saveSessionState()
+        }
+    }
+
+    /// O relógio fica sem sessão ("none"). Se não der já, fica pendente.
+    func clearSession() throws {
+        queue.sync {
+            pendingClear = true
+            saveSessionState()
+        }
+        try flushPendingClear()
+    }
+
+    /// Manda o "none" pendente. Só larga `sentUserId` e `pendingClear` quando
+    /// o applicationContext ficou mesmo atualizado.
+    func flushPendingClear() throws {
+        guard queue.sync(execute: { pendingClear }) else { return }
+        if WCSession.isSupported() {
+            guard WCSession.default.activationState == .activated else { throw WatchSessionError.notActivated }
+            try WCSession.default.updateApplicationContext(["session": "none"])
+        }
+        // Sem WatchConnectivity (iPad) não há relógio: nada a mandar.
+        queue.sync {
+            pendingClear = false
+            sentUserId = nil
+            saveSessionState()
+        }
+    }
+
+    func markSessionNeeded() {
+        queue.sync {
+            needsSession = true
+            saveSessionState()
+        }
+    }
+
+    private func loadSessionState() {
+        guard let data = try? Data(contentsOf: sessionFileURL),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return }
+        sentUserId = root["sentUserId"] as? String
+        needsSession = root["needsSession"] as? Bool ?? false
+        pendingClear = root["pendingClear"] as? Bool ?? false
+    }
+
+    /// Só dentro da `queue`.
+    private func saveSessionState() {
+        var root: [String: Any] = ["needsSession": needsSession, "pendingClear": pendingClear]
+        if let sentUserId { root["sentUserId"] = sentUserId }
+        guard let data = try? JSONSerialization.data(withJSONObject: root) else { return }
+        try? FileManager.default.createDirectory(at: sessionFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: sessionFileURL, options: .atomic)
+    }
+
     private func load() {
         guard let data = try? Data(contentsOf: fileURL),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -104,7 +209,11 @@ final class WatchGamesStore: NSObject {
 }
 
 extension WatchGamesStore: WCSessionDelegate {
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    // Um "none" que ficou por mandar (saiu da conta com o relógio por ativar).
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        guard activationState == .activated else { return }
+        try? flushPendingClear()
+    }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
 
@@ -114,6 +223,13 @@ extension WatchGamesStore: WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        // O relógio pede uma sessão: fica marcado; a página manda-a quando
+        // puder (já, se estiver aberta; senão ao voltar à app).
+        if userInfo["kind"] as? String == "needSession" {
+            markSessionNeeded()
+            NotificationCenter.default.post(name: Self.sessionNeeded, object: nil)
+            return
+        }
         guard let json = userInfo["game"] as? String,
               let game = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         else { return }
@@ -125,8 +241,15 @@ extension WatchGamesStore: WCSessionDelegate {
     }
 }
 
+enum WatchSessionError: Error {
+    case unsupported
+    case notActivated
+}
+
 /// `WatchGames` na app web: `list()`, `remove({ id })`, `markRegistered({ id,
-/// friendMatchId })` e o evento `gameReceived`.
+/// friendMatchId })` e o evento `gameReceived`. A sessão do relógio:
+/// `watchSessionStatus()`, `sendWatchSession({ session, supabaseUrl, anonKey })`,
+/// `clearWatchSession()` e o evento `sessionNeeded` (src/lib/watchSession.js).
 @objc(WatchGamesPlugin)
 public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "WatchGamesPlugin"
@@ -135,9 +258,13 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "list", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "markRegistered", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "watchSessionStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendWatchSession", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearWatchSession", returnType: CAPPluginReturnPromise),
     ]
 
     private var observer: NSObjectProtocol?
+    private var sessionObserver: NSObjectProtocol?
 
     override public func load() {
         observer = NotificationCenter.default.addObserver(
@@ -146,10 +273,16 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let game = note.userInfo?["game"] as? [String: Any] else { return }
             self?.notifyListeners("gameReceived", data: ["game": game])
         }
+        sessionObserver = NotificationCenter.default.addObserver(
+            forName: WatchGamesStore.sessionNeeded, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.notifyListeners("sessionNeeded", data: [:])
+        }
     }
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let sessionObserver { NotificationCenter.default.removeObserver(sessionObserver) }
     }
 
     @objc func list(_ call: CAPPluginCall) {
@@ -167,6 +300,47 @@ public class WatchGamesPlugin: CAPPlugin, CAPBridgedPlugin {
             return call.reject("id ou friendMatchId em falta")
         }
         WatchGamesStore.shared.markRegistered(id: id, friendMatchId: match)
+        call.resolve()
+    }
+
+    @objc func watchSessionStatus(_ call: CAPPluginCall) {
+        call.resolve(WatchGamesStore.shared.sessionStatus())
+    }
+
+    /// Junta `supabaseUrl` e `anonKey` à sessão e manda tudo numa string JSON
+    /// (formato no `WatchGamesStore`). Os erros nunca levam os tokens.
+    @objc func sendWatchSession(_ call: CAPPluginCall) {
+        guard let session = call.getObject("session"),
+              let accessToken = session["access_token"] as? String,
+              let refreshToken = session["refresh_token"] as? String,
+              let expiresAt = session["expires_at"] as? NSNumber,
+              let userId = session["user_id"] as? String,
+              let supabaseUrl = call.getString("supabaseUrl"),
+              let anonKey = call.getString("anonKey")
+        else { return call.reject("sessão incompleta") }
+        let payload: [String: Any] = [
+            "access_token": accessToken,
+            "refresh_token": refreshToken,
+            "expires_at": expiresAt.int64Value,
+            "user_id": userId,
+            "supabase_url": supabaseUrl,
+            "anon_key": anonKey,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let json = String(data: data, encoding: .utf8)
+        else { return call.reject("sessão inválida") }
+        do {
+            try WatchGamesStore.shared.sendSession(json: json, userId: userId)
+            call.resolve()
+        } catch {
+            call.reject("relógio indisponível")
+        }
+    }
+
+    @objc func clearWatchSession(_ call: CAPPluginCall) {
+        // Se o relógio não estiver ativo, o "none" fica pendente e vai quando
+        // ativar; até lá não se manda nenhuma sessão.
+        try? WatchGamesStore.shared.clearSession()
         call.resolve()
     }
 }
