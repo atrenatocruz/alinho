@@ -70,8 +70,9 @@ export function shortlist(rackets, answers, max = 40) {
   const shape = answers?.shape && answers.shape !== 'recomenda' ? answers.shape : null
   const brands = (answers?.brands ?? []).filter((b) => b !== 'outra' && b !== 'sem_preferencia')
   const rank = (r) => (shape && r.specs?.shape === shape ? 2 : 0) + (brands.includes(String(r.brand ?? '').toLowerCase()) ? 1 : 0)
+  const seen = new Set()
   return rackets
-    .filter((r) => r.available && r.price <= ceiling)
+    .filter((r) => r.available && r.price <= ceiling && !seen.has(r.store_id) && seen.add(r.store_id))
     .sort((a, b) => rank(b) - rank(a) || b.price - a.price)
     .slice(0, max)
 }
@@ -111,7 +112,7 @@ export function buildPrompt({ answers, profile, candidates, lang }) {
     'Dá prioridade à adequação ao jogador, ao conforto e ao desempenho, não à popularidade da marca nem só ao preço.',
     'Não recomendes automaticamente uma raquete avançada ou cara só porque tem melhores specs técnicas.',
     'Se o jogador tem dores (cotovelo, pulso, ombro), dá prioridade ao conforto.',
-    'hardness e sweet_spot: só o que a descrição da raquete diz; se não diz, escreve "não indicado". Não inventes números nem specs.',
+    'hardness e sweet_spot: só o que a descrição da raquete diz; se não diz, deixa vazio (""). Não inventes números nem specs.',
     'Em "best" põe o id da melhor das 3. Em "why" explica em 1–2 frases porque serve a este jogador, a partir das respostas dele.',
     `Responde em ${LANG_NAME[lang] ?? LANG_NAME.pt}.`,
     '',
@@ -121,7 +122,19 @@ export function buildPrompt({ answers, profile, candidates, lang }) {
   ].join('\n')
 }
 
-export function validatePicks(json, allowedIds) {
+// O que a descrição tem de mencionar para a IA poder falar de dureza / ponto doce.
+const HARDNESS_IN_TEXT = /dur[oa]\b|dureza|bland[oa]|soft|hard|medium|tacto/i
+const SWEET_SPOT_IN_TEXT = /punto dulce|sweet ?spot|ponto doce/i
+const NOT_STATED = /^\s*(n[ãa]o indicad[oa]|no indicad[oa]|not stated|n\/a|-)?\s*$/i
+
+// Só fica o que a descrição sustenta; o resto vai vazio e o ecrã mostra «não indicado».
+function grounded(value, description, re) {
+  const v = String(value ?? '')
+  return NOT_STATED.test(v) || !re.test(description ?? '') ? '' : v
+}
+
+// `descriptions`: store_id → descrição da loja (para a dureza e o ponto doce).
+export function validatePicks(json, allowedIds, descriptions = {}) {
   if (!json || typeof json !== 'object') return { ok: false, reason: 'not_object' }
   const { best, picks } = json
   if (!Array.isArray(picks) || picks.length !== 3) return { ok: false, reason: 'not_three' }
@@ -134,8 +147,8 @@ export function validatePicks(json, allowedIds) {
     why: String(p.why ?? ''),
     pros: Array.isArray(p.pros) ? p.pros.map(String) : [],
     cons: Array.isArray(p.cons) ? p.cons.map(String) : [],
-    hardness: String(p.hardness ?? 'não indicado'),
-    sweet_spot: String(p.sweet_spot ?? 'não indicado'),
+    hardness: grounded(p.hardness, descriptions[p.id], HARDNESS_IN_TEXT),
+    sweet_spot: grounded(p.sweet_spot, descriptions[p.id], SWEET_SPOT_IN_TEXT),
   }))
   return { ok: true, best, picks: clean }
 }

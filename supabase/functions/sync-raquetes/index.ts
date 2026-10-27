@@ -70,8 +70,11 @@ Deno.serve(async (req) => {
   }
   if (!products.length) return json({ error: 'catalog_unavailable' }, 502)
 
-  const rows = products.map(parseShopifyRacket).filter(Boolean)
-    .map((r) => ({ ...r, synced_at: startedAt }))
+  // A paginação por páginas da Shopify pode repetir um produto que mudou de
+  // página a meio; dois iguais no mesmo upsert rebentavam com o lote todo.
+  const byId = new Map()
+  for (const r of products.map(parseShopifyRacket)) if (r) byId.set(r.store_id, { ...r, synced_at: startedAt })
+  const rows = [...byId.values()]
 
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false, autoRefreshToken: false },

@@ -49,6 +49,27 @@ describe('validatePicks', () => {
   it('recusa repetidos', () => expect(validatePicks({ ...ok, picks: [ok.picks[0], ok.picks[0], ok.picks[1]] }, ['a', 'b', 'c']).ok).toBe(false))
   it('recusa best fora dos picks', () => expect(validatePicks({ ...ok, best: 'z' }, ['a', 'b', 'c', 'z']).ok).toBe(false))
   it('recusa lixo', () => expect(validatePicks('nada', ['a']).ok).toBe(false))
+
+  // A dureza e o ponto doce só ficam se a descrição da loja falar deles: o
+  // código garante-o, não só o prompt (anti-objetivo da spec).
+  it('apaga a dureza e o ponto doce que a descrição não diz', () => {
+    const json = { best: 'a', picks: ['a', 'b', 'c'].map((id) => ({ id, why: 'x', pros: [], cons: [], hardness: 'Média', sweet_spot: 'Grande' })) }
+    const desc = { a: 'Goma EVA Soft, tacto blando. Punto dulce amplio.', b: 'Pala redonda de carbono.', c: '' }
+    const r = validatePicks(json, ['a', 'b', 'c'], desc)
+    expect(r.picks.map((p) => [p.id, p.hardness, p.sweet_spot])).toEqual([['a', 'Média', 'Grande'], ['b', '', ''], ['c', '', '']])
+  })
+  it('«não indicado» vindo da IA fica vazio (o ecrã traduz)', () => {
+    const json = { best: 'a', picks: ['a', 'b', 'c'].map((id) => ({ id, why: 'x', pros: [], cons: [], hardness: 'não indicado', sweet_spot: 'not stated' })) }
+    const r = validatePicks(json, ['a', 'b', 'c'], { a: 'dureza media, punto dulce', b: '', c: '' })
+    expect(r.picks[0]).toMatchObject({ hardness: '', sweet_spot: '' })
+  })
+})
+
+describe('shortlist sem repetidos', () => {
+  it('o mesmo store_id só entra uma vez', () => {
+    const r = { store_id: 'a', price: 70, available: true, brand: 'Nox', specs: {} }
+    expect(shortlist([r, { ...r }], { budget: 'lt80' })).toHaveLength(1)
+  })
 })
 
 describe('buildPrompt', () => {

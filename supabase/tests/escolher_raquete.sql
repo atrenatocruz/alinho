@@ -60,5 +60,26 @@ BEGIN
 END $$;
 INSERT INTO _r VALUES (NOT has_function_privilege('anon', 'public.take_racket_run(uuid)', 'EXECUTE'), 'anon não corre take_racket_run');
 
+-- Uma tentativa falhada devolve-se: depois de 3 e de um refund, há outra.
+DO $$ DECLARE v_b UUID := (SELECT b FROM _ctx); r BOOLEAN;
+BEGIN
+  PERFORM refund_racket_run(v_b);
+  r := take_racket_run(v_b);
+  INSERT INTO _r VALUES (r, 'refund_racket_run devolve uma tentativa');
+END $$;
+INSERT INTO _r VALUES (NOT has_function_privilege('authenticated', 'public.refund_racket_run(uuid)', 'EXECUTE'), 'authenticated não corre refund_racket_run');
+
+-- Mais regras: ninguém de fora lê nada, e authenticated não apaga nem lê o contador.
+INSERT INTO _r VALUES
+  (NOT has_table_privilege('anon', 'public.rackets', 'SELECT') AND NOT has_table_privilege('anon', 'public.racket_picks', 'SELECT'), 'anon não lê rackets nem racket_picks'),
+  (NOT has_table_privilege('authenticated', 'public.racket_picks', 'DELETE'), 'authenticated não apaga racket_picks'),
+  (NOT has_table_privilege('authenticated', 'public.racket_pick_runs', 'SELECT'), 'authenticated não lê racket_pick_runs');
+
+-- Apagar a conta (anonymize_account, migration_account_deletion.sql) apaga as
+-- respostas — o perfil fica, por isso o ON DELETE CASCADE não chega.
+SELECT anonymize_account(a) FROM _ctx;
+INSERT INTO _r SELECT count(*) = 0, 'apagar a conta apaga racket_picks' FROM racket_picks WHERE user_id = (SELECT a FROM _ctx);
+INSERT INTO _r SELECT count(*) = 0, 'apagar a conta apaga racket_pick_runs' FROM racket_pick_runs WHERE user_id = (SELECT a FROM _ctx);
+
 SELECT CASE WHEN ok THEN 'OK    ' ELSE 'ERRO  ' END || label AS resultado FROM _r;
 ROLLBACK;

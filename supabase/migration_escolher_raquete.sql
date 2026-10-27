@@ -6,7 +6,9 @@
 --   racket_picks      — a última recomendação de cada jogador. Só o próprio a lê;
 --                       só a Edge Function recomendar-raquete escreve (service role).
 --   racket_pick_runs  — quantas recomendações cada jogador pediu hoje (limite: 3 por dia de Lisboa).
---   take_racket_run() — conta mais uma; false se já ia em 3. Só o service role a corre.
+--   take_racket_run() — conta mais uma; false se já ia em 3. refund_racket_run() devolve uma
+--                       tentativa que falhou. Só o service role as corre.
+--   trigger em profiles — apagar a conta (anonymize_account) apaga as respostas.
 --   cron 'sync-raquetes' — chama a Edge Function sync-raquetes todos os dias às 05:00 UTC.
 --
 -- Como correr (Renato, à mão no SQL Editor): primeiro no dev, depois o teste
@@ -86,6 +88,45 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.take_racket_run(UUID) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.take_racket_run(UUID) TO service_role;
+
+-- Devolve uma tentativa que falhou (IA em baixo ou resposta inválida): o limite
+-- conta recomendações recebidas, não falhas da IA.
+CREATE OR REPLACE FUNCTION public.refund_racket_run(p_user UUID)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+  UPDATE racket_pick_runs SET count = count - 1
+   WHERE user_id = p_user AND day = (NOW() AT TIME ZONE 'Europe/Lisbon')::date AND count > 0;
+$function$;
+REVOKE ALL ON FUNCTION public.refund_racket_run(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.refund_racket_run(UUID) TO service_role;
+
+-- ── 3b. Apagar a conta apaga as respostas ───────────────────────────────
+-- anonymize_account (migration_account_deletion.sql) não apaga o perfil — só o
+-- esvazia —, por isso o ON DELETE CASCADE nunca dispara. As respostas têm dados
+-- de saúde (dores): saem quando o perfil é anonimizado. Um trigger em vez de
+-- reescrever o anonymize_account, para não copiar a função toda para aqui.
+CREATE OR REPLACE FUNCTION public.forget_racket_picks()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+BEGIN
+  DELETE FROM racket_picks     WHERE user_id = NEW.id;
+  DELETE FROM racket_pick_runs WHERE user_id = NEW.id;
+  RETURN NEW;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.forget_racket_picks() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS profiles_forget_racket_picks ON public.profiles;
+CREATE TRIGGER profiles_forget_racket_picks
+  AFTER UPDATE OF email ON public.profiles
+  FOR EACH ROW
+  WHEN (NEW.email LIKE 'removido-%@alinho.invalid' AND OLD.email IS DISTINCT FROM NEW.email)
+  EXECUTE FUNCTION public.forget_racket_picks();
 
 -- ── 4. O sync diário ─────────────────────────────────────────────────────
 SELECT cron.schedule(

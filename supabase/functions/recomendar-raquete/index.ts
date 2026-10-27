@@ -16,8 +16,8 @@
 // Ao Gemini nunca vão nome, email nem id do jogador. As respostas e o prompt nunca
 // vão para os logs (há respostas sobre dores): nos erros, só o código.
 //
-// Secrets: GEMINI_API_KEY (Google AI Studio), GEMINI_MODEL (o Flash mais recente do
-// plano gratuito; por omissão gemini-2.5-flash). SUPABASE_URL, SUPABASE_ANON_KEY e
+// Secrets: GEMINI_API_KEY (Google AI Studio), GEMINI_MODEL (um ou mais modelos separados por
+// vírgulas; por omissão gemini-flash-latest,gemini-flash-lite-latest). SUPABASE_URL, SUPABASE_ANON_KEY e
 // SUPABASE_SERVICE_ROLE_KEY são injetados pela plataforma.
 //
 // Deploy (Renato, projeto dev primeiro):
@@ -68,33 +68,46 @@ function cleanAnswers(raw: unknown): Answers | null {
 
 class AiUnavailable extends Error {}
 
+// GEMINI_MODEL pode ter vários modelos separados por vírgulas: se um está
+// sobrecarregado (503) ou sem quota (429), tenta o seguinte. No teste de 27 out o
+// gemini-flash-latest do plano gratuito deu 503 «high demand» quatro vezes seguidas.
+const DEFAULT_MODELS = 'gemini-flash-latest,gemini-flash-lite-latest'
+
 async function askGemini(prompt: string): Promise<unknown> {
   const key = Deno.env.get('GEMINI_API_KEY')
   if (!key) throw new AiUnavailable('no key')
-  const model = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
-  let res: Response
-  try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, temperature: 0.4 },
-      }),
-      signal: AbortSignal.timeout(25000),
-    })
-  } catch {
-    throw new AiUnavailable('timeout')
+  const models = (Deno.env.get('GEMINI_MODEL') || DEFAULT_MODELS).split(',').map((m) => m.trim()).filter(Boolean)
+  let last = 'no model'
+  for (const model of models) {
+    let res: Response
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, temperature: 0.4 },
+        }),
+        signal: AbortSignal.timeout(25000),
+      })
+    } catch {
+      last = `${model} timeout`
+      continue
+    }
+    if (res.status === 429 || res.status >= 500) {
+      last = `${model} ${res.status}`
+      continue
+    }
+    if (!res.ok) throw new AiUnavailable(`${model} ${res.status}`)
+    const body = await res.json()
+    const text = body?.candidates?.[0]?.content?.parts?.[0]?.text
+    try {
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
   }
-  if (res.status === 429 || res.status >= 500) throw new AiUnavailable(`gemini ${res.status}`)
-  if (!res.ok) throw new AiUnavailable(`gemini ${res.status}`)
-  const body = await res.json()
-  const text = body?.candidates?.[0]?.content?.parts?.[0]?.text
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
+  throw new AiUnavailable(last)
 }
 
 Deno.serve(async (req) => {
@@ -143,10 +156,22 @@ Deno.serve(async (req) => {
     }
     const prompt = buildPrompt({ answers, profile, candidates, lang })
     const ids = candidates.map((r: { store_id: string }) => r.store_id)
+    const descriptions = Object.fromEntries(
+      candidates.map((r: { store_id: string; description: string | null }) => [r.store_id, r.description ?? '']),
+    )
 
-    let result = validatePicks(await askGemini(prompt), ids)
-    if (!result.ok) result = validatePicks(await askGemini(prompt), ids)
+    // Uma tentativa falhada não conta para o limite: só se gasta com resultado.
+    const refund = () => db.rpc('refund_racket_run', { p_user: userId })
+    let result
+    try {
+      result = validatePicks(await askGemini(prompt), ids, descriptions)
+      if (!result.ok) result = validatePicks(await askGemini(prompt), ids, descriptions)
+    } catch (e) {
+      await refund()
+      throw e
+    }
     if (!result.ok) {
+      await refund()
       console.error('recomendar-raquete: invalid AI answer', result.reason)
       return jsonResponse({ error: 'ai_failed' }, 502)
     }
