@@ -27,7 +27,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2.117.3'
 import { STORE, parseShopifyRacket } from '../_shared/raquetes.js'
 
-const MAX_PAGES = 40
+// A 27 out a loja tinha 8674 produtos (35 páginas). Chegar ao limite sem uma
+// página vazia conta como lista incompleta (não se marca nada como esgotado).
+const MAX_PAGES = 80
 const BATCH = 200
 
 function json(body: unknown, status = 200): Response {
@@ -50,17 +52,22 @@ Deno.serve(async (req) => {
   if (!secret || req.headers.get('x-sync-secret') !== secret) return json({ error: 'forbidden' }, 403)
 
   const startedAt = new Date().toISOString()
-  const products: unknown[] = []
-  let partial = false
+  // Só as raquetes ficam em memória (filtradas página a página); `total` conta
+  // todos os produtos lidos.
+  const byId = new Map()
+  let total = 0
+  let partial = true
   try {
     for (let page = 1; page <= MAX_PAGES; page++) {
       const list = await fetchPage(page)
-      if (!list.length) break
-      products.push(...list)
+      if (!list.length) { partial = false; break }
+      total += list.length
+      for (const r of list.map(parseShopifyRacket)) if (r) byId.set(r.store_id, { ...r, synced_at: startedAt })
     }
+    if (partial) console.error('sync-raquetes: page cap reached, treating as partial')
   } catch (e) {
     // Sem a primeira página não se sabe nada: não marcar tudo como esgotado.
-    if (!products.length) {
+    if (!total) {
       console.error('sync-raquetes: catalog unavailable', (e as Error).message)
       return json({ error: 'catalog_unavailable' }, 502)
     }
@@ -68,12 +75,11 @@ Deno.serve(async (req) => {
     console.error('sync-raquetes: partial catalog', (e as Error).message)
     partial = true
   }
-  if (!products.length) return json({ error: 'catalog_unavailable' }, 502)
+  if (!total) return json({ error: 'catalog_unavailable' }, 502)
 
-  // A paginação por páginas da Shopify pode repetir um produto que mudou de
-  // página a meio; dois iguais no mesmo upsert rebentavam com o lote todo.
-  const byId = new Map()
-  for (const r of products.map(parseShopifyRacket)) if (r) byId.set(r.store_id, { ...r, synced_at: startedAt })
+  // O Map por store_id também tira repetidos: a paginação por páginas da Shopify
+  // pode repetir um produto que mudou de página a meio, e dois iguais no mesmo
+  // upsert rebentavam com o lote todo.
   const rows = [...byId.values()]
 
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
@@ -92,7 +98,7 @@ Deno.serve(async (req) => {
   }
 
   return json({
-    total: products.length,
+    total,
     rackets: rows.length,
     available: rows.filter((r) => r!.available).length,
   })
