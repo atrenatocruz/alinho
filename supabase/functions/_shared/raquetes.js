@@ -65,15 +65,28 @@ export function parseShopifyRacket(p) {
 
 export const BUDGETS = { lt80: 80, '80_150': 150, '150_220': 220, '220_300': 300, '300plus': Infinity }
 
+// No máximo 2 raquetes por marca na lista que vai à IA: com 5 escolhas sem
+// repetidos ficam sempre 3 marcas diferentes (Renato, 27 out: «3 marcas
+// diferentes»; antes, com dores, a IA devolvia só Royal Padel).
+const PER_BRAND = 2
+
 export function shortlist(rackets, answers, max = 40) {
   const ceiling = BUDGETS[answers?.budget] ?? Infinity
   const shape = answers?.shape && answers.shape !== 'recomenda' ? answers.shape : null
   const brands = (answers?.brands ?? []).filter((b) => b !== 'outra' && b !== 'sem_preferencia')
   const rank = (r) => (shape && r.specs?.shape === shape ? 2 : 0) + (brands.includes(String(r.brand ?? '').toLowerCase()) ? 1 : 0)
   const seen = new Set()
+  const perBrand = new Map()
   return rackets
     .filter((r) => r.available && r.price <= ceiling && !seen.has(r.store_id) && seen.add(r.store_id))
     .sort((a, b) => rank(b) - rank(a) || b.price - a.price)
+    .filter((r) => {
+      const b = brandKey(r.brand)
+      const n = perBrand.get(b) ?? 0
+      if (n >= PER_BRAND) return false
+      perBrand.set(b, n + 1)
+      return true
+    })
     .slice(0, max)
 }
 
@@ -95,7 +108,8 @@ export const RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
     best: { type: 'STRING' },
-    picks: { type: 'ARRAY', items: pickSchema, minItems: 3, maxItems: 3 },
+    // Até 5 por ordem (a melhor primeiro): o código fica com as 3 primeiras de marcas diferentes.
+    picks: { type: 'ARRAY', items: pickSchema, minItems: 3, maxItems: 5 },
   },
   required: ['best', 'picks'],
 }
@@ -116,14 +130,14 @@ export function buildPrompt({ answers, profile, candidates, lang }) {
     id: r.store_id, name: r.name, brand: r.brand, popular: isPopularBrand(r.brand), price_eur: r.price, specs: r.specs, description: r.description,
   }))
   return [
-    'És um especialista em raquetes de padel. Escolhe exatamente 3 raquetes desta lista para este jogador, usando só os ids da lista.',
-    'As 3 raquetes têm de ser de 3 marcas diferentes.',
+    'És um especialista em raquetes de padel. Escolhe as 5 raquetes desta lista que melhor servem este jogador, por ordem (a melhor primeiro), usando só os ids da lista.',
+    'Vamos mostrar as 3 primeiras de marcas diferentes: escolhe raquetes de marcas diferentes sempre que der.',
     'Dá prioridade à adequação ao jogador, ao conforto e ao desempenho, não à popularidade da marca nem só ao preço.',
     'Mas se duas raquetes servem este jogador de forma parecida, escolhe a de uma marca conhecida ("popular": true) em vez da menos conhecida.',
     'Não recomendes automaticamente uma raquete avançada ou cara só porque tem melhores specs técnicas.',
     'Se o jogador tem dores (cotovelo, pulso, ombro), dá prioridade ao conforto.',
     'hardness e sweet_spot: só o que a descrição da raquete diz; se não diz, deixa vazio (""). Não inventes números nem specs.',
-    'Em "best" põe o id da melhor das 3. Em "why" explica em 1–2 frases porque serve a este jogador, a partir das respostas dele.',
+    'Em "best" põe o id da melhor. Em "why" explica em 1–2 frases porque serve a este jogador, a partir das respostas dele.',
     `Responde em ${LANG_NAME[lang] ?? LANG_NAME.pt}.`,
     '',
     `Perfil de jogo: ${JSON.stringify(profile)}`,
@@ -144,21 +158,31 @@ function grounded(value, description, re) {
 }
 
 // `descriptions`: store_id → descrição da loja (para a dureza e o ponto doce).
-// `brands`: store_id → marca. As 3 têm de ser de marcas diferentes, a não ser
-// que a lista toda tenha menos de 3 marcas.
+// `brands`: store_id → marca. A IA devolve 3 a 5 por ordem; ficam as 3 primeiras
+// de marcas diferentes (a não ser que a lista toda tenha menos de 3 marcas).
+// Um id que não estava na lista recusa a resposta inteira (a IA inventou).
 export function validatePicks(json, allowedIds, descriptions = {}, brands = {}) {
   if (!json || typeof json !== 'object') return { ok: false, reason: 'not_object' }
   const { best, picks } = json
-  if (!Array.isArray(picks) || picks.length !== 3) return { ok: false, reason: 'not_three' }
-  const ids = picks.map((p) => p?.id)
-  if (ids.some((id) => typeof id !== 'string' || !allowedIds.includes(id))) return { ok: false, reason: 'unknown_id' }
-  if (new Set(ids).size !== 3) return { ok: false, reason: 'repeated' }
-  if (!ids.includes(best)) return { ok: false, reason: 'bad_best' }
+  if (!Array.isArray(picks) || picks.length < 3 || picks.length > 5) return { ok: false, reason: 'not_three' }
+  if (picks.some((p) => typeof p?.id !== 'string' || !allowedIds.includes(p.id))) return { ok: false, reason: 'unknown_id' }
   const brandsOffered = new Set(allowedIds.map((id) => brandKey(brands[id])).filter(Boolean))
-  if (brandsOffered.size >= 3 && new Set(ids.map((id) => brandKey(brands[id]))).size !== 3) {
-    return { ok: false, reason: 'same_brand' }
+  const distinctBrands = brandsOffered.size >= 3
+  const chosen = []
+  const usedIds = new Set()
+  const usedBrands = new Set()
+  let skippedBrand = false
+  for (const p of picks) {
+    if (chosen.length === 3) break
+    if (usedIds.has(p.id)) continue
+    const b = brandKey(brands[p.id])
+    if (distinctBrands && b && usedBrands.has(b)) { skippedBrand = true; continue }
+    chosen.push(p)
+    usedIds.add(p.id)
+    if (b) usedBrands.add(b)
   }
-  const clean = picks.map((p) => ({
+  if (chosen.length < 3) return { ok: false, reason: skippedBrand ? 'same_brand' : 'repeated' }
+  const clean = chosen.map((p) => ({
     id: p.id,
     why: String(p.why ?? ''),
     pros: Array.isArray(p.pros) ? p.pros.map(String) : [],
@@ -166,5 +190,5 @@ export function validatePicks(json, allowedIds, descriptions = {}, brands = {}) 
     hardness: grounded(p.hardness, descriptions[p.id], HARDNESS_IN_TEXT),
     sweet_spot: grounded(p.sweet_spot, descriptions[p.id], SWEET_SPOT_IN_TEXT),
   }))
-  return { ok: true, best, picks: clean }
+  return { ok: true, best: usedIds.has(best) ? best : chosen[0].id, picks: clean }
 }

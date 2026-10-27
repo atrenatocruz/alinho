@@ -176,7 +176,9 @@ Rotas sugeridas: `/perfil/raquete` (resultado ou início) e `/perfil/raquete/per
 
 ## Adenda (Renato, 27 out, depois de testar no dev)
 
-- **As 3 raquetes são de 3 marcas diferentes.** Garantido no código (`validatePicks` recusa
+- **As 3 raquetes são de 3 marcas diferentes.** Garantido no código: a lista curta tem no máximo
+  2 raquetes por marca, a IA devolve 5 por ordem e `validatePicks` fica com as 3 primeiras de marcas
+  diferentes (recusa
   `same_brand` e a IA tenta outra vez), a não ser que a lista curta tenha menos de 3 marcas.
 - **Em empate, marca conhecida.** A regra «não à popularidade da marca» continua, mas quando
   duas raquetes servem o jogador de forma parecida fica a de uma marca conhecida

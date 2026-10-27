@@ -47,7 +47,9 @@ describe('validatePicks', () => {
   it('aceita 3 ids da lista', () => expect(validatePicks(ok, ['a', 'b', 'c', 'd']).ok).toBe(true))
   it('recusa id inventado', () => expect(validatePicks(ok, ['a', 'b']).ok).toBe(false))
   it('recusa repetidos', () => expect(validatePicks({ ...ok, picks: [ok.picks[0], ok.picks[0], ok.picks[1]] }, ['a', 'b', 'c']).ok).toBe(false))
-  it('recusa best fora dos picks', () => expect(validatePicks({ ...ok, best: 'z' }, ['a', 'b', 'c', 'z']).ok).toBe(false))
+  it('best fora das escolhidas: a melhor passa a ser a primeira', () => {
+    expect(validatePicks({ ...ok, best: 'z' }, ['a', 'b', 'c', 'z'])).toMatchObject({ ok: true, best: 'a' })
+  })
   it('recusa lixo', () => expect(validatePicks('nada', ['a']).ok).toBe(false))
 
   // A dureza e o ponto doce só ficam se a descrição da loja falar deles: o
@@ -83,16 +85,45 @@ describe('3 marcas diferentes (Renato, 27 out)', () => {
   it('3 marcas diferentes passam', () => {
     expect(validatePicks(json, ['a', 'b', 'c'], {}, { a: 'Nox', b: 'Head', c: 'Siux' }).ok).toBe(true)
   })
+  // A IA devolve até 5 por ordem; o código fica com as 3 primeiras de marcas diferentes.
+  it('de 5 por ordem, ficam as 3 primeiras de marcas diferentes', () => {
+    const five = { best: 'a', picks: ['a', 'b', 'c', 'd', 'e'].map(pick) }
+    const brands = { a: 'Royal Padel', b: 'Royal Padel', c: 'Nox', d: 'Royal Padel', e: 'Head' }
+    const r = validatePicks(five, ['a', 'b', 'c', 'd', 'e'], {}, brands)
+    expect(r).toMatchObject({ ok: true, best: 'a' })
+    expect(r.picks.map((p) => p.id)).toEqual(['a', 'c', 'e'])
+  })
+  it('a melhor que caiu por repetir a marca dá lugar à primeira que ficou', () => {
+    const four = { best: 'b', picks: ['a', 'b', 'c', 'd'].map(pick) }
+    const brands = { a: 'Nox', b: 'Nox', c: 'Head', d: 'Siux' }
+    expect(validatePicks(four, ['a', 'b', 'c', 'd'], {}, brands)).toMatchObject({ ok: true, best: 'a' })
+  })
+  it('mais de 5 ou menos de 3 é recusado', () => {
+    const six = { best: 'a', picks: ['a', 'b', 'c', 'd', 'e', 'f'].map(pick) }
+    expect(validatePicks(six, ['a', 'b', 'c', 'd', 'e', 'f']).ok).toBe(false)
+    expect(validatePicks({ best: 'a', picks: ['a', 'b'].map(pick) }, ['a', 'b']).ok).toBe(false)
+  })
 })
 
 describe('buildPrompt: marcas', () => {
   const candidates = [{ store_id: 'a', name: 'X', brand: 'Bullpadel', price: 200, specs: {}, description: '' }, { store_id: 'b', name: 'Y', brand: 'Royal Padel', price: 200, specs: {}, description: '' }]
   const p = buildPrompt({ answers: {}, profile: {}, candidates, lang: 'pt' })
-  it('pede 3 marcas diferentes', () => expect(p).toMatch(/3 marcas diferentes/))
+  it('pede 5 por ordem, de marcas diferentes', () => {
+    expect(p).toMatch(/5 raquetes/)
+    expect(p).toMatch(/marcas diferentes/)
+  })
   it('em empate, prefere as marcas conhecidas, e marca-as na lista', () => {
     expect(p).toMatch(/marca conhecida/)
     expect(p).toMatch(/"brand":"Bullpadel","popular":true/)
     expect(p).toMatch(/"brand":"Royal Padel","popular":false/)
+  })
+})
+
+describe('shortlist: no máximo 2 por marca', () => {
+  it('a 3.ª da mesma marca fica de fora (e entra a de outra marca)', () => {
+    const r = (store_id, brand, price) => ({ store_id, brand, price, available: true, specs: {} })
+    const rows = [r('a', 'Royal Padel', 290), r('b', 'Royal Padel', 280), r('c', 'ROYAL PADEL', 270), r('d', 'Nox', 200)]
+    expect(shortlist(rows, { budget: '220_300' }).map((x) => x.store_id)).toEqual(['a', 'b', 'd'])
   })
 })
 
