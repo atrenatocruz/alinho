@@ -260,6 +260,10 @@ const RPC_MOCKS = {
   // as mais recentes (conquistas animadas, 11 out). awarded_at: a 1.ª da
   // lista é a mais recente.
   get_player_achievements: () => [
+    // localStorage.mockGoalStreak = 'true' — «No Alvo» ganha (objetivo do mês).
+    ...(localStorage.getItem('mockGoalStreak') ? [
+      { achievement_key: 'goal_streak_3', category: 'jogo', rarity: 'raro', rarity_pct: 3.2, awarded_at: new Date().toISOString() },
+    ] : []),
     // localStorage.mockLongAchievements = 'true' — as de texto comprido primeiro
     // (o cartão aberto cortava a «% têm» no bico, 13 out).
     ...(localStorage.getItem('mockLongAchievements') ? [
