@@ -7,7 +7,8 @@
 //
 // Pedido: POST {answers, lang: 'pt'|'en'|'es'} com o JWT do utilizador.
 // Respostas: 200 {best_id, picks} (e grava em racket_picks) ·
-//   401 unauthorized · 400 bad_answers · 422 no_candidates · 429 daily_limit ·
+//   401 unauthorized · 400 bad_answers · 503 catalog_empty (sem raquetes: o sync não correu) ·
+//   422 no_candidates · 429 daily_limit ·
 //   503 ai_unavailable (Gemini sem quota, em baixo ou lento) · 502 ai_failed
 //   (duas respostas inválidas). Sempre {error: código}.
 // O limite (3 por dia de Lisboa, take_racket_run) só se gasta quando há raquetes
@@ -142,7 +143,12 @@ Deno.serve(async (req) => {
     ])
     if (rErr) return jsonResponse({ error: 'server_error' }, 500)
 
-    const candidates = shortlist(rackets ?? [], answers)
+    // Catálogo vazio (o sync ainda não correu, ou falhou): não é culpa do orçamento.
+    if (!rackets?.length) {
+      console.error('recomendar-raquete: catalog empty')
+      return jsonResponse({ error: 'catalog_empty' }, 503)
+    }
+    const candidates = shortlist(rackets, answers)
     if (!candidates.length) return jsonResponse({ error: 'no_candidates' }, 422)
 
     const { data: allowed, error: runErr } = await db.rpc('take_racket_run', { p_user: userId })

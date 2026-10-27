@@ -6996,6 +6996,7 @@
   "raquete.err_no_candidates": "No hay palas en stock hasta ese precio. Sube un poco el presupuesto",
   "raquete.err_ai_unavailable": "Inténtalo en un momento",
   "raquete.err_ai_failed": "Inténtalo en un momento",
+  "raquete.err_catalog_empty": "Inténtalo en un momento",
   "raquete.err_network": "Sin conexión. Inténtalo otra vez",
   "raquete.err_generic": "No pudimos elegir las palas. Inténtalo otra vez",
   "raquete.retry": "Intentar otra vez",

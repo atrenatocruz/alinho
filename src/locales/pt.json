@@ -6996,6 +6996,7 @@
   "raquete.err_no_candidates": "Não há raquetes em stock até esse valor. Sobe um pouco o orçamento",
   "raquete.err_ai_unavailable": "Tenta daqui a pouco",
   "raquete.err_ai_failed": "Tenta daqui a pouco",
+  "raquete.err_catalog_empty": "Tenta daqui a pouco",
   "raquete.err_network": "Sem ligação. Tenta outra vez",
   "raquete.err_generic": "Não deu para escolher as raquetes. Tenta outra vez",
   "raquete.retry": "Tentar outra vez",

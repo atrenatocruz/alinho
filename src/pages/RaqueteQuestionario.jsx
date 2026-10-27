@@ -53,7 +53,7 @@ export default function RaqueteQuestionario() {
   }
 
   if (error) {
-    const known = ['daily_limit', 'no_candidates', 'ai_unavailable', 'ai_failed', 'network'].includes(error)
+    const known = ['daily_limit', 'no_candidates', 'catalog_empty', 'ai_unavailable', 'ai_failed', 'network'].includes(error)
     return (
       <div className="space-y-3 pt-10" role="alert">
         <EmptyState pose="triste" title={t(known ? `raquete.err_${error}` : 'raquete.err_generic')} />

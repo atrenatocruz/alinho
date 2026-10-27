@@ -6981,6 +6981,7 @@
   "raquete.err_no_candidates": "No rackets in stock up to that price. Raise your budget a little",
   "raquete.err_ai_unavailable": "Try again in a moment",
   "raquete.err_ai_failed": "Try again in a moment",
+  "raquete.err_catalog_empty": "Try again in a moment",
   "raquete.err_network": "No connection. Try again",
   "raquete.err_generic": "We couldn’t pick the rackets. Try again",
   "raquete.retry": "Try again",
