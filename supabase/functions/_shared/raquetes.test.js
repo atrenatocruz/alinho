@@ -127,6 +127,21 @@ describe('shortlist: no máximo 2 por marca', () => {
   })
 })
 
+describe('género (Renato, 27 out: «as raquetes mudam bastante»)', () => {
+  const r = (store_id, name, brand) => ({ store_id, name, brand, price: 200, available: true, specs: {} })
+  const rows = [r('a', 'BULLPADEL WONDER 27 MUJER', 'Bullpadel'), r('b', 'NOX AT10 WOMAN', 'Nox'), r('c', 'HEAD EXTREME', 'Head')]
+  it('homem: os modelos de mulher ficam de fora', () => {
+    expect(shortlist(rows, { budget: '220_300' }, 40, { gender: 'masculino' }).map((x) => x.store_id)).toEqual(['c'])
+  })
+  it('mulher ou sem género: ficam todos', () => {
+    expect(shortlist(rows, { budget: '220_300' }, 40, { gender: 'feminino' })).toHaveLength(3)
+    expect(shortlist(rows, { budget: '220_300' })).toHaveLength(3)
+  })
+  it('o prompt diz o que fazer com o género', () => {
+    expect(buildPrompt({ answers: {}, profile: { gender: 'feminino' }, candidates: [], lang: 'pt' })).toMatch(/MUJER/)
+  })
+})
+
 describe('shortlist sem repetidos', () => {
   it('o mesmo store_id só entra uma vez', () => {
     const r = { store_id: 'a', price: 70, available: true, brand: 'Nox', specs: {} }

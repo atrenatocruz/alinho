@@ -7042,11 +7042,11 @@
   "raquete.opt_wants_controlo": "Control",
   "raquete.opt_wants_equilibrio": "Equilibrio entre control y potencia",
   "raquete.opt_wants_potencia": "Potencia",
-  "raquete.opt_wants_conforto": "Confort y tolerancia",
+  "raquete.opt_wants_conforto": "Confort y más fácil de acertar",
   "raquete.q_shape": "¿Qué forma buscas?",
-  "raquete.opt_shape_redonda": "Redonda: control y tolerancia",
-  "raquete.opt_shape_lagrima": "Lágrima: control y potencia",
-  "raquete.opt_shape_diamante": "Diamante: ataque",
+  "raquete.opt_shape_redonda": "Redonda: más control y más fácil de acertar",
+  "raquete.opt_shape_lagrima": "Lágrima: equilibrio entre control y potencia",
+  "raquete.opt_shape_diamante": "Diamante: más potencia, para quien ataca",
   "raquete.opt_shape_recomenda": "Recomiéndame una",
   "raquete.q_budget": "¿Hasta cuánto quieres gastar?",
   "raquete.opt_budget_lt80": "Menos de 80 €",
@@ -7061,5 +7061,10 @@
   "raquete.opt_brands_adidas": "Adidas",
   "raquete.opt_brands_babolat": "Babolat",
   "raquete.opt_brands_outra": "Otra",
-  "raquete.opt_brands_sem_preferencia": "Sin preferencia"
+  "raquete.opt_brands_sem_preferencia": "Sin preferencia",
+  "raquete.searching_1": "Mirando el catálogo de hoy…",
+  "raquete.searching_2": "Comparando las palas con tus respuestas…",
+  "raquete.searching_3": "Eligiendo 3 marcas distintas…",
+  "raquete.searching_4": "Casi listo…",
+  "raquete.back_profile": "Volver al perfil"
 }

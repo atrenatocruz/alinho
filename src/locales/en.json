@@ -7027,11 +7027,11 @@
   "raquete.opt_wants_controlo": "Control",
   "raquete.opt_wants_equilibrio": "Balance of control and power",
   "raquete.opt_wants_potencia": "Power",
-  "raquete.opt_wants_conforto": "Comfort and forgiveness",
+  "raquete.opt_wants_conforto": "Comfort, easier to hit well",
   "raquete.q_shape": "Which shape are you after?",
-  "raquete.opt_shape_redonda": "Round: control and forgiveness",
-  "raquete.opt_shape_lagrima": "Teardrop: control and power",
-  "raquete.opt_shape_diamante": "Diamond: attack",
+  "raquete.opt_shape_redonda": "Round: more control, easier to hit well",
+  "raquete.opt_shape_lagrima": "Teardrop: a balance of control and power",
+  "raquete.opt_shape_diamante": "Diamond: more power, for attackers",
   "raquete.opt_shape_recomenda": "Recommend one for me",
   "raquete.q_budget": "What is your maximum budget?",
   "raquete.opt_budget_lt80": "Under €80",
@@ -7046,5 +7046,10 @@
   "raquete.opt_brands_adidas": "Adidas",
   "raquete.opt_brands_babolat": "Babolat",
   "raquete.opt_brands_outra": "Other",
-  "raquete.opt_brands_sem_preferencia": "No preference"
+  "raquete.opt_brands_sem_preferencia": "No preference",
+  "raquete.searching_1": "Checking today’s catalogue…",
+  "raquete.searching_2": "Comparing rackets with your answers…",
+  "raquete.searching_3": "Picking 3 different brands…",
+  "raquete.searching_4": "Almost there…",
+  "raquete.back_profile": "Back to profile"
 }

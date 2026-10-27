@@ -70,7 +70,12 @@ export const BUDGETS = { lt80: 80, '80_150': 150, '150_220': 220, '220_300': 300
 // diferentes»; antes, com dores, a IA devolvia só Royal Padel).
 const PER_BRAND = 2
 
-export function shortlist(rackets, answers, max = 40) {
+// Modelos de mulher pelo nome («BULLPADEL WONDER 27 MUJER», «… WOMAN»).
+const WOMEN_MODEL = /\b(mujer|woman|women)\b/i
+
+// `gender` do perfil ('masculino' | 'feminino' | null): a um homem nunca vão
+// modelos de mulher (Renato, 27 out: «as raquetes mudam bastante»).
+export function shortlist(rackets, answers, max = 40, { gender = null } = {}) {
   const ceiling = BUDGETS[answers?.budget] ?? Infinity
   const shape = answers?.shape && answers.shape !== 'recomenda' ? answers.shape : null
   const brands = (answers?.brands ?? []).filter((b) => b !== 'outra' && b !== 'sem_preferencia')
@@ -79,6 +84,7 @@ export function shortlist(rackets, answers, max = 40) {
   const perBrand = new Map()
   return rackets
     .filter((r) => r.available && r.price <= ceiling && !seen.has(r.store_id) && seen.add(r.store_id))
+    .filter((r) => gender !== 'masculino' || !WOMEN_MODEL.test(r.name ?? ''))
     .sort((a, b) => rank(b) - rank(a) || b.price - a.price)
     .filter((r) => {
       const b = brandKey(r.brand)
@@ -136,6 +142,7 @@ export function buildPrompt({ answers, profile, candidates, lang }) {
     'Mas se duas raquetes servem este jogador de forma parecida, escolhe a de uma marca conhecida ("popular": true) em vez da menos conhecida.',
     'Não recomendes automaticamente uma raquete avançada ou cara só porque tem melhores specs técnicas.',
     'Se o jogador tem dores (cotovelo, pulso, ombro), dá prioridade ao conforto.',
+    'O género do jogador está em "gender" no perfil de jogo. Modelos de mulher («MUJER», «WOMAN» no nome) só para mulheres; a uma mulher podes recomendá-los quando servem melhor (costumam ser mais leves).',
     'hardness e sweet_spot: só o que a descrição da raquete diz; se não diz, deixa vazio (""). Não inventes números nem specs.',
     'Em "best" põe o id da melhor. Em "why" explica em 1–2 frases porque serve a este jogador, a partir das respostas dele.',
     `Responde em ${LANG_NAME[lang] ?? LANG_NAME.pt}.`,

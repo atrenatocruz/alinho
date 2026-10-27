@@ -14,7 +14,7 @@
 // O limite (3 por dia de Lisboa, take_racket_run) só se gasta quando há raquetes
 // para recomendar, logo antes de chamar a IA.
 //
-// Ao Gemini nunca vão nome, email nem id do jogador. As respostas e o prompt nunca
+// Ao Gemini nunca vão nome, email nem id do jogador (o género vai: muda a raquete). As respostas e o prompt nunca
 // vão para os logs (há respostas sobre dores): nos erros, só o código.
 //
 // Secrets: GEMINI_API_KEY (Google AI Studio), GEMINI_MODEL (um ou mais modelos separados por
@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     })
     const [{ data: prof }, { data: mems }, { data: rackets, error: rErr }] = await Promise.all([
-      db.from('profiles').select('preferred_side, dominant_hand').eq('id', userId).maybeSingle(),
+      db.from('profiles').select('preferred_side, dominant_hand, gender').eq('id', userId).maybeSingle(),
       db.from('memberships').select('level').eq('user_id', userId),
       db.from('rackets').select('store_id, name, brand, price, available, description, specs').eq('available', true),
     ])
@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
       console.error('recomendar-raquete: catalog empty')
       return jsonResponse({ error: 'catalog_empty' }, 503)
     }
-    const candidates = shortlist(rackets, answers)
+    const candidates = shortlist(rackets, answers, 40, { gender: prof?.gender ?? null })
     if (!candidates.length) return jsonResponse({ error: 'no_candidates' }, 422)
 
     const { data: allowed, error: runErr } = await db.rpc('take_racket_run', { p_user: userId })
@@ -158,6 +158,8 @@ Deno.serve(async (req) => {
     const profile = {
       side: prof?.preferred_side ?? null,
       hand: prof?.dominant_hand ?? null,
+      // O género muda muito a raquete (Renato, 27 out); a um homem já não vão modelos de mulher.
+      gender: prof?.gender ?? null,
       levels: [...new Set((mems ?? []).map((m: { level: string }) => m.level))],
     }
     const prompt = buildPrompt({ answers, profile, candidates, lang })
