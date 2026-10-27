@@ -39,6 +39,8 @@ import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import SwapGuestSheet from '../components/mix/SwapGuestSheet'
+import { GuestClaimButton, GuestClaimConfirm, GuestClaimAdminBox } from '../components/mix/GuestClaim'
+import { listGuestClaims, claimGuestSpot, answerGuestClaim, claimsByGuest } from '../lib/guestClaims'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
@@ -155,6 +157,14 @@ export default function GameDetails() {
   const isScorekeeper = scorekeeperIds.includes(user.id)
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
+  // «Sou eu»: lê os pedidos sempre que a lista muda, só se houver convidados.
+  // Sem a função na base (antes do SI a correr), fica sem pedidos e nada muda.
+  const hasGuests = participants.some((p) => p.guest_id || p.partner_guest_id || p.user?.no_account || p.partner?.no_account)
+  const loadGuestClaims = () => {
+    if (!game?.id || !user?.id || !hasGuests) { setGuestClaims([]); return Promise.resolve() }
+    return listGuestClaims(game.id).then(setGuestClaims).catch(() => setGuestClaims([]))
+  }
+  useEffect(() => { loadGuestClaims() }, [game?.id, game?.status, participants, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [waitlist, setWaitlist] = useState([])
   // Volta a pedir sempre que a lista de inscritos muda (QA, 10 out: depois de
   // «Adicionar jogador» as etiquetas só apareciam ao recarregar).
@@ -218,6 +228,12 @@ export default function GameDetails() {
   // «Trocar por uma conta» num convidado (Francisco, 19 out): o convidado a trocar.
   const [swapGuest, setSwapGuest] = useState(null)
   const [swapNotice, setSwapNotice] = useState('')
+  // «Sou eu» (SPEC 2026-10-21-sou-eu): os pedidos do mix (admin: os
+  // pendentes; os outros: os seus e os 'pending_other'), o convidado da folha
+  // «És o X?» e a tira preta depois de pedir ou responder.
+  const [guestClaims, setGuestClaims] = useState([])
+  const [claimFor, setClaimFor] = useState(null) // { guest, pairNumber }
+  const [claimNotice, setClaimNotice] = useState('')
   // Publicar um rascunho (Trello #544) — a pergunta aberta.
   const [publishOpen, setPublishOpen] = useState(false)
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
@@ -251,6 +267,29 @@ export default function GameDetails() {
   // Chegou pelo «Entrar no clube» do cartão da Home (bug de 29 set): a faixa
   // diz porque está aqui — entrou no clube, ainda não está inscrito.
   const location = useLocation()
+  // «Sou eu»: o aviso do sino abre o mix já na linha do convidado (?convidado=).
+  const claimGuestParam = new URLSearchParams(location.search).get('convidado')
+  // A página chega aos bocados (inscritos, pedidos) e a linha ainda não existia
+  // quando isto corria uma vez só: ficava no topo (QA, 26 out). Procura-a até
+  // ~6 s e pára quando ela fica à vista, uma vez por chegada.
+  const claimScrolledFor = useRef(null)
+  useEffect(() => {
+    if (!claimGuestParam || claimScrolledFor.current === location.key) return undefined
+    const started = performance.now()
+    let timer = 0
+    const tryScroll = () => {
+      // window.CSS: o CSS de cima é o do @dnd-kit (QA, 23 out: rebentava a página).
+      const el = document.querySelector(`[data-guest="${window.CSS.escape(claimGuestParam)}"]`)
+      if (el) {
+        const r = el.getBoundingClientRect()
+        if (r.top >= 0 && r.bottom <= window.innerHeight) { claimScrolledFor.current = location.key; return }
+        el.scrollIntoView({ block: 'center' })
+      }
+      if (performance.now() - started < 6000) timer = setTimeout(tryScroll, 250)
+    }
+    timer = setTimeout(tryScroll, 300)
+    return () => clearTimeout(timer)
+  }, [claimGuestParam, location.key])
   useEffect(() => {
     if (location.state?.notice) setDoneNotice(location.state.notice)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2758,6 +2797,39 @@ export default function GameDetails() {
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
   const isUserRequested = myRequestState === 'requested'
   const isUserDeclined = myRequestState === 'declined'
+  // «Sou eu» (SPEC 2026-10-21-sou-eu): só nos convidados, só a quem tem
+  // conta e não está neste mix (nem em espera), e só até o mix terminar.
+  // Quem organiza não vê (tem o «Trocar por uma conta»). Um pedido aberto de
+  // outra pessoa ('pending_other') esconde o «Sou eu» nesse convidado.
+  const guestClaimsByGuest = claimsByGuest(guestClaims)
+  const canClaimGuest = !!user?.id && !isGuest && !isAdmin && !isUserJoined && !isDraftMix(game)
+    && !waitlist.some((w) => w.user_id === user.id || w.partner_id === user.id)
+    && ['open', 'closed'].includes(game?.status)
+  const pairNumberOf = (person) => {
+    const n = participants.filter((r) => r.user?.id && r.partner?.id).findIndex((r) => r.id === person.rowId)
+    return n >= 0 ? n + 1 : null
+  }
+  const claimButtonFor = (person) => {
+    if (!canClaimGuest || !person.no_account) return null
+    const claim = guestClaimsByGuest[person.id]
+    if (claim?.status === 'pending_other') return null
+    // Um pedido aberto por pessoa em cada mix (Dev 3, 23 out): com um meu à
+    // espera, os outros convidados ficam sem «Sou eu».
+    if (claim?.status !== 'pending' && guestClaims.some((c) => c.status === 'pending')) return null
+    return (
+      <GuestClaimButton
+        pending={claim?.status === 'pending'}
+        disabled={busy}
+        onClaim={() => { setClaimNotice(''); setClaimFor({ guest: person, pairNumber: person.hasPartner ? pairNumberOf(person) : null }) }}
+      />
+    )
+  }
+  // Aceitar faz a troca (a mesma do «Trocar por uma conta»); recusar fecha o pedido.
+  const answerClaim = async (claim, accept) => {
+    await answerGuestClaim(claim.claim_id, accept)
+    setClaimNotice(accept ? t('guestclaim.accepted_notice', { name: claim.user_name }) : t('guestclaim.declined_notice'))
+    await loadGameDetails()
+  }
   // Mix com aprovação: o que quem joga faz pela app é um pedido (quem organiza
   // e o robô inscrevem logo — base de dados, Dev 3).
   const awaitsApproval = !!game?.join_approval && !isAdmin
@@ -4656,6 +4728,12 @@ export default function GameDetails() {
           })()}
           <PriceRosterSummary roster={priceRoster} ids={people.map((x) => x.id)} normalPrice={game.price_per_player} className="-mt-2 mb-3" />
           {/* «Trocar por uma conta»: o que mudou, logo por cima da lista (também com o mix cheio). */}
+          {claimNotice && (
+            <div className="mb-3 bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+              <Check size={16} className="text-white shrink-0" />
+              {claimNotice}
+            </div>
+          )}
           {swapNotice && (
             <div className="mb-3 bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
               <Check size={16} className="text-white shrink-0" />
@@ -4682,6 +4760,7 @@ export default function GameDetails() {
                 return (
                 <div
                   key={`${person.id}-${idx}`}
+                  data-guest={person.no_account ? person.id : undefined}
                   className={`rounded-ctrl p-3.5 ${person.id === user.id ? 'bg-ink-50' : 'bg-canvas'}`}
                 >
                   <div className="flex items-center gap-3">
@@ -4713,6 +4792,7 @@ export default function GameDetails() {
                               {t('swapguest.action')}
                             </button>
                           )}
+                          {claimButtonFor(person)}
                         </div>
                       </>
                     ) : (
@@ -4757,6 +4837,9 @@ export default function GameDetails() {
                       </button>
                     )}
                   </div>
+                  {isAdmin && guestClaimsByGuest[person.id]?.status === 'pending' && person.no_account && (
+                    <GuestClaimAdminBox claim={guestClaimsByGuest[person.id]} onAnswer={answerClaim} />
+                  )}
                   {soloLine && (
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 pl-[52px]">
                       <button type="button" onClick={() => { setPairWith(null); setPairFor(person) }} disabled={busy}
@@ -5117,6 +5200,17 @@ export default function GameDetails() {
         }}
         onClose={() => setDeclineAsk(null)}
         errorOf={requestErrorText}
+      />
+      <GuestClaimConfirm
+        guest={claimFor?.guest}
+        mixTitle={game.title}
+        pairNumber={claimFor?.pairNumber}
+        onConfirm={async () => {
+          await claimGuestSpot(game.id, claimFor.guest.id)
+          setClaimNotice(t('guestclaim.sent_notice'))
+          await loadGuestClaims()
+        }}
+        onClose={() => setClaimFor(null)}
       />
       {swapGuest && (
         <SwapGuestSheet
