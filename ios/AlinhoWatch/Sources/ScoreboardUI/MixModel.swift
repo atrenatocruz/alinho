@@ -113,8 +113,9 @@ final class MixModel: ObservableObject {
     /// Quem tem o relógio.
     var userID: UUID? { credentials.load()?.userID }
 
-    /// O botão «Jogos do mix» aparece.
-    var showsEntry: Bool { hasCredentials && state != .unavailable }
+    /// O botão «Jogos do mix» aparece. Também sem sessão: lá dentro diz para
+    /// abrir o alinho no iPhone, em vez de o botão faltar sem explicação.
+    var showsEntry: Bool { state != .unavailable }
 
     // MARK: - Lista
 

@@ -212,6 +212,8 @@ export const AuthProvider = ({ children }) => {
       .catch(() => {})
     keep(CapacitorApp.addListener('resume', () => syncWatchSession(userId)))
     keep(WatchGames.addListener('sessionNeeded', () => syncWatchSession(userId)))
+    // A ligação ao relógio só fica ativa depois do arranque: tenta-se outra vez.
+    keep(WatchGames.addListener('watchStateChanged', () => syncWatchSession(userId)))
     return () => {
       removed = true
       handles.forEach((h) => h.remove())
