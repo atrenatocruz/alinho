@@ -28,7 +28,10 @@ raquetes».
    A quota é por projeto do Google: o dev e a produção gastam a mesma.
 2. **Secrets** (Supabase → Edge Functions → Secrets, em cada projeto):
    - `GEMINI_API_KEY` — a chave do passo 1;
-   - `GEMINI_MODEL` — o nome do modelo (por omissão `gemini-2.5-flash`);
+   - `GEMINI_MODEL` — opcional: um ou mais modelos separados por vírgulas, tentados por
+     ordem quando um está cheio (503) ou sem quota (429). Por omissão
+     `gemini-flash-latest,gemini-flash-lite-latest`. A 27 out o Flash deu 503 «high
+     demand» várias vezes seguidas e o Flash-Lite respondeu em ~5 s com 3 raquetes válidas;
    - `SYNC_RAQUETES_SECRET` — um valor aleatório comprido, inventado por ti.
 3. **Funções:**
    ```bash
@@ -68,7 +71,7 @@ Os logs só têm o código: nunca as respostas (há respostas sobre dores) nem o
 
 ## Trocar
 
-- **De modelo:** mudar o secret `GEMINI_MODEL`. Outro fornecedor: só `askGemini` em
+- **De modelo:** mudar o secret `GEMINI_MODEL` (lista separada por vírgulas). Outro fornecedor: só `askGemini` em
   `recomendar-raquete/index.ts`.
 - **De loja:** `STORE` e `parseShopifyRacket` em `_shared/raquetes.js` (o link e o nome
   saem daí). Uma loja sem catálogo Shopify precisa de outro parse; o resto fica igual.
