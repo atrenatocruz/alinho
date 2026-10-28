@@ -428,6 +428,8 @@
   "home.join_club": "Join club",
   "home.no_clubs_title": "You’re not in any club or group yet",
   "home.next_title": "Your next games",
+  "home.last_title": "Your recent games",
+  "home.last_see_all": "See all",
   "home.free_count_one": "1 free slot",
   "home.free_count_other": "{{count}} free slots",
   "home.free_price": "{{price}} / player",
