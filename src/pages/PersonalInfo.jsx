@@ -252,7 +252,7 @@ export default function PersonalInfo() {
         </Row>
         <Row label={t('profile.language_label')}>
           {/* Um campo de escolha como o do Distrito (menu-lingua, 28 out). */}
-          <Select value={form.language} onChange={set('language')} title={t('profile.language_label')}
+          <Select value={form.language} onChange={set('language')} title={t('profile.language_label')} check
             options={[
               { value: 'pt', label: t('profile.language_portuguese') },
               { value: 'en', label: t('profile.language_english') },
