@@ -136,6 +136,8 @@ const ICONS = {
   deste_boleia: Car,
   primeira_rotunda: RotateCw,
   ate_a_porta: DoorOpen,
+  // O pódio do ranking do mês (26 out).
+  podio_do_mes: CalendarCheck,
   quebra_enguico: Unlock,
 }
 

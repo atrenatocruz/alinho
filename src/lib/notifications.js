@@ -70,6 +70,25 @@ export async function unreadFriendResultNotice(matchId) {
   return (data || []).find((n) => n.kind === 'friend_match_result_sent' && n.data?.match_id === matchId) || null
 }
 
+/** Os prémios do mês (partner_month_offer) deste mês: já vêm lidos, por isso
+    não estão nos por ler; o sino mostra-os no fim, mais claros. */
+export async function listMyMonthPrizeOffers() {
+  const now = new Date()
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, kind, data, created_at')
+    .eq('kind', 'partner_month_offer')
+    .eq('data->>month', month)
+    .order('created_at', { ascending: false })
+    .limit(5)
+  if (error) {
+    if (errorKind(error) === 'not_ready') return []
+    throw error
+  }
+  return (data || []).filter((n) => n.kind === 'partner_month_offer' && String(n.data?.month || '').slice(0, 10) === month)
+}
+
 export async function markNotificationsRead(ids) {
   if (!ids?.length) return
   const { error } = await supabase.rpc('mark_notifications_read', { p_ids: ids })

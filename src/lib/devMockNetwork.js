@@ -1019,7 +1019,7 @@ const RPC_MOCKS = {
   // abrem primeiro no cartão animado, depois a folha dos kudos).
   get_unseen_celebrations: () => {
     const nTrophies = Number(localStorage.getItem('mockTrophies') || 0)
-    const RAR = { residente: 'raro', meio_cento: 'epico', centuriao_do_vidro: 'lendario', semana_cheia: 'raro', mes_cheio: 'epico' }
+    const RAR = { residente: 'raro', meio_cento: 'epico', centuriao_do_vidro: 'lendario', semana_cheia: 'raro', mes_cheio: 'epico', podio_do_mes: 'raro' }
     // localStorage.mockTrophyKeys = 'equilibrista,ida_e_volta' — quais (para ver os textos compridos).
     const keys = localStorage.getItem('mockTrophyKeys')?.split(',')
       || ['residente', 'primeira_bola', 'centuriao_do_vidro', 'areia_nos_tenis', 'meio_cento', 'cliente_da_casa', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
@@ -1046,6 +1046,14 @@ const RPC_MOCKS = {
     }]
   },
   mark_celebrations_seen: () => null,
+  // mockPrizeOffer = 'on': a janela «Prémios de <mês>» do início do mês (Dev 3,
+  // migration_podio_do_mes). Uma vez por sessão do browser.
+  get_my_month_prize_offers: () => (localStorage.getItem('mockPrizeOffer') === 'on' ? [{
+    partner_id: 'p-rm', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', logo_url: '/parceiros/rm-logotipo.jpg',
+    district: 'Setúbal', month: `${new Date().toISOString().slice(0, 7)}-01`,
+    prizes: [1, 2, 3].map((place) => ({ place, discount_pct: { 1: 15, 2: 10, 3: 5 }[place], description: 'Desconto numa massagem desportiva' })),
+  }] : []),
+  mark_month_prize_offer_seen: () => null,
   // Avisos de mix (Trello #292) — a app regista, o sino lê.
   notify_mix_changes: (params) => (params?.p_changes || []).length,
   mark_notifications_read: () => null,
@@ -1742,7 +1750,13 @@ const TABLE_MOCKS = {
     { id: 'pn1', kind: 'partner_month_vouchers', created_at: new Date().toISOString(),
       data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', month: '2026-11-01', issued: 3 } },
     { id: 'pn2', kind: 'partner_prize_won', created_at: new Date().toISOString(),
-      data: { voucher_id: 'pv-2', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', prize_place: 2, discount_pct: 10, prize_month: '2026-11-01', valid_until: '2026-12-31' } },
+      data: { voucher_id: 'pv-2', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', prize_place: 2, discount_pct: 10, prize_month: '2026-11-01', prize_district: 'Setúbal', valid_until: '2026-12-31',
+        description: 'Desconto numa massagem desportiva', partner_logo_url: '/parceiros/rm-logotipo.jpg' } },
+    // O «Pódio do Mês» (Dev 3, migration_podio_do_mes) e os prémios do mês, já lidos.
+    { id: 'pn3', kind: 'achievement_podio_mes', created_at: new Date().toISOString(),
+      data: { month: '2026-11-01', district: 'Setúbal', place: 2 } },
+    { id: 'pn4', kind: 'partner_month_offer', created_at: new Date().toISOString(), read_at: new Date().toISOString(),
+      data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', district: 'Setúbal', month: `${new Date().toISOString().slice(0, 7)}-01` } },
   ] : localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
