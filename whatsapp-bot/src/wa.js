@@ -171,13 +171,17 @@ export async function connectWhatsApp({ onGroupMessage, onDirectMessage }) {
         // that one" pointer — core protocol metadata Baileys exposes even
         // though it isn't the official Business API.
         const quotedStanzaId = msg.message.extendedTextMessage?.contextInfo?.stanzaId ?? null
+        // O texto da mensagem citada: depois de um restart o mapa
+        // mensagem→mix está vazio, e o link do cartão ainda diz qual é.
+        const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
+        const quotedText = quoted?.conversation ?? quoted?.extendedTextMessage?.text ?? null
 
         // Quem foi mencionado (@) — é assim que se diz ao bot quem é o
         // parceiro («In @João»). Só se procura o número quando há menções,
         // para a conversa normal do grupo não custar nada.
         const mentionedJids = msg.message.extendedTextMessage?.contextInfo?.mentionedJid ?? []
         const deliver = (mentionedPns) =>
-          onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId, mentionedJids, mentionedPns })
+          onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId, quotedText, mentionedJids, mentionedPns })
         if (mentionedJids.length === 0) {
           deliver([])
         } else {

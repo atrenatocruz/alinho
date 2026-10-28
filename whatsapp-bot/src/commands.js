@@ -2,7 +2,7 @@ import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage, shortWeekday, shortHour, shortLink } from './roster.js'
 import { resolveProfileByPhoneJid, guestIdentity, ensureMembership, hashPhone, isLegacyGuestProfile } from './phone.js'
-import { parseCopiedRoster, extraNames, isSenderName, normName, nameMatches as copiedNameMatches } from './copiedRoster.js'
+import { parseCopiedRoster, parseReplyNames, extraNames, isSenderName, normName, nameMatches as copiedNameMatches } from './copiedRoster.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
@@ -377,7 +377,7 @@ export async function handleGroupMessage(payload, deps) {
   }
 }
 
-async function handleGroupMessageInner({ groupJid, senderPn, text, message, key, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText, sendReaction }, ctx) {
+async function handleGroupMessageInner({ groupJid, senderPn, text, message, key, quotedStanzaId, quotedText = null, mentionedJids = [], mentionedPns = [] }, { sendText, sendReaction }, ctx) {
   const timer = ctx.timer
 
   // «Confirmar 482917» no grupo (Ruben, 1 out): valida o número sem SMS —
@@ -409,9 +409,30 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   // used to run unconditionally here, costing every message a query).
   const pending = getPendingConfirmation(senderPn, groupJid)
   let parsed = parseCommand(text)
+  // O «In» no fim (A2N, 28 out): «Bruno Ribeiro e Nuno Miguel in». Só se o
+  // que vem antes forem nomes — com maiúsculas, a não ser que responda a
+  // uma mensagem («fazer check in» não é um pedido).
+  let typedRest = null
+  if (!pending && !parsed) {
+    const m = text.trim().match(/^(.+?)[\s,.!-]+(?:in|alinho)[\s.!]*$/i)
+    if (m && parseReplyNames(m[1], { strict: !quotedStanzaId })) {
+      typedRest = m[1].trim().replace(/\s+/g, ' ')
+      parsed = { action: 'in', rest: stripAccents(typedRest.toLowerCase()), glued: false }
+    }
+  }
+  // O mix do cartão a que se responde: pelo mapa, ou (depois de um restart)
+  // pelo link do cartão citado.
+  const quotedGameId = quotedStanzaId ? (gameIdForMessage(quotedStanzaId) || parseCopiedRoster(quotedText)?.gameId || null) : null
   // Cópia da lista do robô com nomes a mais (Francisco, 27 set): trata-se
   // como um «In» — de quem enviou, ou das pessoas que acrescentou.
-  const copied = !pending && !parsed ? parseCopiedRoster(text) : null
+  let copied = !pending && !parsed ? parseCopiedRoster(text) : null
+  // Resposta ao cartão de um mix só com nomes (Renato, 28 out): «Bruno
+  // Ribeiro e Nuno Miguel» inscreve-os nesse mix, como uma lista copiada com
+  // esses nomes a mais. Só nesse mix — `reply` tira os outros palpites.
+  if (!pending && !parsed && !copied && quotedStanzaId) {
+    const names = parseReplyNames(text)
+    if (names && quotedGameId) copied = { names, gameId: String(quotedGameId).toLowerCase(), title: null, label: null, reply: true }
+  }
   if (copied) parsed = { action: 'in', rest: null, glued: false }
   if (!pending && !parsed) return
   // Declarado já aqui: o «Sim» a um parceiro sem conta (lá em baixo, no
@@ -660,7 +681,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   // o que sobra é o parceiro (partnerNames.js). E «In Miguel Oliveira com
   // Marco Silva» — o nome de quem escreveu antes do «com» não é um mix.
   if (action === 'in' && rest && !glued) {
-    const repliedToCard = quotedStanzaId ? Boolean(gameIdForMessage(quotedStanzaId)) : false
+    const repliedToCard = Boolean(quotedGameId)
     const namesAMix = !repliedToCard && matchOpenMixesByText(openMixes, rest, { glued }).matched.length > 0
     if (!namesAMix) {
       const senderNames = [resolvedProfile?.name, message?.pushName]
@@ -668,11 +689,22 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
         if (isOnlySenderName(rest, senderNames)) rest = null
       } else {
         // O texto como foi escrito (acentos, maiúsculas): as últimas palavras.
-        const typed = text.trim().replace(/\s+/g, ' ').split(' ').slice(-rest.split(' ').length).join(' ')
+        const typed = typedRest ?? text.trim().replace(/\s+/g, ' ').split(' ').slice(-rest.split(' ').length).join(' ')
         const partner = partnerFromTypedNames(typed, senderNames)
         if (partner !== undefined) {
           rest = null
           if (partner) partnerRequest = { name: stripAccents(partner.toLowerCase()), typedName: partner, mentionedPns: [] }
+        } else {
+          // Nomes que não são quem escreveu + um parceiro («In Bruno Ribeiro
+          // e Nuno Miguel», dito pelo Miguel Miranda — A2N, 28 out): antes
+          // inscrevia só quem escreveu. Inscreve-os, como numa lista copiada,
+          // no mix do cartão — ou no único aberto.
+          const names = parseReplyNames(typed, { strict: false })
+          const gameId = quotedGameId || (openMixes.length === 1 ? openMixes[0].id : null)
+          if (names && gameId) {
+            await handleCopiedList({ names, gameId: String(gameId).toLowerCase(), title: null, label: null, reply: true }, openMixes)
+            return
+          }
         }
       }
     }
@@ -1449,6 +1481,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     // O link curto só traz o começo do id: serve se só um mix aberto começar assim.
     const byLink = copied.gameId ? openMixes.filter((m) => String(m.id).toLowerCase().startsWith(copied.gameId)) : []
     let mix = byLink.length === 1 ? byLink[0] : null
+    // Resposta ao cartão: o mix é o do cartão, ou nenhum (fechado entretanto).
+    if (!mix && copied.reply) {
+      await reply('mix_no_longer_available')
+      return
+    }
     if (!mix && copied.label) mix = openMixes.find((m) => mixLabel(m, labelable) === copied.label)
     if (!mix && copied.title) mix = openMixes.find((m) => normName(m.title) === normName(copied.title))
     if (!mix && openMixes.length === 1) mix = openMixes[0]
