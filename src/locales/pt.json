@@ -4779,6 +4779,7 @@
   "tournament.create.locked_days": "Já há duplas inscritas: mudar os dias ou os campos estragava os jogos que vão ser marcados.",
   "tournament.create.locked_where": "Já há duplas inscritas: as horas de cada dia e os campos ficam como estão.",
   "tournament.create.locked_categories": "Já há duplas inscritas nestas categorias. Mudar as vagas ou o preço mudava as regras a quem já se inscreveu.",
+  "tournament.create.locked_deuce": "O torneio já começou: a forma de contar não muda.",
   "tournament.create.special_load_failed": "Não foi possível ler os preços especiais. Para não os perderes, fecha e volta a abrir o Editar.",
   "tournament.create.max_categories_only_up": "Já há inscritos: só podes aumentar.",
   "tournament.create.save_changes": "Guardar alterações",

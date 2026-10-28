@@ -4779,6 +4779,7 @@
   "tournament.create.locked_days": "Ya hay parejas inscritas: cambiar los días o las pistas estropearía los partidos que se van a programar.",
   "tournament.create.locked_where": "Ya hay parejas inscritas: las horas de cada día y las pistas se quedan como están.",
   "tournament.create.locked_categories": "Ya hay parejas inscritas en estas categorías. Cambiar las plazas o el precio cambiaría las reglas a quien ya se ha inscrito.",
+  "tournament.create.locked_deuce": "El torneo ya ha empezado: la forma de contar no se puede cambiar.",
   "tournament.create.special_load_failed": "No se han podido leer los precios especiales. Para no perderlos, cierra y vuelve a abrir Editar.",
   "tournament.create.max_categories_only_up": "Ya hay inscritos: solo puedes aumentarlo.",
   "tournament.create.save_changes": "Guardar cambios",

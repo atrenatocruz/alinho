@@ -64,7 +64,7 @@ function StatusBand({ kind, status }) {
 export default function EventHero({
   kind, imageUrl = null, chip = null, org = null, title, time = null, timeAside = null, dateLine = null,
   onAddToCalendar = null, onBack = null, onShare = null, status = null, children = null,
-  manage = null, nextStep = null, roundBottom = false, barTitle = null, poster = false,
+  manage = null, nextStep = null, roundBottom = false, barTitle = null, poster = false, subLine = null,
 }) {
   const { t } = useTranslation()
   const coverRef = useRef(null)
@@ -139,6 +139,9 @@ export default function EventHero({
             </p>
           </div>
         )}
+        {/* Uma segunda linha por baixo da data, na mesma letra: o «Aos 40-40»
+            da liga e do encontro (design-handoff/2026-10-28-aos-40-40-liga). */}
+        {subLine && <div className="mt-0.5 text-sm text-ink-700">{subLine}</div>}
         {nextStep && <div className="mt-3 empty:hidden">{nextStep}</div>}
         {status && <StatusBand kind={kind} status={status} />}
         {children && <div className="mt-3 space-y-2.5">{children}</div>}

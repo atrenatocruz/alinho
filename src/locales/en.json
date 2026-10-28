@@ -4775,6 +4775,7 @@
   "tournament.create.locked_days": "Teams have already signed up: changing days or courts would break the matches still to be scheduled.",
   "tournament.create.locked_where": "Pairs have already entered: each day's hours and the courts stay as they are.",
   "tournament.create.locked_categories": "Teams have already signed up to these categories. Changing places or price would change the rules for those already in.",
+  "tournament.create.locked_deuce": "The tournament has already started: scoring can no longer change.",
   "tournament.create.special_load_failed": "Couldn't read the special prices. So you don't lose them, close and reopen Edit.",
   "tournament.create.max_categories_only_up": "There are already entries: you can only increase it.",
   "tournament.create.save_changes": "Save changes",

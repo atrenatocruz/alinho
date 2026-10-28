@@ -2248,6 +2248,45 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_UNICO_TABLE_MOCKS), ...Ob
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }
 
+// localStorage.mockLeague = 'true': uma liga em inscrições, gerida por quem
+// está a ver, com duas equipas por aprovar (Dev 1, 27 out: separadores da
+// gestão e «Aos 40-40» da liga). mockLeagueDeuce escolhe o modo.
+{
+  const before = RPC_MOCKS.get_league_page
+  RPC_MOCKS.get_league_page = (params) => {
+    if (localStorage.getItem('mockLeague') !== 'true') return before?.(params) ?? null
+    const cat = { id: 'lg-cat-m4', gender: 'masculino', level: 4, status: 'inscricoes', home_away: false, matches_per_encounter: 3,
+      points_win: 3, points_draw: 1, points_loss: 0, points_walkover: -1 }
+    const team = (id, name, status) => ({ id, category_id: cat.id, name, status, applied_at: '2026-10-20T10:00:00Z', start_rating: null })
+    return {
+      league: { id: 'lg-1', slug: params?.p_slug || 'liga-mare-alta', name: 'Liga Maré Alta', kind: 'comunitaria', status: 'inscricoes',
+        scope: 'distrito', district: 'Lisboa', owner: { name: 'Maré Alta Padel', slug: 'mare-alta', logo: null },
+        deuce_mode: localStorage.getItem('mockLeagueDeuce') || 'ponto_de_ouro' },
+      viewer: { can_manage: true, is_owner: true, team_ids: [], admin_clubs: [] },
+      categories: [cat],
+      teams: [team('lg-t1', 'Maré Alta A', 'aprovada'), team('lg-t2', 'Serra Azul', 'aprovada'), team('lg-t3', 'Padel da Vila', 'pendente'), team('lg-t4', 'Os do Costume', 'pendente')],
+      rounds: [], encounters: [], tiebreaks: [],
+      organizers: [{ user_id: 'lg-o1', name: 'Rita Moura' }, { user_id: 'lg-o2', name: 'João Sá' }],
+    }
+  }
+  // O encontro da 1.ª jornada, marcado (Dev 1, 28 out: «Aos 40-40» do encontro).
+  const beforeEnc = RPC_MOCKS.get_league_encounter
+  RPC_MOCKS.get_league_encounter = (params) => {
+    if (localStorage.getItem('mockLeague') !== 'true') return beforeEnc?.(params) ?? null
+    return {
+      encounter: { id: params?.p_encounter_id || 'lg-e1', status: 'marcado', scheduled_at: '2026-11-01T10:00:00Z', venue: 'Padel Norte',
+        round_number: 1, submitted_by_team_id: null, walkover_team_id: null },
+      league: { slug: 'liga-mare-alta', name: 'Liga Maré Alta', kind: 'comunitaria',
+        ...(localStorage.getItem('mockLeagueEncNoDeuce') === 'true' ? {} : { deuce_mode: localStorage.getItem('mockLeagueDeuce') || 'ponto_de_ouro' }) },
+      category: { id: 'lg-cat-m4', gender: 'masculino', level: 4, matches_per_encounter: 3 },
+      home: { id: 'lg-t1', name: 'Maré Alta A', logo: null },
+      away: { id: 'lg-t2', name: 'Serra Azul', logo: null },
+      viewer: { can_manage: false, side: 'home' },
+      matches: [],
+    }
+  }
+}
+
 // localStorage.mockFriendGroup = 'true': o jogo entre amigos é de um grupo
 // (Dev Org), para o Editar procurar só nos membros (#586, 28 set).
 {

@@ -10,10 +10,12 @@ import StepPage from '../components/steps/StepPage'
 import { Chips, DateTimeField, PrimaryButton, Select } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { createLeague, saveCategory, publishLeague, leagueErrorMessage } from '../lib/leagueApi'
+import { createLeague, saveCategory, publishLeague, setLeagueDeuceMode, leagueErrorMessage } from '../lib/leagueApi'
 import { CATEGORY_DEFAULTS, categoryProblem } from '../lib/leagueConfig'
 import { emptyCreateProgress, nextCreateStep } from '../lib/leagueCreate'
 import { districtOptions } from '../lib/leagueDistricts'
+import { DeuceModeChips } from '../components/DeuceMode'
+import { DEFAULT_DEUCE_MODE } from '../lib/deuceMode'
 
 const field = 'min-h-[48px] w-full rounded-ctrl border border-line bg-white px-3.5 text-base'
 
@@ -38,7 +40,7 @@ export default function CreateLeaguePage() {
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [league, setLeague] = useState({ kind: 'comunitaria', name: '', scope: 'local', district: org?.district || '', applicationsCloseAt: '', maxTeams: 8 })
+  const [league, setLeague] = useState({ kind: 'comunitaria', name: '', scope: 'local', district: org?.district || '', applicationsCloseAt: '', maxTeams: 8, deuceMode: DEFAULT_DEUCE_MODE })
   const [cat, setCat] = useState({ ...CATEGORY_DEFAULTS, gender: 'masculino', level: 4 })
 
   const leagueProblem = league.name.trim().length < 3 ? 'name_short' : null
@@ -62,6 +64,11 @@ export default function CreateLeaguePage() {
         })
         pr.league = { id: created.id, slug: created.slug }
         setCreatedSlug(created.slug)
+        // «Aos 40-40» grava-se à parte (set_deuce_mode); se falhar, a liga
+        // fica com o ponto de ouro, o de omissão.
+        if (league.deuceMode !== DEFAULT_DEUCE_MODE) {
+          try { await setLeagueDeuceMode(created.id, league.deuceMode) } catch (err) { console.error('Error saving deuce mode:', err) }
+        }
       }
       if (nextCreateStep(pr) === 'category') { await saveCategory(pr.league.id, null, cat); pr.categoryDone = true }
       if (nextCreateStep(pr) === 'publish') { await publishLeague(pr.league.id); pr.published = true }
@@ -98,6 +105,11 @@ export default function CreateLeaguePage() {
           <input inputMode="numeric" className={`${field} mt-2`} value={league.maxTeams ?? ''}
             onChange={(e) => setLeague({ ...league, maxTeams: e.target.value ? Number(e.target.value.replace(/\D/g, '')) : null })} />
         </label>
+        {/* «Aos 40-40» (design-handoff/2026-10-22-aos-40-40-criar): uma escolha para a liga inteira. */}
+        <div>
+          <span className="mb-2 block text-sm font-bold">{t('deuce.label')}</span>
+          <DeuceModeChips value={league.deuceMode} onChange={(v) => setLeague({ ...league, deuceMode: v })} />
+        </div>
       </div>
     </StepPage>
   )
