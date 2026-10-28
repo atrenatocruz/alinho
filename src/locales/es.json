@@ -7192,5 +7192,6 @@
   "country.cant_change_text_other": "{{country}}: solo se puede tener cuenta a partir de los {{age}} años. Si te has mudado, escríbenos a support@alinho.pt.",
   "country.write_us": "Escribir a alinho",
   "country.email_subject": "Cambiar el país donde vivo",
-  "profile.language_spanish": "Español"
+  "profile.language_spanish": "Español",
+  "site.language_title": "Idioma"
 }

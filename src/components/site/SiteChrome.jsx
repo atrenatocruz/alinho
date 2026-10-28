@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { Wordmark } from '../Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import i18n from '../../lib/i18n'
+import LanguageMenu from './LanguageMenu'
 
 /* Estas páginas vivem fora do Layout, que é quem põe as outras no topo.
    Sem isto, «Ver os planos» abria a página Planos lá em baixo, onde estava o
@@ -129,17 +130,17 @@ export function SiteHeader({ sticky = true }) {
           <Link to="/" onClick={toTop(pathname, '/')} className="shrink-0 leading-none" aria-label="alinho.pt">
             <Wordmark variant="light" className="!h-[26px] sm:!h-[30px]" />
           </Link>
-          <Link to={cta.to} className="rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white sm:hidden">
-            {cta.label}
-          </Link>
+          {/* Telemóvel: o menu da língua ao lado do «Ir à app» (menu-lingua, 28 out). */}
+          <div className="flex items-center gap-2 sm:hidden">
+            <LanguageMenu />
+            <Link to={cta.to} className="rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white">
+              {cta.label}
+            </Link>
+          </div>
         </div>
         <span className="hidden flex-1 sm:block" />
         <nav className="hidden items-center gap-[30px] sm:flex" aria-label={t('site.nav_label')}>{nav}</nav>
-        <button type="button" onClick={() => setSiteLanguage({ pt: 'en', en: 'es', es: 'pt' }[(i18n.language || 'pt').slice(0, 2)] || 'pt')} title={t('layout.toggle_language')}
-          className="hidden min-h-[44px] items-center font-display text-sm font-semibold text-[#4F535A] hover:text-ink-900 sm:inline-flex">
-          {/* Mostra a língua para onde vai: PT → EN → ES → PT. */}
-          {({ pt: 'EN', en: 'ES', es: 'PT' })[(i18n.language || 'pt').slice(0, 2)] || 'EN'}
-        </button>
+        <LanguageMenu className="hidden sm:block" />
         <Link to={cta.to} className="hidden rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white sm:inline-block">
           {cta.label}
         </Link>
@@ -154,9 +155,6 @@ export function SiteFooter() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
   const year = new Date().getFullYear()
-  const lang = ['en', 'es'].includes((i18n.language || '').slice(0, 2)) ? i18n.language.slice(0, 2) : 'pt'
-  const pill = (on) => `rounded-full border px-[13px] py-2 font-display text-[13px] font-semibold leading-none ${
-    on ? 'border-white bg-white text-ink-900' : 'border-[#2E3137] text-[#C4C8CF] hover:text-white'}`
   return (
     <footer className="border-t border-[#1E2127] bg-ink-900 px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-8 sm:px-10 sm:py-[30px]">
       <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-5 sm:flex-row sm:justify-between">
@@ -168,11 +166,7 @@ export function SiteFooter() {
             </Link>
           ))}
         </nav>
-        <div className="flex gap-1.5" role="group" aria-label={t('layout.toggle_language')}>
-          <button type="button" aria-pressed={lang === 'pt'} onClick={() => setSiteLanguage('pt')} className={pill(lang === 'pt')}>{t('profile.language_portuguese')}</button>
-          <button type="button" aria-pressed={lang === 'en'} onClick={() => setSiteLanguage('en')} className={pill(lang === 'en')}>{t('profile.language_english')}</button>
-          <button type="button" aria-pressed={lang === 'es'} onClick={() => setSiteLanguage('es')} className={pill(lang === 'es')}>{t('profile.language_spanish')}</button>
-        </div>
+        <LanguageMenu tone="dark" />
         <p className="font-sans text-[13px] text-[#7B818C]">&copy; {year} alinho.pt</p>
       </div>
     </footer>

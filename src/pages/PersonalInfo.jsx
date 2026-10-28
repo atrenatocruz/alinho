@@ -251,7 +251,8 @@ export default function PersonalInfo() {
           <div className="mt-2"><ConfirmPhoneCard compact /></div>
         </Row>
         <Row label={t('profile.language_label')}>
-          <Chips className="mt-1" label={t('profile.language_label')} value={form.language} onChange={set('language')}
+          {/* Um campo de escolha como o do Distrito (menu-lingua, 28 out). */}
+          <Select value={form.language} onChange={set('language')} title={t('profile.language_label')}
             options={[
               { value: 'pt', label: t('profile.language_portuguese') },
               { value: 'en', label: t('profile.language_english') },

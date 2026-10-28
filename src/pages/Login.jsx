@@ -13,6 +13,7 @@ import { minSignupAge, countryFromLocale, isAtLeast, maxSignupBirthday } from '.
 import CountryPicker, { countryAgeText } from '../components/CountryPicker'
 import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 import EmailField from '../components/EmailField'
+import LanguageMenu from '../components/site/LanguageMenu'
 import { emailProblem } from '../lib/emailCheck'
 import { supabase } from '../lib/supabase'
 import { App } from '@capacitor/app'
@@ -33,18 +34,6 @@ const CREAM = '#F1EFE6'
 const LAST_KEY = 'alinho.lastLogin'
 const readLast = () => { try { return localStorage.getItem(LAST_KEY) } catch { return null } }
 const saveLast = (how) => { try { localStorage.setItem(LAST_KEY, how) } catch { /* sem localStorage */ } }
-
-// Mesmo padrão do Layout.jsx, sem perfil: muda já e fica guardado.
-function toggleLanguage() {
-  // Três línguas (26 out): pt → en → es → pt.
-  const next = { pt: 'en', en: 'es', es: 'pt' }[(i18n.language || 'pt').slice(0, 2)] || 'pt'
-  i18n.changeLanguage(next)
-  try {
-    localStorage.setItem('preferredLanguage', next)
-  } catch {
-    // ignore — best-effort persistence
-  }
-}
 
 // Fora do Login: um componente dentro dele era recriado a cada tecla.
 export function PasswordField({ id, value, onChange, placeholder, autoComplete, minLength, required, invalid = false, describedBy }) {
@@ -124,10 +113,7 @@ function CreamTop({ children, compact = false }) {
   const { t } = useTranslation()
   return (
     <div className={`relative px-6 text-center ${compact ? 'pt-12 pb-6' : 'pt-12 pb-8'}`} style={{ background: CREAM }}>
-      <button type="button" onClick={toggleLanguage} title={t('layout.toggle_language')}
-        className="absolute right-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-sm font-extrabold text-ink-900 hover:bg-black/5">
-        {({ pt: 'EN', en: 'ES', es: 'PT' })[(i18n.language || 'pt').slice(0, 2)] || 'EN'}
-      </button>
+      <LanguageMenu className="absolute right-3 top-3 z-10" />
       {/* O logótipo leva à página inicial: sem sessão, o Login não tinha outra saída (15 set). */}
       <Link to="/" className="inline-block leading-none" aria-label="alinho.pt">
         <Wordmark variant="light" className="!h-[30px]" />
