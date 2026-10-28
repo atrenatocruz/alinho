@@ -1054,7 +1054,7 @@ export default function Profile() {
           <button
             type="button"
             onClick={() => navigate('/perfil/numeros')}
-            className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+            className="card card-open w-full text-left"
           >
             <span className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
@@ -1077,7 +1077,7 @@ export default function Profile() {
         <button
           type="button"
           onClick={() => navigate('/perfil/informacao')}
-          className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+          className="card card-open w-full text-left"
         >
           <div className="flex items-center justify-between gap-3 mb-4">
             <span className="flex items-center gap-2">

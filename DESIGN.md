@@ -295,6 +295,19 @@ The text says what happens, never how the system works. Use `ConfirmSheet` (`dan
 - No mascots, no gradients and no pastel backgrounds on cards. «Horários livres»: a dashed light-orange card with one
   pill per hour.
 
+## Cards that open something (28 Oct)
+Any card or row where **the whole card** takes you to another page (Profile, Home, Manage, lists). Francisco, 28 Oct.
+- **At rest:** white, with the usual light shadow (`.card`).
+- **Mouse over (mouse only):** a deeper shadow, the existing `shadow-lift`, as if the card lifts. It stays white and
+  does not move. Only under `@media (hover: hover)`, so it never sticks on a phone after scrolling.
+- **On tap or click:** it shrinks a little while pressed (`press`, `active:scale-[0.985]`).
+- **Never changes colour**, on hover or on tap. No `hover:bg-ink-50`: that grey is almost the ground colour and the card
+  seems to disappear.
+- A button inside the card («Criar») keeps its own button effect; the card does not change because of it.
+- Cards that only show data and open nothing have no effect.
+- Use the `card-open` class (`src/index.css`): it does the shadow and the shrink, so new cards don't write it by hand.
+- Picture: `design-handoff/2026-10-28-cartoes-ao-tocar/regra.png`.
+
 ## Faces and empty places (the circles rule, 14 Oct)
 - Faces of the people in, then **one dashed circle per missing place**. Everywhere: cards, the event status strip, lists.
 - Big events show **6 circles at most**:
@@ -365,6 +378,7 @@ icons. Badges are lime with a black number. It is hidden on step-by-step pages (
 - **Dark translucent circles on the cover** that swap for others on scroll. The glass circles are always the same.
 - **Pastel, gradient or mascot event cards**, and the old type colours (brown for friends, turquoise for lessons,
   `#8C2350` for the league, court-blue / volt-green). Use the R0 table.
+- **A grey hover on cards** (`hover:bg-ink-50`). Cards lift with a shadow under a mouse instead (28 Oct).
 - **Buttons side by side**, two lime buttons on one screen, a type colour on a button, lime on a destructive action.
 - **«Sê o primeiro»** or an empty line where places are free. Show dashed circles.
 - **Cropping the cover image** for club or group avatars.

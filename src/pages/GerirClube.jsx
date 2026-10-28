@@ -4571,7 +4571,7 @@ export default function GerirClube() {
                   {/* Os preços passaram para a página própria das aulas
                       (Professores · Turmas · Preços, versão final de 26 set). */}
                   <button type="button" onClick={() => navigate(`/gerir/${slug}/aulas`)}
-                    className="card flex w-full items-center justify-between gap-3 text-left hover:bg-ink-50">
+                    className="card flex w-full items-center justify-between gap-3 text-left card-open">
                     <span>
                       <span className="block text-base font-extrabold text-ink-900">{t('gerirclube.lessons_card')}</span>
                       <span className="block text-sm text-muted">{t('gerirclube.lessons_card_hint')}</span>

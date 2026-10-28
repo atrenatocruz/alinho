@@ -185,6 +185,16 @@
   .press {
     @apply transition-transform duration-fast active:scale-[0.985];
   }
+
+  /* Cartão que abre alguma coisa (Francisco, 28 out): com o rato, sombra
+     mais funda; ao tocar, encolhe; nunca muda de cor. Só com rato, para a
+     sombra não ficar presa no telemóvel depois de deslizar. */
+  .card-open {
+    @apply transition-[transform,box-shadow] duration-fast active:scale-[0.985];
+  }
+  @media (hover: hover) {
+    .card-open:hover { box-shadow: var(--shadow-lift); }
+  }
 }
 
 @layer utilities {
@@ -315,7 +325,7 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up, .animate-pop, .animate-fade-in, .animate-pulse-soft, .animate-swap-confirm, .animate-fill-in { animation: none; }
   .sk::after { animation: none; display: none; }
-  .press { transition: none; }
+  .press, .card-open { transition: none; }
 }
 
 /* Scroll-triggered reveal (JS toggles .reveal-visible via IntersectionObserver
