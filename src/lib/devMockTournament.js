@@ -117,6 +117,8 @@ const TOURNAMENT = () => {
     // mockTShirt = 'sale' | 'gift': t-shirts do torneio (SPEC t-shirts, 8 out).
     rules: {
       scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockTTieBreak') || 'tiebreak',
+      // mockTDeuce = 'star_point' | 'vantagens': «Aos 40-40» (27 out). Sem ele, o torneio não traz o modo (ponto de ouro).
+      ...(localStorage.getItem('mockTDeuce') ? { deuce: localStorage.getItem('mockTDeuce') } : {}),
       ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
     },
     // Cartaz fictício, para se ver o topo da página com imagem. Em

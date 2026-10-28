@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EventHero from '../components/event/EventHero'
+import { DeuceModeLabel } from '../components/DeuceMode'
+import { deuceModeOf } from '../lib/deuceMode'
 import { PrimaryButton, ConfirmSheet, Chips, DateTimeField, EmptyState, LoadErrorState } from '../components/ui'
 import { getLeagueEncounter, confirmResult, contestResult, acceptTime, proposeTime, setTime, resolveEncounter, leagueErrorMessage } from '../lib/leagueApi'
 import { encounterTotals } from '../lib/leagueResult'
@@ -69,6 +71,9 @@ export default function LeagueEncounterPage() {
         time={when ? formatTime(when, i18n.language, { hour: '2-digit', minute: '2-digit' }) : null}
         timeAside={viewer.side === 'home' ? t('league.at_home') : viewer.side === 'away' ? t('league.away') : null}
         dateLine={[when ? formatDate(when, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }) : t('league.enc_por_marcar'), e.venue].filter(Boolean).join(' · ')}
+        /* Sem o modo vindo da base (antes da migração do Dev 3), a linha não
+           aparece: nunca «ponto de ouro» por omissão (UX, 28 out). */
+        subLine={league.deuce_mode ? <DeuceModeLabel mode={deuceModeOf(league)} text={`${t('deuce.label')}: ${t(`deuce.short_${deuceModeOf(league)}`)}`} /> : null}
         onBack={() => navigate(-1)}
         status={{
           tone: e.status === 'oficial' ? 'ok' : 'kind',
