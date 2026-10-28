@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom'
 import { listTournamentClashes } from '../../lib/tournamentApi'
 import { ClashBanner, ClashCaseSheet, ClashListSheet, ClashSwapSheet, casesFor } from './Clashes'
 import { appOrigin } from '../../lib/native'
+import { localeOf } from '../../lib/formatDate'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -319,7 +320,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
 }
 
 export default function EntriesPanel({ tournament, categories = [], category, publicView = false }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { adminOrganizations } = useAuth()
   // Na vista de quem chega de fora, a lista é a de toda a gente.
   const isAdmin = !publicView && (adminOrganizations || []).some?.((o) => (o.id || o) === tournament.organization_id)
@@ -427,7 +428,7 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
   const confirmed = rows.filter((r) => ['validada', 'selecionada'].includes(r.status)).length
 
   // "20 set" — curto, que a linha é estreita.
-  const signedUpOn = (iso) => new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })
+  const signedUpOn = (iso) => new Date(iso).toLocaleDateString(localeOf(i18n.language), { day: 'numeric', month: 'short' })
 
   // Reenviar o link de quem entrou pelo nome, para colar no WhatsApp. O
   // código vai-se buscar agora, não vem na lista (revisão do Dev 3).

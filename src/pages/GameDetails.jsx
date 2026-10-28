@@ -31,7 +31,7 @@ import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '.
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
-import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/formatDate'
+import { formatDate as formatDateLib, formatTime, formatCurrency, localeOf } from '../lib/formatDate'
 import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError, isGameFull } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
@@ -2830,7 +2830,7 @@ export default function GameDetails() {
     // vencedora): a imagem diz «RESULTADOS DO MIX», por isso o texto também,
     // sem o «Junta-te ao mix!» (UX, 18 out).
     if (game?.status === 'finished' && !(game.winner_team_id && teamById[game.winner_team_id])) {
-      const day = new Date(game.date).toLocaleDateString(i18n.language === 'en' ? 'en-GB' : 'pt-PT', { day: 'numeric', month: 'long' })
+      const day = new Date(game.date).toLocaleDateString(localeOf(i18n.language), { day: 'numeric', month: 'long' })
       const club = winnersOrg?.name || game.location
       const mix = String(game.title || t('gamedetails.share_default_title')).trim()
       return `${t(club ? 'gamedetails.share_finished_results' : 'gamedetails.share_finished_results_noplace', { mix, day, club })} ${t('gamedetails.share_signature')}`

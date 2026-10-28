@@ -20,7 +20,7 @@ import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import XpShield from '../components/XpShield'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
-import { formatDate as formatDateLib } from '../lib/formatDate'
+import { formatDate as formatDateLib, localeOf } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import { loadMyPick, mergePickWithCatalog } from '../lib/raquete'
 import RaqueteProfileDone from '../components/raquete/RaqueteProfileDone'
@@ -1207,7 +1207,7 @@ export default function Profile() {
                 )}
                 <VoucherTicket
                   {...(v.partner_id ? {
-                    fromText: v.prize_place ? t('reception.ticket_from', { place: v.prize_place, month: v.prize_month ? new Date(`${String(v.prize_month).slice(0, 10)}T12:00:00`).toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT', { month: 'long' }) : '' }) : null,
+                    fromText: v.prize_place ? t('reception.ticket_from', { place: v.prize_place, month: v.prize_month ? new Date(`${String(v.prize_month).slice(0, 10)}T12:00:00`).toLocaleDateString(localeOf(i18n.language), { month: 'long' }) : '' }) : null,
                     showLabel: t('reception.title'),
                   } : {})}
                   prizeText={v.partner_id ? t('reception.ticket_prize', { pct: v.discount_pct, partner: v.partner?.name || '' }) : (v.game?.prize || '')}
