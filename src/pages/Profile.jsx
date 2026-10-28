@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, Watch } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { loadPlayerAchievements } from '../lib/achievements'
+import { achievementContext, loadPlayerAchievements } from '../lib/achievements'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
@@ -1012,7 +1012,7 @@ export default function Profile() {
               </Suspense>
             )}
             {trophyOpen && (() => {
-              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at }))
+              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at, ctx: achievementContext(tr) }))
               return (
                 <Suspense fallback={null}>
                   <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))} onClose={() => setTrophyOpen(null)} />
