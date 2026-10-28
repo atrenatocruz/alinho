@@ -6,6 +6,19 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { useFeatureFlag } from './useFeatureFlag'
 
+/* As contagens dos «Números» da Rita (Dev 3, migration_parceiros_7_numeros.sql):
+   disparam e esquecem. Não devolvem nada, nunca rebentam o ecrã, e sem a
+   função (base por correr) não fazem nada. Só totais, nunca quem foi. */
+const fireAndForget = (fn, params) => {
+  try {
+    Promise.resolve(supabase.rpc(fn, params)).catch(() => {})
+  } catch { /* sem rede ou sem cliente: não conta */ }
+}
+/** p_place: 'contact' (ligar ou mapa). As aberturas da página contam no get_partner. */
+export const trackPartner = (partnerId, place) => { if (partnerId) fireAndForget('partner_track', { p_partner_id: partnerId, p_place: place }) }
+/** O «Mostrar na receção» aberto pelo dono do código (a base guarda só a 1.ª vez). */
+export const markVoucherOpened = (voucherId) => { if (voucherId) fireAndForget('voucher_mark_opened', { p_voucher_id: voucherId }) }
+
 /** O seletor do «Do mês» com um distrito: 'district:Setúbal'. */
 export const DISTRICT_SCOPE = 'district:'
 export const isDistrictScope = (scope) => typeof scope === 'string' && scope.startsWith(DISTRICT_SCOPE)
