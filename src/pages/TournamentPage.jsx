@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { shareMessage, tournamentUrl } from '../lib/tournamentPublic'
 import { whatsappShare } from '../lib/partnerInvite'
-import { ArrowLeft, Eye, Trophy } from 'lucide-react'
+import { ArrowLeft, Eye, HelpCircle, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -32,6 +32,8 @@ import { CategorySelect, MonoLabel } from '../components/tournament/TournamentBi
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
+import { DeuceHelpSheet } from '../components/DeuceMode'
+import { deuceModeOf } from '../lib/deuceMode'
 import ChampionsBlock from '../components/tournament/ChampionsBlock'
 import NextGameCard, { useMyNextGame } from '../components/tournament/NextGameCard'
 import { canCancel, cancelDanger } from '../components/tournament/cancelTournament'
@@ -92,6 +94,7 @@ export default function TournamentPage() {
   const [editing, setEditing] = useState(null)
   const [adminError, setAdminError] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+  const [deuceHelp, setDeuceHelp] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -402,9 +405,16 @@ export default function TournamentPage() {
   const totalSlots = categories.reduce((n, c) => n + (Number(c.slots) || 0), 0)
   const shirt = tour.rules?.tshirt
   const euros = (cents) => (cents / 100).toLocaleString(i18n.language, { maximumFractionDigits: 2 })
+  const deuceMode = deuceModeOf({ deuce_mode: tour.rules?.deuce })
   const heroFacts = [
     { key: 'days', label: t('tournament.fact_days'), value: dateRange(tour.starts_on, tour.ends_on, i18n.language) },
     { key: 'courts', label: t('tournament.fact_courts'), value: tour.court_count || null },
+    // A pontuação e, por baixo, o modo dos 40-40; o «?» no canto e a caixa
+    // inteira abrem «Como se joga o 40-40» (design-handoff/2026-10-22-aos-40-40-criar,
+    // ponto 4 e «Caixa Pontuação», Francisco 28 out).
+    { key: 'scoring', label: t('tournament.create.scoring'),
+      value: <span className="flex flex-col"><span>{t(`tournament.create.scoring_${tour.rules?.scoring || 'pro_set_9'}`)}</span><span>{t(`deuce.${deuceMode}`)}</span></span>,
+      aside: <HelpCircle size={16} aria-label={t('deuce.help_title')} />, onClick: () => setDeuceHelp(true) },
     { key: 'price', label: t('tournament.fact_price'), value: tour.entry_fee_cents ? t('tournament.fact_price_pair', { price: euros(tour.entry_fee_cents) }) : null },
     { key: 'tshirt', label: t('tournament.fact_tshirt'), value: shirt?.mode === 'gift' ? t('tournament.fact_tshirt_gift') : shirt?.mode === 'sale' ? t('tournament.fact_tshirt_sale', { price: euros(shirt.price_cents || 0) }) : null },
     { key: 'deadline', label: t('tournament.fact_entries'), value: shortDay(tour.entries_deadline, i18n.language) ? t('tournament.fact_until', { date: shortDay(tour.entries_deadline, i18n.language) }) : null },
@@ -511,6 +521,7 @@ export default function TournamentPage() {
         {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
 
         <EventFacts items={heroFacts} />
+        {deuceHelp && <DeuceHelpSheet mode={deuceMode} onClose={() => setDeuceHelp(false)} />}
 
         {/* Com o sorteio feito, o terminar de cada categoria (o passo seguinte
             de quem organiza foi para o topo, UX 13 out). */}

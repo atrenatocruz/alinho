@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EventHero from '../components/event/EventHero'
+import { DeuceModeLabel } from '../components/DeuceMode'
+import { deuceModeOf } from '../lib/deuceMode'
 import { Tabs, Chips, PrimaryButton, EmptyState, LoadErrorState } from '../components/ui'
 import StandingsTable from '../components/league/StandingsTable'
 import EncounterRow from '../components/league/EncounterRow'
@@ -77,6 +79,7 @@ export default function LeaguePage() {
         time={currentRound ? t('league.round', { n: currentRound.number }) : null}
         timeAside={currentRound ? t('league.round_of', { total: catRounds.length }) : null}
         dateLine={[t(`league.status_${league.status}`), cat?.home_away ? t('league.home_away') : null].filter(Boolean).join(' · ')}
+        subLine={league.deuce_mode ? <DeuceModeLabel mode={deuceModeOf(league)} text={`${t('deuce.label')}: ${t(`deuce.short_${deuceModeOf(league)}`)}`} /> : null}
         onBack={() => navigate(-1)}
         onShare={() => navigator.share?.({ title: league.name, url: withMyRef(appHref()) })}
         status={myRow ? { tone: 'kind', text: t('league.your_position', { pos: myRow.position, code: categoryCode(cat.gender, cat.level) }),

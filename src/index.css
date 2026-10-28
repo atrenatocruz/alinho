@@ -393,3 +393,7 @@ body[data-steps] main > div { padding-bottom: 0 !important; }
   width: 16px; height: 16px; border-radius: 9999px; background: #1E4FA8; border: 2.5px solid #fff;
   box-shadow: 0 0 0 7px rgb(30 79 168 / .18);
 }
+.place-suggestions li b em {
+  margin-left: 6px; padding: 1px 6px; border-radius: 9999px; font-style: normal; font-size: 0.7rem; font-weight: 800;
+  background: rgb(var(--lime-400)); color: rgb(var(--ink-900)); vertical-align: 1px;
+}

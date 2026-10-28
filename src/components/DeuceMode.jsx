@@ -16,8 +16,10 @@ export function DeuceModeChips({ value, onChange, locked = false, lockedText = n
   const options = DEUCE_MODES.map((m) => ({ value: m, label: t(`deuce.${m}`) }))
   return (
     <div>
-      <div className={locked ? 'pointer-events-none opacity-50' : ''} aria-disabled={locked || undefined}>
-        <Chips label={t('deuce.label')} value={value} onChange={onChange} options={options} />
+      {/* Trancado também ao teclado (QA, 28 out): inert tira o foco e o
+          clique, e o onChange ignora o que ainda chegar. */}
+      <div className={locked ? 'pointer-events-none opacity-50' : ''} aria-disabled={locked || undefined} {...(locked ? { inert: '' } : {})}>
+        <Chips label={t('deuce.label')} value={value} onChange={locked ? () => {} : onChange} options={options} />
       </div>
       {locked ? (
         <p className="mt-2 flex items-center gap-1.5 text-sm text-muted"><Lock size={14} className="shrink-0" />{lockedText || t('deuce.locked')}</p>
@@ -28,31 +30,38 @@ export function DeuceModeChips({ value, onChange, locked = false, lockedText = n
   )
 }
 
+/** A folha «Como se joga o 40-40»: o texto do modo e, por baixo, os tie-breaks.
+ *  Também a abre a caixa «Pontuação» da página do torneio (Dev 1, 28 out). */
+export function DeuceHelpSheet({ mode, noTieBreaks = false, onClose }) {
+  const { t } = useTranslation()
+  return (
+    <Sheet title={t('deuce.help_title')} onClose={onClose}>
+      <p className="text-sm leading-relaxed text-ink-900">
+        <b className="font-extrabold">{t(`deuce.${mode}`)}.</b> {t(`deuce.help_${mode}`)}
+      </p>
+      {!noTieBreaks && <p className="mt-3 text-sm text-muted">{t('deuce.help_tiebreak')}</p>}
+    </Sheet>
+  )
+}
+
 /** «Pro set a 9 · ponto de ouro» com o «?» que explica o modo. `noTieBreaks`:
- *  o Set sem fim não tem tie-breaks, e a frase deles sai (QA, 27 out). `stacked`:
- *  em caixas estreitas, duas linhas sem o «·», o modo com maiúscula (Dev 1, 28 out). */
-export function DeuceModeLabel({ scoringLabel, mode, noTieBreaks = false, stacked = false }) {
+ *  o Set sem fim não tem tie-breaks, e a frase deles sai (QA, 27 out). `text`:
+ *  outra frase à frente do «?», como o «Aos 40-40: ponto de ouro» da liga (Dev 1, 28 out). */
+export function DeuceModeLabel({ scoringLabel, mode, noTieBreaks = false, text = null }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   return (
     <>
       <span className="inline-flex items-center gap-1">
-        {stacked
-          ? <span className="flex flex-col"><span>{scoringLabel}</span><span>{t(`deuce.${mode}`)}</span></span>
-          : <span>{scoringLabel} · {t(`deuce.short_${mode}`)}</span>}
+        <span>{text || `${scoringLabel} · ${t(`deuce.short_${mode}`)}`}</span>
+        {/* 44 px ao toque, o ícone com 16 (QA, 28 out); a margem negativa
+            devolve o espaço, e a linha fica com a mesma altura. */}
         <button type="button" onClick={() => setOpen(true)} aria-label={t('deuce.help_title')}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted">
+          className="-my-2.5 -mr-2.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted">
           <HelpCircle size={16} />
         </button>
       </span>
-      {open && (
-        <Sheet title={t('deuce.help_title')} onClose={() => setOpen(false)}>
-          <p className="text-sm leading-relaxed text-ink-900">
-            <b className="font-extrabold">{t(`deuce.${mode}`)}.</b> {t(`deuce.help_${mode}`)}
-          </p>
-          {!noTieBreaks && <p className="mt-3 text-sm text-muted">{t('deuce.help_tiebreak')}</p>}
-        </Sheet>
-      )}
+      {open && <DeuceHelpSheet mode={mode} noTieBreaks={noTieBreaks} onClose={() => setOpen(false)} />}
     </>
   )
 }

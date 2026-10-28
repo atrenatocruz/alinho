@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { courtNames } from './CreateTournamentForm'
+import { courtNames } from './courtNames'
 
 // QA, 30 set: 2 campos por dia e só «Campo 1» escrito dava um torneio de
 // um campo só, e o «Propor horas» punha tudo nele.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { supabase } from './supabase'
 
 /* Sugestões de moradas e sítios enquanto se escreve — Photon (komoot), sobre
    o OpenStreetMap, sem chave nem faturação (28 out: troca da Google, que
@@ -95,6 +96,60 @@ export async function geocodeAddress(text) {
   return found
 }
 
+/* TomTom Search (28 out): pesquisa por nome de sítio muito melhor que o
+   OpenStreetMap. Quota grátis diária; a chave restringe-se por domínio no
+   painel do TomTom. Sem VITE_TOMTOM_API_KEY não se usa. Devolve null se
+   falhar, para se cair no Photon. */
+const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY || null
+async function tomtomSearch(q, signal) {
+  const params = new URLSearchParams({
+    key: TOMTOM_KEY, countrySet: 'PT', language: 'pt-PT', limit: '6', typeahead: 'true', idxSet: 'POI,PAD,Addr,Str',
+  })
+  try {
+    const res = await fetch(`https://api.tomtom.com/search/2/search/${encodeURIComponent(q)}.json?${params}`, { signal })
+    if (!res.ok) throw new Error(`TomTom ${res.status}`)
+    const data = await res.json()
+    return (data.results || []).map((r) => {
+      const address = r.address?.freeformAddress || ''
+      const name = r.type === 'POI' ? r.poi?.name || null : null
+      return {
+        value: name && address ? `${name} - ${address}` : address || name || '',
+        name,
+        latitude: r.position?.lat ?? null,
+        longitude: r.position?.lon ?? null,
+        line1: name || address,
+        line2: name ? address : (r.address?.municipality || ''),
+      }
+    })
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    console.error('Error searching TomTom:', error)
+    return null
+  }
+}
+
+// A função ainda não existe nesta base de dados (migração por correr): não se volta a pedir.
+let clubSearchMissing = false
+async function searchClubPlaces(q) {
+  if (clubSearchMissing) return []
+  const { data, error } = await supabase.rpc('search_club_places', { p_query: q })
+  if (error) {
+    if (error.code === 'PGRST202') clubSearchMissing = true
+    else console.error('Error searching Alinho clubs for places:', error)
+    return []
+  }
+  return (data || []).map((c) => ({
+    club: true,
+    value: `${c.name} - ${c.location}`,
+    name: c.name,
+    address: c.location,
+    latitude: c.latitude == null ? null : Number(c.latitude),
+    longitude: c.longitude == null ? null : Number(c.longitude),
+    line1: c.name,
+    line2: c.location,
+  }))
+}
+
 /**
  * Liga as sugestões a um <input> simples, só enquanto `active` for true.
  * `onPlaceSelected` recebe `{ value, name, latitude, longitude }` — o texto
@@ -137,11 +192,18 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
     const highlight = () => {
       [...list.children].forEach((li, i) => li.setAttribute('aria-selected', i === index ? 'true' : 'false'))
     }
-    const choose = (i) => {
+    const choose = async (i) => {
       const item = items[i]
       if (!item) return
       close()
-      onPlaceSelectedRef.current({ value: item.value, name: item.name, latitude: item.latitude, longitude: item.longitude })
+      // Clube do Alinho sem coordenadas guardadas: procura-se a morada dele.
+      const coords = item.latitude == null && item.address ? await geocodeAddress(item.address) : null
+      onPlaceSelectedRef.current({
+        value: item.value,
+        name: item.name,
+        latitude: item.latitude ?? coords?.latitude ?? null,
+        longitude: item.longitude ?? coords?.longitude ?? null,
+      })
     }
     const render = () => {
       list.replaceChildren()
@@ -150,6 +212,11 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
         li.setAttribute('role', 'option')
         const b = document.createElement('b')
         b.textContent = item.line1
+        if (item.club) {
+          const tag = document.createElement('em')
+          tag.textContent = 'Alinho'
+          b.appendChild(tag)
+        }
         li.appendChild(b)
         if (item.line2) {
           const s = document.createElement('span')
@@ -169,14 +236,24 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
       controller = new AbortController()
       const params = new URLSearchParams({ q, limit: '6', bbox: PT_BBOX })
       if (cities) { params.append('layer', 'city'); params.append('layer', 'locality') }
+      const signal = controller.signal
+      // Os clubes do Alinho primeiro (search_club_places); sem a função, só o Photon.
+      const clubsPromise = cities ? Promise.resolve([]) : searchClubPlaces(q)
       try {
-        const res = await fetch(`${PHOTON_URL}?${params}`, { signal: controller.signal })
-        if (!res.ok) throw new Error(`Photon ${res.status}`)
-        const data = await res.json()
+        // Com chave do TomTom, os sítios vêm dele (dados próprios: encontra
+        // clubes pelo nome); se falhar, ou sem chave, do Photon.
+        let found = !cities && TOMTOM_KEY ? await tomtomSearch(q, signal) : null
+        if (!found) {
+          const res = await fetch(`${PHOTON_URL}?${params}`, { signal })
+          if (!res.ok) throw new Error(`Photon ${res.status}`)
+          found = ((await res.json()).features || []).map((f) => placeFromFeature(f, { cities }))
+        }
+        const clubs = await clubsPromise
+        if (signal.aborted) return
         const seen = new Set()
-        items = (data.features || [])
-          .map((f) => placeFromFeature(f, { cities }))
-          .filter((it) => it.value && it.latitude != null && !seen.has(it.value) && seen.add(it.value))
+        items = [...clubs, ...found]
+          .filter((it) => it.value && (it.latitude != null || it.club) && !seen.has(it.value) && seen.add(it.value))
+          .slice(0, 7)
         if (document.activeElement === input) render()
       } catch (error) {
         if (error.name === 'AbortError') return
