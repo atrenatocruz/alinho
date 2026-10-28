@@ -13,7 +13,7 @@ import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrgan
 import { getMyPrivateMatches, privateMatchActions, claimFriendMatchInvitesByEmail } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import ConfirmPhoneCard from './ConfirmPhoneCard'
-import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
+import { listMyMonthPrizeOffers, listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { claimDay } from '../lib/guestClaims'
 import { shortPersonName } from '../lib/mixLogic'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
@@ -23,6 +23,7 @@ import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
 import LeagueNoticeRow, { LEAGUE_NOTICE_KINDS } from './league/LeagueNoticeRow'
 import PartnerNoticeRow, { PARTNER_NOTICE_KINDS } from './partners/PartnerNoticeRow'
+import PartnerPrizeWindows from './partners/PartnerPrizeWindows'
 import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
 import { changesText } from '../lib/mixChanges'
@@ -177,6 +178,13 @@ export default function Layout({ children }) {
     && profile.phone_hash !== 'dev-bypass' && !phonePromptDismissed
 
 
+  // Avisos dos parceiros (códigos do mês para quem gere; prémio para quem ganhou).
+  const [partnerNotices, setPartnerNotices] = useState([])
+  // Os prémios do mês (partner_month_offer): já vêm lidos e ficam no fim do
+  // sino, mais claros, só no mês a que dizem respeito.
+  const [monthOffers, setMonthOffers] = useState([])
+  const [noticesLoaded, setNoticesLoaded] = useState(false)
+
   // Celebrações: troféus novos + kudos recebidos desde a última visita.
   // Uma verificação por sessão de browser; fail-soft em qualquer erro.
   const [celebrations, setCelebrations] = useState([])
@@ -197,12 +205,19 @@ export default function Layout({ children }) {
   // (se os houver) na folha de sempre. O cartão nunca abre por cima de outra
   // folha (ex.: a pergunta de fim do mix): espera que não haja nenhuma, e
   // depois de aberto fica aberto.
+  // Quem ganhou um prémio de parceiro vê o «Pódio do Mês» dentro da janela
+  // do prémio: a celebração dessa conquista não abre a seguir (SPEC de 26 out).
+  const prizeWon = partnerNotices.some((n) => n.kind === 'partner_prize_won')
   const newTrophies = celebrations
     .filter((c) => c.kind === 'trophy')
+    .filter((c) => !(prizeWon && c.trophy_key === 'podio_do_mes'))
     .map((c) => ({ key: c.trophy_key, rarity: c.rarity }))
   const [trophiesDone, setTrophiesDone] = useState(false)
   const [trophiesShown, setTrophiesShown] = useState(false)
-  const trophiesPending = newTrophies.length > 0 && !trophiesDone && !needsPhonePrompt
+  // As janelas dos prémios dos parceiros vão primeiro: a conquista espera que
+  // os avisos cheguem e que essas janelas fechem.
+  const [prizeBusy, setPrizeBusy] = useState(false)
+  const trophiesPending = newTrophies.length > 0 && !trophiesDone && !needsPhonePrompt && noticesLoaded && !prizeBusy
   const noOverlay = useNoOverlayOpen(trophiesPending && !trophiesShown)
   useEffect(() => {
     if (trophiesPending && noOverlay && !trophiesShown) setTrophiesShown(true)
@@ -374,8 +389,6 @@ export default function Layout({ children }) {
   // Convites para jogos entre amigos (#342): ficam até se responder.
   const [friendNotices, setFriendNotices] = useState([])
   const [leagueNotices, setLeagueNotices] = useState([])
-  // Avisos dos parceiros (códigos do mês para quem gere; prémio para quem ganhou).
-  const [partnerNotices, setPartnerNotices] = useState([])
   // Quem criou conta por causa de um convite por email fica logo com o
   // jogo: junta-se uma vez por sessão do browser (Dev 3, #342).
   useEffect(() => {
@@ -393,9 +406,13 @@ export default function Layout({ children }) {
       setFriendNotices([])
       setLeagueNotices([])
       setPartnerNotices([])
+      setNoticesLoaded(Boolean(profile?.id))
       return
     }
     let cancelled = false
+    listMyMonthPrizeOffers()
+      .then((data) => { if (!cancelled) setMonthOffers(data) })
+      .catch((error) => console.error('Error loading month prize offers:', error))
     listMyUnreadNotifications()
       .then((data) => {
         if (cancelled) return
@@ -407,6 +424,7 @@ export default function Layout({ children }) {
         setPartnerNotices(data.filter((n) => PARTNER_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
+      .finally(() => { if (!cancelled) setNoticesLoaded(true) })
     return () => {
       cancelled = true
     }
@@ -733,7 +751,7 @@ export default function Layout({ children }) {
               <div className="px-4 py-3 border-b border-line">
                 <p className="font-extrabold text-ink-900">{t('layout.notifications')}</p>
               </div>
-              {notificationsTotal === 0 ? (
+              {notificationsTotal === 0 && monthOffers.length === 0 ? (
                 <div className="p-4 text-center">
                   <p className="text-sm text-muted">{t('layout.no_new_notifications')}</p>
                 </div>
@@ -785,6 +803,9 @@ export default function Layout({ children }) {
                   ))}
                   {partnerNotices.map((notice) => (
                     <PartnerNoticeRow key={notice.id} notice={notice} onOpen={openPartnerNotice} />
+                  ))}
+                  {monthOffers.map((notice) => (
+                    <PartnerNoticeRow key={notice.id} notice={notice} onOpen={() => setShowNotifications(false)} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link
@@ -1127,6 +1148,10 @@ export default function Layout({ children }) {
 
       {/* Celebrações depois do phone-prompt na ordem de render — só uma
           aparece de cada vez na prática (o phone-prompt é dispensável). */}
+      {profile?.id && !isGuest && (
+        <PartnerPrizeWindows profileId={profile.id} blocked={needsPhonePrompt || (trophiesShown && !trophiesDone)} onBusy={setPrizeBusy}
+          wonNotices={noticesLoaded ? partnerNotices.filter((n) => n.kind === 'partner_prize_won') : []} />
+      )}
       {trophiesShown && !trophiesDone && (
         <Suspense fallback={null}>
           <AchievementViewer items={newTrophies} celebrate onClose={closeTrophies} />
