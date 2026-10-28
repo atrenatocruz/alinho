@@ -19,7 +19,8 @@ import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge, SWITCH_TRACK } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
-import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, scoringForFormat } from '../lib/mixLogic'
+import { scoringHasDeuce } from '../lib/deuceMode'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
@@ -104,6 +105,7 @@ const FORMATS = [
 ]
 const SCORING_FORMATS = [
   { value: 'pontos_simples', labelKey: SCORING_FORMAT_LABEL_KEY.pontos_simples },
+  { value: 'pontos_corridos', labelKey: SCORING_FORMAT_LABEL_KEY.pontos_corridos },
   { value: 'pro_set_9', labelKey: SCORING_FORMAT_LABEL_KEY.pro_set_9 },
   { value: 'melhor_2_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_2_sets },
   { value: 'melhor_3_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_3_sets },
@@ -226,6 +228,8 @@ const EMPTY_GAME_FORM = {
   whatsapp_post_times: null,
   // O 8-8 do pro set (#580): 'tiebreak' (a 7, FPP) ou 'super_tiebreak' (a 10).
   tiebreak_8_8: 'tiebreak',
+  // «Aos 40-40» (22 out): ponto de ouro por omissão.
+  deuce_mode: 'ponto_de_ouro',
 }
 
 // Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
@@ -1325,6 +1329,7 @@ export default function GerirClube() {
       pool_size: game.pool_size ?? null,
       tiebreak_8_8: game.tiebreak_8_8 ?? null,
     } : {}),
+    ...(typeof game.deuce_mode === 'string' ? { deuce_mode: game.deuce_mode } : {}),
   })
 
   // advanceByFrequency vive em src/lib/mixDraft.js: publicar um rascunho de
@@ -1531,7 +1536,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1606,6 +1611,8 @@ export default function GerirClube() {
             // O 8-8 (#580): só vai quando é o super tie-break (antes da
             // migração a coluna não existe, e o tie-break a 7 é o de omissão).
             ...(gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
+            // «Aos 40-40»: só vai quando não é o ponto de ouro (antes da migração do Dev 3 a coluna não existe).
+            ...(gameForm.deuce_mode && gameForm.deuce_mode !== 'ponto_de_ouro' && scoringHasDeuce(scoringFormatOf(gameForm)) ? { deuce_mode: gameForm.deuce_mode } : {}),
             status: asDraft ? 'draft' : launchAt ? 'pending' : 'open',
             ...(launchAt ? { launch_at: launchAt.toISOString() } : {}),
             // A imagem só vai quando há uma (antes da migração a coluna não existe).
@@ -1800,7 +1807,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1863,6 +1870,8 @@ export default function GerirClube() {
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
           ...((tieBreak88 === 'super_tiebreak' || editingGame.tiebreak_8_8) ? { tiebreak_8_8: gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? 'super_tiebreak' : null } : {}),
+          ...(((gameForm.deuce_mode && gameForm.deuce_mode !== 'ponto_de_ouro') || (editingGame.deuce_mode && editingGame.deuce_mode !== 'ponto_de_ouro'))
+            ? { deuce_mode: scoringHasDeuce(scoringFormatOf(gameForm)) && gameForm.deuce_mode ? gameForm.deuce_mode : 'ponto_de_ouro' } : {}),
           // A imagem: vai quando há uma ou quando se tirou a que havia.
           ...((imageUrl || editingGame.image_url) ? { image_url: imageUrl || null } : {}),
           ...pendingLaunchUpdate,
@@ -2650,6 +2659,7 @@ export default function GerirClube() {
       // As horas do WhatsApp do próprio mix ('HH:MM'); sem nenhuma escolhida
       // (null), o campo traz as do último mix.
       tiebreak_8_8: game.tiebreak_8_8 || 'tiebreak',
+      deuce_mode: game.deuce_mode || 'ponto_de_ouro',
       whatsapp_post_times: Array.isArray(game.whatsapp_post_times) ? game.whatsapp_post_times.map((h) => String(h).slice(0, 5)) : null,
       auto_start_hours_before: game.auto_start_hours_before ?? '',
       // «Abrem as inscrições» de um mix que não se repete e ainda não abriu:
@@ -3401,7 +3411,7 @@ export default function GerirClube() {
                         onChange={(v) => setGameForm({
                           ...gameForm,
                           ...formatFieldsFor(v),
-                          ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
+                          scoring_format: scoringForFormat(v, gameForm.scoring_format),
                           ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
                         })}
                       />

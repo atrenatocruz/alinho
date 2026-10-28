@@ -489,3 +489,10 @@ export const finishFriendMatchGame = async (gameId) => {
   if (error) throw error
   return data
 }
+
+/** «Aos 40-40» (22 out, Dev 3): grava a sessão toda. `id` é o da sessão ou de
+ *  qualquer jogo dela; só o organizador. Erros: not_allowed, bad_deuce_mode. */
+export const setFriendDeuceMode = async (id, mode) => {
+  const { error } = await supabase.rpc('set_deuce_mode', { p_kind: 'friend_match', p_id: id, p_mode: mode })
+  if (error) throw error
+}

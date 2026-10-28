@@ -26,7 +26,7 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -45,6 +45,8 @@ import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
 import ShareAsSheet from '../components/mix/ShareAsSheet'
+import { DeuceModeLabel } from '../components/DeuceMode'
+import { deuceModeOf, scoringHasDeuce } from '../lib/deuceMode'
 import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
@@ -3547,6 +3549,13 @@ export default function GameDetails() {
             ] : [
               { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
               { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
+              // A pontuação («Set sem fim», «Pontos corridos», SPEC 26 out) e,
+              // quando há 15-30-40, o modo dos 40-40 com o «?» (22 out).
+              { key: 'scoring', label: t('homecard.fact_scoring'),
+                value: scoringHasDeuce(scoringFormatOf(game))
+                  ? <DeuceModeLabel scoringLabel={t(SCORING_FORMAT_LABEL_KEY[scoringFormatOf(game)] || 'mixlogic.scoring_pontos_simples')} mode={deuceModeOf(game)}
+                    noTieBreaks={['pontos_simples', 'set_sem_fim'].includes(scoringFormatOf(game))} />
+                  : t(SCORING_FORMAT_LABEL_KEY[scoringFormatOf(game)]) },
             ]
             items.push(
               { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
@@ -3560,7 +3569,10 @@ export default function GameDetails() {
                 <EventFacts items={items} />
                 {!isOpenGame(game) && (
                   <p className="px-0.5 text-sm text-muted">
-                    {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
+                    {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate'
+                      // O Americano em «Set sem fim» soma jogos (UX, 26 out).
+                      : game.format === 'americano' && scoringFormatOf(game) === 'set_sem_fim' ? 'americano_set_sem_fim'
+                      : (game.format || 'sobe_desce')}`)}
                   </p>
                 )}
                 {game.location && (

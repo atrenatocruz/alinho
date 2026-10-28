@@ -4,7 +4,9 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Users, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createFriendMatch, updateFriendMatch, addFriendMatchInvitees, removeFriendMatchInvitee, cancelFriendMatch } from '../lib/privateMatches'
+import { createFriendMatch, updateFriendMatch, addFriendMatchInvitees, removeFriendMatchInvitee, cancelFriendMatch, setFriendDeuceMode } from '../lib/privateMatches'
+import { DeuceModeChips } from '../components/DeuceMode'
+import { DEFAULT_DEUCE_MODE, deuceModeOf } from '../lib/deuceMode'
 import { FORMAT_DB, formatKey, formatToSave } from '../components/friends/friendScoring'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
@@ -63,6 +65,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const [court, setCourt] = useState(m?.court || '')
   // «Melhor de 3» vem escolhido (27 set); substitui o «N sets» fixo.
   const [format, setFormat] = useState(m ? formatKey(m.scoring_format, m.num_sets) : 'best3')
+  // «Aos 40-40» (22 out): ponto de ouro por omissão; grava-se à parte (set_deuce_mode).
+  const [deuceMode, setDeuceMode] = useState(() => deuceModeOf(m))
   const [teamsMode, setTeamsMode] = useState(m?.teams_mode || 'manual')
   // «Cada jogo dura» (27 set): 0 = sem tempo; só com mais de 4 pessoas.
   const [gameMinutes, setGameMinutes] = useState(m?.game_minutes || 0)
@@ -121,6 +125,10 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
       })
+      // O modo dos 40-40 grava-se à parte; se falhar, o jogo fica com o ponto de ouro.
+      if (format !== 'points' && deuceMode !== DEFAULT_DEUCE_MODE) {
+        try { await setFriendDeuceMode(id, deuceMode) } catch (err) { console.error('Error saving deuce mode:', err) }
+      }
       // replace: o criar sai do histórico — o «voltar» do jogo não pode
       // reabrir o «Novo jogo» no passo 1 (Francisco, 12 out).
       navigate(`/jogos-privados/sessao/${id}`, { replace: true })
@@ -134,7 +142,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   }
 
   // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
-  const snapshot = () => JSON.stringify([people.map((p) => p.inviteeId || p.user_id || p.name), rankedIntent, when, location, court, format, teamsMode, gameMinutes, showLive])
+  const snapshot = () => JSON.stringify([people.map((p) => p.inviteeId || p.user_id || p.name), rankedIntent, when, location, court, format, teamsMode, gameMinutes, showLive, deuceMode])
   const [initialSnap, setInitialSnap] = useState(null)
   useEffect(() => { if (edit && initialSnap == null) setInitialSnap(snapshot()) }) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -158,6 +166,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
         showLive,
       })
+      if (format !== 'points' && deuceMode !== deuceModeOf(m)) await setFriendDeuceMode(m.id, deuceMode)
       // As pessoas gravam-se DEPOIS do resto (#586, 13 out): é o resto que
       // pode ser recusado (format_locked, ranked_locked, teams_locked…), e
       // antes as pessoas já ficavam mudadas quando ele falhava.
@@ -356,13 +365,20 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
                 ]}
               />
             </div>
-            {format !== 'points' && <p className="mt-2 text-xs text-muted">{t(`friends.format_${format}_hint`)}</p>}
+            <p className="mt-2 text-xs text-muted">{t(`friends.format_${format}_hint`)}</p>
             {scoringLocked && (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
                 <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.format_locked_hint')}
               </p>
             )}
           </div>
+          {/* «Aos 40-40» (22 out): a seguir aos sets; com «Pontos» não aparece. */}
+          {format !== 'points' && (
+            <div>
+              <p className={label}>{t('deuce.label')}</p>
+              <DeuceModeChips value={deuceMode} onChange={setDeuceMode} locked={scoringLocked} />
+            </div>
+          )}
           {durationBlock}
           <div>
             <p className={label}>{t('friends.show_live_label')}</p>
