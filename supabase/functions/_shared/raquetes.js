@@ -120,7 +120,13 @@ export const RESPONSE_SCHEMA = {
   required: ['best', 'picks'],
 }
 
-const LANG_NAME = { pt: 'português de Portugal', en: 'English', es: 'español' }
+// Em pt, de Portugal e não do Brasil (o «Porque te serve» saía com «buscam»,
+// «aprendizado», «controle»; SPEC da raquete, ponto 5).
+const LANG_NAME = {
+  pt: 'português de Portugal (nunca do Brasil: «controlo», não «controle»; «procuram», não «buscam»; «aprendizagem», não «aprendizado»; trata o jogador por tu)',
+  en: 'British English',
+  es: 'español de España',
+}
 
 // As marcas conhecidas (Renato, 27 out: «nox, bullpadel, adidas, head, etc»; a
 // Babolat é a outra das marcas do questionário). Só desempatam: quando duas
@@ -144,6 +150,8 @@ export function buildPrompt({ answers, profile, candidates, lang }) {
     'Se o jogador tem dores (cotovelo, pulso, ombro), dá prioridade ao conforto.',
     'O género do jogador está em "gender" no perfil de jogo. Modelos de mulher («MUJER», «WOMAN» no nome) só para mulheres; a uma mulher podes recomendá-los quando servem melhor (costumam ser mais leves).',
     'hardness e sweet_spot: só o que a descrição da raquete diz; se não diz, deixa vazio (""). Não inventes números nem specs.',
+    'Em hardness escreve só uma palavra: macia, média ou dura. Em sweet_spot só uma: grande, médio ou pequeno.',
+    'Em "why" usa frases curtas, sem nomes técnicos em espanhol ou inglês (nada de «intermedio», «balance», «tacto»).',
     'Em "best" põe o id da melhor. Em "why" explica em 1–2 frases porque serve a este jogador, a partir das respostas dele.',
     `Responde em ${LANG_NAME[lang] ?? LANG_NAME.pt}.`,
     '',

@@ -2314,6 +2314,30 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_UNICO_TABLE_MOCKS), ...Ob
   }
 }
 
+// «As tuas 3 raquetes» (localStorage.mockRaquetePick = 'done'): três raquetes
+// reais da Street Padel (alinho-dev, 28 out), com respostas e porquês.
+{
+  const SP = 'https://www.streetpadel.com/products/'
+  const CDN = 'https://cdn.shopify.com/s/files/1/0939/5991/3771/files/'
+  const RACKETS = [
+    { store_id: 'rq-1', name: 'WILSON ENDURE PRO V1 AZUL', brand: 'Wilson', url: `${SP}wilson-endure-pro-v1-azul-122475-p`, image_url: `${CDN}122475-pala-wilson-endure-pro-v1-wr190311u-1500x1500-1_1.jpg?v=1786110474`, price: '204.95', available: true, specs: { shape: 'redonda', weight: '355-370 g', balance: 'baixo', profile_mm: 38 } },
+    { store_id: 'rq-2', name: 'ROYAL PADEL M27 POLY 2026', brand: 'Royal Padel', url: `${SP}royal-padel-m27-poly-2026-122255-p`, image_url: `${CDN}122255-pala-royal-padel-m27-poly-2026-1500x1500-1.jpg?v=1786110632`, price: '261.95', available: true, specs: { shape: 'lagrima', weight: '360-375 g', balance: 'medio', profile_mm: null } },
+    { store_id: 'rq-3', name: 'Black Crown presenta el HURRICANE COMFORT 4.0, una pala que redefine el confort.', brand: 'Black Crown', url: `${SP}black-crown-hurricane-comfort-40-161988-p`, image_url: `${CDN}161988-pala-black-crown-hurricane-comfort-4-0-a006456-1500x1500-1.jpg?v=1786110449`, price: '167.95', available: true, specs: { shape: null, weight: null, balance: null, profile_mm: null } },
+  ]
+  const PICK = {
+    best_id: 'rq-1', created_at: new Date().toISOString(),
+    answers: { style: 'defensivo', pain: ['cotovelo'], budget: '150_220' },
+    picks: [
+      { id: 'rq-1', why: 'Redonda e macia: perdoa as bolas fora do centro e poupa o cotovelo. Dá-te controlo para defender.', pros: [], cons: [], hardness: 'intermedio', sweet_spot: 'generoso' },
+      { id: 'rq-2', why: 'Mais firme, para quando quiseres atacar sem perder o conforto.', pros: [], cons: [], hardness: 'intermedia-dura', sweet_spot: '' },
+      { id: 'rq-3', why: 'A mais barata das três e muito leve. Boa para jogar muitas vezes.', pros: [], cons: [], hardness: 'suave', sweet_spot: '' },
+    ],
+  }
+  const done = () => localStorage.getItem('mockRaquetePick') === 'done'
+  TABLE_MOCKS.racket_picks = () => (done() ? [PICK] : [])
+  TABLE_MOCKS.rackets = () => RACKETS
+}
+
 const jsonResponse = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
