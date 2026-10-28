@@ -21,6 +21,7 @@ import XpShield from '../components/XpShield'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
+import { loadMyPick, mergePickWithCatalog } from '../lib/raquete'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
 import ReceptionPass from '../components/vouchers/ReceptionPass'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
@@ -55,6 +56,15 @@ export default function Profile() {
   const headerActions = useHeaderActions()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  // «Escolhe a tua raquete»: as 3 raquetes guardadas (null = ainda não fez).
+  const [racketItems, setRacketItems] = useState(null)
+  useEffect(() => {
+    let stale = false
+    loadMyPick()
+      .then((res) => { if (!stale && res) setRacketItems(mergePickWithCatalog(res.pick, res.rackets)) })
+      .catch(() => {})
+    return () => { stale = true }
+  }, [])
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
   // Re-applies whenever ?tab= changes without a full remount — the bell
   // dropdown links here from an already-mounted Profile (same route).
@@ -1010,6 +1020,33 @@ export default function Profile() {
             })()}
           </div>
         )}
+
+        {/* «Escolhe a tua raquete» (spec 2026-10-27): para todos. Depois de
+            responder, mostra as 3 raquetes guardadas. */}
+        <button
+          type="button"
+          onClick={() => navigate(racketItems ? '/perfil/raquete' : '/perfil/raquete/perguntas')}
+          className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+        >
+          <span className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-3">
+              {racketItems ? (
+                <span className="flex shrink-0 -space-x-2">
+                  {racketItems.map((x) => (
+                    <span key={x.id} className="h-11 w-11 overflow-hidden rounded-ctrl border-2 border-white bg-ink-50">
+                      {x.racket?.image_url && <img src={x.racket.image_url} alt="" loading="lazy" className="h-full w-full object-contain" />}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+              <span className="min-w-0">
+                <span className="block text-lg text-ink-900">{t(racketItems ? 'raquete.card_title_done' : 'raquete.card_title')}</span>
+                <span className="block text-sm text-muted">{t(racketItems ? 'raquete.card_body_done' : 'raquete.card_body')}</span>
+              </span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-muted" />
+          </span>
+        </button>
 
         {/* Os jogos do relógio (Apple Watch): só na app de iPhone. */}
         {hasWatchGames && (

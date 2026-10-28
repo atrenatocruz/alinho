@@ -29,6 +29,8 @@ const MEDAL_KEYS = new Set([
   'batismo_de_campo', 'boca_a_boca', 'embaixador_da_bola',
   // As três da estrada (design-handoff/2026-10-21-conquista-primeira-rotunda).
   'deste_boleia', 'primeira_rotunda', 'ate_a_porta',
+  // As três do objetivo de jogos por mês (design-handoff/2026-10-27-conquistas-objetivo).
+  'goal_streak_3', 'goal_streak_6', 'goal_streak_12',
 ])
 
 /** O endereço da medalha, ou null se esta conquista ainda não tem uma. */

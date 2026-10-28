@@ -10,6 +10,37 @@ import RegistarJogo from '../components/numeros/RegistarJogo'
 import FriendsChallenge from '../components/numeros/FriendsChallenge'
 import { getWatchMatchStates } from '../lib/friendChallenges'
 import { canRegister } from '../lib/watchRegister'
+import { watchSessionDiagnostics } from '../lib/watchSession'
+
+// O estado da ligação ao relógio (Relógio no mix): para perceber porque é que
+// o relógio não mostra os jogos do mix. Fora da app de iPhone não aparece.
+function WatchLinkStatus() {
+  const { t } = useTranslation()
+  const [d, setD] = useState(null)
+  useEffect(() => {
+    let stale = false
+    watchSessionDiagnostics().then((r) => { if (!stale) setD(r) })
+    return () => { stale = true }
+  }, [])
+  if (!d) return null
+  const yn = (v) => t(v ? 'numeros.watch_link_yes' : 'numeros.watch_link_no')
+  return (
+    <div className="rounded-ctrl bg-ink-50 p-3 text-[12px] text-muted">
+      <p className="font-extrabold text-ink-900">{t('numeros.watch_link_title')}</p>
+      {d.error ? (
+        <p>{t('numeros.watch_link_error', { error: d.error })}</p>
+      ) : (
+        <p>{t('numeros.watch_link_line', { activated: yn(d.activated), paired: yn(d.paired), app: yn(d.appInstalled), sent: yn(d.sentUserId) })}</p>
+      )}
+      {d.lastError && <p>{t('numeros.watch_link_error', { error: d.lastError })}</p>}
+      <p>
+        {d.last
+          ? t('numeros.watch_link_last', { at: new Date(d.last.at).toLocaleString(), result: d.last.result })
+          : t('numeros.watch_link_never')}
+      </p>
+    </div>
+  )
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    «Os meus números» (relógio, Fase B — docs/superpowers/specs/
@@ -120,6 +151,7 @@ export default function MeusNumeros() {
           <FriendsChallenge />
         </DesafiosTab>
       )}
+      <WatchLinkStatus />
     </div>
   )
 }

@@ -38,6 +38,23 @@ export function launchDate(mixDate, days, time) {
   return d
 }
 
+/* O mix_offset_seconds conta-se no RELÓGIO (hora de Lisboa), não em segundos
+   absolutos: «6 dias antes, às 13:00» é sempre 13:00, com a mudança da hora
+   pelo meio ou não (bug de 27 out: o «+1 Mix de Segunda» passou a abrir às
+   12:00). A base faz a mesma conta (migration_abertura_na_hora_de_lisboa.sql:
+   recurrence_insert_pending e resume_recurrence). */
+const wallMs = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds())
+
+/** Os segundos de relógio entre a abertura e o mix (o que se grava). */
+export const launchOffsetSeconds = (mixDate, launchAt) =>
+  Math.round((wallMs(new Date(mixDate)) - wallMs(new Date(launchAt))) / 1000)
+
+/** O momento em que abre um mix, a partir do mix_offset_seconds guardado. */
+export function launchAtFromOffset(mixDate, offsetSeconds) {
+  const w = new Date(wallMs(new Date(mixDate)) - (Number(offsetSeconds) || 0) * 1000)
+  return new Date(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate(), w.getUTCHours(), w.getUTCMinutes(), w.getUTCSeconds())
+}
+
 /** «qui» — o dia da semana curto, sem ponto. */
 export const weekdayShort = (d, lang) =>
   new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(d).replace('.', '').slice(0, 3).toLowerCase()

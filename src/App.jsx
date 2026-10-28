@@ -25,6 +25,8 @@ import ProfileXp from './pages/ProfileXp'
 import PartnerPage from './pages/PartnerPage'
 import PlayerStats from './pages/PlayerStats'
 import MeusNumeros from './pages/MeusNumeros'
+import RaqueteQuestionario from './pages/RaqueteQuestionario'
+import RaqueteResultado from './pages/RaqueteResultado'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -676,6 +678,23 @@ function AppRoutes() {
         />
         {/* Os jogos do relógio (Apple Watch, Fase B): só na app de iPhone
             aparece a entrada no Perfil; a página abre vazia noutro lado. */}
+        {/* «Escolhe a tua raquete» (spec 2026-10-27): o resultado guardado e as perguntas. */}
+        <Route
+          path="/perfil/raquete"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <RaqueteResultado />
+            </Guard>
+          }
+        />
+        <Route
+          path="/perfil/raquete/perguntas"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <RaqueteQuestionario />
+            </Guard>
+          }
+        />
         <Route
           path="/perfil/numeros"
           element={

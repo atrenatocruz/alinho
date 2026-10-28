@@ -221,6 +221,14 @@ refresh token fazia cair um dos dois.
   (`ios/AlinhoWatch/Sources/AlinhoSync`).
 - Sem sessão, o relógio pede uma com `transferUserInfo(["kind": "needSession"])`.
 - Contas sem email recebem `no_email` e não conseguem ligar o relógio.
+- O iPhone volta a tentar quando a ligação ao relógio fica ativa ou muda
+  (evento `watchStateChanged`): no arranque a página pergunta antes de o
+  WatchConnectivity estar ativo.
+- **Diagnóstico:** no fundo de «Os meus números» (só na app de iPhone) aparece
+  a «Ligação ao relógio»: ativa, emparelhado, app no relógio, sessão enviada e a
+  última tentativa (`sent`, `not_installed`, `no_email`, `error:<código>`). Se o
+  relógio não mostra os jogos do mix, começar por aqui. No relógio, «Jogos do
+  mix» aparece sempre; sem sessão diz para abrir o alinho no iPhone.
 
 **No servidor (à mão, primeiro no dev e depois em produção, antes de ir para
 `main`):**

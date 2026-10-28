@@ -11,6 +11,7 @@
 // Publicar faz o mesmo que criar um mix aberto hoje — o robô anuncia-o,
 // porque só olha para `open`.
 import { supabase } from './supabase'
+import { launchAtFromOffset } from './launchDay'
 
 export const DRAFT = 'draft'
 export const isDraftMix = (game) => game?.status === DRAFT
@@ -35,7 +36,7 @@ export function nextOccurrencePlan(gameDate, recurrence) {
   const pastEnd =
     (recurrence.ends_type === 'on_date' && recurrence.ends_on && nextDate > new Date(recurrence.ends_on)) ||
     (recurrence.ends_type === 'after_occurrences' && created >= Number(recurrence.ends_after_occurrences))
-  const launchAt = new Date(nextDate.getTime() - (recurrence.mix_offset_seconds || 0) * 1000)
+  const launchAt = launchAtFromOffset(nextDate, recurrence.mix_offset_seconds || 0)
   return { nextDate, launchAt, pastEnd }
 }
 

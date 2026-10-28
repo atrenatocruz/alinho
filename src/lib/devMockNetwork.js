@@ -69,6 +69,10 @@ const COMMUNITY_ORGS = [
 
 const ACHIEVEMENTS_CATALOG = [
   { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 10 },
+  // Objetivo de jogos por mês (migration_objetivo_mensal.sql).
+  { key: 'goal_streak_3', category: 'jogo', rarity: 'raro', sort: 1033 },
+  { key: 'goal_streak_6', category: 'jogo', rarity: 'epico', sort: 1034 },
+  { key: 'goal_streak_12', category: 'jogo', rarity: 'lendario', sort: 1035 },
   { key: 'areia_nos_tenis', category: 'jogo', rarity: 'comum', sort: 11 },
   { key: 'cliente_da_casa', category: 'jogo', rarity: 'comum', sort: 12 },
   { key: 'residente', category: 'jogo', rarity: 'raro', sort: 13 },
@@ -256,6 +260,10 @@ const RPC_MOCKS = {
   // as mais recentes (conquistas animadas, 11 out). awarded_at: a 1.ª da
   // lista é a mais recente.
   get_player_achievements: () => [
+    // localStorage.mockGoalStreak = 'true' — «No Alvo» ganha (objetivo do mês).
+    ...(localStorage.getItem('mockGoalStreak') ? [
+      { achievement_key: 'goal_streak_3', category: 'jogo', rarity: 'raro', rarity_pct: 3.2, awarded_at: new Date().toISOString() },
+    ] : []),
     // localStorage.mockLongAchievements = 'true' — as de texto comprido primeiro
     // (o cartão aberto cortava a «% têm» no bico, 13 out).
     ...(localStorage.getItem('mockLongAchievements') ? [

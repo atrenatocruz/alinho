@@ -15,7 +15,7 @@ vi.mock('./supabase', () => ({
   supabase: { functions: { invoke }, auth: { getSession } },
 }))
 
-import { shouldSendWatchSession, syncWatchSession, clearWatchSession } from './watchSession'
+import { shouldSendWatchSession, syncWatchSession, clearWatchSession, watchSessionDiagnostics } from './watchSession'
 
 const base = { installed: true, sentUserId: null, needsSession: false, userId: 'u1', lastFailure: null }
 
@@ -105,5 +105,43 @@ describe('syncWatchSession e clearWatchSession', () => {
     spy.mockRestore()
     expect(invoke).toHaveBeenCalledTimes(2)
     expect(WatchGames.sendWatchSession).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('watchSessionDiagnostics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const store = new Map()
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => store.set(k, String(v)),
+    })
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } })
+  })
+
+  it('sem relógio instalado: fica registado porque não se mandou', async () => {
+    WatchGames.watchSessionStatus.mockResolvedValue({ installed: false, sentUserId: null, needsSession: false, paired: true, appInstalled: false })
+    await syncWatchSession('u1')
+    const d = await watchSessionDiagnostics()
+    expect(invoke).not.toHaveBeenCalled()
+    expect(d.appInstalled).toBe(false)
+    expect(d.last.result).toBe('not_installed')
+  })
+
+  it('mandada: fica «sent»', async () => {
+    WatchGames.watchSessionStatus.mockResolvedValue({ installed: true, sentUserId: null, needsSession: false })
+    WatchGames.sendWatchSession.mockResolvedValue()
+    invoke.mockResolvedValue({ data: { access_token: 'a', refresh_token: 'r', expires_at: 1, user_id: 'u1' }, error: null })
+    await syncWatchSession('u1')
+    expect((await watchSessionDiagnostics()).last.result).toBe('sent')
+  })
+
+  it('a função falhou: fica o código do erro', async () => {
+    WatchGames.watchSessionStatus.mockResolvedValue({ installed: true, sentUserId: null, needsSession: false })
+    invoke.mockResolvedValue({ data: null, error: { message: 'x', context: { json: async () => ({ error: 'unauthorized' }) } } })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await syncWatchSession('u1')
+    spy.mockRestore()
+    expect((await watchSessionDiagnostics()).last.result).toBe('error:unauthorized')
   })
 })

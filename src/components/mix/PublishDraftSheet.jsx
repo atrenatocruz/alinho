@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ConfirmSheet } from '../ui'
 import LaunchDayPicker from '../LaunchDayPicker'
-import { launchDate } from '../../lib/launchDay'
+import { launchDate, launchAtFromOffset, launchOffsetSeconds } from '../../lib/launchDay'
 import { draftRecurrence, publishDraftMix } from '../../lib/mixDraft'
 
 const pad = (n) => String(n).padStart(2, '0')
@@ -44,7 +44,7 @@ export default function PublishDraftSheet({ game, userId, onClose, onPublished, 
         .then((r) => {
           if (!alive) return
           setRec(r)
-          if (!game.launch_at && r?.mix_offset_seconds) pick(new Date(mixDate.getTime() - r.mix_offset_seconds * 1000))
+          if (!game.launch_at && r?.mix_offset_seconds) pick(launchAtFromOffset(mixDate, r.mix_offset_seconds))
         })
         .catch((err) => console.error('Error loading draft recurrence:', err))
     }
@@ -55,7 +55,7 @@ export default function PublishDraftSheet({ game, userId, onClose, onPublished, 
   const n = parseInt(days, 10) || 0
   const publish = async () => {
     const open = n >= 1 ? launchDate(mixDate, n, time) : null
-    const offsetSeconds = rec && open ? Math.round((mixDate.getTime() - open.getTime()) / 1000) : null
+    const offsetSeconds = rec && open ? launchOffsetSeconds(mixDate, open) : null
     const published = await publishDraftMix(game, userId, { launchAt: open, offsetSeconds })
     onPublished?.(published)
   }
