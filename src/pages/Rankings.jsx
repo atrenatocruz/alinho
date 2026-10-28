@@ -452,7 +452,7 @@ export default function Rankings() {
 
       {mode === 'month' ? (
         <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare}
-          partner={zonePartner} onScope={setScope} onScale={setScaleChoice} />
+          partner={zonePartner} />
       ) : loading ? (
         // A forma da lista em vez da roda (esqueletos, 12 out; Francisco, 18 out).
         <SkeletonGate><RankingSkeleton /></SkeletonGate>
