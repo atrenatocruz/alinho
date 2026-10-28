@@ -14,6 +14,7 @@ import { errorKind } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
 import MonthRanking from '../components/rankings/MonthRanking'
+import { DISTRICT_SCOPE, isDistrictScope, showsPartner, useMyPartners } from '../lib/partners'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 import RankPodium from '../components/rankings/RankPodium'
 import RankingSkeleton from '../components/rankings/RankingSkeleton'
@@ -60,7 +61,8 @@ export default function Rankings() {
   // distrito do parceiro e em «Todos».
   const [mode, setMode] = useState(initialTab === 'assiduidade' ? 'xp' : initialTab === 'do-mes' ? 'month' : 'ranking')
   const [scope, setScope] = useState(
-    (initialTab === 'geral' || initialTab === 'mensal') && currentOrganizationId ? currentOrganizationId : 'global'
+    location.state?.scope ? location.state.scope
+      : (initialTab === 'geral' || initialTab === 'mensal') && currentOrganizationId ? currentOrganizationId : 'global'
   )
   const [period, setPeriod] = useState(ALWAYS)
   const [query, setQuery] = useState('')
@@ -71,7 +73,7 @@ export default function Rankings() {
   const wantMonthly = useRef(initialTab === 'mensal')
   // null = ainda não escolheu → a escala do próprio (o perfil pode chegar
   // depois do primeiro render).
-  const [scaleChoice, setScaleChoice] = useState(null)
+  const [scaleChoice, setScaleChoice] = useState(location.state?.scale || null)
   const scale = scaleChoice ?? defaultScale(profile?.gender)
 
   // «Do mês» (#626): sai só se a função do Dev 3 não existir. Começa à
@@ -88,13 +90,22 @@ export default function Rankings() {
       })
   }, [])
 
+  // Parceiros (18 out, UX): no «Do mês», quem joga num distrito com parceiro
+  // tem também «Distrito de X», logo a seguir a «Global».
+  const myPartners = useMyPartners()
+  // Com prémios, ou a começar (o distrito aparece; a linha e as pastilhas não).
+  const zonePartner = myPartners.find(showsPartner) || null
+  const zoneDistrict = zonePartner ? (zonePartner.prize_district || zonePartner.district) : null
   const scopeOptions = useMemo(() => [
     { value: 'global', label: t('rankings.scope_global') },
+    ...(mode === 'month' && zoneDistrict ? [{ value: `${DISTRICT_SCOPE}${zoneDistrict}`, label: t('rankings.scope_district', { district: zoneDistrict }) }] : []),
     ...memberships
       .filter((m) => m.organization)
       .map((m) => ({ value: m.organization_id, label: m.organization.name }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt')),
-  ], [memberships, t])
+  ], [memberships, t, mode, zoneDistrict])
+  // O distrito só existe no «Do mês»: fora dele volta ao Global.
+  useEffect(() => { if (mode !== 'month' && isDistrictScope(scope)) setScope('global') }, [mode, scope])
 
   // Muda de âmbito → período volta a "Sempre" (os meses são de cada clube).
   useEffect(() => {
@@ -105,7 +116,8 @@ export default function Rankings() {
   // ── Carregar ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    if (mode === 'month') return undefined
+    // O distrito só vale no «Do mês»: à saída volta ao Global antes de carregar.
+    if (mode === 'month' || isDistrictScope(scope)) return undefined
     setLoading(true)
 
     const load = async () => {
@@ -439,7 +451,8 @@ export default function Rankings() {
       </StickyTop>
 
       {mode === 'month' ? (
-        <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare} />
+        <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare}
+          partner={zonePartner} onScope={setScope} onScale={setScaleChoice} />
       ) : loading ? (
         // A forma da lista em vez da roda (esqueletos, 12 out; Francisco, 18 out).
         <SkeletonGate><RankingSkeleton /></SkeletonGate>

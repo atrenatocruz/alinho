@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
+import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { uploadOrgCover, removeOldCover, rememberCover, coverOf } from '../lib/orgCover'
 import CoverSheet from '../components/club/CoverSheet'
@@ -674,14 +674,14 @@ export default function GerirClube() {
 
   useEffect(() => { setFormLevelScale('') }, [showCreateGame, editingGame?.id])
 
-  useGooglePlacesAutocomplete(
+  usePlaceAutocomplete(
     locationInputRef,
     showCreateGame || editingGame,
     ({ value, latitude, longitude }) =>
       setGameForm((form) => ({ ...form, location: value, latitude, longitude }))
   )
 
-  useGooglePlacesAutocomplete(
+  usePlaceAutocomplete(
     clubLocationInputRef,
     activeTab === 'settings' && !loading && !!settings,
     ({ value, latitude, longitude }) =>
@@ -4571,7 +4571,7 @@ export default function GerirClube() {
                   {/* Os preços passaram para a página própria das aulas
                       (Professores · Turmas · Preços, versão final de 26 set). */}
                   <button type="button" onClick={() => navigate(`/gerir/${slug}/aulas`)}
-                    className="card flex w-full items-center justify-between gap-3 text-left hover:bg-ink-50">
+                    className="card flex w-full items-center justify-between gap-3 text-left card-open">
                     <span>
                       <span className="block text-base font-extrabold text-ink-900">{t('gerirclube.lessons_card')}</span>
                       <span className="block text-sm text-muted">{t('gerirclube.lessons_card_hint')}</span>

@@ -8,6 +8,7 @@ import { SkeletonGate, SkBlock, SkCircle, SkLine } from '../components/Skeleton'
 import { sharePageLink } from '../lib/shareImage'
 import { Award, ChevronRight, UserPlus, UserCheck, Clock, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { achievementContext, loadPlayerAchievements } from '../lib/achievements'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, ConfirmSheet } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
@@ -92,7 +93,7 @@ export default function PlayerDetails() {
   const loadXp = async () => {
     const [xp, trophies, catalog, extras] = await Promise.all([
       supabase.rpc('get_player_xp', { p_user_id: id }),
-      supabase.rpc('get_player_achievements', { p_user_id: id }),
+      loadPlayerAchievements(supabase, id),
       supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
       supabase.rpc('get_player_public_extras', { p_user_id: id }),
     ])
@@ -542,7 +543,7 @@ export default function PlayerDetails() {
               )}
               {/* A folha da conquista é a do Dev 2 (AchievementViewer, com o dono). */}
               {trophyOpen && (() => {
-                const items = playerTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at }))
+                const items = playerTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at, ctx: achievementContext(tr) }))
                 return (
                   <Suspense fallback={null}>
                     <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))}

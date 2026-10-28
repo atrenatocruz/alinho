@@ -12,9 +12,9 @@
 // antes de a imagem chegar (sem saltos).
 // Poses novas de 21 out (biblioteca-pronta): o mesmo boneco com o recorte
 // limpo, um pouco mais largas; o @2x para ecrãs de alta densidade.
-const WIDTH_AT_320 = { ola: 290, festa: 269, 'a-pensar': 228, triste: 224, pronto: 333 }
+const WIDTH_AT_320 = { ola: 290, festa: 269, 'a-pensar': 228, triste: 224, pronto: 333, trofeu: 164 }
 
-/** pose: 'ola' | 'festa' | 'a-pensar' | 'triste' | 'pronto'.
+/** pose: 'ola' | 'festa' | 'a-pensar' | 'triste' | 'pronto' | 'trofeu'.
  *  size: a altura em px (cerca de 150 nas páginas da app). */
 export default function Alino({ pose = 'ola', size = 150, className = '' }) {
   const w = WIDTH_AT_320[pose]

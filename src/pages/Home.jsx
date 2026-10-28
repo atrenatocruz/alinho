@@ -28,6 +28,8 @@ import LiveNowLine from '../components/home/LiveNowLine'
 import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
 import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
 import FreeSlotsCard from '../components/home/FreeSlotsCard'
+import PartnerCard from '../components/partners/PartnerCard'
+import { pickPartnerOfDay, useMyPartners } from '../lib/partners'
 import OpenSlotSheet from '../components/home/OpenSlotSheet'
 import { groupFreeSlots, markFreeSlots } from '../lib/freeSlots'
 import { ratingBand } from '../lib/elo'
@@ -38,7 +40,6 @@ import FriendInviteEventCard from '../components/friends/FriendInviteEventCard'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
-import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
 import { cancelLessonRequest, listMyLessonRequests, listMyLessons, listLessonEvents, setLessonAttendance } from '../lib/lessonsApi'
 import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
@@ -49,7 +50,7 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
   toDayKey, fromDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
-  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
+  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -98,6 +99,9 @@ let homeCache = null
 // estou vêm sempre, por mais longe que sejam (os meus próximos jogos).
 const WINDOW_DAYS = 7
 const MAX_DAYS_AHEAD = 120
+// Os últimos dias ficam por cima de «Hoje» (Renato, 28 out): só os meus jogos
+// (applyFilters). Mais para trás, só o dia escolhido no calendário.
+const PAST_DAYS = 3
 const startOfDay = (offsetDays) => {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
@@ -152,6 +156,10 @@ export default function Home() {
   const [gamesDays, setGamesDays] = useState(() => cached?.gamesDays || WINDOW_DAYS + 1)
   const gamesDaysRef = useRef(gamesDays)
   const [loadingMore, setLoadingMore] = useState(false)
+  // Um dia antes dos PAST_DAYS escolhido no calendário, e os jogos dele.
+  const [pastDay, setPastDay] = useState(null)
+  const [pastDayGames, setPastDayGames] = useState([])
+  const pastDayRef = useRef(null)
   // Esqueleto (não o círculo a rodar): só se demorar mais de 0,2 s; ao fim
   // de 8 s sem dados, o erro de sempre.
   const showSkeleton = useSkeleton(loading)
@@ -266,10 +274,8 @@ export default function Home() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   // Vista de mapa (Fase 2 do épico, Trello #258) — alternativa à lista, não
   // um filtro: persiste como os filtros, para sobreviver a abrir um mix e
-  // voltar atrás. Sem chave da Google não há mapa para mostrar (ver
-  // lib/googleMaps.js), por isso nunca sai de 'list' nesse caso.
-  const [viewMode, setViewMode] = useState(() => (GOOGLE_MAPS_API_KEY ? readSession(VIEW_MODE_KEY, 'list') : 'list'))
-  const [selectedPin, setSelectedPin] = useState(null)
+  // voltar atrás. Mapa com MapLibre + OpenFreeMap (28 out): sem chave, há sempre.
+  const [viewMode, setViewMode] = useState(() => readSession(VIEW_MODE_KEY, 'list'))
 
   useEffect(() => { writeSession(FILTERS_KEY, filters) }, [filters])
   useEffect(() => { writeSession(VIEW_MODE_KEY, viewMode) }, [viewMode])
@@ -408,7 +414,7 @@ export default function Home() {
     const seq = ++gamesSeq.current
     const until = startOfDay(days).toISOString()
     const [windowRes, later] = await Promise.all([
-      gameQuery().gte('date', startOfDay(-1).toISOString()).lt('date', until),
+      gameQuery().gte('date', startOfDay(-PAST_DAYS).toISOString()).lt('date', until),
       loadMyLaterGames(until),
     ])
     if (windowRes.error) throw windowRes.error
@@ -441,6 +447,26 @@ export default function Home() {
       console.error('Error loading more days of games:', error)
     } finally {
       setLoadingMore(false)
+    }
+  }
+
+  // Os jogos de um só dia já passado (escolhido no calendário). Ficam à
+  // parte: o loadGames substitui a lista e levava-os.
+  const loadPastDay = async (dayKey) => {
+    pastDayRef.current = dayKey
+    setPastDay(dayKey)
+    setPastDayGames([])
+    if (orgIds.length === 0) return
+    const from = fromDayKey(dayKey)
+    const to = new Date(from)
+    to.setDate(to.getDate() + 1)
+    try {
+      const { data, error } = await gameQuery().gte('date', from.toISOString()).lt('date', to.toISOString())
+      if (error) throw error
+      const rows = await withMembers(data || [])
+      if (pastDayRef.current === dayKey) setPastDayGames(rows)
+    } catch (error) {
+      console.error('Error loading games of a past day:', error)
     }
   }
 
@@ -614,6 +640,7 @@ export default function Home() {
     if (!user) return []
     return [
       ...games.map((g) => eventFromGame(g, user.id)),
+      ...pastDayGames.filter((g) => !games.some((x) => x.id === g.id)).map((g) => eventFromGame(g, user.id)),
       ...groupMatches.map(({ match, org }) => eventFromGroupMatch(match, user.id, org)),
       // Um cartão por sessão de jogo entre amigos (bug de 27 set).
       ...eventsFromPrivateMatches(privateMatches, user.id, new Map((memberships || []).map((ms) => [ms.organization_id,
@@ -627,19 +654,24 @@ export default function Home() {
       ...leagueEvents,
       ...friendInviteEvents,
     ].filter((e, _, all) => !(e.source === 'friend_session' && e.id && all.some((x) => x.key === `friend_invite:${e.id}`)))
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, leagueEvents, friendInviteEvents, user, memberships])
+  }, [games, pastDayGames, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, leagueEvents, friendInviteEvents, user, memberships])
 
   const visible = useMemo(() => applyFilters(markFreeSlots(events), filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
-  // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
-  // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
+  // A Home abre em «Hoje»; por cima, os últimos PAST_DAYS dias (Renato,
+  // 28 out — antes não havia passado nenhum, só em «Filtros › Já jogados») e
+  // o dia passado escolhido no calendário, mesmo vazio.
   // Horários livres (SPEC-4, 9 out): os jogos em aberto sem ninguém de um
   // dia juntam-se numa linha só (FreeSlotsCard); com alguém, cartão normal.
   // Só «Horários livres» escolhido: um cartão por clube (SPEC-4).
   const onlyFree = filters.kinds.length === 1 && filters.kinds[0] === 'free'
-  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today)
-    .map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey, Date.now(), { perClub: onlyFree }) })), [visible, today, onlyFree])
+  const pastFrom = toDayKey(startOfDay(-PAST_DAYS))
+  const days = useMemo(() => {
+    const list = groupByDay(visible.filter((e) => e.dayKey >= pastFrom || e.dayKey === pastDay), today)
+    if (pastDay && pastDay < pastFrom && !list.some((d) => d.dayKey === pastDay)) list.unshift({ dayKey: pastDay, events: [] })
+    return list.map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey, Date.now(), { perClub: onlyFree }) }))
+  }, [visible, today, pastFrom, pastDay, onlyFree])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show
@@ -648,7 +680,7 @@ export default function Home() {
   const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
   // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
   // ajudam a decidir onde jogar a seguir.
-  const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
+  const mapEvents = useMemo(() => visible.filter((e) => !isPastEvent(e, today)), [visible, today])
 
   /* --- Ação direta num mix (Trello #51). As regras são as mesmas dos botões
      da página do mix; quem decide de verdade é a RLS de `participants`. Sem
@@ -852,8 +884,20 @@ export default function Home() {
   // Um dia do calendário que ainda não está pedido: pede até lá (e mais uma
   // semana) e salta quando os dias chegarem.
   const pendingDay = useRef(null)
+  // Antes dos PAST_DAYS: pede-se só esse dia, e fica na lista até se escolher
+  // outro dia no calendário.
   const pickDay = (dayKey) => {
     touchedList.current = true
+    if (dayKey < pastFrom) {
+      pendingDay.current = dayKey
+      loadPastDay(dayKey)
+      return
+    }
+    if (pastDayRef.current) {
+      pastDayRef.current = null
+      setPastDay(null)
+      setPastDayGames([])
+    }
     const offset = Math.round((fromDayKey(dayKey) - startOfDay(0)) / 86400000)
     if (offset + 1 > gamesDaysRef.current && gamesDaysRef.current < MAX_DAYS_AHEAD) {
       pendingDay.current = dayKey
@@ -1204,6 +1248,12 @@ export default function Home() {
     )
   }
 
+  // Parceiros (18 out, atrás do interruptor «parceiros»): um cartão por dia,
+  // em «Hoje», a seguir ao 1.º jogo — só a quem joga na zona do parceiro.
+  const myPartners = useMyPartners()
+  const partnerToday = pickPartnerOfDay(myPartners, today)
+  const partnerCard = partnerToday ? <PartnerCard key={`partner-${partnerToday.id}`} partner={partnerToday} /> : null
+
   const renderEventWithError = (event) => (
     cardError?.key === event.key ? (
       <div key={event.key} className="space-y-1.5">
@@ -1244,9 +1294,7 @@ export default function Home() {
             <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {GOOGLE_MAPS_API_KEY && (
-              <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
-            )}
+            <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
             {headerActions}
           </div>
         </div>
@@ -1271,7 +1319,19 @@ export default function Home() {
 
 
       {viewMode === 'map' ? (
-        <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
+        <MapView
+          events={mapEvents}
+          today={today}
+          location={location}
+          linkFor={eventLink}
+          actionFor={(e) => {
+            if (e.source !== 'game' || e.finished) return null
+            const a = cardAction(e.raw)
+            return a && { ...a, busy: pendingKeys.has(e.key) }
+          }}
+          onAction={(e) => { const a = cardAction(e.raw); if (a) handleGameAction(e, a.kind) }}
+          onShowList={(dayKey) => { setViewMode('list'); requestAnimationFrame(() => pickDay(dayKey)) }}
+        />
       ) : filters.show === 'played' ? (
         // «Já jogados» (27 set): a lista do que já se jogou, do mais recente
         // para trás, em vez da agenda por dias.
@@ -1317,7 +1377,10 @@ export default function Home() {
                 )
                 : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t(noClubs && dayKey === today ? 'home.no_clubs_today_empty' : 'agenda.today_empty')}</p>
-                : dayEvents.map(renderEventWithError)}
+                : dayKey === today && partnerCard
+                  ? [...dayEvents.slice(0, 1).map(renderEventWithError), partnerCard, ...dayEvents.slice(1).map(renderEventWithError)]
+                  : dayEvents.map(renderEventWithError)}
+              {dayKey === today && dayEvents.length === 0 && partnerCard}
               {/* Os torneios abertos a quem chega (não pedem clube) e o convite. */}
               {dayKey === today && noClubs && openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
               {dayKey === today && noClubsCard}
@@ -1389,17 +1452,6 @@ export default function Home() {
 
       {customizeOpen && (
         <PersonalizeHomeSheet hidden={homeSections.hidden} onToggle={homeSections.toggle} onClose={() => setCustomizeOpen(false)} />
-      )}
-
-      {selectedPin && (
-        <Sheet
-          title={selectedPin.events[0]?.orgName || t('agenda.map_pin_title')}
-          onClose={() => setSelectedPin(null)}
-        >
-          <div className="space-y-2.5">
-            {selectedPin.events.map(renderEventWithError)}
-          </div>
-        </Sheet>
       )}
 
       <ConfirmSheet open={!!leaveAsk} title={t('dialogs.leave_game_title')}

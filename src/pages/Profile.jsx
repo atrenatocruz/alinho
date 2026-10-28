@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, Watch } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { achievementContext, loadPlayerAchievements } from '../lib/achievements'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
@@ -57,14 +58,17 @@ export default function Profile() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // «Escolhe a tua raquete»: as 3 raquetes guardadas (null = ainda não fez).
+  // Só com o interruptor «raquete» ligado.
+  const { on: raqueteOn } = useFeatureFlag('raquete')
   const [racketItems, setRacketItems] = useState(null)
   useEffect(() => {
+    if (!raqueteOn) return undefined
     let stale = false
     loadMyPick()
       .then((res) => { if (!stale && res) setRacketItems(mergePickWithCatalog(res.pick, res.rackets)) })
       .catch(() => {})
     return () => { stale = true }
-  }, [])
+  }, [raqueteOn])
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
   // Re-applies whenever ?tab= changes without a full remount — the bell
   // dropdown links here from an already-mounted Profile (same route).
@@ -170,7 +174,7 @@ export default function Profile() {
     try {
       const [{ data: catalog, error: catErr }, { data: mine, error: mineErr }] = await Promise.all([
         supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
-        supabase.rpc('get_player_achievements', { p_user_id: profile.id }),
+        loadPlayerAchievements(supabase, profile.id),
       ])
       if (catErr) throw catErr
       if (mineErr) throw mineErr
@@ -1011,7 +1015,7 @@ export default function Profile() {
               </Suspense>
             )}
             {trophyOpen && (() => {
-              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at }))
+              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at, ctx: achievementContext(tr) }))
               return (
                 <Suspense fallback={null}>
                   <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))} onClose={() => setTrophyOpen(null)} />
@@ -1023,6 +1027,7 @@ export default function Profile() {
 
         {/* «Escolhe a tua raquete» (spec 2026-10-27): para todos. Depois de
             responder, mostra as 3 raquetes guardadas. */}
+        {raqueteOn && (
         <button
           type="button"
           onClick={() => navigate(racketItems ? '/perfil/raquete' : '/perfil/raquete/perguntas')}
@@ -1047,13 +1052,14 @@ export default function Profile() {
             <ChevronRight size={18} className="shrink-0 text-muted" />
           </span>
         </button>
+        )}
 
         {/* Os jogos do relógio (Apple Watch): só na app de iPhone. */}
         {hasWatchGames && (
           <button
             type="button"
             onClick={() => navigate('/perfil/numeros')}
-            className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+            className="card card-open w-full text-left"
           >
             <span className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
@@ -1076,7 +1082,7 @@ export default function Profile() {
         <button
           type="button"
           onClick={() => navigate('/perfil/informacao')}
-          className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+          className="card card-open w-full text-left"
         >
           <div className="flex items-center justify-between gap-3 mb-4">
             <span className="flex items-center gap-2">

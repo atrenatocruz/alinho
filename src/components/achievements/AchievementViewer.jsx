@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Lock } from 'lucide-react'
 import { medalUrl } from '../../lib/achievementMedals'
 import { RARITY_META, formatRarityPct } from '../../lib/achievements'
+import AchievementWhen from './AchievementWhen'
 import './achievementsFx.css'
 
 // Partilhar a conquista (SPEC 2026-10-13-partilhar-conquistas): só carrega ao abrir.
@@ -159,11 +160,15 @@ export default function AchievementViewer({ items, start = 0, locked = false, ce
       </div>
 
       <div key={`m${i}`} className="achv-meta">
-        <p className="text-xs text-white/60">
-          {locked ? (owner ? t('achievements.fx_locked_note_other', { name: firstName(owner.name) }) : t('achievements.fx_locked_note'))
-            : owner ? t('achievements.fx_earned_note_other', { name: firstName(owner.name) })
-            : t('achievements.fx_earned_note')}
-        </p>
+        {/* Ganha, com o quando e com quem da base (v2): o dia, o evento, o
+            parceiro e a dupla vencida. Sem ele, a frase de sempre. */}
+        {!locked && a.ctx ? <AchievementWhen ctx={a.ctx} owner={owner} onNavigate={onClose} /> : (
+          <p className="text-xs text-white/60">
+            {locked ? (owner ? t('achievements.fx_locked_note_other', { name: firstName(owner.name) }) : t('achievements.fx_locked_note'))
+              : owner ? t('achievements.fx_earned_note_other', { name: firstName(owner.name) })
+              : t('achievements.fx_earned_note')}
+          </p>
+        )}
         {/* Ganha: «Partilhar» a lima por cima e, por baixo, «Boa!» (na festa)
             ou «Fechar», em contorno claro — um só botão lima (SPEC de partilhar
             as conquistas, 13 out). Por ganhar: só «Fechar», sem partilhar. */}
