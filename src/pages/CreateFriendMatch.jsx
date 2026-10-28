@@ -11,7 +11,7 @@ import { FORMAT_DB, formatKey, formatToSave } from '../components/friends/friend
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
 import { PrimaryButton, DateTimeField, Chips } from '../components/ui'
-import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
+import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
 import { describeError } from '../lib/errors'
 import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
@@ -76,7 +76,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const [error, setError] = useState('')
 
   const locationInputRef = useRef(null)
-  useGooglePlacesAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
+  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
   })

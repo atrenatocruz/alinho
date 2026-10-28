@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { importLibrary } from '@googlemaps/js-api-loader'
 import { useTranslation } from 'react-i18next'
 import { LocateFixed } from 'lucide-react'
-import { GOOGLE_MAPS_API_KEY } from '../../lib/googleMaps'
 import { eventsToPins, eventDistance } from '../../lib/agenda'
 import { countPeople, mixCapacity } from '../../lib/mixLogic'
 import { formatTime } from '../../lib/formatDate'
@@ -18,21 +16,24 @@ const MIXED_COLOR = '#1F2937'
 // Quantos dias aparecem na fila de cima (só os que têm eventos).
 const MAX_DAY_CHIPS = 14
 
-// Estilo minimalista a condizer com o resto da app (DESIGN.md). POI e
-// transportes escondidos: só interessa onde estão os jogos.
-const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#f3f4f6' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#6b7280' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#e5e7eb' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#e5e7eb' }] },
-  { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbe3ea' }] },
-]
+// Mapas do OpenStreetMap pela OpenFreeMap (28 out: troca da Google — sem
+// chave, sem faturação, sem limites). «Positron»: claro e calmo, a condizer
+// com a app (DESIGN.md); os pins é que levam a cor.
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
+// O MapLibre (~800 KB) só se carrega quando se abre o mapa.
+const loadMapLibre = () => Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m.default)
+
+/** Polígono de um círculo (raio em km) — o raio de «Escolher localização». */
+function circleGeoJSON({ latitude, longitude }, km) {
+  const pts = []
+  const dLat = km / 110.574
+  const dLng = km / (111.32 * Math.cos((latitude * Math.PI) / 180))
+  for (let i = 0; i <= 64; i += 1) {
+    const a = (i / 64) * 2 * Math.PI
+    pts.push([longitude + dLng * Math.cos(a), latitude + dLat * Math.sin(a)])
+  }
+  return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [pts] }, properties: {} }
+}
 
 /** O estado de um evento para o pin e o cartão: estás dentro, cheio, faltam N. */
 function eventStatus(e, t) {
@@ -60,29 +61,15 @@ function pinLabel(pin, t, lang) {
   return { text: [t('homecard.day_count', { count: evs.length }), range].filter(Boolean).join(' · '), tone }
 }
 
-/* Pins em HTML sem Advanced Markers (esses pedem um Map ID): um OverlayView
-   com um <button> posicionado no ponto. A classe só existe depois de a API
-   da Google carregar. */
-let PillOverlay = null
-function pillOverlayClass() {
-  if (PillOverlay) return PillOverlay
-  PillOverlay = class extends window.google.maps.OverlayView {
-    constructor(position, onClick) {
-      super()
-      this.position = position
-      this.el = document.createElement('button')
-      this.el.type = 'button'
-      this.el.className = 'map-pill'
-      this.el.addEventListener('click', (ev) => { ev.stopPropagation(); onClick() })
-    }
-    onAdd() { this.getPanes().overlayMouseTarget.appendChild(this.el) }
-    draw() {
-      const p = this.getProjection().fromLatLngToDivPixel(this.position)
-      if (p) this.el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -100%)`
-    }
-    onRemove() { this.el.remove() }
-  }
-  return PillOverlay
+/** O elemento do pin: o MapLibre posiciona o de fora; a pílula é o filho. */
+function createPinEl(onClick) {
+  const wrap = document.createElement('div')
+  const el = document.createElement('button')
+  el.type = 'button'
+  el.className = 'map-pill'
+  el.addEventListener('click', (ev) => { ev.stopPropagation(); onClick() })
+  wrap.appendChild(el)
+  return { wrap, el }
 }
 
 function paintPill(el, pin, label, active) {
@@ -90,7 +77,7 @@ function paintPill(el, pin, label, active) {
   const color = kinds.size === 1 ? (KIND_COLOR[[...kinds][0]] || MIXED_COLOR) : MIXED_COLOR
   el.dataset.tone = label.tone || ''
   el.dataset.active = active ? 'true' : 'false'
-  el.style.zIndex = active ? '3' : label.tone === 'full' ? '1' : '2'
+  el.parentElement.style.zIndex = active ? '3' : label.tone === 'full' ? '1' : '2'
   el.replaceChildren()
   const dot = document.createElement('i')
   dot.style.background = color
@@ -139,14 +126,15 @@ function MiniCard({ event, active, distance, link, action, onAction, cardRef }) 
    Os pins são pílulas com a hora e o que falta. Só se recriam os que
    mudaram, e o mapa só se enquadra ao abrir e ao trocar de dia — nunca por
    cima do que a pessoa arrastou.
-   Sem VITE_GOOGLE_PLACES_API_KEY não há mapa (a Home esconde o botão).
+   MapLibre + OpenFreeMap (28 out): sem chave, sempre disponível.
    ════════════════════════════════════════════════════════════════════════ */
 export function MapView({ events, today, location, linkFor, actionFor, onAction, onShowList }) {
   const { t, i18n } = useTranslation()
   const containerRef = useRef(null)
   const mapRef = useRef(null)
-  const overlaysRef = useRef(new Map()) // chave do sítio → overlay
-  const extrasRef = useRef([]) // «estou aqui» e o raio
+  const libRef = useRef(null)
+  const markersRef = useRef(new Map()) // chave do sítio → { marker, el, pin }
+  const meRef = useRef(null) // o ponto de «estou aqui»
   const userMovedRef = useRef(false)
   const fittedDayRef = useRef(null)
   const cardRefs = useRef(new Map())
@@ -190,25 +178,42 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
 
   // O mapa cria-se uma vez.
   useEffect(() => {
-    if (!GOOGLE_MAPS_API_KEY || !containerRef.current) return undefined
+    if (!containerRef.current) return undefined
     let cancelled = false
-    importLibrary('maps').then(({ Map }) => {
+    let map
+    loadMapLibre().then((maplibregl) => {
       if (cancelled || !containerRef.current || mapRef.current) return
+      libRef.current = maplibregl
       const start = location || gpsCenter
-      const map = new Map(containerRef.current, {
-        center: start ? { lat: start.latitude, lng: start.longitude } : DEFAULT_CENTER,
-        zoom: start ? 13 : 11,
-        disableDefaultUI: true,
-        // Um dedo mexe o mapa: a página por baixo não faz scroll nesta vista.
-        gestureHandling: 'greedy',
-        clickableIcons: false,
-        styles: MAP_STYLE,
+      map = new maplibregl.Map({
+        container: containerRef.current,
+        style: MAP_STYLE_URL,
+        center: start ? [start.longitude, start.latitude] : [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
+        zoom: start ? 12 : 10,
+        attributionControl: { compact: true },
+        // Mapa plano: rodar e inclinar só baralham quem procura um clube.
+        dragRotate: false,
+        pitchWithRotate: false,
+        touchPitch: false,
       })
-      map.addListener('dragstart', () => { userMovedRef.current = true })
-      mapRef.current = map
-      setReady(true)
+      map.touchZoomRotate.disableRotation()
+      map.on('dragstart', () => { userMovedRef.current = true })
+      map.on('load', () => {
+        if (cancelled) return
+        map.addSource('radius', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+        map.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#1E4FA8', 'fill-opacity': 0.05 } })
+        map.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#1E4FA8', 'line-opacity': 0.5, 'line-width': 1.5, 'line-dasharray': [3, 2] } })
+        mapRef.current = map
+        setReady(true)
+      })
     }).catch((error) => console.error('Error loading the map:', error))
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      map?.remove()
+      mapRef.current = null
+      markersRef.current.clear()
+      meRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -216,26 +221,26 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
-    const Overlay = pillOverlayClass()
     const seen = new Set()
     for (const pin of pins) {
       const key = pinKeyOf(pin)
       seen.add(key)
-      let o = overlaysRef.current.get(key)
-      if (!o) {
-        o = new Overlay(new window.google.maps.LatLng(pin.latitude, pin.longitude), () => {
-          const first = o.pin.events[0]
+      let m = markersRef.current.get(key)
+      if (!m) {
+        const { wrap, el } = createPinEl(() => {
+          const first = markersRef.current.get(key).pin.events[0]
           setActiveKey(first.key)
           cardRefs.current.get(first.key)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
         })
-        o.setMap(map)
-        overlaysRef.current.set(key, o)
+        const marker = new libRef.current.Marker({ element: wrap, anchor: 'bottom' }).setLngLat([pin.longitude, pin.latitude]).addTo(map)
+        m = { marker, el }
+        markersRef.current.set(key, m)
       }
-      o.pin = pin
-      paintPill(o.el, pin, pinLabel(pin, t, i18n.language), pin === activePin)
+      m.pin = pin
+      paintPill(m.el, pin, pinLabel(pin, t, i18n.language), pin === activePin)
     }
-    for (const [key, o] of overlaysRef.current) {
-      if (!seen.has(key)) { o.setMap(null); overlaysRef.current.delete(key) }
+    for (const [key, m] of markersRef.current) {
+      if (!seen.has(key)) { m.marker.remove(); markersRef.current.delete(key) }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, pins, activePin, i18n.language])
@@ -249,16 +254,15 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
     fittedDayRef.current = dayKey
     userMovedRef.current = false
     if (pins.length === 1) {
-      map.setCenter({ lat: pins[0].latitude, lng: pins[0].longitude })
-      map.setZoom(14)
+      map.jumpTo({ center: [pins[0].longitude, pins[0].latitude], zoom: 14 })
     } else if (pins.length > 1) {
-      const bounds = new window.google.maps.LatLngBounds()
-      pins.forEach((p) => bounds.extend({ lat: p.latitude, lng: p.longitude }))
-      // Em baixo fica o carrossel e a barra da app.
-      map.fitBounds(bounds, { top: 56, left: 40, right: 40, bottom: 230 })
+      const bounds = new libRef.current.LngLatBounds()
+      pins.forEach((p) => bounds.extend([p.longitude, p.latitude]))
+      // Em cima a fila dos dias; em baixo o carrossel e a barra da app.
+      map.fitBounds(bounds, { padding: { top: 70, left: 48, right: 48, bottom: 250 }, maxZoom: 15, duration: 0 })
     } else {
       const c = gpsCenter || location
-      if (c) map.setCenter({ lat: c.latitude, lng: c.longitude })
+      if (c) map.jumpTo({ center: [c.longitude, c.latitude] })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, dayKey, pins])
@@ -267,28 +271,19 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
-    extrasRef.current.forEach((x) => x.setMap(null))
-    extrasRef.current = []
     const me = gpsCenter || location
     if (me) {
-      extrasRef.current.push(new window.google.maps.Marker({
-        position: { lat: me.latitude, lng: me.longitude },
-        map,
-        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#1E4FA8', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
-        zIndex: 1,
-        clickable: false,
-      }))
+      if (!meRef.current) {
+        const dot = document.createElement('div')
+        dot.className = 'map-me'
+        meRef.current = new libRef.current.Marker({ element: dot }).setLngLat([me.longitude, me.latitude]).addTo(map)
+      } else {
+        meRef.current.setLngLat([me.longitude, me.latitude])
+      }
     }
-    if (location?.radiusKm) {
-      extrasRef.current.push(new window.google.maps.Circle({
-        map,
-        center: { lat: location.latitude, lng: location.longitude },
-        radius: location.radiusKm * 1000,
-        strokeColor: '#1E4FA8', strokeOpacity: 0.5, strokeWeight: 1.5,
-        fillColor: '#1E4FA8', fillOpacity: 0.04,
-        clickable: false,
-      }))
-    }
+    map.getSource('radius')?.setData(location?.radiusKm
+      ? circleGeoJSON(location, location.radiusKm)
+      : { type: 'FeatureCollection', features: [] })
   }, [ready, gpsCenter, location])
 
   // Trocar de dia volta ao primeiro cartão.
@@ -313,7 +308,7 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map || !activeKey || !activePin) return
-    map.panTo({ lat: activePin.latitude, lng: activePin.longitude })
+    map.easeTo({ center: [activePin.longitude, activePin.latitude], duration: 350 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey])
 
@@ -321,11 +316,8 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
     const map = mapRef.current
     const c = gpsCenter || location
     if (!map || !c) return
-    map.panTo({ lat: c.latitude, lng: c.longitude })
-    map.setZoom(13)
+    map.easeTo({ center: [c.longitude, c.latitude], zoom: 13 })
   }
-
-  if (!GOOGLE_MAPS_API_KEY) return null
 
   return (
     // Do fundo do cabeçalho até ao fim do ecrã; a barra da app flutua por cima.

@@ -40,7 +40,6 @@ import FriendInviteEventCard from '../components/friends/FriendInviteEventCard'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
-import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
 import { cancelLessonRequest, listMyLessonRequests, listMyLessons, listLessonEvents, setLessonAttendance } from '../lib/lessonsApi'
 import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
@@ -275,9 +274,8 @@ export default function Home() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   // Vista de mapa (Fase 2 do épico, Trello #258) — alternativa à lista, não
   // um filtro: persiste como os filtros, para sobreviver a abrir um mix e
-  // voltar atrás. Sem chave da Google não há mapa para mostrar (ver
-  // lib/googleMaps.js), por isso nunca sai de 'list' nesse caso.
-  const [viewMode, setViewMode] = useState(() => (GOOGLE_MAPS_API_KEY ? readSession(VIEW_MODE_KEY, 'list') : 'list'))
+  // voltar atrás. Mapa com MapLibre + OpenFreeMap (28 out): sem chave, há sempre.
+  const [viewMode, setViewMode] = useState(() => readSession(VIEW_MODE_KEY, 'list'))
 
   useEffect(() => { writeSession(FILTERS_KEY, filters) }, [filters])
   useEffect(() => { writeSession(VIEW_MODE_KEY, viewMode) }, [viewMode])
@@ -1296,9 +1294,7 @@ export default function Home() {
             <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {GOOGLE_MAPS_API_KEY && (
-              <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
-            )}
+            <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
             {headerActions}
           </div>
         </div>
