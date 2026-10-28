@@ -58,14 +58,17 @@ export default function Profile() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // «Escolhe a tua raquete»: as 3 raquetes guardadas (null = ainda não fez).
+  // Só com o interruptor «raquete» ligado.
+  const { on: raqueteOn } = useFeatureFlag('raquete')
   const [racketItems, setRacketItems] = useState(null)
   useEffect(() => {
+    if (!raqueteOn) return undefined
     let stale = false
     loadMyPick()
       .then((res) => { if (!stale && res) setRacketItems(mergePickWithCatalog(res.pick, res.rackets)) })
       .catch(() => {})
     return () => { stale = true }
-  }, [])
+  }, [raqueteOn])
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
   // Re-applies whenever ?tab= changes without a full remount — the bell
   // dropdown links here from an already-mounted Profile (same route).
@@ -1024,6 +1027,7 @@ export default function Profile() {
 
         {/* «Escolhe a tua raquete» (spec 2026-10-27): para todos. Depois de
             responder, mostra as 3 raquetes guardadas. */}
+        {raqueteOn && (
         <button
           type="button"
           onClick={() => navigate(racketItems ? '/perfil/raquete' : '/perfil/raquete/perguntas')}
@@ -1048,6 +1052,7 @@ export default function Profile() {
             <ChevronRight size={18} className="shrink-0 text-muted" />
           </span>
         </button>
+        )}
 
         {/* Os jogos do relógio (Apple Watch): só na app de iPhone. */}
         {hasWatchGames && (
