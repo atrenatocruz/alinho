@@ -335,7 +335,11 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
         })}
       </div>
 
-      <div ref={containerRef} className="absolute inset-0" />
+      {/* O CSS do MapLibre põe `position: relative` no contentor do mapa:
+          num `absolute inset-0` ficava com 0 px de altura. Daí o filho. */}
+      <div className="absolute inset-0">
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
 
       {(gpsCenter || location) && (
         <button type="button" onClick={recenter} aria-label={t('home.map_recenter')}
