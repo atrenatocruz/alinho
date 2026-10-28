@@ -100,6 +100,9 @@ let homeCache = null
 // estou vêm sempre, por mais longe que sejam (os meus próximos jogos).
 const WINDOW_DAYS = 7
 const MAX_DAYS_AHEAD = 120
+// Os últimos dias ficam por cima de «Hoje» (Renato, 28 out): só os meus jogos
+// (applyFilters). Mais para trás, só o dia escolhido no calendário.
+const PAST_DAYS = 3
 const startOfDay = (offsetDays) => {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
@@ -154,6 +157,10 @@ export default function Home() {
   const [gamesDays, setGamesDays] = useState(() => cached?.gamesDays || WINDOW_DAYS + 1)
   const gamesDaysRef = useRef(gamesDays)
   const [loadingMore, setLoadingMore] = useState(false)
+  // Um dia antes dos PAST_DAYS escolhido no calendário, e os jogos dele.
+  const [pastDay, setPastDay] = useState(null)
+  const [pastDayGames, setPastDayGames] = useState([])
+  const pastDayRef = useRef(null)
   // Esqueleto (não o círculo a rodar): só se demorar mais de 0,2 s; ao fim
   // de 8 s sem dados, o erro de sempre.
   const showSkeleton = useSkeleton(loading)
@@ -410,7 +417,7 @@ export default function Home() {
     const seq = ++gamesSeq.current
     const until = startOfDay(days).toISOString()
     const [windowRes, later] = await Promise.all([
-      gameQuery().gte('date', startOfDay(-1).toISOString()).lt('date', until),
+      gameQuery().gte('date', startOfDay(-PAST_DAYS).toISOString()).lt('date', until),
       loadMyLaterGames(until),
     ])
     if (windowRes.error) throw windowRes.error
@@ -443,6 +450,26 @@ export default function Home() {
       console.error('Error loading more days of games:', error)
     } finally {
       setLoadingMore(false)
+    }
+  }
+
+  // Os jogos de um só dia já passado (escolhido no calendário). Ficam à
+  // parte: o loadGames substitui a lista e levava-os.
+  const loadPastDay = async (dayKey) => {
+    pastDayRef.current = dayKey
+    setPastDay(dayKey)
+    setPastDayGames([])
+    if (orgIds.length === 0) return
+    const from = fromDayKey(dayKey)
+    const to = new Date(from)
+    to.setDate(to.getDate() + 1)
+    try {
+      const { data, error } = await gameQuery().gte('date', from.toISOString()).lt('date', to.toISOString())
+      if (error) throw error
+      const rows = await withMembers(data || [])
+      if (pastDayRef.current === dayKey) setPastDayGames(rows)
+    } catch (error) {
+      console.error('Error loading games of a past day:', error)
     }
   }
 
@@ -616,6 +643,7 @@ export default function Home() {
     if (!user) return []
     return [
       ...games.map((g) => eventFromGame(g, user.id)),
+      ...pastDayGames.filter((g) => !games.some((x) => x.id === g.id)).map((g) => eventFromGame(g, user.id)),
       ...groupMatches.map(({ match, org }) => eventFromGroupMatch(match, user.id, org)),
       // Um cartão por sessão de jogo entre amigos (bug de 27 set).
       ...eventsFromPrivateMatches(privateMatches, user.id, new Map((memberships || []).map((ms) => [ms.organization_id,
@@ -629,19 +657,24 @@ export default function Home() {
       ...leagueEvents,
       ...friendInviteEvents,
     ].filter((e, _, all) => !(e.source === 'friend_session' && e.id && all.some((x) => x.key === `friend_invite:${e.id}`)))
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, leagueEvents, friendInviteEvents, user, memberships])
+  }, [games, pastDayGames, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, leagueEvents, friendInviteEvents, user, memberships])
 
   const visible = useMemo(() => applyFilters(markFreeSlots(events), filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
-  // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
-  // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
+  // A Home abre em «Hoje»; por cima, os últimos PAST_DAYS dias (Renato,
+  // 28 out — antes não havia passado nenhum, só em «Filtros › Já jogados») e
+  // o dia passado escolhido no calendário, mesmo vazio.
   // Horários livres (SPEC-4, 9 out): os jogos em aberto sem ninguém de um
   // dia juntam-se numa linha só (FreeSlotsCard); com alguém, cartão normal.
   // Só «Horários livres» escolhido: um cartão por clube (SPEC-4).
   const onlyFree = filters.kinds.length === 1 && filters.kinds[0] === 'free'
-  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today)
-    .map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey, Date.now(), { perClub: onlyFree }) })), [visible, today, onlyFree])
+  const pastFrom = toDayKey(startOfDay(-PAST_DAYS))
+  const days = useMemo(() => {
+    const list = groupByDay(visible.filter((e) => e.dayKey >= pastFrom || e.dayKey === pastDay), today)
+    if (pastDay && pastDay < pastFrom && !list.some((d) => d.dayKey === pastDay)) list.unshift({ dayKey: pastDay, events: [] })
+    return list.map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey, Date.now(), { perClub: onlyFree }) }))
+  }, [visible, today, pastFrom, pastDay, onlyFree])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show
@@ -854,8 +887,20 @@ export default function Home() {
   // Um dia do calendário que ainda não está pedido: pede até lá (e mais uma
   // semana) e salta quando os dias chegarem.
   const pendingDay = useRef(null)
+  // Antes dos PAST_DAYS: pede-se só esse dia, e fica na lista até se escolher
+  // outro dia no calendário.
   const pickDay = (dayKey) => {
     touchedList.current = true
+    if (dayKey < pastFrom) {
+      pendingDay.current = dayKey
+      loadPastDay(dayKey)
+      return
+    }
+    if (pastDayRef.current) {
+      pastDayRef.current = null
+      setPastDay(null)
+      setPastDayGames([])
+    }
     const offset = Math.round((fromDayKey(dayKey) - startOfDay(0)) / 86400000)
     if (offset + 1 > gamesDaysRef.current && gamesDaysRef.current < MAX_DAYS_AHEAD) {
       pendingDay.current = dayKey
