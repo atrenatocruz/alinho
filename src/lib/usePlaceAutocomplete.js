@@ -54,6 +54,47 @@ export function placeFromFeature(f, { cities = false } = {}) {
   return { value, name, latitude, longitude, line1: name || address || p.name || '', line2: name ? address : (p.city || p.county || '') }
 }
 
+/* Morada escrita à mão → coordenadas (o mapa da Home, para os jogos que
+   ficaram sem elas — p. ex. quando a Google falhava e o local se escrevia à
+   mão). Guarda-se neste browser: cada morada só se pede uma vez. */
+const GEO_KEY = 'alinho:geo:v1'
+let geoCache = null
+const readGeo = () => {
+  if (geoCache) return geoCache
+  try { geoCache = JSON.parse(localStorage.getItem(GEO_KEY) || '{}') } catch { geoCache = {} }
+  return geoCache
+}
+const writeGeo = () => {
+  try { localStorage.setItem(GEO_KEY, JSON.stringify(geoCache)) } catch { /* sem armazenamento: pede-se outra vez */ }
+}
+
+/** O que já se sabe desta morada: { latitude, longitude }, null (não se encontrou) ou undefined (por pedir). */
+export const cachedGeocode = (text) => readGeo()[String(text || '').trim().toLowerCase()]
+
+export async function geocodeAddress(text) {
+  const key = String(text || '').trim().toLowerCase()
+  if (!key) return null
+  const cache = readGeo()
+  if (key in cache) return cache[key]
+  // A morada inteira; sem o nome antes do « - » e sem o código postal, se não der.
+  const tries = [text, text.split(' - ').pop(), text.split(' - ').pop().replace(/\b\d{4}(-\d{3})?\b/g, ' ')]
+    .map((q) => q.replace(/\s+/g, ' ').trim()).filter((q, i, all) => q && all.indexOf(q) === i)
+  let found = null
+  for (const q of tries) {
+    try {
+      const res = await fetch(`${PHOTON_URL}?${new URLSearchParams({ q, limit: '1', bbox: PT_BBOX })}`)
+      if (!res.ok) return null // falha do serviço: não se guarda, tenta-se noutra visita
+      const [longitude, latitude] = (await res.json()).features?.[0]?.geometry?.coordinates || []
+      if (latitude != null) { found = { latitude, longitude }; break }
+    } catch {
+      return null
+    }
+  }
+  cache[key] = found
+  writeGeo()
+  return found
+}
+
 /**
  * Liga as sugestões a um <input> simples, só enquanto `active` for true.
  * `onPlaceSelected` recebe `{ value, name, latitude, longitude }` — o texto

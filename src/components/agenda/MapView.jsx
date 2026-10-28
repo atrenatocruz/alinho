@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LocateFixed } from 'lucide-react'
 import { eventsToPins, eventDistance } from '../../lib/agenda'
+import { geocodeAddress, cachedGeocode } from '../../lib/usePlaceAutocomplete'
 import { countPeople, mixCapacity } from '../../lib/mixLogic'
 import { formatTime } from '../../lib/formatDate'
 import { KIND_STYLE } from './EventCard'
@@ -158,7 +159,33 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   const dayEvents = useMemo(() => events
     .filter((e) => e.dayKey === dayKey)
     .sort((a, b) => Number(!a.hasTime) - Number(!b.hasTime) || a.startsAt - b.startsAt), [events, dayKey])
-  const placed = dayEvents.filter((e) => e.latitude != null && e.longitude != null)
+  // Sem coordenadas mas com morada escrita: procura-se a morada (Photon) e
+  // fica guardada neste browser. `geoTick` volta a desenhar quando chega.
+  const [geoTick, setGeoTick] = useState(0)
+  const addressOf = (e) => (e.raw?.location || '').trim()
+  useEffect(() => {
+    const missing = [...new Set(dayEvents
+      .filter((e) => (e.latitude == null || e.longitude == null) && addressOf(e) && cachedGeocode(addressOf(e)) === undefined)
+      .map(addressOf))].slice(0, 8)
+    if (missing.length === 0) return undefined
+    let cancelled = false
+    ;(async () => {
+      for (const text of missing) {
+        await geocodeAddress(text)
+        if (cancelled) return
+        setGeoTick((n) => n + 1)
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayEvents])
+  const located = useMemo(() => dayEvents.map((e) => {
+    if (e.latitude != null && e.longitude != null) return e
+    const g = addressOf(e) ? cachedGeocode(addressOf(e)) : null
+    return g ? { ...e, latitude: g.latitude, longitude: g.longitude } : e
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [dayEvents, geoTick])
+  const placed = useMemo(() => located.filter((e) => e.latitude != null && e.longitude != null), [located])
   const unplaced = dayEvents.length - placed.length
   const pins = useMemo(() => eventsToPins(placed), [placed])
   const pinKeyOf = (p) => `${p.latitude.toFixed(5)},${p.longitude.toFixed(5)}`
@@ -249,10 +276,13 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
-    if (fittedDayRef.current === dayKey && userMovedRef.current) return
-    if (fittedDayRef.current === dayKey && pins.length === 0) return
-    fittedDayRef.current = dayKey
-    userMovedRef.current = false
+    // Volta a enquadrar só se mudou o dia ou o nº de pins (uma morada que
+    // chegou do Photon), e nunca por cima do que a pessoa arrastou.
+    const sig = `${dayKey}:${pins.length}`
+    const sameDay = fittedDayRef.current?.startsWith(`${dayKey}:`)
+    if (fittedDayRef.current === sig || (sameDay && userMovedRef.current)) return
+    fittedDayRef.current = sig
+    if (!sameDay) userMovedRef.current = false
     if (pins.length === 1) {
       map.jumpTo({ center: [pins[0].longitude, pins[0].latitude], zoom: 14 })
     } else if (pins.length > 1) {
