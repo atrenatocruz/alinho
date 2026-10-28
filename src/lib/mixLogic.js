@@ -996,11 +996,44 @@ export const formatFieldsFor = (uiFormat) => (uiFormat === 'escalada'
 /** A chave do nome do modo de um mix («Escalada», «Sobe e desce»…). */
 export const formatLabelKey = (game) => FORMAT_LABEL_KEY[uiFormatOf(game)] || FORMAT_LABEL_KEY.sobe_desce
 
+// «Set sem fim» e «Pontos corridos» (SPEC 2026-10-26, Francisco): o
+// 'pontos_simples' é o «Set sem fim» (15-30-40, o set não acaba); o
+// 'pontos_corridos' conta 1, 2, 3… No Americano, o «Set sem fim» grava
+// 'set_sem_fim' (Dev 3), porque o 'pontos_simples' dos Americanos antigos
+// lê-se «Pontos corridos».
 export const SCORING_FORMAT_LABEL_KEY = {
   pontos_simples: 'mixlogic.scoring_pontos_simples',
+  set_sem_fim: 'mixlogic.scoring_pontos_simples',
+  pontos_corridos: 'mixlogic.scoring_pontos_corridos',
   pro_set_9: 'mixlogic.scoring_pro_set_9',
   melhor_2_sets: 'mixlogic.scoring_melhor_2_sets',
   melhor_3_sets: 'mixlogic.scoring_melhor_3_sets',
+}
+
+/** A ajuda por baixo das pastilhas da pontuação, ou null. */
+export const SCORING_FORMAT_HINT_KEY = {
+  pontos_simples: 'mixlogic.scoring_pontos_simples_hint',
+  set_sem_fim: 'mixlogic.scoring_pontos_simples_hint',
+  pontos_corridos: 'mixlogic.scoring_pontos_corridos_hint',
+  melhor_2_sets: 'tournament.create.scoring_melhor_2_sets_hint',
+}
+
+/** As duas formas do Americano; por omissão, pontos corridos. */
+export const AMERICANO_SCORING_FORMATS = ['pontos_corridos', 'set_sem_fim']
+
+/** A pontuação de um mix como se lê: um Americano antigo com
+ *  'pontos_simples' é «Pontos corridos» (sem mexer nos dados, Dev 3). */
+export function scoringFormatOf(game) {
+  const f = game?.scoring_format || 'pontos_simples'
+  if (game?.format === 'americano') return AMERICANO_SCORING_FORMATS.includes(f) ? f : 'pontos_corridos'
+  return f === 'set_sem_fim' ? 'pontos_simples' : f
+}
+
+/** A pontuação ao mudar de formato: o Americano começa em pontos corridos;
+ *  ao sair dele, o «Set sem fim» do Americano volta a 'pontos_simples'. */
+export function scoringForFormat(format, current) {
+  if (format === 'americano') return 'pontos_corridos'
+  return !current || current === 'set_sem_fim' ? 'pontos_simples' : current
 }
 
 export const GENDER_RESTRICTION_LABEL_KEY = {

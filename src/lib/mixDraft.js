@@ -74,6 +74,7 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     ...(game.scoring_format && game.scoring_format !== 'pontos_simples' ? { scoring_format: game.scoring_format } : {}),
     ...(game.format === 'grupos_eliminatorias' && game.pool_size ? { pool_size: game.pool_size } : {}),
     ...(game.tiebreak_8_8 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
+    ...(game.deuce_mode && game.deuce_mode !== 'ponto_de_ouro' ? { deuce_mode: game.deuce_mode } : {}),
     status: 'pending',
     created_by: userId,
     recurrence_id: recurrenceId,

@@ -16,7 +16,7 @@ import { parseLevel } from './mixLevels'
 export const RULE_FIELDS = [
   'title', 'format', 'price_per_player', 'special', 'num_courts', 'court_time_minutes', 'game_time_minutes',
   'level', 'gender_restriction', 'age_restriction', 'prize', 'has_voucher', 'ranked', 'location',
-  'pairing_mode', 'respect_sides', 'allow_pair_signup', 'join_approval', 'scoring_format', 'tiebreak_8_8',
+  'pairing_mode', 'respect_sides', 'allow_pair_signup', 'join_approval', 'scoring_format', 'tiebreak_8_8', 'deuce_mode',
   'pool_size', 'auto_start_hours_before', 'image_url', 'whatsapp_post_times',
 ]
 
@@ -35,6 +35,8 @@ const norm = (field, v) => {
     case 'gender_restriction': return v || 'indiferente'
     case 'pairing_mode': return v || 'por_nivel'
     case 'tiebreak_8_8': return v === 'super_tiebreak' ? 'super_tiebreak' : null
+    // «Aos 40-40» (22 out): sem escolha é o ponto de ouro.
+    case 'deuce_mode': return v || 'ponto_de_ouro'
     case 'whatsapp_post_times': return Array.isArray(v) ? v.map((h) => String(h).slice(0, 5)).sort().join(',') : null
     case 'special': return v == null ? null : JSON.stringify(v)
     default: return v
@@ -92,6 +94,7 @@ function changeValue(t, { field, value }, lang) {
     case 'has_voucher': case 'allow_pair_signup': case 'join_approval': case 'respect_sides':
       return t(value ? 'seriescope.value_yes' : 'seriescope.value_no')
     case 'ranked': return value === false ? t('gamedetails.badge_friendly') : t('seriescope.value_ranked')
+    case 'deuce_mode': return t(`deuce.short_${value || 'ponto_de_ouro'}`)
     default: return null
   }
 }

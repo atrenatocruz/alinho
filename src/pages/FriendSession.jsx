@@ -37,6 +37,9 @@ import { resultHow } from '../components/friends/FriendResultNotice'
 import { shortName } from '../components/friends/friendShare'
 import { unreadFriendResultNotice } from '../lib/notifications'
 import EventCoverSkeleton from '../components/event/EventCoverSkeleton'
+import { DeuceModeLabel } from '../components/DeuceMode'
+import { deuceModeOf } from '../lib/deuceMode'
+import { formatKey } from '../components/friends/friendScoring'
 
 // «Vai» / «Por responder» (amigos sem bloquear, 27 set).
 const STATUS_KEY = { accepted: 'friends.tag_going', pending: 'friends.status_pending', declined: 'friends.tag_declined', guest: 'friends.guest_tag' }
@@ -458,6 +461,12 @@ export default function FriendSession() {
             <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
               {match.location && <MapPin size={14} />}
               {[match.location, match.court, t('friends.people_count', { count: players.length })].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {/* «Aos 40-40» (22 out): a forma de contar e o modo, com o «?»; com «Pontos» não aparece. */}
+          {formatKey(match.scoring_format, match.num_sets) !== 'points' && (
+            <p className="mt-1 text-sm text-muted">
+              <DeuceModeLabel scoringLabel={t(`friends.format_${formatKey(match.scoring_format, match.num_sets)}`)} mode={deuceModeOf(match)} />
             </p>
           )}
           {organizerLine}
