@@ -27,7 +27,7 @@ import {
   BarChart3, ArrowUpDown, Users, UsersRound, Link, UserPlus, MessageCircle,
   Smartphone, Flag, ListOrdered, Layers, GraduationCap, BookOpen, Gift,
   Scale, Hash, Compass, Crosshair, Anchor, Egg, Dumbbell, Plane, Bell,
-  Car, RotateCw, DoorOpen,
+  Car, RotateCw, DoorOpen, Unlock,
 } from 'lucide-react'
 
 const ICONS = {
@@ -136,6 +136,7 @@ const ICONS = {
   deste_boleia: Car,
   primeira_rotunda: RotateCw,
   ate_a_porta: DoorOpen,
+  quebra_enguico: Unlock,
 }
 
 // Troféus de evento (ou futuros) sem ícone dedicado caem aqui.
@@ -177,3 +178,65 @@ export const formatRarityPct = (pct, lang = 'pt') =>
   Number(pct).toLocaleString(String(lang).startsWith('en') ? 'en-GB' : 'pt-PT', { maximumFractionDigits: 1 })
 
 export const CATEGORY_ORDER = ['jogo', 'torneio', 'elo', 'xp', 'kudos', 'aulas', 'antiguidade', 'evento']
+
+/* ── Quando e com quem (design-handoff/2026-10-21-conquistas-quando-e-
+   quebra-enguico, aprovado a 21 out). A get_player_achievements_v2 (Dev 3)
+   traz o dia, o evento, o parceiro e, na Quebra Enguiço, a dupla vencida, já
+   com a privacidade da base. Sem ela (antes de o SI a correr), a de sempre:
+   o cartão aberto fica como estava. */
+export async function loadPlayerAchievements(supabase, userId) {
+  const v2 = await supabase.rpc('get_player_achievements_v2', { p_user_id: userId })
+  if (!v2.error) return v2
+  if (!/get_player_achievements_v2|PGRST202|42883/i.test(`${v2.error.code} ${v2.error.message}`)) return v2
+  return supabase.rpc('get_player_achievements', { p_user_id: userId })
+}
+
+/** O «quando e com quem» de uma linha, ou null (a função antiga não o traz). */
+export function achievementContext(row) {
+  if (!row || !row.context) return null
+  return {
+    context: row.context,
+    on: row.event_on || null,
+    before: row.before_on || null,
+    eventKind: row.event_kind || null,
+    eventId: row.event_id || null,
+    eventTitle: row.event_title || null,
+    partner: row.partner_id || row.partner_name
+      ? { id: row.partner_id || null, name: row.partner_name || null, linkable: !!row.partner_id && row.partner_linkable !== false }
+      : null,
+    beaten: Array.isArray(row.beaten) ? row.beaten : [],
+  }
+}
+
+/** «14 out», ou «14 out 2025» se for de outro ano. `iso` = 'YYYY-MM-DD'. */
+export function achievementDay(iso, locale, now = new Date()) {
+  if (!iso) return ''
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00`)
+  if (Number.isNaN(d.getTime())) return ''
+  const month = d.toLocaleDateString(locale, { month: 'short' }).replace(/\./g, '')
+  return d.getFullYear() === now.getFullYear() ? `${d.getDate()} ${month}` : `${d.getDate()} ${month} ${d.getFullYear()}`
+}
+
+/** «novembro», o mês do dia `iso` ('YYYY-MM-DD'), na língua de quem vê. */
+export function achievementMonth(iso, locale) {
+  if (!iso) return ''
+  const d = new Date(`${String(iso).slice(0, 10)}T12:00`)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(locale, { month: 'long' })
+}
+
+/** Para onde leva o evento (o jogo de grupo não tem página própria). */
+export function achievementEventPath(ctx) {
+  if (!ctx?.eventId) return null
+  if (ctx.eventKind === 'mix') return `/jogo/${ctx.eventId}`
+  if (ctx.eventKind === 'torneio') return `/torneio/${ctx.eventId}`
+  if (ctx.eventKind === 'amigos') return `/jogos-privados/sessao/${ctx.eventId}`
+  return null
+}
+
+/** «e» entre dois nomes. Em espanhol, «y» passa a «e» antes de um som «i»
+ *  («Ana e Inés», «Pedro e Hilario»), mas não antes de «hie»/«hia» (Copywriter). */
+export function andWord(t, locale, nextName) {
+  const word = t('achievements.when_and')
+  if (String(locale || '').startsWith('es') && /^h?[iíIÍ](?![aeoáéó])/i.test(String(nextName || '').trim())) return 'e'
+  return word
+}

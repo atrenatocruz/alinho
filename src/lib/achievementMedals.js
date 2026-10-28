@@ -31,6 +31,8 @@ const MEDAL_KEYS = new Set([
   'deste_boleia', 'primeira_rotunda', 'ate_a_porta',
   // As três do objetivo de jogos por mês (design-handoff/2026-10-27-conquistas-objetivo).
   'goal_streak_3', 'goal_streak_6', 'goal_streak_12',
+  // Quebra Enguiço (design-handoff/2026-10-21-conquistas-quando-e-quebra-enguico).
+  'quebra_enguico',
 ])
 
 /** O endereço da medalha, ou null se esta conquista ainda não tem uma. */

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Lock } from 'lucide-react'
 import { medalUrl } from '../../lib/achievementMedals'
-import { RARITY_META } from '../../lib/achievements'
+import { RARITY_META, achievementContext } from '../../lib/achievements'
 import { supabase } from '../../lib/supabase'
 import AchievementViewer from './AchievementViewer'
 import './achievementsFx.css'
@@ -52,7 +52,7 @@ export default function AchievementCollection({ catalog, mine, owner = null }) {
       .filter((m) => sortOf.has(m.achievement_key))
       .slice()
       .sort((x, y) => String(y.awarded_at || '').localeCompare(String(x.awarded_at || '')))
-      .map((m) => ({ key: m.achievement_key, rarity: rarityOf(m.rarity), pct: m.rarity_pct ?? pctByKey.get(m.achievement_key), at: m.awarded_at }))
+      .map((m) => ({ key: m.achievement_key, rarity: rarityOf(m.rarity), pct: m.rarity_pct ?? pctByKey.get(m.achievement_key), at: m.awarded_at, ctx: achievementContext(m) }))
     const grouped = RARITY_ORDER.map((r) => {
       const list = catalog
         .filter((c) => rarityOf(c.rarity) === r)

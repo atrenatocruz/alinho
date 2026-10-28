@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, Watch } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { loadPlayerAchievements } from '../lib/achievements'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
@@ -170,7 +171,7 @@ export default function Profile() {
     try {
       const [{ data: catalog, error: catErr }, { data: mine, error: mineErr }] = await Promise.all([
         supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
-        supabase.rpc('get_player_achievements', { p_user_id: profile.id }),
+        loadPlayerAchievements(supabase, profile.id),
       ])
       if (catErr) throw catErr
       if (mineErr) throw mineErr

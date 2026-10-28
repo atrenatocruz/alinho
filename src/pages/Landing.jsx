@@ -55,13 +55,9 @@ function Hero() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
-    // No computador, o «Criar conta» à vista ao abrir (Francisco, 22 out;
-    // design-handoff/2026-10-22-entrada-site-primeiro-ecra): o texto começa em
-    // cima, alinhado com o topo do telemóvel, e a secção sobe 40 px. Os
-    // tamanhos e o telemóvel no ecrã pequeno ficam iguais.
-    <section className="overflow-hidden bg-[#F7F7F4] pb-12 pt-10 lg:pb-[100px] lg:pt-10">
-      <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-5 lg:grid-cols-2 lg:items-start lg:gap-20 lg:px-10">
-        <div className="animate-fade-up lg:pt-6">
+    <section className="overflow-hidden bg-[#F7F7F4] pb-12 pt-10 lg:pb-[100px] lg:pt-20">
+      <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-5 lg:grid-cols-2 lg:gap-20 lg:px-10">
+        <div className="animate-fade-up">
           <h1 className="font-display text-[40px] font-black leading-[1.02] tracking-[-.035em] text-ink-900 [text-wrap:balance] sm:text-[56px] lg:text-[76px] lg:leading-none">
             {t('landing.hero_title')}
           </h1>
