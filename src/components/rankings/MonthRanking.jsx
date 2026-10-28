@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Check, Trophy } from 'lucide-react'
+import { ChevronRight, Check, Trophy, Gift } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Avatar, RatingBadge, EmptyState } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import RankPodium from './RankPodium'
 import RankingSkeleton from './RankingSkeleton'
 import { SkeletonGate } from '../Skeleton'
+import { PartnerLogo } from '../partners/PartnerCard'
+import { DISTRICT_SCOPE, districtOf, hasPrizes, partnerInitials, prizeFor, prizesLine } from '../../lib/partners'
 import {
   MONTH_MIN_GAMES, monthGender, monthPoints, monthPointsMuted, splitMonthRanking,
   monthKey, monthTitle, monthName, nextMonthKey,
@@ -22,7 +24,44 @@ import {
    - A lista do 4.º em diante; pontos a zero ou negativos a cinzento.
    - A tua linha presa em baixo, com «ver ›». */
 
-export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
+/* Parceiros (18 out, UX): `partner` é o parceiro com prémios no distrito de
+   quem joga. No «Distrito de X» com «Todos», a linha do presente com os prémios e as
+   pastilhas no pódio; no Global e nos clubes, a linha leva ao distrito; com
+   Masculino ou Feminino, leva a «Todos» (o pódio fica sem prémios). */
+function PartnerLine({ partner, district, isAll, onDistrict, onScope, onScale }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const brand = partnerInitials(partner.name)
+  const full = onDistrict && isAll
+  const go = () => {
+    if (full) navigate(`/parceiro/${partner.slug}`)
+    else if (!isAll) onScale?.('all')
+    else onScope?.(`${DISTRICT_SCOPE}${district}`)
+  }
+  return (
+    <button type="button" onClick={go}
+      className="flex w-full items-center gap-2.5 rounded-card border border-line bg-white px-3 py-2.5 text-left">
+      <PartnerLogo partner={partner} size={28} />
+      <span className="min-w-0 flex-1">
+        {full ? (
+          <>
+            <span className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-ink-900">
+              <Gift size={15} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />{prizesLine(partner)}
+            </span>
+            <span className="block text-[12px] text-[#5B6068]">{t('partners.line_sub', { name: partner.name })}</span>
+          </>
+        ) : (
+          <span className="block text-[13px] font-extrabold text-ink-900">
+            {t(isAll ? 'partners.line_to_district' : 'partners.line_to_all', { brand, district })}
+          </span>
+        )}
+      </span>
+      <ChevronRight size={16} className="shrink-0 text-[#8A8E95]" />
+    </button>
+  )
+}
+
+export default function MonthRanking({ scope, scale, scopeLabel, onShare, partner = null, onScope, onScale }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
   const current = monthKey(new Date())
@@ -32,7 +71,9 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
   const [failed, setFailed] = useState(false)
   const [monthsOpen, setMonthsOpen] = useState(false)
   const [highlight, setHighlight] = useState(null)
-  const orgId = scope === 'global' ? null : scope
+  // «Distrito de X» (parceiros, 18 out): o pódio da zona, get_month_ranking_zone do Dev 3.
+  const district = districtOf(scope)
+  const orgId = scope === 'global' || district ? null : scope
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -46,19 +87,25 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
     let off = false
     setRows(null)
     setFailed(false)
-    supabase.rpc('get_month_ranking', { p_organization_id: orgId, p_month: month, p_gender: monthGender(scale) })
+    const call = district
+      ? supabase.rpc('get_month_ranking_zone', { p_district: district, p_month: month, p_gender: monthGender(scale) })
+      : supabase.rpc('get_month_ranking', { p_organization_id: orgId, p_month: month, p_gender: monthGender(scale) })
+    call
       .then(({ data, error }) => {
         if (off) return
         if (error) { console.error('Error loading month ranking:', error); setFailed(true); setRows([]) } else setRows(data || [])
       })
     return () => { off = true }
-  }, [orgId, month, scale])
+  }, [orgId, district, month, scale])
 
   const isCurrent = month === current
   const { podium, rest, me, qualifiedCount } = splitMonthRanking(rows)
   const thisMonth = isCurrent ? t('month.this_month') : t('month.in_month', { month: monthName(month, lang) })
   const next = monthName(nextMonthKey(month), lang)
   const club = scope === 'global' ? null : scopeLabel
+  const partnerDistrict = partner ? (partner.prize_district || partner.district) : null
+  const isAll = monthGender(scale) === 'todos'
+  const showPrizes = !!partner && isCurrent && isAll && district != null && district === partnerDistrict
 
   const openPlayer = (userId) => {
     setHighlight(userId)
@@ -101,8 +148,14 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
         <EmptyState icon={Trophy} pose="triste" title={t('month.unavailable')} />
       ) : (
         <>
+          {/* Sem prémios este mês (o acordo começa depois): sem a linha (UX, 22 out). */}
+          {partner && isCurrent && hasPrizes(partner) && (
+            <PartnerLine partner={partner} district={partnerDistrict} isAll={isAll} onDistrict={district === partnerDistrict}
+              onScope={onScope} onScale={onScale} />
+          )}
           {/* O pódio: 1.º, 2.º, 3.º, da esquerda para a direita. */}
           <RankPodium id="month-podium" spots={podium} freeHint={t('month.free_hint')} onOpen={(id) => navigate(`/jogador/${id}`)}
+            prizeOf={showPrizes ? (place) => { const p = prizeFor(partner, place); return p ? `${p.discount_pct}%` : null } : null}
             value={(row) => ({ text: monthPoints(row.points), muted: monthPointsMuted(row.points) })}
             onShare={onShare && qualifiedCount > 0 ? () => onShare({
               kind: 'month', month, club,
