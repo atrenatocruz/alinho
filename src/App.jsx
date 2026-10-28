@@ -409,6 +409,11 @@ const PUBLIC_HEAD = {
     canonical: 'https://www.alinho.pt/como-funciona',
     description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
+  '/planos': {
+    title: 'Grupos e clubes no alinho.pt: planos para quem organiza',
+    canonical: 'https://www.alinho.pt/planos',
+    description: 'Jogar é sempre grátis. Cada pessoa pode criar um grupo grátis. Os planos são para quando o grupo crescer.',
+  },
   '/professores': {
     title: 'Professores de padel no alinho.pt: aulas e horário',
     canonical: 'https://www.alinho.pt/professores',
