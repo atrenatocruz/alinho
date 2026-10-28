@@ -26,6 +26,20 @@ export async function partnerListVouchers(partnerId, month = null) {
   return data || []
 }
 
+/** Os números do mês para o parceiro (design-handoff/2026-10-28-rm-tres-pecas,
+    peça 2). Função do Dev 3 (nome combinado a 28 out). p_month 'AAAA-MM-01', ou
+    null = o mês de agora. Devolve { counting_since, card_people, page_people,
+    contact_taps, prizes, opened, used }: só totais, nunca quem foi. Sem a função
+    (base por correr), null: o ecrã mostra o vazio. */
+export async function partnerMonthNumbers(partnerId, month = null) {
+  const { data, error } = await supabase.rpc('partner_month_numbers', { p_partner_id: partnerId, p_month: month })
+  if (error) {
+    if (error.code === 'PGRST202') return null
+    throw error
+  }
+  return data || null
+}
+
 /** Marca um código como usado. Erros: not_allowed, not_found, already_used, expired. */
 export async function partnerRedeemVoucher(code) {
   const { data, error } = await supabase.rpc('partner_redeem_voucher', { p_code: code })
