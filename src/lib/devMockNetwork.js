@@ -334,6 +334,20 @@ const RPC_MOCKS = {
       { voucher_id: 'pv-3', code: 'RM-H2X5N', prize_place: 3, discount_pct: 5, prize_month: month, prize_district: 'Setúbal', status: 'expirado', valid_until: `${month.slice(0, 8)}20`, used_at: null, created_at: `${month}T00:05:00Z` },
     ]
   },
+  // Os números do mês (peça 2 da RM). mockPartnerNumbers = 'empty' faz a
+  // página ainda não estar no ar (vazio). Contam desde o mês passado.
+  partner_month_numbers: (params) => {
+    const now = new Date()
+    const thisMonth = `${now.toISOString().slice(0, 7)}-01`
+    const month = params?.p_month || thisMonth
+    if (localStorage.getItem('mockPartnerNumbers') === 'empty') {
+      return { counting_since: `${new Date(now.getFullYear(), now.getMonth() + 1, 2).toISOString().slice(0, 7)}-01`, card_people: 0, page_people: 0, contact_taps: 0, prizes: 0, opened: 0, used: 0 }
+    }
+    const since = `${new Date(now.getFullYear(), now.getMonth() - 1, 2).toISOString().slice(0, 7)}-01`
+    return month < thisMonth
+      ? { counting_since: since, card_people: 1280, page_people: 143, contact_taps: 21, prizes: 3, opened: 2, used: 1 }
+      : { counting_since: since, card_people: 412, page_people: 57, contact_taps: 9, prizes: 0, opened: 0, used: 0 }
+  },
   partner_redeem_voucher: () => (localStorage.getItem('mockRedeem')
     ? { __error: localStorage.getItem('mockRedeem') }
     : { ok: true, discount_pct: 10, prize_place: 2, prize_month: `${new Date().toISOString().slice(0, 7)}-01`, valid_until: `${new Date().getFullYear()}-12-31` }),
