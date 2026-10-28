@@ -318,6 +318,8 @@ const RPC_MOCKS = {
       : [],
     prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal',
   } : null),
+  // A lista do site alinho.pt/parceiros (Dev 1, 28 out): só a RM.
+  list_partners: () => [RPC_MOCKS.get_partner({ p_slug: 'rm-terapias' })],
   // A página de quem gere um parceiro (Dev 3, 22 out). localStorage.mockPartnerManager
   // = 'true' faz a conta de teste gerir a RM. mockRedeem = '<erro>' faz o
   // partner_redeem_voucher recusar com esse erro.

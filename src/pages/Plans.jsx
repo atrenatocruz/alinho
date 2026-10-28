@@ -162,6 +162,8 @@ export default function Plans() {
     pending.current = true
     setTab(key)
     window.history.replaceState(window.history.state, '', key === 'grupos' ? window.location.pathname : `#${key}`)
+    // O cabeçalho sublinha Clubes ou Professores pelo separador (site, 28 out).
+    window.dispatchEvent(new Event('site:tab'))
   }
 
   return (

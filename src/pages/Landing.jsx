@@ -5,6 +5,8 @@ import { MedalGrid, Highlights, SITE_DARK } from '../components/site/MedalShowca
 import { SiteHeader, SiteFooter, useLoginHref, usePageTop } from '../components/site/SiteChrome'
 import { WaysSection, BotSection, SITE_EYEBROW, SITE_H2, SITE_LEAD, SITE_ILL } from '../components/site/SiteWays'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
+import { PartnerCard, YourBusinessCard, usePublicPartners } from '../components/site/PartnerCards'
+import { useFeatureFlag } from '../lib/useFeatureFlag'
 
 /* alinho.pt antes de entrar (Trello #327) — desenho APROVADO pelo Francisco
    a 24 set: design-handoff/2026-09-24-alinho-pt-antes-de-entrar/SPEC.md e
@@ -98,6 +100,34 @@ function RankingPoint() {
           <div className="mt-8 max-w-[460px]"><Highlights /></div>
         </div>
         <MedalGrid className="hidden w-full max-w-[520px] lg:ml-auto lg:block" />
+      </div>
+    </section>
+  )
+}
+
+/* «Parceiros do alinho.pt», logo a seguir ao ranking, que é o que dá os
+   prémios (design-handoff/2026-10-28-site-menu-e-parceiros, ponto 4; Francisco,
+   28 out): um resumo da /parceiros, com os mesmos cartões. Com mais parceiros,
+   no telemóvel ficam lado a lado e deslizam; o tracejado «O teu negócio aqui?»
+   só no computador. Só com o interruptor «parceiros» ligado. */
+function PartnersSection() {
+  const { t } = useTranslation()
+  const { on } = useFeatureFlag('parceiros')
+  const partners = usePublicPartners(on)
+  if (!on || !partners?.length) return null
+  return (
+    <section className="bg-[#F7F7F4] py-16 lg:py-[90px]">
+      <div className="mx-auto max-w-[1200px] px-5 lg:px-10">
+        <p className={`${SITE_EYEBROW} text-[#5B6068]`}>{t('partners.eyebrow')}</p>
+        <h2 className={`${SITE_H2} mt-3 max-w-[16ch]`}>{t('partners.title')}</h2>
+        <p className={SITE_LEAD}>{t('partners.lead')}</p>
+        <div className="no-scrollbar -mx-5 mt-8 flex snap-x gap-[18px] overflow-x-auto px-5 sm:mx-0 sm:grid sm:overflow-visible sm:px-0 sm:[grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
+          {partners.map((p) => (
+            <PartnerCard key={p.id || p.slug} p={p} className={`snap-start sm:w-auto ${partners.length > 1 ? 'w-[min(320px,85%)] shrink-0' : 'w-full'}`} />
+          ))}
+          <YourBusinessCard className="hidden sm:grid" />
+        </div>
+        <Link to="/parceiros" className="mt-6 inline-block font-display text-[16px] font-extrabold text-ink-900 underline underline-offset-4">{t('partners.see_all')}</Link>
       </div>
     </section>
   )
@@ -258,6 +288,7 @@ export default function Landing() {
       <Nav />
       <Hero />
       <RankingPoint />
+      <PartnersSection />
       <WaysSection />
       <BotSection />
       {/* Espaço guardado (SPEC, ponto 5): «Já se joga na alinho», só com

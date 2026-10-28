@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
@@ -23,7 +23,7 @@ import { isMemberLimitError } from '../lib/plans'
 import { listOpenTournaments } from '../lib/tournamentApi'
 import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
 import { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
-import MyNextGames, { CustomizePill } from '../components/home/MyNextGames'
+import MyNextGames, { CustomizePill, SectionTitle } from '../components/home/MyNextGames'
 import LiveNowLine from '../components/home/LiveNowLine'
 import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
 import { useRaqueteForYou } from '../components/raquete/useRaqueteForYou'
@@ -1054,6 +1054,19 @@ export default function Home() {
     ...raqueteForYou,
   ]
   const firstUpcomingDay = days.find((d) => d.dayKey >= today)?.dayKey
+  // Os dias passados por cima de «Hoje» têm título, como os blocos de baixo,
+  // e «Ver todos ›» abre Filtros › Já jogados (UX, aprovado a 28 out).
+  const firstPastDay = days[0]?.dayKey < today ? days[0].dayKey : null
+  const lastTitle = (
+    <SectionTitle right={(
+      <button type="button" onClick={() => setFilters((f) => ({ ...f, show: 'played' }))}
+        className="press flex h-7 shrink-0 items-center gap-0.5 rounded-full border border-line bg-white pl-2.5 pr-2 text-[11.5px] font-extrabold normal-case tracking-normal text-ink-900">
+        <span className="leading-none">{t('home.last_see_all')}</span><ChevronRight size={13} strokeWidth={2.4} aria-hidden="true" className="shrink-0" />
+      </button>
+    )}>
+      {t('home.last_title')}
+    </SectionTitle>
+  )
   const topBlock = (
     <div ref={topBlockRef} className="space-y-4">
       <MyNextGames events={events} todayKey={today} userId={user?.id} linkFor={eventLink} filters={filters}
@@ -1352,6 +1365,7 @@ export default function Home() {
         <div className={`mt-3 space-y-5 ${skeletonShown.current ? 'animate-fill-in' : ''}`}>
           {days.map(({ dayKey, events: dayEvents }) => (
             <Fragment key={dayKey}>
+            {dayKey === firstPastDay && lastTitle}
             {dayKey === firstUpcomingDay && topBlock}
             <section
               ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}

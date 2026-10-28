@@ -88,7 +88,8 @@ const keepFocusedInView = (e) => {
   setTimeout(() => el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 300)
 }
 
-export function Sheet({ title, onClose, children }) {
+// `actions`: botões na linha do título, à esquerda do X (ex.: a lupa).
+export function Sheet({ title, onClose, children, actions = null }) {
   const { t } = useTranslation()
   const box = useVisibleViewport()
   return createPortal(
@@ -104,9 +105,12 @@ export function Sheet({ title, onClose, children }) {
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg text-ink-900">{title}</h3>
+          <div className="flex items-center gap-1">
+          {actions}
           <button onClick={onClose} aria-label={t('ui.close')} className="w-11 h-11 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900">
             <X size={20} />
           </button>
+          </div>
         </div>
         {children}
       </div>
