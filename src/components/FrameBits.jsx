@@ -44,7 +44,7 @@ const scopeLine = (t, lang, f) => `${f.scope_name || t('frames.global')} · ${mo
 /** O título por baixo do nome; tocar abre a folha com todas. */
 export function FrameTitle({ list, mine = true }) {
   const { t, i18n } = useTranslation()
-  const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
+  const lang = String(i18n.language || 'pt').slice(0, 2)
   const [open, setOpen] = useState(false)
   const best = list[0]
   if (!best) return null

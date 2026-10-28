@@ -11,6 +11,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { sharePageLink } from '../lib/shareImage'
 import { getPartner, prizeMedal } from '../lib/partners'
 import { appHref } from '../lib/native'
+import { localeOf } from '../lib/formatDate'
 
 /* A página do parceiro (design-handoff/2026-10-18-parceiros-primeiro, SPEC-UX
    ponto 3, aprovado pelo Francisco a 18 out): a mesma estrutura da página do
@@ -58,7 +59,7 @@ function PartnerBody() {
     return <EmptyState pose="triste" title={t('partner.not_found_title')} subtitle={t('partner.not_found_body')} />
   }
 
-  const loc = i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT'
+  const loc = localeOf(i18n.language)
   const month = partner.prize_month ? new Date(`${String(partner.prize_month).slice(0, 10)}T12:00:00`) : new Date()
   const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0)
   const endLabel = `${monthEnd.getDate()} ${t('partner.of')} ${monthEnd.toLocaleDateString(loc, { month: 'long' })}`

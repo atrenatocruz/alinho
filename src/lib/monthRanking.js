@@ -1,4 +1,5 @@
 import i18n from './i18n'
+import { localeOf } from './formatDate'
 /* Ranking do mês (design-handoff/2026-10-12-ranking-do-mes-podio, aprovado
    pelo Francisco a 12 out; regras em REGRAS-BA.md). Os números vêm todos da
    get_month_ranking do Dev 3 (#626): aqui só se arruma o que ela devolve para
@@ -79,14 +80,14 @@ const monthDate = (key) => new Date(`${String(key).slice(0, 7)}-01T12:00:00`)
 
 /** «Outubro 2026». */
 export function monthTitle(key, lang = 'pt') {
-  const txt = monthDate(key).toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'long', year: 'numeric' })
+  const txt = monthDate(key).toLocaleDateString(localeOf(lang), { month: 'long', year: 'numeric' })
   const clean = txt.replace(' de ', ' ')
   return clean.charAt(0).toUpperCase() + clean.slice(1)
 }
 
 /** «outubro» / «October» — o nome do mês, sozinho. */
 export function monthName(key, lang = 'pt') {
-  return monthDate(key).toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'long' })
+  return monthDate(key).toLocaleDateString(localeOf(lang), { month: 'long' })
 }
 
 /** O mês a seguir (para «recomeça a 1 de novembro»). */

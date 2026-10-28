@@ -5,6 +5,7 @@ import { bakeCircle } from '../tournament/TournamentShareCard'
 import { shortName, monthName } from '../../lib/monthRanking'
 import { Crown } from './RankPodium'
 import { appOrigin } from '../../lib/native'
+import { localeOf } from '../../lib/formatDate'
 
 /* A imagem do pódio para partilhar (design-handoff/2026-10-12-ranking-do-
    mes-podio, ponto 7 e acerto de 12 out): o fluxo de sempre (foto opcional,
@@ -67,7 +68,7 @@ function MonthPodiumBody({ kind, podium, faces, month, lang, compact, title }) {
  *  org = { name, slug } ou null (geral). */
 export default function MonthPodiumShare({ share, org, onClose }) {
   const { t, i18n } = useTranslation()
-  const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
+  const lang = String(i18n.language || 'pt').slice(0, 2)
   const { podium, kind = 'month' } = share
   const month = share.month || `${new Date().toISOString().slice(0, 7)}-01`
   const [faces, setFaces] = useState({})
@@ -82,7 +83,7 @@ export default function MonthPodiumShare({ share, org, onClose }) {
   // O título grande: o mês, no Do mês; nos outros, o que vier (a escala ou «XP»).
   const title = kind === 'month' ? name.charAt(0).toUpperCase() + name.slice(1) : share.title
   const date = new Date(`${month.slice(0, 7)}-01T12:00:00`)
-    .toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'long', year: 'numeric' }).replace(' de ', ' ').toLocaleUpperCase(lang)
+    .toLocaleDateString(localeOf(lang), { month: 'long', year: 'numeric' }).replace(' de ', ' ').toLocaleUpperCase(lang)
   const scopeName = org?.name || t('monthshare.global')
   const names = podium.filter(Boolean).map((r) => shortName(r.name))
   const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} ${t('monthshare.and')} ${names[names.length - 1]}` : names[0] || ''

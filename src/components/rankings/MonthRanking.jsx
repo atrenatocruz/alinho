@@ -63,7 +63,7 @@ function PartnerLine({ partner, district, isAll, onDistrict, onScope, onScale })
 
 export default function MonthRanking({ scope, scale, scopeLabel, onShare, partner = null, onScope, onScale }) {
   const { t, i18n } = useTranslation()
-  const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
+  const lang = String(i18n.language || 'pt').slice(0, 2)
   const current = monthKey(new Date())
   const [month, setMonth] = useState(current)
   const [months, setMonths] = useState([])

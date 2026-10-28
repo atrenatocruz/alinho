@@ -3,6 +3,7 @@
 // (supabase/migration_planos_pagos_1.sql e _2).
 import { supabase } from './supabase'
 import { signupErrorMessage } from './tournamentError'
+import { localeOf } from './formatDate'
 
 async function rpc(fn, args) {
   const { data, error } = await supabase.rpc(fn, args)
@@ -50,6 +51,6 @@ export function addDaysIso(iso, n) {
 export function shortDay(iso, lang) {
   if (!iso) return ''
   const d = new Date(`${String(iso).slice(0, 10)}T12:00:00`)
-  const month = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'short' }).replace(/\./g, '')
+  const month = d.toLocaleDateString(localeOf(lang), { month: 'short' }).replace(/\./g, '')
   return `${d.getDate()} ${month}`
 }
