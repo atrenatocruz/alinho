@@ -72,7 +72,7 @@ export default function CreateLeaguePage() {
   const levelPrefix = cat.gender === 'feminino' ? 'F' : cat.gender === 'misto' ? 'MX' : 'M'
 
   if (step === 1) return (
-    <StepPage title={t('league.create')} step={1} total={2} onBack={() => navigate(-1)}
+    <StepPage title={t('league.create')} step={1} total={2} stepLabel={t('league.step_league')} onBack={() => navigate(-1)}
       onNext={() => setStep(2)} nextDisabled={!!leagueProblem || noOrg}
       nextHint={leagueProblem ? t(`league.create_${leagueProblem}`) : null}>
       <div className="space-y-6">
@@ -103,7 +103,7 @@ export default function CreateLeaguePage() {
   )
 
   return (
-    <StepPage title={t('league.create_category_title')} step={2} total={2} onBack={() => setStep(1)}
+    <StepPage title={t('league.create_category_title')} step={2} total={2} stepLabel={t('league.step_categories')} onBack={() => setStep(1)}
       onNext={finish} nextLabel={t('league.create')} nextDisabled={!!catProblem}
       nextHint={catProblem ? t(`league.error_${catProblem}`, t('league.error_generic')) : null} error={error} busy={busy}>
       <div className="space-y-6">
