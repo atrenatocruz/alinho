@@ -17,10 +17,16 @@ const MIXED_COLOR = '#1F2937'
 // Quantos dias aparecem na fila de cima (só os que têm eventos).
 const MAX_DAY_CHIPS = 14
 
-// Mapas do OpenStreetMap pela OpenFreeMap (28 out: troca da Google — sem
-// chave, sem faturação, sem limites). «Positron»: claro e calmo, a condizer
-// com a app (DESIGN.md); os pins é que levam a cor.
-const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
+// Mapas do TomTom (estilo «Orbis», claro) quando há VITE_TOMTOM_API_KEY
+// (Renato, 28 out); senão, ou se o TomTom recusar (quota diária, chave),
+// os do OpenStreetMap pela OpenFreeMap — sem chave nem limites. Os dois
+// claros e calmos, a condizer com a app (DESIGN.md); os pins levam a cor.
+const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY || null
+const FALLBACK_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron'
+const MAP_STYLE_URL = TOMTOM_KEY
+  ? `https://api.tomtom.com/maps/orbis/assets/styles/0.*/style.json?key=${TOMTOM_KEY}&apiVersion=1&map=basic_street-light`
+  : FALLBACK_STYLE_URL
+const RADIUS_COLOR = '#1E4FA8'
 // O MapLibre (~800 KB) só se carrega quando se abre o mapa.
 const loadMapLibre = () => Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m.default)
 
@@ -136,6 +142,7 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   const libRef = useRef(null)
   const markersRef = useRef(new Map()) // chave do sítio → { marker, el, pin }
   const meRef = useRef(null) // o ponto de «estou aqui»
+  const radiusDataRef = useRef({ type: 'FeatureCollection', features: [] })
   const userMovedRef = useRef(false)
   const fittedDayRef = useRef(null)
   const cardRefs = useRef(new Map())
@@ -225,11 +232,26 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
       })
       map.touchZoomRotate.disableRotation()
       map.on('dragstart', () => { userMovedRef.current = true })
+      // O raio vive no estilo: volta a pôr-se a cada estilo novo (a troca
+      // para a reserva apaga-o).
+      map.on('style.load', () => {
+        if (map.getSource('radius')) return
+        map.addSource('radius', { type: 'geojson', data: radiusDataRef.current })
+        map.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': RADIUS_COLOR, 'fill-opacity': 0.05 } })
+        map.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': RADIUS_COLOR, 'line-opacity': 0.5, 'line-width': 1.5, 'line-dasharray': [3, 2] } })
+      })
+      // TomTom a recusar (401/403 da chave, 429 da quota): passa-se de vez
+      // para a OpenFreeMap, sem esperar que a pessoa note o mapa vazio.
+      let fellBack = !TOMTOM_KEY
+      map.on('error', (ev) => {
+        const status = ev?.error?.status
+        if (fellBack || ![401, 403, 429].includes(status)) return
+        fellBack = true
+        console.warn('TomTom map refused, falling back to OpenFreeMap:', status)
+        map.setStyle(FALLBACK_STYLE_URL)
+      })
       map.on('load', () => {
         if (cancelled) return
-        map.addSource('radius', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-        map.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#1E4FA8', 'fill-opacity': 0.05 } })
-        map.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#1E4FA8', 'line-opacity': 0.5, 'line-width': 1.5, 'line-dasharray': [3, 2] } })
         mapRef.current = map
         setReady(true)
       })
@@ -311,9 +333,10 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
         meRef.current.setLngLat([me.longitude, me.latitude])
       }
     }
-    map.getSource('radius')?.setData(location?.radiusKm
+    radiusDataRef.current = location?.radiusKm
       ? circleGeoJSON(location, location.radiusKm)
-      : { type: 'FeatureCollection', features: [] })
+      : { type: 'FeatureCollection', features: [] }
+    map.getSource('radius')?.setData(radiusDataRef.current)
   }, [ready, gpsCenter, location])
 
   // Trocar de dia volta ao primeiro cartão.
