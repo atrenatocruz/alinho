@@ -25,6 +25,9 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_not_finis
   // «Sou eu» (21 out, migration_mix_sou_eu.sql): o pedido, aos admins; a
   // resposta, a quem pediu.
   'mix_guest_claim', 'mix_guest_claim_accepted', 'mix_guest_claim_declined',
+  // «Pedir correção» (23 out, migration_mix_pedir_correcao.sql): o pedido, aos
+  // admins; a resposta, aos jogadores com conta desse jogo.
+  'mix_correction_requested', 'mix_correction_accepted', 'mix_correction_declined',
   // #622: o mix terminou e quem ganhou (Dev 3, migration_mix_aviso_terminou.sql).
   'mix_finished',
   // Aprovar quem entra (2 out, Dev 3): o pedido a quem organiza, e a resposta
