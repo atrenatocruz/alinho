@@ -2,6 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import pt from '../locales/pt.json'
 import en from '../locales/en.json'
+import es from '../locales/es.json'
 
 // A pre-auth visitor can switch language from Landing/Login (no profile to
 // persist it on yet) — that choice is stashed in localStorage so it
@@ -10,7 +11,7 @@ import en from '../locales/en.json'
 function getInitialLanguage() {
   try {
     const stored = localStorage.getItem('preferredLanguage')
-    if (stored === 'pt' || stored === 'en') return stored
+    if (stored === 'pt' || stored === 'en' || stored === 'es') return stored
   } catch {
     // ignore — fall through to default
   }
@@ -23,6 +24,8 @@ i18n
     resources: {
       pt: { translation: pt },
       en: { translation: en },
+      // Espanhol (passo 2 do plano das línguas, 26 out): o es.json é do Copywriter.
+      es: { translation: es },
     },
     lng: getInitialLanguage(),
     fallbackLng: 'pt',

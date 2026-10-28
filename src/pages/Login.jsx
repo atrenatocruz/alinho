@@ -9,9 +9,11 @@ import TurnstileWidget from '../components/TurnstileWidget'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
-import { MIN_SIGNUP_AGE, isAtLeast, maxSignupBirthday } from '../lib/age'
+import { minSignupAge, countryFromLocale, isAtLeast, maxSignupBirthday } from '../lib/age'
+import CountryPicker, { countryAgeText } from '../components/CountryPicker'
 import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 import EmailField from '../components/EmailField'
+import LanguageMenu from '../components/site/LanguageMenu'
 import { emailProblem } from '../lib/emailCheck'
 import { supabase } from '../lib/supabase'
 import { App } from '@capacitor/app'
@@ -32,17 +34,6 @@ const CREAM = '#F1EFE6'
 const LAST_KEY = 'alinho.lastLogin'
 const readLast = () => { try { return localStorage.getItem(LAST_KEY) } catch { return null } }
 const saveLast = (how) => { try { localStorage.setItem(LAST_KEY, how) } catch { /* sem localStorage */ } }
-
-// Mesmo padrão do Layout.jsx, sem perfil: muda já e fica guardado.
-function toggleLanguage() {
-  const next = i18n.language === 'en' ? 'pt' : 'en'
-  i18n.changeLanguage(next)
-  try {
-    localStorage.setItem('preferredLanguage', next)
-  } catch {
-    // ignore — best-effort persistence
-  }
-}
 
 // Fora do Login: um componente dentro dele era recriado a cada tecla.
 export function PasswordField({ id, value, onChange, placeholder, autoComplete, minLength, required, invalid = false, describedBy }) {
@@ -122,10 +113,7 @@ function CreamTop({ children, compact = false }) {
   const { t } = useTranslation()
   return (
     <div className={`relative px-6 text-center ${compact ? 'pt-12 pb-6' : 'pt-12 pb-8'}`} style={{ background: CREAM }}>
-      <button type="button" onClick={toggleLanguage} title={t('layout.toggle_language')}
-        className="absolute right-3 top-3 z-10 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-sm font-extrabold text-ink-900 hover:bg-black/5">
-        {i18n.language === 'en' ? 'PT' : 'EN'}
-      </button>
+      <LanguageMenu className="absolute right-3 top-3 z-10" />
       {/* O logótipo leva à página inicial: sem sessão, o Login não tinha outra saída (15 set). */}
       <Link to="/" className="inline-block leading-none" aria-label="alinho.pt">
         <Wordmark variant="light" className="!h-[30px]" />
@@ -302,6 +290,8 @@ export default function Login() {
   const nameRef = useRef(null)
   const [signupBirthday, setSignupBirthday] = useState('')
   const [signupGender, setSignupGender] = useState('')
+  // «País onde vives» (23 out): já escolhido pela língua do telemóvel ou do browser.
+  const [signupCountry, setSignupCountry] = useState(() => countryFromLocale(typeof navigator !== 'undefined' ? navigator.language : ''))
   // Os erros do passo 4/4, cada um junto ao seu campo.
   const [aboutErr, setAboutErr] = useState({})
 
@@ -346,10 +336,10 @@ export default function Login() {
       nameRef.current?.focus()
       return
     }
-    // Menos de 13 anos não pode consentir sozinho (Lei 58/2019, art. 16.º).
+    // A idade mínima é a do país onde se vive (PT 13, ES 14, outros 16; 23 out).
     const errs = {
       birthday: !signupBirthday ? t('login.error_missing_birthday')
-        : !isAtLeast(signupBirthday, MIN_SIGNUP_AGE) ? t('login.error_under_age', { age: MIN_SIGNUP_AGE }) : null,
+        : !isAtLeast(signupBirthday, minSignupAge(signupCountry)) ? countryAgeText(t, signupCountry, i18n.language?.slice(0, 2), 'error_age') : null,
       gender: !signupGender ? t('login.error_missing_gender') : null,
     }
     setAboutErr(errs)
@@ -360,6 +350,7 @@ export default function Login() {
         name: signupName,
         birthday: signupBirthday,
         gender: signupGender,
+        country: signupCountry,
       }, captchaToken)
       if (err) throw err
       // Com «Confirm email», um email que já tem conta responde com um falso
@@ -660,12 +651,22 @@ export default function Login() {
                   aria-invalid={nameMissing || undefined} aria-describedby={nameMissing ? 'signup-name-erro' : undefined} />
                 <FieldError id="signup-name-erro">{nameMissing ? t('login.error_missing_name') : null}</FieldError>
               </div>
+              {/* O país antes da data: a idade mínima depende dele (UX, 23 out). */}
+              <div>
+                <label htmlFor="signup-country" className={label}>{t('country.label')}</label>
+                <CountryPicker id="signup-country" value={signupCountry}
+                  onChange={(c) => {
+                    setSignupCountry(c)
+                    // Data já escolhida que não chega para o país novo: o erro aparece logo (UX, 26 out).
+                    const young = signupBirthday && !isAtLeast(signupBirthday, minSignupAge(c))
+                    setAboutErr((x) => ({ ...x, birthday: young ? countryAgeText(t, c, i18n.language?.slice(0, 2), 'error_age') : null }))
+                  }} />
+                <p className="mt-1.5 text-xs text-muted">{countryAgeText(t, signupCountry, i18n.language?.slice(0, 2))}</p>
+              </div>
               {/* Com erro, o campo leva a borda vermelha e o fundo rosa, como a password (UX). */}
               <div className={aboutErr.birthday ? BAD : ''}>
                 <label className={label}>{t('login.birthday_label')}</label>
-                <DateField value={signupBirthday} onChange={(v) => { setSignupBirthday(v); setAboutErr((x) => ({ ...x, birthday: null })) }} max={maxSignupBirthday()} hideToday required birthday />
-                {/* A regra dos 13 anos, à vista (UX, 18 out). */}
-                {!aboutErr.birthday && <p className="mt-1.5 text-xs text-muted">{t('login.birthday_min_age', { age: MIN_SIGNUP_AGE })}</p>}
+                <DateField value={signupBirthday} onChange={(v) => { setSignupBirthday(v); setAboutErr((x) => ({ ...x, birthday: null })) }} max={maxSignupBirthday(new Date(), signupCountry)} hideToday required birthday />
                 <FieldError id="signup-birthday-erro">{aboutErr.birthday}</FieldError>
               </div>
               <div className={aboutErr.gender ? BAD : ''}>
