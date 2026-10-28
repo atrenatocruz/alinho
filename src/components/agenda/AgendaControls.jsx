@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search, Check, SlidersHorizontal } from 'lucide-react'
-import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
+import { usePlaceAutocomplete } from '../../lib/usePlaceAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
 import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DEFAULT_FILTERS } from '../../lib/agenda'
@@ -360,7 +360,7 @@ export function LocationSheet({ location, onSave, onClose }) {
   const [radiusKm, setRadiusKm] = useState(location?.radiusKm || 15)
   const [gpsState, setGpsState] = useState('idle') // idle | locating | denied
 
-  useGooglePlacesAutocomplete(inputRef, true, ({ name, value, latitude, longitude }) => {
+  usePlaceAutocomplete(inputRef, true, ({ name, value, latitude, longitude }) => {
     if (latitude == null || longitude == null) return
     const label = name || value
     setText(label)

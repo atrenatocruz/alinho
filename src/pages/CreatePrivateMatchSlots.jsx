@@ -7,7 +7,7 @@ import { Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createPrivateMatch } from '../lib/privateMatches'
 import { PrimaryButton, Avatar, DateTimeField, Select, Chips } from '../components/ui'
-import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
+import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
 import StepPage, { StepMissingNote } from '../components/steps/StepPage'
@@ -102,7 +102,7 @@ export default function CreatePrivateMatchSlots() {
   const [error, setError] = useState('')
 
   const locationInputRef = useRef(null)
-  useGooglePlacesAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
+  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
   })

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { usePlacesUnavailable } from '../lib/useGooglePlacesAutocomplete'
+import { usePlacesUnavailable } from '../lib/usePlaceAutocomplete'
 
 /** Por baixo do campo do local, quando a procura da Google falhou nesta
     visita (chave, quota, rede): o que se escreveu à mão fica a valer. */

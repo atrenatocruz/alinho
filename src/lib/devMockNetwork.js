@@ -1900,6 +1900,8 @@ const TABLE_MOCKS = {
     { key: 'parceiros', enabled: localStorage.getItem('mockParceiros') === 'true' },
     // localStorage.mockPlanosPagos = 'true' liga os planos pagos (#723).
     { key: 'planos_pagos', enabled: localStorage.getItem('mockPlanosPagos') === 'true' },
+    // localStorage.mockRaquete = 'true' liga o «Escolhe a tua raquete».
+    { key: 'raquete', enabled: localStorage.getItem('mockRaquete') === 'true' },
   ],
   // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
   // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).

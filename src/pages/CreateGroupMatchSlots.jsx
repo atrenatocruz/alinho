@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile } from '../lib/clubProfile'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { createGroupMatch } from '../lib/groupMatches'
-import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
+import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
 import { DateTimeField, Select, PrimaryButton, Chips } from '../components/ui'
 import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import { describeError } from '../lib/errors'
@@ -40,7 +40,7 @@ export default function CreateGroupMatchSlots() {
   const [step, setStep] = useState(1)
   const locationInputRef = useRef(null)
 
-  useGooglePlacesAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
+  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
   })

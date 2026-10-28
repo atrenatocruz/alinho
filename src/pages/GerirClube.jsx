@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
+import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { uploadOrgCover, removeOldCover, rememberCover, coverOf } from '../lib/orgCover'
 import CoverSheet from '../components/club/CoverSheet'
@@ -674,14 +674,14 @@ export default function GerirClube() {
 
   useEffect(() => { setFormLevelScale('') }, [showCreateGame, editingGame?.id])
 
-  useGooglePlacesAutocomplete(
+  usePlaceAutocomplete(
     locationInputRef,
     showCreateGame || editingGame,
     ({ value, latitude, longitude }) =>
       setGameForm((form) => ({ ...form, location: value, latitude, longitude }))
   )
 
-  useGooglePlacesAutocomplete(
+  usePlaceAutocomplete(
     clubLocationInputRef,
     activeTab === 'settings' && !loading && !!settings,
     ({ value, latitude, longitude }) =>

@@ -10,6 +10,7 @@ import Layout, { Wordmark } from './components/Layout'
 import { captureAccountOrigin } from './lib/accountOrigin'
 import { POLICY_VERSION } from './lib/contacts'
 import { hideBoot } from './lib/boot'
+import { useFeatureFlag } from './lib/useFeatureFlag'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Plans from './pages/Plans'
@@ -175,6 +176,15 @@ const LoadErrorScreen = ({ onRetry }) => {
       </div>
     </div>
   )
+}
+
+// «Escolhe a tua raquete» só com o interruptor «raquete» ligado (sem linha =
+// desligado): com ele desligado, o link direto volta ao Perfil.
+function RaqueteGate({ children }) {
+  const flag = useFeatureFlag('raquete')
+  if (flag.loading) return null
+  if (!flag.on) return <Navigate to="/perfil" replace />
+  return children
 }
 
 // O /instrucoes antigo abre a Ajuda, na mesma parte.
@@ -683,7 +693,7 @@ function AppRoutes() {
           path="/perfil/raquete"
           element={
             <Guard require="protected" showSplash={showSplash}>
-              <RaqueteResultado />
+              <RaqueteGate><RaqueteResultado /></RaqueteGate>
             </Guard>
           }
         />
@@ -691,7 +701,7 @@ function AppRoutes() {
           path="/perfil/raquete/perguntas"
           element={
             <Guard require="protected" showSplash={showSplash}>
-              <RaqueteQuestionario />
+              <RaqueteGate><RaqueteQuestionario /></RaqueteGate>
             </Guard>
           }
         />
