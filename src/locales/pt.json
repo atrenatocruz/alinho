@@ -429,6 +429,8 @@
   "home.join_club": "Entrar no clube",
   "home.no_clubs_title": "Ainda não estás em nenhum clube nem grupo",
   "home.next_title": "Os teus próximos jogos",
+  "home.last_title": "Os teus últimos jogos",
+  "home.last_see_all": "Ver todos",
   "home.free_count_one": "1 horário livre",
   "home.free_count_other": "{{count}} horários livres",
   "home.free_price": "{{price}} / jogador",
