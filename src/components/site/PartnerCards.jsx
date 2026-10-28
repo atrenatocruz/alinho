@@ -66,8 +66,8 @@ export function PartnerCard({ p, className = '' }) {
   )
 }
 
-/** O tracejado «O teu negócio aqui?», para quem quer ser parceiro: o separador
- *  Parceiros dos Planos, com os contactos (PO, 19 out). */
+/** O tracejado «O teu negócio aqui?», para quem quer ser parceiro: leva ao
+ *  «Para marcas e lojas», no fim da /parceiros, com os contactos. */
 export function YourBusinessCard({ className = '' }) {
   const { t } = useTranslation()
   return (
@@ -76,7 +76,7 @@ export function YourBusinessCard({ className = '' }) {
         <b className="mb-1.5 block font-display text-[18px] font-extrabold text-ink-900">{t('partners.your_business')}</b>
         {t('partners.your_business_text')}
         <br />
-        <Link to="/planos#parceiros" className="mt-1 inline-block font-display text-[15px] font-extrabold text-ink-900">{t('partners.talk_to_us')}</Link>
+        <Link to="/parceiros#marcas" className="mt-1 inline-block font-display text-[15px] font-extrabold text-ink-900">{t('partners.talk_to_us')}</Link>
       </div>
     </div>
   )

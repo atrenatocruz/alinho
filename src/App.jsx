@@ -102,6 +102,7 @@ const PartnerManage = lazyPage(() => import('./pages/PartnerManage'))
 const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
 const Novidades = lazyPage(() => import('./pages/Novidades'))
 const Parceiros = lazyPage(() => import('./pages/Parceiros'))
+const Professores = lazyPage(() => import('./pages/Professores'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
 const DeleteAccountPage = lazyPage(() => import('./pages/DeleteAccountPage'))
@@ -408,6 +409,11 @@ const PUBLIC_HEAD = {
     canonical: 'https://www.alinho.pt/como-funciona',
     description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
+  '/professores': {
+    title: 'Professores de padel no alinho.pt: aulas e horário',
+    canonical: 'https://www.alinho.pt/professores',
+    description: 'Mostra-te aos jogadores e organiza as tuas aulas no mesmo sítio onde eles já combinam os jogos.',
+  },
   '/parceiros': {
     title: 'Parceiros do alinho.pt: prémios do ranking do mês',
     canonical: 'https://www.alinho.pt/parceiros',
@@ -494,6 +500,7 @@ function AppRoutes() {
         <Route path="/como-funciona" element={<HowItWorks />} />
         <Route path="/novidades" element={<Novidades />} />
         <Route path="/parceiros" element={<Parceiros />} />
+        <Route path="/professores" element={<Professores />} />
         <Route path="/mix-offline" element={<MixOffline />} />
         <Route
           path="/"

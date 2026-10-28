@@ -1,28 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, MessageCircle } from 'lucide-react'
 import { Nav, Footer, PlansGrid, usePageTop } from './Landing'
 import { SITE_H2, SITE_ILL } from '../components/site/SiteWays'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
-/* Página «Planos» (Trello #327; desenho de 24 set). Desde 18 out
-   (design-handoff/2026-10-18-site-planos-professores-parceiros, aprovado pelo
-   Francisco; textos do Marketing, versão A, sem preço) tem três separadores:
-   «Grupos e clubes | Professores | Parceiros», presos por baixo do cabeçalho
-   ao descer («Esse tab tem de ficar no topo quando fazemos scroll»).
-
-   - Abre em «Grupos e clubes»; /planos#professores e /planos#parceiros abrem
-     logo o separador certo.
-   - Ao trocar de separador mais abaixo, a página volta ao início do conteúdo,
-     por baixo da barra.
-   - Os contactos vivem em src/lib/contacts.js, num sítio só. */
-
-const TABS = [
-  { key: 'grupos', label: 'plans.tab_groups' },
-  { key: 'professores', label: 'plans.tab_teachers' },
-  { key: 'parceiros', label: 'plans.tab_partners' },
-]
+/* Página «Grupos e clubes» em /planos (Trello #327; desenho de 24 set).
+   Desde 28 out (design-handoff/2026-10-28-site-paginas-sem-separadores,
+   aprovado pelo Francisco) já não tem separadores: cada porta do menu abre a
+   sua página. Os Professores vivem em /professores e o «Para marcas e lojas»
+   no fim de /parceiros; os links antigos /planos#professores e
+   /planos#parceiros levam lá. As secções vivem aqui e as outras páginas
+   importam-nas. Os contactos vivem em src/lib/contacts.js, num sítio só. */
 
 const BTN = 'inline-flex w-full items-center justify-center gap-2 rounded-[16px] px-4 py-[18px] font-display text-[17px] font-extrabold leading-none'
 const BTN_DARK = `${BTN} bg-ink-900 text-white`
@@ -72,10 +61,9 @@ function Groups() {
   const { t } = useTranslation()
   return (
     <>
-      <p className="max-w-[760px] rounded-[16px] bg-[#F4F8DC] px-[18px] py-3.5 font-display text-[16px] font-bold leading-[1.4] text-[#3F6212]">
-        {t('plans.free_group_line')}
-      </p>
-      <div className="mt-[18px]"><PlansGrid /></div>
+      {/* A linha verde «Cada pessoa pode criar um grupo grátis» passou para a
+          frase de cima (28 out). */}
+      <PlansGrid />
       <p className="mx-auto mt-5 max-w-[56ch] text-center text-[13px] text-[#5B6068]">{t('landing.pricing_footnote')}</p>
       {/* «Quem escreve escolhe» (Francisco, 25 set): os dois iguais, com contorno. */}
       <ContactCard className="mt-[26px]" dark={false} title={t('plans.club_title')}
@@ -85,23 +73,19 @@ function Groups() {
   )
 }
 
-// Professores: no telemóvel a imagem vem logo a seguir à frase de topo; no
-// computador fica à direita, ao lado de tudo.
-function Teachers() {
+// Professores (página /professores): o título e a frase ficam no topo da
+// página; no telemóvel a imagem vem primeiro e, no computador, à direita.
+export function Teachers() {
   const { t } = useTranslation()
   return (
-    <div className="grid items-start lg:grid-cols-[1.1fr_.9fr] lg:gap-x-[60px] lg:[grid-template-areas:'a_s'_'b_s'] [grid-template-areas:'a'_'s'_'b']">
-      <div className="[grid-area:a]">
-        <h2 className={SITE_H2}>{t('plans.teachers_title')}</h2>
-        <p className={PANE_LEAD}>{t('plans.teachers_lead')}</p>
-      </div>
-      <div className="mt-6 rounded-[24px] bg-[#F1F2EE] p-[22px] text-center [grid-area:s] lg:mt-0">
+    <div className="grid items-start lg:grid-cols-[1.1fr_.9fr] lg:gap-x-[60px] lg:[grid-template-areas:'b_s'] [grid-template-areas:'s'_'b']">
+      <div className="rounded-[24px] bg-[#F1F2EE] p-[22px] text-center [grid-area:s]">
         <img src="/planos/professor-cartao.webp" alt={t('plans.teachers_shot_alt')} width="740" height="360" loading="lazy"
           className="mx-auto block w-full max-w-[400px] rounded-[18px] shadow-[0_10px_30px_-18px_rgba(0,0,0,.35)]" />
         <p className={SITE_ILL}>{t('plans.teachers_shot_caption')}</p>
       </div>
       <div className="[grid-area:b]">
-        <p className={INTRO}>{t('plans.teachers_intro')}</p>
+        <p className={`${INTRO} lg:mt-0`}>{t('plans.teachers_intro')}</p>
         <Features prefix="plans.teachers" count={5} />
         <ContactCard className="mt-[26px]" title={t('plans.teachers_cta_title')} text={t('plans.teachers_cta_text')}
           waText={t('plans.teachers_whatsapp_text')} emailSubject={t('plans.teachers_email_subject')} />
@@ -110,9 +94,9 @@ function Teachers() {
   )
 }
 
-// Parceiros: sem imagem de ecrã (não há ecrã de parceiro na app). O cartão
+// «Para marcas e lojas», no fim de /parceiros: sem imagem de ecrã. O cartão
 // de contacto fica à direita no computador.
-function Partners() {
+export function PartnersForBrands() {
   const { t } = useTranslation()
   return (
     <div className="grid items-start lg:grid-cols-[1.1fr_.9fr] lg:gap-x-[60px]">
@@ -132,69 +116,31 @@ function Partners() {
   )
 }
 
+/** O topo creme das páginas do site: título grande e a frase. */
+export function SiteTop({ title, lead }) {
+  return (
+    <section className="bg-[#F7F7F4]">
+      <div className="mx-auto max-w-[1200px] px-4 pb-[18px] pt-9 sm:px-10 lg:pt-[70px]">
+        <h1 className="font-display text-[44px] font-black leading-none tracking-[-.035em] text-ink-900 lg:text-[76px]">{title}</h1>
+        <p className="mt-[18px] max-w-[52ch] text-[17px] leading-[1.5] text-[#2A2E35] lg:text-[21px]">{lead}</p>
+      </div>
+    </section>
+  )
+}
+
 export default function Plans() {
   const { t } = useTranslation()
   const { hash } = useLocation()
-  const topRef = useRef(null)
   usePageTop()
-  const fromHash = (h) => (TABS.some((x) => `#${x.key}` === h) ? h.slice(1) : 'grupos')
-  const [tab, setTab] = useState(() => fromHash(hash))
-  // Mais abaixo, trocar de separador volta ao início do conteúdo (por baixo
-  // da barra presa); lá em cima, não mexe. O endereço acompanha, sem passar
-  // pelo router (que levaria a página ao topo).
-  const pending = useRef(false)
-  useLayoutEffect(() => {
-    if (!pending.current) return
-    pending.current = false
-    const top = topRef.current?.offsetHeight || 0
-    if (window.scrollY > top) window.scrollTo(0, top)
-  }, [tab])
-  // Um link para /planos#parceiros (o rodapé) com a página já aberta: troca
-  // de separador e sobe ao início do conteúdo.
-  const first = useRef(true)
-  useEffect(() => {
-    if (first.current) { first.current = false; return }
-    pending.current = true
-    setTab(fromHash(hash))
-  }, [hash]) // eslint-disable-line react-hooks/exhaustive-deps
-  const pick = (key) => {
-    if (key === tab) return
-    pending.current = true
-    setTab(key)
-    window.history.replaceState(window.history.state, '', key === 'grupos' ? window.location.pathname : `#${key}`)
-    // O cabeçalho sublinha Clubes ou Professores pelo separador (site, 28 out).
-    window.dispatchEvent(new Event('site:tab'))
-  }
-
+  // Os links antigos dos separadores levam às páginas novas.
+  if (hash === '#professores') return <Navigate to="/professores" replace />
+  if (hash === '#parceiros') return <Navigate to="/parceiros#marcas" replace />
   return (
     <div className="min-h-screen bg-white">
       <Nav />
-      <section ref={topRef} className="bg-[#F7F7F4]">
-        <div className="mx-auto max-w-[1200px] px-4 pb-[18px] pt-9 sm:px-10 lg:pt-[70px]">
-          <h1 className="font-display text-[44px] font-black leading-none tracking-[-.035em] text-ink-900 lg:text-[76px]">{t('plans.title_site')}</h1>
-          <p className="mt-[18px] max-w-[46ch] text-[17px] leading-[1.5] text-[#2A2E35] lg:text-[21px]">{t('plans.site_lead')}</p>
-        </div>
-      </section>
-      {/* Os separadores do site (opção C, Francisco, 19 out — SPEC ponto 7):
-          só as palavras, com o traço lima por baixo da escolhida, como o menu
-          do topo e o índice da Ajuda. Numa barra branca a 97% presa por baixo
-          do cabeçalho; no telemóvel desliza se não couber. */}
-      <div className="sticky z-[15] border-b border-[#E6E7E3] bg-white" style={{ top: 'var(--site-head, 0px)' }}>
-        <div role="tablist" aria-label={t('plans.tabs_label')}
-          className="mx-auto flex max-w-[1200px] gap-6 overflow-x-auto px-4 [scrollbar-width:none] sm:gap-10 sm:px-10 [&::-webkit-scrollbar]:hidden">
-          {TABS.map((x) => (
-            <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} onClick={() => pick(x.key)}
-              className={`flex-none whitespace-nowrap border-b-[3px] pb-[13px] pt-[15px] font-display text-[16px] font-extrabold leading-none sm:pb-4 sm:pt-[18px] sm:text-[20px] ${
-                tab === x.key ? 'border-lime-400 text-[#040404]' : 'border-transparent text-[#7B818C]'}`}>
-              {t(x.label)}
-            </button>
-          ))}
-        </div>
-      </div>
-      <main className="mx-auto max-w-[1200px] px-4 pb-20 pt-8 sm:px-10" role="tabpanel">
-        {tab === 'grupos' && <Groups />}
-        {tab === 'professores' && <Teachers />}
-        {tab === 'parceiros' && <Partners />}
+      <SiteTop title={t('plans.tab_groups')} lead={t('plans.groups_lead')} />
+      <main className="mx-auto max-w-[1200px] px-4 pb-20 pt-8 sm:px-10">
+        <Groups />
       </main>
       <Footer />
     </div>

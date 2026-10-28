@@ -3,17 +3,17 @@
 // Francisco a 17 out). Também no torneio e nos convites.
 //
 // As cinco portas, iguais em cima e em baixo e pela mesma ordem: Jogadores ·
-// Clubes · Professores · Parceiros · Ajuda (design-handoff/2026-10-28-site-
-// menu-e-parceiros, aprovado pelo Francisco a 28 out). Jogadores abre «Como
-// funciona»; Clubes e Professores, os Planos no separador certo; Parceiros, a
-// /parceiros (ou os Planos em «Parceiros», com o interruptor desligado).
+// Grupos e clubes · Professores · Parceiros · Ajuda, cada uma com a sua página
+// (design-handoff/2026-10-28-site-menu-e-parceiros e 2026-10-28-site-paginas-
+// sem-separadores, aprovados pelo Francisco a 28 out).
 //
-// Cabeçalho, creme e preso em cima:
-//   - a partir de 1100 px, numa linha: o logótipo à esquerda e, à direita, as
-//     cinco, a língua e o «Entrar» em pastilha preta (UX, 28 out, SPEC 4a:
-//     com «Colaboradores» em es precisa de ~1016 px);
-//   - abaixo disso: em cima o logótipo e «Entrar»; por baixo as cinco, numa
-//     fila que desliza, com o esbatido à direita a dizer que há mais.
+// Cabeçalho, creme e preso em cima. Nenhuma porta fica cortada nem escondida:
+//   - numa linha (o logótipo, as cinco, a língua e o «Entrar») só quando a
+//     linha inteira cabe com 40 px de folga, medida na hora e na língua em
+//     que se está (SPEC 4a: «Pa…» cortado a 1264 px com a conta fixa);
+//   - senão, em cima o logótipo, a língua e o «Entrar»; por baixo as cinco,
+//     que partem em linhas (no telemóvel, duas), sem deslizar (SPEC 3,
+//     «cuidado com as tabs no mobile do menu», Francisco, 28 out).
 //   A página onde se está fica sublinhada a lima (2 px).
 // Rodapé, preto: em cima as cinco e Novidades (a página onde se está a lima);
 // em baixo, pequeno, Privacidade, Termos e «© 2026 alinho.pt», e a língua.
@@ -64,35 +64,16 @@ export function setSiteLanguage(lang) {
 // A Ajuda vive em /ajuda (o /instrucoes leva lá): sem sessão, a página do
 // site; com sessão, dentro da app.
 export const HELP_PATH = '/ajuda'
-const PLAN_TABS = ['#professores', '#parceiros']
-
-/** O separador dos Planos em que se está. Os Planos trocam de separador sem
- *  passar pelo router (replaceState) e avisam com «site:tab». */
-function usePlansHash() {
-  const { hash } = useLocation()
-  const [now, setNow] = useState(hash)
-  useEffect(() => { setNow(hash) }, [hash])
-  useEffect(() => {
-    const read = () => setNow(window.location.hash)
-    window.addEventListener('site:tab', read)
-    return () => window.removeEventListener('site:tab', read)
-  }, [])
-  return now
-}
-
-/** As cinco portas, com `on` na página onde se está. «Parceiros» (PO, 19 out):
- *  com o interruptor «parceiros» ligado, a página dos parceiros; desligado, o
- *  separador Parceiros dos Planos, para quem quer ser parceiro. */
+/** As cinco portas, com `on` na página onde se está. A /parceiros existe
+ *  sempre: com o interruptor «parceiros» desligado mostra só o «Para marcas e
+ *  lojas». */
 function useSiteLinks() {
-  const { on: partnersOn } = useFeatureFlag('parceiros')
   const { pathname } = useLocation()
-  const hash = usePlansHash()
-  const onPlans = pathname === '/planos'
   return [
     { to: '/como-funciona', key: 'site.nav_players', on: pathname === '/como-funciona' },
-    { to: '/planos', key: 'site.nav_clubs', on: onPlans && !PLAN_TABS.includes(hash) },
-    { to: '/planos#professores', key: 'plans.tab_teachers', on: onPlans && hash === '#professores' },
-    { to: partnersOn ? '/parceiros' : '/planos#parceiros', key: 'partners.footer_link', on: pathname === '/parceiros' || (onPlans && hash === '#parceiros') },
+    { to: '/planos', key: 'plans.tab_groups', on: pathname === '/planos' },
+    { to: '/professores', key: 'plans.tab_teachers', on: pathname === '/professores' },
+    { to: '/parceiros', key: 'partners.footer_link', on: pathname === '/parceiros' },
     { to: HELP_PATH, key: 'site.help_link', on: ['/instrucoes', '/ajuda'].includes(pathname) },
   ]
 }
@@ -143,58 +124,71 @@ export function SiteHeader({ sticky = true }) {
   const { user } = useAuth()
   const cta = user ? { to: '/', label: t('site.open_app') } : { to: loginHref(), label: t('landing.login_link') }
   const links = useSiteLinks()
+  const linkClass = (on) => `inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap border-b-2 font-display text-[15px] font-bold text-ink-900 sm:text-base ${on ? 'border-lime-400' : 'border-transparent'}`
   const nav = (
     links.map((l) => (
-      <Link key={l.key} to={l.to} onClick={toTop(pathname, l.to)} aria-current={l.on ? 'page' : undefined}
-        className={`inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap border-b-2 font-display text-[15px] font-bold text-ink-900 sm:text-base ${l.on ? 'border-lime-400' : 'border-transparent'}`}>
+      <Link key={l.key} to={l.to} onClick={toTop(pathname, l.to)} aria-current={l.on ? 'page' : undefined} className={linkClass(l.on)}>
         {t(l.key)}
       </Link>
     ))
   )
-  // Na fila que desliza, a página onde se está fica à vista.
+  // Uma linha só quando cabe inteira com 40 px de folga, medida com as
+  // peças verdadeiras: o logótipo, as cinco (numa cópia escondida, sempre
+  // numa linha), a língua e o «Entrar». Volta a medir quando a largura, a
+  // língua ou as letras mudam.
   const rowRef = useRef(null)
-  const onIndex = links.findIndex((l) => l.on)
-  useEffect(() => {
-    // Depois de pintar e outra vez com as letras carregadas (mudam a largura);
-    // tem de passar o esbatido (40 px) para se ler inteira (QA, 28 out).
-    const go = () => {
+  const logoRef = useRef(null)
+  const endRef = useRef(null)
+  const measureRef = useRef(null)
+  const [oneLine, setOneLine] = useState(false)
+  const tEs = i18n.hasResourceBundle?.('es', 'translation') ? i18n.getFixedT('es') : t
+  useLayoutEffect(() => {
+    const check = () => {
       const row = rowRef.current
-      const el = row?.querySelector('[aria-current="page"]')
-      if (!row || !el) return
-      const over = el.getBoundingClientRect().right - (row.getBoundingClientRect().right - 48)
-      if (over > 0) row.scrollLeft += over
+      if (!row || !logoRef.current || !endRef.current || !measureRef.current) return
+      const cs = getComputedStyle(row)
+      const inner = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const need = logoRef.current.offsetWidth + measureRef.current.scrollWidth + endRef.current.offsetWidth + 2 * 30 + 40
+      setOneLine(need <= inner)
     }
-    const id = requestAnimationFrame(go)
-    document.fonts?.ready.then(go)
-    return () => cancelAnimationFrame(id)
-  }, [pathname, onIndex])
+    check()
+    const ro = new ResizeObserver(check)
+    ;[rowRef.current, measureRef.current, endRef.current].forEach((el) => el && ro.observe(el))
+    document.fonts?.ready.then(check)
+    return () => ro.disconnect()
+  }, [])
   return (
     <header ref={ref} className={`${sticky ? 'sticky top-0' : 'relative'} z-20 border-b border-black/5 bg-[#F7F7F4] pt-[env(safe-area-inset-top,0px)]`}>
-      <div className="mx-auto flex max-w-[1200px] items-center gap-[30px] px-4 sm:h-[76px] sm:px-10">
-        <div className="flex h-16 flex-1 items-center justify-between sm:h-auto sm:flex-none">
-          <Link to="/" onClick={toTop(pathname, '/')} className="shrink-0 leading-none" aria-label="alinho.pt">
-            <Wordmark variant="light" className="!h-[26px] sm:!h-[30px]" />
-          </Link>
-          {/* Telemóvel: o menu da língua ao lado do «Ir à app» (menu-lingua, 28 out). */}
-          <div className="flex items-center gap-2 sm:hidden">
-            <LanguageMenu />
-            <Link to={cta.to} className="rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white">
-              {cta.label}
-            </Link>
-          </div>
-        </div>
-        <span className="hidden flex-1 sm:block" />
-        <nav className="hidden items-center gap-[30px] min-[1100px]:flex" aria-label={t('site.nav_label')}>{nav}</nav>
-        <LanguageMenu className="hidden sm:block" />
-        <Link to={cta.to} className="hidden rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white sm:inline-block">
-          {cta.label}
+      <div ref={rowRef} className="mx-auto flex h-16 max-w-[1200px] items-center gap-[30px] px-4 sm:h-[76px] sm:px-10">
+        <Link ref={logoRef} to="/" onClick={toTop(pathname, '/')} className="shrink-0 leading-none" aria-label="alinho.pt">
+          <Wordmark variant="light" className="!h-[26px] sm:!h-[30px]" />
         </Link>
+        <span className="flex-1" />
+        {oneLine && <nav className="flex items-center gap-[30px]" aria-label={t('site.nav_label')}>{nav}</nav>}
+        {/* A língua ao lado do «Entrar», em todos os tamanhos (menu-lingua, 28 out). */}
+        <div ref={endRef} className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <LanguageMenu />
+          <Link to={cta.to} className="rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white">
+            {cta.label}
+          </Link>
+        </div>
       </div>
-      {/* Abaixo de 1100 px: as cinco numa segunda linha, que desliza; o
-          esbatido à direita diz que há mais. */}
-      <div className="relative mx-auto max-w-[1200px] min-[1100px]:hidden">
-        <nav ref={rowRef} className="no-scrollbar flex items-center gap-[30px] overflow-x-auto px-4 pb-1 pr-10 sm:px-10" aria-label={t('site.nav_label')}>{nav}</nav>
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#F7F7F4]" />
+      {/* Sem lugar numa linha: as cinco por baixo, a partir em linhas. Todas à
+          vista, sem deslizar nem esbatido. */}
+      {!oneLine && (
+        <nav className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-5 px-4 pb-1 sm:gap-x-[30px] sm:px-10" aria-label={t('site.nav_label')}>{nav}</nav>
+      )}
+      {/* A medida das cinco numa linha (escondida, fora do ecrã), na palavra
+          mais comprida de cada porta entre a língua de agora e o es, a mais
+          comprida (SPEC 4a): a forma não muda ao trocar de língua. */}
+      <div aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 h-0 w-0 overflow-hidden">
+        <div ref={measureRef} className="flex w-max gap-[30px]">
+          {links.map((l) => {
+            const a = t(l.key)
+            const b = tEs(l.key)
+            return <span key={l.key} className={linkClass(false)}>{b.length > a.length ? b : a}</span>
+          })}
+        </div>
       </div>
     </header>
   )
