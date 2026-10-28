@@ -9,7 +9,7 @@ import RankPodium from './RankPodium'
 import RankingSkeleton from './RankingSkeleton'
 import { SkeletonGate } from '../Skeleton'
 import { PartnerLogo } from '../partners/PartnerCard'
-import { DISTRICT_SCOPE, districtOf, hasPrizes, partnerInitials, prizeFor, prizesLine } from '../../lib/partners'
+import { districtOf, hasPrizes, prizeFor, prizesLine } from '../../lib/partners'
 import {
   MONTH_MIN_GAMES, monthGender, monthPoints, monthPointsMuted, splitMonthRanking,
   monthKey, monthTitle, monthName, nextMonthKey,
@@ -25,45 +25,31 @@ import {
    - A tua linha presa em baixo, com «ver ›». */
 
 /* Parceiros (18 out, UX): `partner` é o parceiro com prémios no distrito de
-   quem joga. No «Distrito de X» com «Todos», a linha do presente com os prémios e as
-   pastilhas no pódio; no Global e nos clubes, a linha leva ao distrito; com
-   Masculino ou Feminino, leva a «Todos» (o pódio fica sem prémios). */
-function PartnerLine({ partner, district, isAll, onDistrict, onScope, onScale }) {
+   quem joga; as pastilhas no pódio só no «Distrito de X» com «Todos». A linha é
+   sempre a mesma e um toque abre a página do parceiro (Francisco, 28 out: antes
+   mudava o seletor e o texto, e eram precisos três toques). */
+function PartnerLine({ partner, district }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const brand = partnerInitials(partner.name)
-  const full = onDistrict && isAll
-  const go = () => {
-    if (full) navigate(`/parceiro/${partner.slug}`)
-    else if (!isAll) onScale?.('all')
-    else onScope?.(`${DISTRICT_SCOPE}${district}`)
-  }
   return (
-    <button type="button" onClick={go}
+    <button type="button" onClick={() => navigate(`/parceiro/${partner.slug}`)}
       className="flex w-full items-center gap-2.5 rounded-card border border-line bg-white px-3 py-2.5 text-left">
-      <PartnerLogo partner={partner} size={28} />
+      {/* O logótipo no topo da 1.ª linha; a seta fica ao centro (Francisco, 28 out). */}
+      <span className="self-start"><PartnerLogo partner={partner} size={28} /></span>
       <span className="min-w-0 flex-1">
-        {full ? (
-          <>
-            <span className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-ink-900">
-              <Gift size={15} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />{prizesLine(partner)}
-            </span>
-            <span className="block text-[12px] text-[#5B6068]">{t('partners.line_sub', { name: partner.name })}</span>
-          </>
-        ) : (
-          <span className="block text-[13px] font-extrabold text-ink-900">
-            {t(isAll ? 'partners.line_to_district' : 'partners.line_to_all', { brand, district })}
-          </span>
-        )}
+        <span className="flex items-center gap-1.5 text-[13.5px] font-extrabold text-ink-900">
+          <Gift size={15} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />{prizesLine(partner)}
+        </span>
+        <span className="block text-[12px] text-[#5B6068]">{t('partners.line_sub', { name: partner.name, district })}</span>
       </span>
       <ChevronRight size={16} className="shrink-0 text-[#8A8E95]" />
     </button>
   )
 }
 
-export default function MonthRanking({ scope, scale, scopeLabel, onShare, partner = null, onScope, onScale }) {
+export default function MonthRanking({ scope, scale, scopeLabel, onShare, partner = null }) {
   const { t, i18n } = useTranslation()
-  const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
+  const lang = String(i18n.language || 'pt').slice(0, 2)
   const current = monthKey(new Date())
   const [month, setMonth] = useState(current)
   const [months, setMonths] = useState([])
@@ -150,8 +136,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare, partne
         <>
           {/* Sem prémios este mês (o acordo começa depois): sem a linha (UX, 22 out). */}
           {partner && isCurrent && hasPrizes(partner) && (
-            <PartnerLine partner={partner} district={partnerDistrict} isAll={isAll} onDistrict={district === partnerDistrict}
-              onScope={onScope} onScale={onScale} />
+            <PartnerLine partner={partner} district={partnerDistrict} />
           )}
           {/* O pódio: 1.º, 2.º, 3.º, da esquerda para a direita. */}
           <RankPodium id="month-podium" spots={podium} freeHint={t('month.free_hint')} onOpen={(id) => navigate(`/jogador/${id}`)}

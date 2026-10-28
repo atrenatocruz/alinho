@@ -4446,8 +4446,9 @@ export default function GerirClube() {
                       <PlacesUnavailableHint />
                     </SettingsField>
                   )}
-                  {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1). */}
-                  {org?.kind !== 'group' && settings.district !== undefined && (
+                  {/* O distrito põe as ligas da zona em «Para ti» (Liga, Fase 1) e o
+                      grupo no pódio da zona dos parceiros; também nos grupos (PO, 28 out). */}
+                  {settings.district !== undefined && (
                     <SettingsField label={t('gerirclube.district_label')}>
                       <div className="mt-1">
                         <Select value={settings.district || ''} onChange={(v) => setSettings({ ...settings, district: v })}

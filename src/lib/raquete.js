@@ -62,7 +62,7 @@ export async function requestPick(answers, lang) {
 
 // A minha última recomendação (a RLS só deixa ler a própria) e as raquetes dela.
 export async function loadMyPick() {
-  const { data: pick, error } = await supabase.from('racket_picks').select('best_id, picks, created_at').maybeSingle()
+  const { data: pick, error } = await supabase.from('racket_picks').select('best_id, picks, answers, created_at').maybeSingle()
   if (error) throw error
   if (!pick) return null
   const ids = (pick.picks ?? []).map((p) => p.id)
@@ -72,6 +72,13 @@ export async function loadMyPick() {
     .in('store_id', ids)
   if (rErr) throw rErr
   return { pick, rackets: rackets ?? [] }
+}
+
+// Só se já respondeu (a linha do «Para ti» na Home), sem carregar as raquetes.
+export async function hasMyPick() {
+  const { data, error } = await supabase.from('racket_picks').select('user_id').limit(1)
+  if (error) throw error
+  return (data ?? []).length > 0
 }
 
 // Preço, foto, stock e link de hoje; a melhor primeiro.

@@ -26,6 +26,7 @@ import { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayC
 import MyNextGames, { CustomizePill, SectionTitle } from '../components/home/MyNextGames'
 import LiveNowLine from '../components/home/LiveNowLine'
 import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
+import { useRaqueteForYou } from '../components/raquete/useRaqueteForYou'
 import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
 import FreeSlotsCard from '../components/home/FreeSlotsCard'
 import PartnerCard from '../components/partners/PartnerCard'
@@ -1043,11 +1044,14 @@ export default function Home() {
   // O número por confirmar (sem ele, o «In» no WhatsApp entra como convidado
   // sem conta — migration_mix_guest_sem_conta.sql) é uma linha do «Para ti»
   // que abre a caixa de sempre numa folha (UX, 10 out).
+  // A raquete, por último (depois do que tem a ver com jogos).
+  const raqueteForYou = useRaqueteForYou(t)
   const phoneToConfirm = !!profile && !profile.phone_verified_at && profile.phone_hash !== 'dev-bypass'
   const forYou = [
     ...forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language,
       onConfirmPhone: phoneToConfirm ? () => setPhoneOpen(true) : null }),
     ...leagueForYouItems(leagueAgenda, t, i18n.language),
+    ...raqueteForYou,
   ]
   const firstUpcomingDay = days.find((d) => d.dayKey >= today)?.dayKey
   // Os dias passados por cima de «Hoje» têm título, como os blocos de baixo,

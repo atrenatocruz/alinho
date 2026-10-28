@@ -15,6 +15,7 @@
    Conquista nova = 1 bloco SQL no verificador + 1 linha no seed + ícone
    aqui (com fallback) + 2 chaves de tradução.
    ════════════════════════════════════════════════════════════════════════ */
+import { localeOf } from './formatDate'
 import {
   Rocket, Footprints, Coffee, Home, Milestone, Landmark, CalendarDays,
   CalendarCheck, CalendarClock, Moon, Sunrise, Sun, Megaphone, Flame,
@@ -177,7 +178,7 @@ export const RARITY_META = {
 
 /** A «% têm» com a vírgula de cá («24,1»), e com o ponto em inglês. */
 export const formatRarityPct = (pct, lang = 'pt') =>
-  Number(pct).toLocaleString(String(lang).startsWith('en') ? 'en-GB' : 'pt-PT', { maximumFractionDigits: 1 })
+  Number(pct).toLocaleString(localeOf(lang), { maximumFractionDigits: 1 })
 
 export const CATEGORY_ORDER = ['jogo', 'torneio', 'elo', 'xp', 'kudos', 'aulas', 'antiguidade', 'evento']
 

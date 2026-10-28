@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from '../agenda/HomeCard'
 import { categoryCode } from '../../lib/tournaments'
+import { localeOf } from '../../lib/formatDate'
 
 export default function LeagueEventCard({ event, past }) {
   const { t, i18n } = useTranslation()
@@ -12,7 +13,7 @@ export default function LeagueEventCard({ event, past }) {
   const r = event.raw
   const to = `/liga/${r.league_slug}/encontro/${r.id}`
   const time = event.hasTime
-    ? new Date(r.scheduled_at).toLocaleTimeString(i18n.language === 'en' ? 'en-GB' : 'pt-PT', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(r.scheduled_at).toLocaleTimeString(localeOf(i18n.language), { hour: '2-digit', minute: '2-digit' })
     : t('league.enc_por_marcar')
   return (
     <HomeCard colors={kindColorsOf('league')} mine={!past} past={past} to={to} ariaLabel={`${r.home_name} vs ${r.away_name}`}
