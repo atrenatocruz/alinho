@@ -51,7 +51,7 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
   toDayKey, fromDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
-  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
+  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -278,7 +278,6 @@ export default function Home() {
   // voltar atrás. Sem chave da Google não há mapa para mostrar (ver
   // lib/googleMaps.js), por isso nunca sai de 'list' nesse caso.
   const [viewMode, setViewMode] = useState(() => (GOOGLE_MAPS_API_KEY ? readSession(VIEW_MODE_KEY, 'list') : 'list'))
-  const [selectedPin, setSelectedPin] = useState(null)
 
   useEffect(() => { writeSession(FILTERS_KEY, filters) }, [filters])
   useEffect(() => { writeSession(VIEW_MODE_KEY, viewMode) }, [viewMode])
@@ -683,7 +682,7 @@ export default function Home() {
   const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
   // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
   // ajudam a decidir onde jogar a seguir.
-  const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
+  const mapEvents = useMemo(() => visible.filter((e) => !isPastEvent(e, today)), [visible, today])
 
   /* --- Ação direta num mix (Trello #51). As regras são as mesmas dos botões
      da página do mix; quem decide de verdade é a RLS de `participants`. Sem
@@ -1324,7 +1323,19 @@ export default function Home() {
 
 
       {viewMode === 'map' ? (
-        <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
+        <MapView
+          events={mapEvents}
+          today={today}
+          location={location}
+          linkFor={eventLink}
+          actionFor={(e) => {
+            if (e.source !== 'game' || e.finished) return null
+            const a = cardAction(e.raw)
+            return a && { ...a, busy: pendingKeys.has(e.key) }
+          }}
+          onAction={(e) => { const a = cardAction(e.raw); if (a) handleGameAction(e, a.kind) }}
+          onShowList={(dayKey) => { setViewMode('list'); requestAnimationFrame(() => pickDay(dayKey)) }}
+        />
       ) : filters.show === 'played' ? (
         // «Já jogados» (27 set): a lista do que já se jogou, do mais recente
         // para trás, em vez da agenda por dias.
@@ -1445,17 +1456,6 @@ export default function Home() {
 
       {customizeOpen && (
         <PersonalizeHomeSheet hidden={homeSections.hidden} onToggle={homeSections.toggle} onClose={() => setCustomizeOpen(false)} />
-      )}
-
-      {selectedPin && (
-        <Sheet
-          title={selectedPin.events[0]?.orgName || t('agenda.map_pin_title')}
-          onClose={() => setSelectedPin(null)}
-        >
-          <div className="space-y-2.5">
-            {selectedPin.events.map(renderEventWithError)}
-          </div>
-        </Sheet>
       )}
 
       <ConfirmSheet open={!!leaveAsk} title={t('dialogs.leave_game_title')}

@@ -400,3 +400,23 @@ body[data-steps] main > div { padding-bottom: 0 !important; }
 @media (prefers-reduced-motion: reduce) {
   .raq-bob, .raq-shadow, .raq-dot { animation: none; }
 }
+
+/* Pins do mapa da Home (MapView.jsx): pílula com a hora e o estado. */
+.map-pill {
+  position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 9999px; white-space: nowrap; cursor: pointer;
+  background: #fff; color: rgb(var(--ink-900)); border: 1.5px solid rgb(var(--ink-900));
+  font: 800 12px/1 var(--font-sans, system-ui, sans-serif); box-shadow: 0 2px 6px rgb(0 0 0 / .18);
+  margin-top: -7px; transition: transform 150ms ease-out;
+}
+.map-pill::after {
+  content: ""; position: absolute; left: 50%; bottom: -5px; width: 8px; height: 8px; background: inherit;
+  border-right: 1.5px solid rgb(var(--ink-900)); border-bottom: 1.5px solid rgb(var(--ink-900));
+  transform: translateX(-50%) rotate(45deg);
+}
+.map-pill i { width: 8px; height: 8px; border-radius: 9999px; flex: none; }
+.map-pill[data-active="true"] { background: rgb(var(--ink-900)); color: #fff; }
+.map-pill[data-tone="urgent"] { border-color: #B91C1C; }
+.map-pill[data-tone="mine"] { box-shadow: 0 0 0 3px rgb(var(--lime-400)), 0 2px 6px rgb(0 0 0 / .18); }
+.map-pill[data-tone="full"] { opacity: .55; }
+@media (prefers-reduced-motion: reduce) { .map-pill { transition: none; } }
