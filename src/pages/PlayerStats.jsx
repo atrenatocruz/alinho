@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Lock, Flame } from 'lucide-react'
 import { BackBar, Chips, EmptyState, Avatar } from '../components/ui'
@@ -142,16 +142,20 @@ export default function PlayerStats() {
     </li>
   )
 
+  // Tocar numa pessoa abre o perfil dela (#735). O id vem das RPCs de
+  // adversários e parceiros, que devolvem a conta; voltar traz às Estatísticas.
   const personRow = (p) => (
-    <li key={p.id} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
-      <Avatar name={p.name} url={p.avatar_url} size="w-9 h-9 text-xs" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-extrabold text-ink-900">{firstLastName(p.name)}</span>
-        <span className="block text-[12px] text-muted">{t('playerstats.record', { wins: p.wins, losses: p.losses })}</span>
-      </span>
-      <span className="shrink-0 font-display text-[17px] font-extrabold tabular-nums text-ink-900">
-        {winRatePct(p.wins, p.total)}%
-      </span>
+    <li key={p.id} className="border-b border-line last:border-b-0">
+      <Link to={`/jogador/${p.id}`} className="press flex items-center gap-3 px-4 py-3">
+        <Avatar name={p.name} url={p.avatar_url} size="w-9 h-9 text-xs" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-extrabold text-ink-900">{firstLastName(p.name)}</span>
+          <span className="block text-[12px] text-muted">{t('playerstats.record', { wins: p.wins, losses: p.losses })}</span>
+        </span>
+        <span className="shrink-0 font-display text-[17px] font-extrabold tabular-nums text-ink-900">
+          {winRatePct(p.wins, p.total)}%
+        </span>
+      </Link>
     </li>
   )
 
@@ -257,7 +261,7 @@ export default function PlayerStats() {
         </div>
       </section>
 
-      {/* Contra quem. */}
+      {/* Adversários mais frequentes. */}
       <section>
         <p className={kicker}>{t('playerstats.opponents_title')}</p>
         {opponents.length === 0 ? (
@@ -267,7 +271,7 @@ export default function PlayerStats() {
             {(hardest || favorite) && (
               <div className="grid grid-cols-2 gap-2.5">
                 {[[hardest, 'playerstats.hardest'], [favorite, 'playerstats.favorite']].map(([p, key]) => p && (
-                  <div key={key} className="rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+                  <Link key={key} to={`/jogador/${p.id}`} className="press block rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
                     <p className="mb-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted">{t(key)}</p>
                     <div className="flex items-center gap-2.5">
                       <Avatar name={p.name} url={p.avatar_url} size="w-9 h-9 text-xs" />
@@ -276,7 +280,7 @@ export default function PlayerStats() {
                         <span className="block text-[12px] text-muted tabular-nums">{t('playerstats.record', { wins: p.wins, losses: p.losses })}</span>
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -287,7 +291,7 @@ export default function PlayerStats() {
         )}
       </section>
 
-      {/* Com quem. */}
+      {/* Parceiros mais frequentes. */}
       {partners.length > 0 && (
         <section>
           <p className={kicker}>{t('playerstats.partners_title')}</p>
