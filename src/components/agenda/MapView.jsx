@@ -27,10 +27,12 @@ const MAP_STYLE_URL = TOMTOM_KEY
   ? `https://api.tomtom.com/maps/orbis/assets/styles/0.*/style.json?key=${TOMTOM_KEY}&apiVersion=1&map=basic_street-light`
   : FALLBACK_STYLE_URL
 const RADIUS_COLOR = '#1E4FA8'
+// O mapa abre em mim, com 10 km à volta à vista (Renato, 29 out).
+const MAP_RADIUS_KM = 10
 // O MapLibre (~800 KB) só se carrega quando se abre o mapa.
 const loadMapLibre = () => Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m.default)
 
-/** Polígono de um círculo (raio em km) — o raio de «Escolher localização». */
+/** Polígono de um círculo (raio em km) à volta de onde estou. */
 function circleGeoJSON({ latitude, longitude }, km) {
   const pts = []
   const dLat = km / 110.574
@@ -41,6 +43,15 @@ function circleGeoJSON({ latitude, longitude }, km) {
   }
   return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [pts] }, properties: {} }
 }
+
+/** O retângulo que cabe o círculo — para enquadrar o raio ao abrir. */
+function radiusBounds({ latitude, longitude }, km) {
+  const dLat = km / 110.574
+  const dLng = km / (111.32 * Math.cos((latitude * Math.PI) / 180))
+  return [[longitude - dLng, latitude - dLat], [longitude + dLng, latitude + dLat]]
+}
+// Em cima a fila dos dias; em baixo o carrossel e a barra da app.
+const FIT_PADDING = { top: 70, left: 16, right: 16, bottom: 250 }
 
 /** O estado de um evento para o pin e o cartão: estás dentro, cheio, faltam N. */
 function eventStatus(e, t) {
@@ -298,8 +309,19 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
-    // Volta a enquadrar só se mudou o dia ou o nº de pins (uma morada que
-    // chegou do Photon), e nunca por cima do que a pessoa arrastou.
+    // Sabendo onde estou: abre-se em mim com o raio todo à vista, e não se
+    // mexe ao trocar de dia. Volta-se a enquadrar só se o GPS chegar depois
+    // da localização escolhida — nunca por cima do que a pessoa arrastou.
+    const me = gpsCenter || location
+    if (me) {
+      const meSig = `me:${me.latitude.toFixed(3)},${me.longitude.toFixed(3)}`
+      if (fittedDayRef.current === meSig || userMovedRef.current) return
+      fittedDayRef.current = meSig
+      map.fitBounds(radiusBounds(me, MAP_RADIUS_KM), { padding: FIT_PADDING, duration: 0 })
+      return
+    }
+    // Sem localização: enquadram-se os pins do dia, de novo só se mudou o
+    // dia ou o nº de pins (uma morada que chegou do Photon).
     const sig = `${dayKey}:${pins.length}`
     const sameDay = fittedDayRef.current?.startsWith(`${dayKey}:`)
     if (fittedDayRef.current === sig || (sameDay && userMovedRef.current)) return
@@ -310,16 +332,12 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
     } else if (pins.length > 1) {
       const bounds = new libRef.current.LngLatBounds()
       pins.forEach((p) => bounds.extend([p.longitude, p.latitude]))
-      // Em cima a fila dos dias; em baixo o carrossel e a barra da app.
-      map.fitBounds(bounds, { padding: { top: 70, left: 48, right: 48, bottom: 250 }, maxZoom: 15, duration: 0 })
-    } else {
-      const c = gpsCenter || location
-      if (c) map.jumpTo({ center: [c.longitude, c.latitude] })
+      map.fitBounds(bounds, { padding: { ...FIT_PADDING, left: 48, right: 48 }, maxZoom: 15, duration: 0 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, dayKey, pins])
+  }, [ready, dayKey, pins, gpsCenter, location])
 
-  // Onde estou e o raio de «Escolher localização» — só orientação.
+  // Onde estou e os 10 km à volta — só orientação.
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
@@ -333,8 +351,8 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
         meRef.current.setLngLat([me.longitude, me.latitude])
       }
     }
-    radiusDataRef.current = location?.radiusKm
-      ? circleGeoJSON(location, location.radiusKm)
+    radiusDataRef.current = me
+      ? circleGeoJSON(me, MAP_RADIUS_KM)
       : { type: 'FeatureCollection', features: [] }
     map.getSource('radius')?.setData(radiusDataRef.current)
   }, [ready, gpsCenter, location])
@@ -369,7 +387,7 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
     const map = mapRef.current
     const c = gpsCenter || location
     if (!map || !c) return
-    map.easeTo({ center: [c.longitude, c.latitude], zoom: 13 })
+    map.fitBounds(radiusBounds(c, MAP_RADIUS_KM), { padding: FIT_PADDING })
   }
 
   return (
