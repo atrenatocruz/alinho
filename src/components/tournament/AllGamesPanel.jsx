@@ -30,7 +30,10 @@ export default function AllGamesPanel({ sections = SECTIONS, ...props }) {
   // (QA, 26 set). Sem formato escolhido ainda, fica.
   const format = props.category?.format
   const noGroups = format && Number(format.groups) === 0
-  const built = sections.filter((key) => TOURNAMENT_PANELS[key] && !(key === 'groups' && noGroups))
+  // Um grupo só, todos contra todos (23 out): não há quadro, e a tabela tem
+  // o seu próprio título («Um grupo · 5 duplas»).
+  const singleGroup = format && Number(format.groups) === 1 && (format.qualifiers_per_group === 0 || format.qualifiers_per_group === '0')
+  const built = sections.filter((key) => TOURNAMENT_PANELS[key] && !(key === 'groups' && noGroups) && !(key === 'draw' && singleGroup))
   // «A decorrer agora» (27 set): o toque no cartão do torneio abre aqui com
   // ?sec=groups|draw, já na secção da fase a decorrer. Os painéis carregam
   // aos poucos e empurram o que está por baixo, por isso volta a apontar
@@ -64,11 +67,13 @@ export default function AllGamesPanel({ sections = SECTIONS, ...props }) {
         const emptyPose = i === 0 ? undefined : null
         return (
           <section key={key} ref={(el) => { refs.current[key] = el }} className="scroll-mt-20">
+            {!(key === 'groups' && singleGroup) && (<>
             <MonoLabel>{t(`tournament.section_${key}`)}</MonoLabel>
             {/* A linha por baixo do título está no desenho: com três secções
                 seguidas, o título sozinho não diz qual é qual a quem chega. */}
             {/* Sem inscrição não há «tua tabela» (designer, 28 set). */}
             <p className="mb-1.5 mt-0.5 text-xs text-ink-500">{t(key === 'groups' && !props.my ? 'tournament.section_groups_hint_open' : `tournament.section_${key}_hint`)}</p>
+            </>)}
             <Suspense fallback={spinner}><Panel {...props} emptyPose={emptyPose} /></Suspense>
           </section>
         )

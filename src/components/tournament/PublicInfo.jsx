@@ -11,6 +11,7 @@ import { pricePerPlayer } from '../../lib/tournaments'
 import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
 import { CategoryPriceText } from './CategorySpecialPrice'
 import { appOrigin } from '../../lib/native'
+import { localeOf } from '../../lib/formatDate'
 
 /** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
  *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
@@ -72,7 +73,7 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
       {/* Categorias: dia, hora e vagas — é o que decide se me inscrevo. */}
       <div className="space-y-1.5">
         {(open ? categories : categories.slice(0, 4)).map((c) => {
-          const when = categoryWhen(c, i18n.language === 'en' ? 'en-GB' : 'pt-PT')
+          const when = categoryWhen(c, localeOf(i18n.language))
           const slots = slotsWords(c)
           const fmt = formatWords(c)
           return (

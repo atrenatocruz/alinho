@@ -3,7 +3,7 @@ import { withMyRef, refInText } from '../lib/myRef'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search, Clock } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search, Clock, Check } from 'lucide-react'
 import { timeOptions, toMin } from '../lib/timeSlots'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
@@ -2367,7 +2367,7 @@ const stripAccents = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 // = nenhuma opção marcada (ainda não há resposta). `startAt`: a opção que
 // fica à vista ao abrir (por omissão, a escolhida). Data de nascimento: os
 // anos abrem em 1995, sem nenhum marcado (UX, 18 out).
-export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false, title = null, highlight = true, startAt = null }) {
+export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false, title = null, highlight = true, startAt = null, check = false }) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_placeholder')
   const [open, setOpen] = useState(false)
@@ -2474,9 +2474,11 @@ export function Select({ value, onChange, options, placeholder, className = '', 
                   onClick={() => { onChange(o.value); closeSheet() }}
                   className={`w-full text-left px-3.5 py-3 rounded-ctrl text-base font-extrabold transition-colors duration-fast ${
                     highlight && o.value === value ? 'bg-lime-400/20 text-ink-900' : 'text-ink-900 hover:bg-ink-50'
-                  }`}
+                  } ${check ? 'flex items-center justify-between' : ''}`}
                 >
                   {o.label}
+                  {/* `check`: o ✓ na escolhida, como no menu de línguas do site. */}
+                  {check && o.value === value && <Check size={18} className="shrink-0" />}
                 </button>
               ))}
             </div>

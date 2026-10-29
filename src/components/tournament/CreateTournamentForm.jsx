@@ -22,11 +22,15 @@ import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
 import { maxCategories } from '../../lib/tournamentSignup'
 import TimeInput from '../TimeInput'
+import { courtNames } from './courtNames'
+import { DeuceModeChips } from '../DeuceMode'
+import { DEFAULT_DEUCE_MODE } from '../../lib/deuceMode'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
   scoring: 'pro_set_9',
   tiebreak_8_8: 'tiebreak',   // em 8-8: tie-break a 7 | super tie-break a 10
+  deuce: DEFAULT_DEUCE_MODE,  // aos 40-40: ponto_de_ouro | star_point | vantagens
   duration_min: 30,
   duration_max: 60,
   max_consecutive: 2,         // nunca 3 seguidos (SPEC §6)
@@ -60,17 +64,6 @@ function Field({ label, children, hint, error, className = '' }) {
 
 // min-h 44: alvo de toque para o dedo, à beira do campo (Trello #558).
 const inputClass = 'input-field'
-
-/** Os nomes dos campos: tantos como o dia com mais campos (QA, 30 set). Com
- *  2 campos por dia e um só nome escrito, o torneio ficava só com o «Campo 1»
- *  e o «Propor horas» punha todos os jogos nele. Os que faltam levam o nome
- *  base («Campo 2»); os que a pessoa escreveu ficam como estão. */
-export function courtNames(names = [], days = [], base = (n) => `Campo ${n}`) {
-  const need = Math.max(0, ...days.map((d) => Number(d.courts) || 0))
-  const list = [...names]
-  for (let i = list.length; i < need; i += 1) list.push(base(i + 1))
-  return list
-}
 
 // Só para os botões de acrescentar (+ dia, + campo, + categoria). As
 // escolhas usam <Chips>, a pastilha única da app (Trello #528).
@@ -966,6 +959,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                 options={TIEBREAK_RULES.map((r) => ({ value: r, label: t(`tournament.create.tiebreak_8_8_${r}`) }))} />
             </Field>
           )}
+          <Field label={t('deuce.label')}>
+            <DeuceModeChips value={draft.rules.deuce || DEFAULT_DEUCE_MODE} onChange={(v) => setRule('deuce', v)}
+              locked={['a_decorrer', 'terminado'].includes(initial?.tournament?.status)}
+              lockedText={t('tournament.create.locked_deuce')} />
+          </Field>
           <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })} error={fieldError(['duration_order'])}>
             <div className="flex items-center gap-2">
               <input type="number" min="15" max="180" step="5" className="input-field !w-[86px] !px-2" value={draft.rules.duration_min} onChange={(e) => setRule('duration_min', Number(e.target.value))} />

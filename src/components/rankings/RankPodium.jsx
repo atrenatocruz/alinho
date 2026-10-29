@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
+import { Gift } from 'lucide-react'
 import { Avatar } from '../ui'
 import { shortName } from '../../lib/monthRanking'
+import { PRIZE_COLORS } from '../../lib/partners'
 
 /* O pódio 1·2·3 da página Rankings, igual nos três separadores (Ranking,
    Do mês, Assiduidade — acerto do Francisco a 12 out, design-handoff/
@@ -26,7 +28,7 @@ export function Crown({ ring = 72 }) {
   )
 }
 
-function Spot({ row, place, big, value, isMe, freeHint, onOpen }) {
+function Spot({ row, place, big, value, isMe, freeHint, onOpen, prize }) {
   const { t } = useTranslation()
   const size = big ? 'w-[60px] h-[60px] text-base' : 'w-12 h-12 text-sm'
   if (!row) {
@@ -55,6 +57,13 @@ function Spot({ row, place, big, value, isMe, freeHint, onOpen }) {
       </div>
       <p className="mt-2 w-full truncate text-[13px] font-extrabold text-ink-900">{shortName(row.name)}</p>
       <p className={`text-[13px] font-extrabold tabular-nums ${v.muted ? 'text-muted' : 'text-[#5B6B00]'}`}>{v.text}</p>
+      {/* O prémio do parceiro no pódio do distrito, na cor do lugar (parceiros, 18 out). */}
+      {prize && (
+        <span className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold tabular-nums"
+          style={{ background: PRIZE_COLORS[Math.min(shown, 3)].bg, color: PRIZE_COLORS[Math.min(shown, 3)].fg }}>
+          <Gift size={12} strokeWidth={2.4} className="shrink-0" aria-hidden="true" />{prize}
+        </span>
+      )}
     </button>
   )
 }
@@ -63,14 +72,16 @@ function Spot({ row, place, big, value, isMe, freeHint, onOpen }) {
  * spots: [1.º, 2.º, 3.º] (null = «Lugar livre») · value(row) → { text, muted }
  * meId: quem é «Tu» · freeHint: o que falta para entrar (só no do mês)
  * onShare: «↗ Partilhar o pódio» (sem ele não aparece)
+ * prizeOf(place) → «15%» ou null: a pastilha do prémio do parceiro (só no do mês)
  */
-export default function RankPodium({ spots, value, meId, freeHint = null, onOpen, onShare, id }) {
+export default function RankPodium({ spots, value, meId, freeHint = null, onOpen, onShare, id, prizeOf = null }) {
   const { t } = useTranslation()
   return (
     <div id={id} className="rounded-card border border-line bg-white overflow-hidden">
       <div className="grid grid-cols-3 gap-2 px-3 pt-3 pb-4">
         {spots.map((row, i) => (
-          <Spot key={i} row={row} place={i + 1} big={i === 0} value={value} isMe={!!row && (row.is_me || row.user_id === meId)} freeHint={freeHint} onOpen={onOpen} />
+          <Spot key={i} row={row} place={i + 1} big={i === 0} value={value} isMe={!!row && (row.is_me || row.user_id === meId)} freeHint={freeHint} onOpen={onOpen}
+            prize={row && prizeOf ? prizeOf(row.place ?? i + 1) : null} />
         ))}
       </div>
       {onShare && spots.some(Boolean) && (

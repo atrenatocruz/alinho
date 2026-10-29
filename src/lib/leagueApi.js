@@ -24,6 +24,8 @@ export const createLeague = (d) => rpc('create_league', {
   p_district: d.district ?? null, p_season_label: d.seasonLabel ?? null, p_description: d.description ?? null,
   p_applications_close_at: d.applicationsCloseAt ?? null, p_max_teams: d.maxTeams ?? null,
 })
+// «Aos 40-40» da liga inteira (migration_aos_40_40.sql, Dev 3).
+export const setLeagueDeuceMode = (id, mode) => rpc('set_deuce_mode', { p_kind: 'league', p_id: id, p_mode: mode })
 export const updateLeague = (id, d) => rpc('update_league', {
   p_league_id: id, p_name: d.name, p_scope: d.scope, p_district: d.district ?? null, p_season_label: d.seasonLabel ?? null,
   p_description: d.description ?? null, p_applications_close_at: d.applicationsCloseAt ?? null, p_max_teams: d.maxTeams ?? null,

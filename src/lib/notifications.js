@@ -25,6 +25,9 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_not_finis
   // «Sou eu» (21 out, migration_mix_sou_eu.sql): o pedido, aos admins; a
   // resposta, a quem pediu.
   'mix_guest_claim', 'mix_guest_claim_accepted', 'mix_guest_claim_declined',
+  // «Pedir correção» (23 out, migration_mix_pedir_correcao.sql): o pedido, aos
+  // admins; a resposta, aos jogadores com conta desse jogo.
+  'mix_correction_requested', 'mix_correction_accepted', 'mix_correction_declined',
   // #622: o mix terminou e quem ganhou (Dev 3, migration_mix_aviso_terminou.sql).
   'mix_finished',
   // Aprovar quem entra (2 out, Dev 3): o pedido a quem organiza, e a resposta
@@ -65,6 +68,25 @@ export async function unreadFriendResultNotice(matchId) {
     throw error
   }
   return (data || []).find((n) => n.kind === 'friend_match_result_sent' && n.data?.match_id === matchId) || null
+}
+
+/** Os prémios do mês (partner_month_offer) deste mês: já vêm lidos, por isso
+    não estão nos por ler; o sino mostra-os no fim, mais claros. */
+export async function listMyMonthPrizeOffers() {
+  const now = new Date()
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, kind, data, created_at')
+    .eq('kind', 'partner_month_offer')
+    .eq('data->>month', month)
+    .order('created_at', { ascending: false })
+    .limit(5)
+  if (error) {
+    if (errorKind(error) === 'not_ready') return []
+    throw error
+  }
+  return (data || []).filter((n) => n.kind === 'partner_month_offer' && String(n.data?.month || '').slice(0, 10) === month)
 }
 
 export async function markNotificationsRead(ids) {

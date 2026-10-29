@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Megaphone } from 'lucide-react'
 import { CardClub } from './EventCard'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from './HomeCard'
-import { formatDate } from '../../lib/formatDate'
+import { formatDate, localeOf } from '../../lib/formatDate'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -29,7 +29,7 @@ const LINE_KEY = {
 }
 
 const hhmm = (date, language) =>
-  new Date(date).toLocaleTimeString(language === 'en' ? 'en-GB' : 'pt-PT', { hour: '2-digit', minute: '2-digit' })
+  new Date(date).toLocaleTimeString(localeOf(language), { hour: '2-digit', minute: '2-digit' })
 
 /** «17–18 out» e «sáb e dom» (ou «17 out» e «sáb», num dia só). */
 function daysOf(startsAt, endsOn, lang) {

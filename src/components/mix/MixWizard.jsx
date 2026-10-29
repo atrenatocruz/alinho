@@ -21,7 +21,9 @@ import MixImageField from './MixImageField'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
-import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople } from '../../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople, scoringFormatOf, scoringForFormat, SCORING_FORMAT_HINT_KEY, SCORING_FORMAT_LABEL_KEY, AMERICANO_SCORING_FORMATS } from '../../lib/mixLogic'
+import { DeuceModeChips } from '../DeuceMode'
+import { deuceModeOf, scoringHasDeuce } from '../../lib/deuceMode'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender } from '../../lib/mixLevels'
@@ -531,11 +533,12 @@ export default function MixWizard({
       <div className={step === 4 ? 'space-y-5' : 'hidden'}>
         {startedNote}
         <Field label={t('gerirclube.format_label')} locked={started}
-          hint={t(`mixlogic.format_help_${uiFormatOf(form) === 'sobe_desce' && form.rotate_partners ? 'sobe_desce_rotate' : uiFormatOf(form)}`)}>
+          hint={t(`mixlogic.format_help_${uiFormatOf(form) === 'sobe_desce' && form.rotate_partners ? 'sobe_desce_rotate'
+            : uiFormatOf(form) === 'americano' && scoringFormatOf(form) === 'set_sem_fim' ? 'americano_set_sem_fim' : uiFormatOf(form)}`)}>
           <Chips label={t('gerirclube.format_label')} value={uiFormatOf(form)} options={options.formats}
             onChange={(v) => set({
               ...formatFieldsFor(v),
-              ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
+              scoring_format: scoringForFormat(v, form.scoring_format),
               ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
             })} />
           {/* Escalada: dá tempo para subir? (29 set) — sobem um campo por ronda. */}
@@ -561,15 +564,17 @@ export default function MixWizard({
           <Chips label={t('mixwizard.game_time_label')} value={form.game_time_minutes}
             onChange={(v) => set({ game_time_minutes: v })} options={options.gameTimes} />
         </Field>
-        {form.format !== 'americano' && (
-          // «2 sets + super tie-break»: o mesmo nome e a mesma frase do torneio
-          // (UX, 7 out).
-          <Field label={t('gerirclube.scoring_label')} locked={started}
-            hint={form.scoring_format === 'melhor_2_sets' ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
-            <Chips label={t('gerirclube.scoring_label')} value={form.scoring_format}
-              onChange={(v) => set({ scoring_format: v })} options={options.scoringFormats} />
-          </Field>
-        )}
+        {/* «2 sets + super tie-break»: o mesmo nome e a mesma frase do torneio
+            (UX, 7 out). O Americano tem só «Pontos corridos» e «Set sem fim»
+            (SPEC 2026-10-26). */}
+        <Field label={t('gerirclube.scoring_label')} locked={started}
+          hint={SCORING_FORMAT_HINT_KEY[scoringFormatOf(form)] ? t(SCORING_FORMAT_HINT_KEY[scoringFormatOf(form)]) : null}>
+          <Chips label={t('gerirclube.scoring_label')} value={scoringFormatOf(form)}
+            onChange={(v) => set({ scoring_format: v })}
+            options={form.format === 'americano'
+              ? AMERICANO_SCORING_FORMATS.map((v) => ({ value: v, label: t(SCORING_FORMAT_LABEL_KEY[v]) }))
+              : options.scoringFormats} />
+        </Field>
         {/* O 8-8 do pro set (#580), como no torneio: tie-break a 7 (FPP) ou
             super tie-break a 10. */}
         {form.format !== 'americano' && form.scoring_format === 'pro_set_9' && (
@@ -580,6 +585,12 @@ export default function MixWizard({
                 { value: 'tiebreak', label: t('tournament.create.tiebreak_8_8_tiebreak') },
                 { value: 'super_tiebreak', label: t('tournament.create.tiebreak_8_8_super_tiebreak') },
               ]} />
+          </Field>
+        )}
+        {/* «Aos 40-40» (22 out): a seguir à pontuação e ao 8-8; com «Pontos corridos» não há 15-30-40. */}
+        {scoringHasDeuce(scoringFormatOf(form)) && (
+          <Field label={t('deuce.label')} locked={started}>
+            <DeuceModeChips value={deuceModeOf(form)} onChange={(v) => set({ deuce_mode: v })} />
           </Field>
         )}
         {uiFormatOf(form) === 'sobe_desce' && (

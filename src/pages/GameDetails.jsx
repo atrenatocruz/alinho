@@ -26,12 +26,12 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
-import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/formatDate'
+import { formatDate as formatDateLib, formatTime, formatCurrency, localeOf } from '../lib/formatDate'
 import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError, isGameFull } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
@@ -41,10 +41,14 @@ import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import SwapGuestSheet from '../components/mix/SwapGuestSheet'
 import { GuestClaimButton, GuestClaimConfirm, GuestClaimAdminBox } from '../components/mix/GuestClaim'
 import { listGuestClaims, claimGuestSpot, answerGuestClaim, claimsByGuest } from '../lib/guestClaims'
+import { listMixCorrections, resolveMixCorrection, correctionsByMatch, canAskCorrection } from '../lib/mixCorrections'
+import { CorrectionAskSheet, CorrectionStatusBox, CorrectionAdminCard, CorrectionRejectSheet } from '../components/mix/MixCorrection'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
 import ShareAsSheet from '../components/mix/ShareAsSheet'
+import { DeuceModeLabel } from '../components/DeuceMode'
+import { deuceModeOf, scoringHasDeuce } from '../lib/deuceMode'
 import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
@@ -377,6 +381,47 @@ export default function GameDetails() {
   }, [winnersShareOpen, orgLogoUrl])
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
+  // «Pedir correção» (SPEC 2026-10-23-mix-pedir-correcao): os pedidos do mix,
+  // a folha de pedir (o jogo), a de recusar (o pedido) e o ?correcao= do sino.
+  const [corrections, setCorrections] = useState([])
+  const [askingCorrection, setAskingCorrection] = useState(null)
+  const [rejectingCorrection, setRejectingCorrection] = useState(null)
+  const [correctionBusy, setCorrectionBusy] = useState(false)
+  const [correctionError, setCorrectionError] = useState('')
+  const loadCorrections = () => {
+    if (!game?.id || !['in_progress', 'finished'].includes(game.status)) { setCorrections([]); return }
+    listMixCorrections(game.id).then(setCorrections).catch((error) => {
+      // Antes da migração do Dev 3 a função não existe: fica sem pedidos.
+      console.error('Error loading mix corrections:', error)
+      setCorrections([])
+    })
+  }
+  useEffect(() => { loadCorrections() }, [game?.id, game?.status, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const correctionParam = new URLSearchParams(location.search).get('correcao')
+  const correctionScrolledFor = useRef(null)
+  useEffect(() => {
+    if (!correctionParam || correctionScrolledFor.current === location.key) return undefined
+    const c = corrections.find((x) => x.correction_id === correctionParam)
+    if (!c) return undefined
+    setOpenRounds((o) => ({ ...o, past: true }))
+    // O pedido e o cartão só existem em «Rondas»: com o mix terminado, abre
+    // nesse separador e não nas Estatísticas (QA, 28 out).
+    setFinishedTab('rondas')
+    // Como no «Sou eu»: procura o cartão até ~6 s e pára quando está à vista.
+    const started = performance.now()
+    let timer = 0
+    const tryScroll = () => {
+      const el = document.getElementById(`correcao-${c.correction_id}`) || document.getElementById(`jogo-${c.match_id}`)
+      if (el) {
+        const r = el.getBoundingClientRect()
+        if (r.top >= 0 && r.bottom <= window.innerHeight) { correctionScrolledFor.current = location.key; return }
+        el.scrollIntoView({ block: 'center' })
+      }
+      if (performance.now() - started < 6000) timer = setTimeout(tryScroll, 250)
+    }
+    timer = setTimeout(tryScroll, 300)
+    return () => clearTimeout(timer)
+  }, [correctionParam, corrections, location.key])
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
   // se sabe — fica o «Jogo não encontrado»).
   const [orgHint, setOrgHint] = useState(undefined)
@@ -2131,6 +2176,25 @@ export default function GameDetails() {
     }
   }
 
+  // O que a correção de um mix terminado mudou (vencedor, nível, voucher):
+  // o «Corrigir resultado» e o aceitar de um «Pedir correção».
+  const correctionNotice = (data) => {
+    const parts = [
+      data.winner_changed
+        ? t('gamedetails.correction_result_winner_changed', { team: teamName(data.new_winner_team_id) })
+        : t('gamedetails.correction_result_winner_unchanged'),
+    ]
+    if (!data.elo_applied && data.elo_skip_reason !== 'sem_ranking') {
+      parts.push(data.elo_skip_reason === 'untracked_participant'
+        ? t('gamedetails.correction_elo_skipped_untracked')
+        : t('gamedetails.correction_elo_skipped_later_event'))
+    }
+    if (data.voucher_not_reverted) {
+      parts.push(t('gamedetails.correction_voucher_not_reverted'))
+    }
+    return parts.join(' ')
+  }
+
   // Post-close mix correction (Trello #257): same shape as
   // handleSaveScore, but calls correct_finished_mix_match instead of a
   // plain `matches` update, gated by confirm() since this recomputes
@@ -2180,25 +2244,64 @@ export default function GameDetails() {
       setEditingMatchId(current => (current === match.id ? null : current))
       await loadGameDetails()
 
-      const parts = [
-        data.winner_changed
-          ? t('gamedetails.correction_result_winner_changed', { team: teamName(data.new_winner_team_id) })
-          : t('gamedetails.correction_result_winner_unchanged'),
-      ]
-      if (!data.elo_applied && data.elo_skip_reason !== 'sem_ranking') {
-        parts.push(data.elo_skip_reason === 'untracked_participant'
-          ? t('gamedetails.correction_elo_skipped_untracked')
-          : t('gamedetails.correction_elo_skipped_later_event'))
-      }
-      if (data.voucher_not_reverted) {
-        parts.push(t('gamedetails.correction_voucher_not_reverted'))
-      }
-      setDoneNotice(parts.join(' '))
+      setDoneNotice(correctionNotice(data))
     } catch (error) {
       console.error('Error correcting finished mix score:', error)
       setMixError(describeError(t, error, 'gamedetails.error_correct_finished_score'))
     } finally {
       setSavingMatchId(current => (current === match.id ? null : current))
+    }
+  }
+
+  // «Pedir correção»: aceitar faz o mesmo que o «Corrigir resultado» (com o
+  // mix terminado, o vencedor novo vai daqui, como lá); a base aplica-o.
+  const acceptCorrection = async (c) => {
+    const match = matches.find((m) => m.id === c.match_id)
+    if (!match) return
+    let newWinnerTeamId = null
+    if (game.status === 'finished' && !isAmericano) {
+      const patched = matches.map((m) => (m.id === match.id
+        ? { ...m, score_a: c.score_a, score_b: c.score_b, winner_team_id: c.score_a > c.score_b ? match.team_a_id : match.team_b_id }
+        : m))
+      newWinnerTeamId = computeMixWinnerTeamId(game, teams, patched)
+      if (!newWinnerTeamId) { setMixError(t('gamedetails.error_correction_no_winner')); return }
+    }
+    const ok = await askConfirm({
+      title: t('tcorrection.accept_title'),
+      message: t('mixcorrection.accept_message', { from: `${c.old_score_a}-${c.old_score_b}`, to: `${c.score_a}-${c.score_b}` }),
+      confirmLabel: t('tcorrection.accept'),
+      cancelLabel: t('gamedetails.cancel'),
+    })
+    if (!ok) return
+    setMixError('')
+    setCorrectionBusy(true)
+    try {
+      const data = await resolveMixCorrection(c.correction_id, true, { newWinnerTeamId })
+      await loadGameDetails()
+      loadCorrections()
+      if (game.status === 'finished') setDoneNotice(correctionNotice(data))
+    } catch (error) {
+      console.error('Error accepting a mix correction:', error)
+      setMixError(describeError(t, error, 'mixcorrection.error_resolve'))
+    } finally {
+      setCorrectionBusy(false)
+    }
+  }
+
+  const rejectCorrection = async (reason) => {
+    const c = rejectingCorrection
+    if (!c) return
+    setCorrectionBusy(true)
+    setCorrectionError('')
+    try {
+      await resolveMixCorrection(c.correction_id, false, { reason })
+      setRejectingCorrection(null)
+      loadCorrections()
+    } catch (error) {
+      console.error('Error declining a mix correction:', error)
+      setCorrectionError(describeError(t, error, 'mixcorrection.error_resolve'))
+    } finally {
+      setCorrectionBusy(false)
     }
   }
 
@@ -2727,7 +2830,7 @@ export default function GameDetails() {
     // vencedora): a imagem diz «RESULTADOS DO MIX», por isso o texto também,
     // sem o «Junta-te ao mix!» (UX, 18 out).
     if (game?.status === 'finished' && !(game.winner_team_id && teamById[game.winner_team_id])) {
-      const day = new Date(game.date).toLocaleDateString(i18n.language === 'en' ? 'en-GB' : 'pt-PT', { day: 'numeric', month: 'long' })
+      const day = new Date(game.date).toLocaleDateString(localeOf(i18n.language), { day: 'numeric', month: 'long' })
       const club = winnersOrg?.name || game.location
       const mix = String(game.title || t('gamedetails.share_default_title')).trim()
       return `${t(club ? 'gamedetails.share_finished_results' : 'gamedetails.share_finished_results_noplace', { mix, day, club })} ${t('gamedetails.share_signature')}`
@@ -3041,6 +3144,32 @@ export default function GameDetails() {
   const orgKindOfGame = gameOrg?.kind || 'group'
   // «Carlos N.»: o nome e a inicial do último.
   const myTeamIds = new Set(teams.filter((tm) => tm.player1_id === user.id || tm.player2_id === user.id).map((tm) => tm.id))
+  const correctionOf = correctionsByMatch(corrections)
+  const isMyMatch = (m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)
+  const canAskFor = (m) => canAskCorrection({ game, match: m, isMine: isMyMatch(m), isAdmin, existing: correctionOf[m.id] })
+  // Os 4 veem o estado; quem organiza vê o cartão do pedido (à espera) e,
+  // depois, o estado. Os outros não veem nada.
+  const correctionView = (m) => {
+    const c = correctionOf[m.id]
+    if (!c) return null
+    if (isAdmin && c.status === 'pendente') {
+      return <CorrectionAdminCard correction={c} match={m} teamName={teamName} busy={correctionBusy}
+        onAccept={() => acceptCorrection(c)} onReject={() => { setCorrectionError(''); setRejectingCorrection(c) }} />
+    }
+    return isAdmin || isMyMatch(m) ? <CorrectionStatusBox correction={c} /> : null
+  }
+  const pendingCorrections = isAdmin ? corrections.filter((c) => c.status === 'pendente') : []
+  const goToCorrection = () => {
+    setOpenRounds((o) => ({ ...o, past: true }))
+    requestAnimationFrame(() => document.getElementById(`correcao-${pendingCorrections[0]?.correction_id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+  }
+  // A linha preta no topo das rondas, só para quem organiza (como no torneio).
+  const correctionBar = pendingCorrections.length > 0 ? (
+    <div className="flex items-center justify-between gap-3 rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white">
+      <span>{t('tcorrection.pending', { count: pendingCorrections.length })}</span>
+      <button type="button" onClick={goToCorrection} className="shrink-0 min-h-[32px] px-1 text-lime-400">{t('tcorrection.see')}</button>
+    </div>
+  ) : null
   const myMatch = currentRoundMatches.find((m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) || null
   const orgSlug = gameOrg?.slug
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
@@ -3547,6 +3676,13 @@ export default function GameDetails() {
             ] : [
               { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
               { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
+              // A pontuação («Set sem fim», «Pontos corridos», SPEC 26 out) e,
+              // quando há 15-30-40, o modo dos 40-40 com o «?» (22 out).
+              { key: 'scoring', label: t('homecard.fact_scoring'),
+                value: scoringHasDeuce(scoringFormatOf(game))
+                  ? <DeuceModeLabel scoringLabel={t(SCORING_FORMAT_LABEL_KEY[scoringFormatOf(game)] || 'mixlogic.scoring_pontos_simples')} mode={deuceModeOf(game)}
+                    noTieBreaks={['pontos_simples', 'set_sem_fim'].includes(scoringFormatOf(game))} />
+                  : t(SCORING_FORMAT_LABEL_KEY[scoringFormatOf(game)]) },
             ]
             items.push(
               { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
@@ -3560,7 +3696,10 @@ export default function GameDetails() {
                 <EventFacts items={items} />
                 {!isOpenGame(game) && (
                   <p className="px-0.5 text-sm text-muted">
-                    {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
+                    {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate'
+                      // O Americano em «Set sem fim» soma jogos (UX, 26 out).
+                      : game.format === 'americano' && scoringFormatOf(game) === 'set_sem_fim' ? 'americano_set_sem_fim'
+                      : (game.format || 'sobe_desce')}`)}
                   </p>
                 )}
                 {game.location && (
@@ -4217,6 +4356,8 @@ export default function GameDetails() {
             </div>
           )}
 
+          {correctionBar}
+
           {/* Rondas */}
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
@@ -4347,9 +4488,20 @@ export default function GameDetails() {
                         {/* «marcado por <nome>» numa linha pequena por baixo dos
                             resultados (UX, 2 out): matches.scored_by_name, gravado
                             pelo save_mix_match_result (Dev 3); jogos antigos não têm. */}
-                        {done && !isCorrecting && (m.scored_by_name || nameById[m.scored_by]) && (
-                          <p className="mt-1.5 px-1 text-[11px] font-bold text-muted">{t('scorekeepers.scored_by', { name: shortPersonName(m.scored_by_name || nameById[m.scored_by]) })}</p>
+                        {/* «Pedir correção» (23 out) à direita do «marcado por», e o
+                            estado do pedido por baixo. */}
+                        {done && !isCorrecting && (m.scored_by_name || nameById[m.scored_by] || canAskFor(m)) && (
+                          <div className="mt-1.5 flex items-center justify-between gap-2 px-1">
+                            {(m.scored_by_name || nameById[m.scored_by])
+                              ? <p className="text-[11px] font-bold text-muted">{t('scorekeepers.scored_by', { name: shortPersonName(m.scored_by_name || nameById[m.scored_by]) })}</p>
+                              : <span />}
+                            {canAskFor(m) && (
+                              <button type="button" onClick={() => setAskingCorrection(m)}
+                                className="shrink-0 min-h-[28px] text-[12.5px] font-bold text-ink-900 underline underline-offset-2">{t('tcorrection.ask')}</button>
+                            )}
+                          </div>
                         )}
+                        {!isCorrecting && correctionView(m)}
                         {isCorrecting && (
                           <button
                             onClick={() => cancelEditingScore(m.id)}
@@ -4459,6 +4611,8 @@ export default function GameDetails() {
                     </div>
                   )}
 
+                  {correctionBar}
+
                   {/* Rondas */}
                   {rounds.map(r => {
                     const ms = matches.filter(m => m.round_number === r)
@@ -4492,7 +4646,7 @@ export default function GameDetails() {
                             const canEditScores = isAdmin && game.status === 'finished'
                             const editable = canEditScores && (!done || isCorrecting)
                             return (
-                              <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
+                              <div key={m.id} id={`jogo-${m.id}`} className="rounded-ctrl bg-canvas p-2.5 scroll-mt-24">
                                 <div className="flex items-center justify-between mb-2 px-1">
                                   <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                                     {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
@@ -4520,6 +4674,19 @@ export default function GameDetails() {
                                   onSave={(finalScore) => handleCorrectFinishedScore(m, finalScore)}
                                   saving={savingMatchId === m.id}
                                 />
+                                {/* «Pedir correção» até 48 h depois do fim (23 out). */}
+                                {done && !isCorrecting && (m.scored_by_name || nameById[m.scored_by] || canAskFor(m)) && (
+                                  <div className="mt-1.5 flex items-center justify-between gap-2 px-1">
+                                    {(m.scored_by_name || nameById[m.scored_by])
+                                      ? <p className="text-[11px] font-bold text-muted">{t('scorekeepers.scored_by', { name: shortPersonName(m.scored_by_name || nameById[m.scored_by]) })}</p>
+                                      : <span />}
+                                    {canAskFor(m) && (
+                                      <button type="button" onClick={() => setAskingCorrection(m)}
+                                        className="shrink-0 min-h-[28px] text-[12.5px] font-bold text-ink-900 underline underline-offset-2">{t('tcorrection.ask')}</button>
+                                    )}
+                                  </div>
+                                )}
+                                {!isCorrecting && correctionView(m)}
                                 {isCorrecting && (
                                   <button
                                     onClick={() => cancelEditingScore(m.id)}
@@ -5747,6 +5914,28 @@ export default function GameDetails() {
         onConfirm={() => { ask?.resolve(true) }}
         onClose={() => { ask?.resolve(false); setAsk(null) }}
       />
+      {askingCorrection && (() => {
+        const m = askingCorrection
+        const mineIsA = myTeamIds.has(m.team_a_id)
+        const otherId = mineIsA ? m.team_b_id : m.team_a_id
+        const other = teams.find((tm) => tm.id === otherId)
+        // Os nomes de quem joga, por baixo da dupla, só quando o nome da dupla
+        // não os diz já (desenho: «Sá / Gil · Marta S. · João G.»).
+        const names = other ? [other.player1_id, other.player2_id].map((pid) => shortPersonName(nameById[pid])).filter(Boolean) : []
+        const otherName = teamName(otherId)
+        const otherPlayers = names.some((n) => otherName.includes(n.split(' ')[0])) ? '' : names.join(' · ')
+        return (
+          <CorrectionAskSheet match={m} mineIsA={mineIsA} scoring={game.scoring_format || 'pontos_simples'}
+            tieTarget={game.tiebreak_8_8 === 'super_tiebreak' ? 10 : 7} finished={game.status === 'finished'}
+            myTeam={teamName(mineIsA ? m.team_a_id : m.team_b_id)} otherTeam={teamName(otherId)} otherPlayers={otherPlayers}
+            onClose={() => setAskingCorrection(null)}
+            onSent={() => { setAskingCorrection(null); loadCorrections() }} />
+        )
+      })()}
+      {rejectingCorrection && (
+        <CorrectionRejectSheet busy={correctionBusy} error={correctionError}
+          onClose={() => setRejectingCorrection(null)} onConfirm={rejectCorrection} />
+      )}
       {doneNotice && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
           <Check size={16} className="shrink-0" />

@@ -22,6 +22,7 @@ import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } fro
 import { setMyTshirtSize } from '../../lib/tournamentApi'
 import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 import { appOrigin } from '../../lib/native'
+import { localeOf } from '../../lib/formatDate'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -271,7 +272,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         <div key={inv.entry_id} className="card space-y-2">
           <p className="font-extrabold text-ink-900">{t('tsignup.invite_title', { name: inv.inviter_name })}</p>
           <p className="text-sm text-muted">
-            {[inv.category_code, inv.respond_by ? t('tsignup.invite_deadline', { date: new Date(inv.respond_by).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' }) }) : null]
+            {[inv.category_code, inv.respond_by ? t('tsignup.invite_deadline', { date: new Date(inv.respond_by).toLocaleDateString(localeOf(i18n.language), { day: 'numeric', month: 'short' }) }) : null]
               .filter(Boolean).join(' · ')}
           </p>
           {shirts && inv.my_tshirt ? (

@@ -10,6 +10,7 @@ import Layout, { Wordmark } from './components/Layout'
 import { captureAccountOrigin } from './lib/accountOrigin'
 import { POLICY_VERSION } from './lib/contacts'
 import { hideBoot } from './lib/boot'
+import { useFeatureFlag } from './lib/useFeatureFlag'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Plans from './pages/Plans'
@@ -25,6 +26,8 @@ import ProfileXp from './pages/ProfileXp'
 import PartnerPage from './pages/PartnerPage'
 import PlayerStats from './pages/PlayerStats'
 import MeusNumeros from './pages/MeusNumeros'
+import RaqueteQuestionario from './pages/RaqueteQuestionario'
+import RaqueteResultado from './pages/RaqueteResultado'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
 import TeacherLessons from './pages/TeacherLessons'
@@ -98,6 +101,8 @@ const Instructions = lazyPage(() => import('./pages/Instructions'))
 const PartnerManage = lazyPage(() => import('./pages/PartnerManage'))
 const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
 const Novidades = lazyPage(() => import('./pages/Novidades'))
+const Parceiros = lazyPage(() => import('./pages/Parceiros'))
+const Professores = lazyPage(() => import('./pages/Professores'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
 const DeleteAccountPage = lazyPage(() => import('./pages/DeleteAccountPage'))
@@ -173,6 +178,15 @@ const LoadErrorScreen = ({ onRetry }) => {
       </div>
     </div>
   )
+}
+
+// «Escolhe a tua raquete» só com o interruptor «raquete» ligado (sem linha =
+// desligado): com ele desligado, o link direto volta ao Perfil.
+function RaqueteGate({ children }) {
+  const flag = useFeatureFlag('raquete')
+  if (flag.loading) return null
+  if (!flag.on) return <Navigate to="/perfil" replace />
+  return children
 }
 
 // O /instrucoes antigo abre a Ajuda, na mesma parte.
@@ -395,6 +409,21 @@ const PUBLIC_HEAD = {
     canonical: 'https://www.alinho.pt/como-funciona',
     description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
+  '/planos': {
+    title: 'Grupos e clubes no alinho.pt: planos para quem organiza',
+    canonical: 'https://www.alinho.pt/planos',
+    description: 'Jogar é sempre grátis. Cada pessoa pode criar um grupo grátis. Os planos são para quando o grupo crescer.',
+  },
+  '/professores': {
+    title: 'Professores de padel no alinho.pt: aulas e horário',
+    canonical: 'https://www.alinho.pt/professores',
+    description: 'Mostra-te aos jogadores e organiza as tuas aulas no mesmo sítio onde eles já combinam os jogos.',
+  },
+  '/parceiros': {
+    title: 'Parceiros do alinho.pt: prémios do ranking do mês',
+    canonical: 'https://www.alinho.pt/parceiros',
+    description: 'Todos os meses, os 3 primeiros do ranking do mês ganham descontos nos parceiros do alinho.pt.',
+  },
   '/novidades': {
     title: 'Novidades do alinho.pt: o que mudou em cada versão',
     canonical: 'https://www.alinho.pt/novidades',
@@ -475,6 +504,8 @@ function AppRoutes() {
         {/* Páginas do site (#619): «Como funciona» e «Novidades». */}
         <Route path="/como-funciona" element={<HowItWorks />} />
         <Route path="/novidades" element={<Novidades />} />
+        <Route path="/parceiros" element={<Parceiros />} />
+        <Route path="/professores" element={<Professores />} />
         <Route path="/mix-offline" element={<MixOffline />} />
         <Route
           path="/"
@@ -676,6 +707,23 @@ function AppRoutes() {
         />
         {/* Os jogos do relógio (Apple Watch, Fase B): só na app de iPhone
             aparece a entrada no Perfil; a página abre vazia noutro lado. */}
+        {/* «Escolhe a tua raquete» (spec 2026-10-27): o resultado guardado e as perguntas. */}
+        <Route
+          path="/perfil/raquete"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <RaqueteGate><RaqueteResultado /></RaqueteGate>
+            </Guard>
+          }
+        />
+        <Route
+          path="/perfil/raquete/perguntas"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <RaqueteGate><RaqueteQuestionario /></RaqueteGate>
+            </Guard>
+          }
+        />
         <Route
           path="/perfil/numeros"
           element={

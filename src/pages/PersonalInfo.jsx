@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Pencil } from 'lucide-react'
+import { Pencil, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { maxSignupBirthday } from '../lib/age'
+import { maxSignupBirthday, canLiveIn } from '../lib/age'
+import { CountrySheet, countryAgeText } from '../components/CountryPicker'
+import { Sheet } from '../components/agenda/AgendaControls'
+import { mailtoLink } from '../lib/contacts'
 import { BackBar, DateField, Select, RatingBadge, Avatar, Chips, SWITCH_TRACK } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
-import { countryOptions } from '../lib/countries'
+import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { describeError } from '../lib/errors'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
@@ -58,6 +61,23 @@ export default function PersonalInfo() {
   const navigate = useNavigate()
 
   const [form, setForm] = useState(() => fromProfile(profile))
+  const [countryOpen, setCountryOpen] = useState(false)
+  const [countryBlocked, setCountryBlocked] = useState(null) // o país para onde não dá para mudar
+  const pickCountry = async (code) => {
+    setCountryOpen(false)
+    if (!code || code === (profile?.country || 'PT')) return
+    // A base também recusa (too_young_for_country); aqui avisa-se antes.
+    const birthday = profile?.birthday || form.birthday
+    if (birthday && !canLiveIn(birthday, code)) { setCountryBlocked(code); return }
+    const { error } = await updateProfile({ country: code })
+    if (error) {
+      if (String(error.message || '').includes('too_young_for_country')) setCountryBlocked(code)
+      else setSaveError(describeError(t, error, 'dialogs.save_error'))
+      return
+    }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -112,7 +132,10 @@ export default function PersonalInfo() {
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error('Error updating profile:', error)
-      setSaveError(describeError(t, error, 'dialogs.save_error'))
+      // A data nova deixa a pessoa abaixo da idade mínima do país onde vive (base, 23 out).
+      setSaveError(String(error?.message || '').includes('too_young_for_country')
+        ? countryAgeText(t, profile?.country || 'PT', i18n.language?.slice(0, 2), 'error_age')
+        : describeError(t, error, 'dialogs.save_error'))
     } finally {
       setLoading(false)
     }
@@ -145,13 +168,38 @@ export default function PersonalInfo() {
 
       {saved && <p className="mt-3 text-sm font-extrabold text-ink-900" role="status">{t('profile.updated_success')}</p>}
 
+      {countryOpen && <CountrySheet value={profile?.country || 'PT'} onPick={pickCountry} onClose={() => setCountryOpen(false)} />}
+      {countryBlocked && (
+        <Sheet title={countryAgeText(t, countryBlocked, i18n.language?.slice(0, 2), 'cant_change_title')} onClose={() => setCountryBlocked(null)}>
+          <p className="text-[15px] leading-snug text-ink-700">{countryAgeText(t, countryBlocked, i18n.language?.slice(0, 2), 'cant_change_text')}</p>
+          <a href={mailtoLink(t('country.email_subject'))}
+            className="mt-4 flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 font-extrabold text-white">
+            {t('country.write_us')}
+          </a>
+          <button type="button" onClick={() => setCountryBlocked(null)}
+            className="mt-2 flex min-h-[52px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-200 bg-white font-extrabold text-ink-900">
+            {t('ui.close')}
+          </button>
+        </Sheet>
+      )}
+
       <p className={KICKER}>{t('personal.section_about')}</p>
       <div className={CARD}>
         <Row label={t('profile.birthday_label')} hint={ageKey ? t(ageKey) : null}>
           <div className="mt-1">
-            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday()} hideToday birthday />
+            <DateField value={form.birthday} onChange={set('birthday')} max={maxSignupBirthday(new Date(), profile?.country || 'PT')} hideToday birthday />
           </div>
         </Row>
+        {/* «País onde vives» (23 out): logo a seguir à data. Muda logo ao escolher;
+            se a idade não chegar para o país novo, não muda e explica porquê. */}
+        <button type="button" onClick={() => setCountryOpen(true)}
+          className="press flex w-full items-center gap-3 border-t border-line px-4 py-3 text-left">
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted">{t('profile.country_label')}</span>
+            <span className="mt-0.5 block text-[15px] font-bold text-ink-900">{countryName(profile?.country || 'PT', i18n.language?.slice(0, 2))}</span>
+          </span>
+          <ChevronRight size={16} className="shrink-0 text-ink-500" />
+        </button>
         <Row label={t('profile.gender_label')}>
           <div className="mt-1">
             <Select value={form.gender} onChange={set('gender')} placeholder={t('login.gender_placeholder')}
@@ -203,10 +251,12 @@ export default function PersonalInfo() {
           <div className="mt-2"><ConfirmPhoneCard compact /></div>
         </Row>
         <Row label={t('profile.language_label')}>
-          <Chips className="mt-1" label={t('profile.language_label')} value={form.language} onChange={set('language')}
+          {/* Um campo de escolha como o do Distrito (menu-lingua, 28 out). */}
+          <Select value={form.language} onChange={set('language')} title={t('profile.language_label')} check
             options={[
               { value: 'pt', label: t('profile.language_portuguese') },
               { value: 'en', label: t('profile.language_english') },
+              { value: 'es', label: t('profile.language_spanish') },
             ]} />
         </Row>
       </div>

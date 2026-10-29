@@ -12,6 +12,7 @@ import { FilterBar, FilterPill, EmptyState } from '../ui'
 import { Realce } from '../SearchField'
 import { semAcentos } from '../../lib/semAcentos'
 import { Crown } from '../rankings/RankPodium'
+import { localeOf } from '../../lib/formatDate'
 
 /* Perfil › Jogos «com vida» (#636, design-handoff/2026-10-12-perfil-jogos-
    com-vida, aprovado pelo Francisco a 12 out, com o acerto de 13 out: sem
@@ -40,15 +41,15 @@ const monthKeyOf = (iso) => `${String(iso).slice(0, 7)}-01`
 const barBottom = (bar, fallback) => (bar
   ? (parseFloat(getComputedStyle(bar).top) || 0) + bar.offsetHeight
   : fallback)
-const lang2 = (l) => (l?.startsWith('en') ? 'en' : 'pt')
+const lang2 = (l) => String(l || 'pt').slice(0, 2)
 const monthLong = (key, lang) => {
   const d = new Date(`${key.slice(0, 7)}-01T12:00:00`)
-  const s = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'long', year: 'numeric' }).replace(' de ', ' ')
+  const s = d.toLocaleDateString(localeOf(lang), { month: 'long', year: 'numeric' }).replace(' de ', ' ')
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 const dayShort = (iso, lang) => {
   const d = new Date(iso)
-  const loc = lang === 'en' ? 'en-GB' : 'pt-PT'
+  const loc = localeOf(lang)
   // «seg 12 out»: três letras do dia, como no protótipo.
   return `${d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '').slice(0, 3)} ${d.getDate()} ${d.toLocaleDateString(loc, { month: 'short' }).replace('.', '')}`
 }
@@ -218,7 +219,7 @@ export function MonthsSheet({ months, month, onPick, onClose }) {
   const firstYear = months.length ? Number(String(months[months.length - 1].month).slice(0, 4)) : now.getFullYear()
   const years = []
   for (let y = now.getFullYear(); y >= firstYear; y -= 1) years.push(y)
-  const short = (k) => new Date(`${k}-01T12:00:00`).toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'short' }).replace('.', '')
+  const short = (k) => new Date(`${k}-01T12:00:00`).toLocaleDateString(localeOf(lang), { month: 'short' }).replace('.', '')
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label={t('played.months_title')}
@@ -462,7 +463,7 @@ export default function PlayedHistory({ data, query, kind, onVisibleMonth, jumpT
             what: kind ? t(KIND_FILTER[kind]).toLowerCase() : t('played.games_word', { count: total }),
           })}
           {q ? ` ${t('played.with_query', { q })}` : ''}
-          {oldest && !month ? ` · ${t('played.since', { month: new Date(oldest).toLocaleDateString(lang === 'en' ? 'en-GB' : 'pt-PT', { month: 'long' }) })}` : ''}
+          {oldest && !month ? ` · ${t('played.since', { month: new Date(oldest).toLocaleDateString(localeOf(lang), { month: 'long' }) })}` : ''}
         </p>
       )}
       {groups.map((g) => {

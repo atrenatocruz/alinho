@@ -33,7 +33,7 @@ export default function OpenTournamentRow({ tournament: x }) {
   const { t, i18n } = useTranslation()
   return (
     <Link to={`/torneio/${x.slug || x.id}`}
-      className="flex items-center gap-3 rounded-card border border-line bg-canvas p-3 hover:bg-ink-50/40">
+      className="flex items-center gap-3 rounded-card border border-line bg-canvas p-3 card-open">
       <Avatar name={x.club_name} url={x.club_logo_url} size="w-11 h-11 text-sm" shape="rounded-xl" />
       <span className="min-w-0 flex-1">
         <b className="block truncate text-[14px] text-ink-900">{x.name}</b>

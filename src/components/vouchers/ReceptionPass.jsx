@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Avatar } from '../ui'
+import { localeOf } from '../../lib/formatDate'
+import { markVoucherOpened } from '../../lib/partners'
 
 /* «Mostrar na receção» (design-handoff/2026-10-18-parceiros-primeiro, SPEC-UX
    ponto 4, aprovado pelo Francisco a 18 out). Abre a partir do voucher de um
@@ -18,7 +20,9 @@ export default function ReceptionPass({ voucher, person, onClose, onMarkUsed }) 
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
-  const loc = i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT'
+  // «Abriram o desconto» nos Números da Rita: a base guarda só a primeira vez.
+  useEffect(() => { markVoucherOpened(voucher?.id) }, [voucher?.id])
+  const loc = localeOf(i18n.language)
   const month = voucher.prize_month ? new Date(`${String(voucher.prize_month).slice(0, 10)}T12:00:00`) : null
   const validUntil = voucher.valid_until ? new Date(`${String(voucher.valid_until).slice(0, 10)}T12:00:00`) : null
   const day = now.toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' })

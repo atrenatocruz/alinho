@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, Eye, X, Ticket, Watch } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { achievementContext, loadPlayerAchievements } from '../lib/achievements'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
@@ -19,8 +20,10 @@ import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import XpShield from '../components/XpShield'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
-import { formatDate as formatDateLib } from '../lib/formatDate'
+import { formatDate as formatDateLib, localeOf } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
+import { loadMyPick, mergePickWithCatalog } from '../lib/raquete'
+import RaqueteProfileDone from '../components/raquete/RaqueteProfileDone'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
 import ReceptionPass from '../components/vouchers/ReceptionPass'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
@@ -55,6 +58,18 @@ export default function Profile() {
   const headerActions = useHeaderActions()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  // «Escolhe a tua raquete»: as 3 raquetes guardadas (null = ainda não fez).
+  // Só com o interruptor «raquete» ligado.
+  const { on: raqueteOn } = useFeatureFlag('raquete')
+  const [racketItems, setRacketItems] = useState(null)
+  useEffect(() => {
+    if (!raqueteOn) return undefined
+    let stale = false
+    loadMyPick()
+      .then((res) => { if (!stale && res) setRacketItems(mergePickWithCatalog(res.pick, res.rackets)) })
+      .catch(() => {})
+    return () => { stale = true }
+  }, [raqueteOn])
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
   // Re-applies whenever ?tab= changes without a full remount — the bell
   // dropdown links here from an already-mounted Profile (same route).
@@ -160,7 +175,7 @@ export default function Profile() {
     try {
       const [{ data: catalog, error: catErr }, { data: mine, error: mineErr }] = await Promise.all([
         supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
-        supabase.rpc('get_player_achievements', { p_user_id: profile.id }),
+        loadPlayerAchievements(supabase, profile.id),
       ])
       if (catErr) throw catErr
       if (mineErr) throw mineErr
@@ -901,6 +916,28 @@ export default function Profile() {
           </Link>
         )}
 
+        {/* «Escolhe a tua raquete» (design-handoff/2026-10-27-raquete, pontos 12
+            e 13, aprovado a 28 out): logo a seguir ao «Jogo entre amigos».
+            Antes de responder, a foto das raquetes e «Começar»; depois, a
+            melhor com o preço de hoje. O cartão inteiro abre. */}
+        {raqueteOn && (racketItems ? (
+          <RaqueteProfileDone items={racketItems} onOpen={() => navigate('/perfil/raquete')} />
+        ) : (
+          <button type="button" onClick={() => navigate('/perfil/raquete/perguntas')}
+            className="card card-open block w-full overflow-hidden !p-0 text-left">
+            <img src="/capas/capa-raquetes.webp" alt="" className="aspect-[2.4/1] w-full object-cover" />
+            <span className="flex items-center gap-3 px-4 py-3.5">
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-[17px] font-extrabold leading-tight text-ink-900">{t('raquete.card_title')}</span>
+                <span className="mt-0.5 block text-[13px] leading-snug text-muted">{t('raquete.card_body')}</span>
+              </span>
+              <span className="shrink-0 rounded-full border-[1.5px] border-ink-900 bg-white px-3.5 py-2 text-[13px] font-extrabold text-ink-900">
+                {t('raquete.start')}
+              </span>
+            </span>
+          </button>
+        ))}
+
       {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
           ranking: envolvimento, não competição. O cartão inteiro abre a
           explicação (antes era só o ícone (?), cujo popover ficava cortado
@@ -1001,7 +1038,7 @@ export default function Profile() {
               </Suspense>
             )}
             {trophyOpen && (() => {
-              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at }))
+              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at, ctx: achievementContext(tr) }))
               return (
                 <Suspense fallback={null}>
                   <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))} onClose={() => setTrophyOpen(null)} />
@@ -1016,7 +1053,7 @@ export default function Profile() {
           <button
             type="button"
             onClick={() => navigate('/perfil/numeros')}
-            className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+            className="card card-open w-full text-left"
           >
             <span className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
@@ -1039,7 +1076,7 @@ export default function Profile() {
         <button
           type="button"
           onClick={() => navigate('/perfil/informacao')}
-          className="card w-full text-left hover:bg-ink-50 transition-colors duration-fast"
+          className="card card-open w-full text-left"
         >
           <div className="flex items-center justify-between gap-3 mb-4">
             <span className="flex items-center gap-2">
@@ -1170,7 +1207,7 @@ export default function Profile() {
                 )}
                 <VoucherTicket
                   {...(v.partner_id ? {
-                    fromText: v.prize_place ? t('reception.ticket_from', { place: v.prize_place, month: v.prize_month ? new Date(`${String(v.prize_month).slice(0, 10)}T12:00:00`).toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT', { month: 'long' }) : '' }) : null,
+                    fromText: v.prize_place ? t('reception.ticket_from', { place: v.prize_place, month: v.prize_month ? new Date(`${String(v.prize_month).slice(0, 10)}T12:00:00`).toLocaleDateString(localeOf(i18n.language), { month: 'long' }) : '' }) : null,
                     showLabel: t('reception.title'),
                   } : {})}
                   prizeText={v.partner_id ? t('reception.ticket_prize', { pct: v.discount_pct, partner: v.partner?.name || '' }) : (v.game?.prize || '')}

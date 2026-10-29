@@ -8,6 +8,7 @@ import { SkeletonGate, SkBlock, SkCircle, SkLine } from '../components/Skeleton'
 import { sharePageLink } from '../lib/shareImage'
 import { Award, ChevronRight, UserPlus, UserCheck, Clock, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { achievementContext, loadPlayerAchievements } from '../lib/achievements'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, ConfirmSheet } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
@@ -24,6 +25,7 @@ import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory } from '../components/profile/PlayedHistory'
 import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 import { appHref } from '../lib/native'
+import { localeOf } from '../lib/formatDate'
 
 const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
 const AchievementViewer = lazy(() => import('../components/achievements/AchievementViewer'))
@@ -92,7 +94,7 @@ export default function PlayerDetails() {
   const loadXp = async () => {
     const [xp, trophies, catalog, extras] = await Promise.all([
       supabase.rpc('get_player_xp', { p_user_id: id }),
-      supabase.rpc('get_player_achievements', { p_user_id: id }),
+      loadPlayerAchievements(supabase, id),
       supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
       supabase.rpc('get_player_public_extras', { p_user_id: id }),
     ])
@@ -188,7 +190,7 @@ export default function PlayerDetails() {
     if (!list.error) setH2hMatches([...(list.data || [])].sort((a, b) => (a.match_date < b.match_date ? 1 : -1)))
   }
 
-  const dayMonth = (d) => { const x = new Date(`${String(d).slice(0, 10)}T12:00:00`); return `${x.getDate()}${i18n.language?.startsWith('en') ? '' : ' de'} ${x.toLocaleDateString(i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT', { month: 'long' })}` }
+  const dayMonth = (d) => { const x = new Date(`${String(d).slice(0, 10)}T12:00:00`); return `${x.getDate()}${i18n.language?.startsWith('en') ? '' : ' de'} ${x.toLocaleDateString(localeOf(i18n.language), { month: 'long' })}` }
 
   if (loading) {
     // A forma do perfil em vez da roda (esqueletos, 12 out): «‹», «⤴» e o
@@ -542,7 +544,7 @@ export default function PlayerDetails() {
               )}
               {/* A folha da conquista é a do Dev 2 (AchievementViewer, com o dono). */}
               {trophyOpen && (() => {
-                const items = playerTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at }))
+                const items = playerTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct, at: tr.awarded_at, ctx: achievementContext(tr) }))
                 return (
                   <Suspense fallback={null}>
                     <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))}

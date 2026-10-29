@@ -9,8 +9,9 @@ import LocationOpenWith from '../components/LocationOpenWith'
 import { EmptyState } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
 import { sharePageLink } from '../lib/shareImage'
-import { getPartner, prizeMedal } from '../lib/partners'
+import { getPartner, prizeMedal, trackPartner } from '../lib/partners'
 import { appHref } from '../lib/native'
+import { localeOf } from '../lib/formatDate'
 
 /* A página do parceiro (design-handoff/2026-10-18-parceiros-primeiro, SPEC-UX
    ponto 3, aprovado pelo Francisco a 18 out): a mesma estrutura da página do
@@ -50,6 +51,7 @@ function PartnerBody() {
   // Tudo o que é parceiros fica atrás do interruptor «parceiros» (PO, 18 out):
   // o dev vai para o main sem aviso.
   const flag = useFeatureFlag('parceiros')
+  // As aberturas da página contam-se dentro do get_partner (Dev 3, 29 out); aqui só os toques.
 
   if (flag.loading) return <div className="h-60" aria-hidden="true" />
   if (!flag.on) return <Navigate to="/" replace />
@@ -58,7 +60,7 @@ function PartnerBody() {
     return <EmptyState pose="triste" title={t('partner.not_found_title')} subtitle={t('partner.not_found_body')} />
   }
 
-  const loc = i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT'
+  const loc = localeOf(i18n.language)
   const month = partner.prize_month ? new Date(`${String(partner.prize_month).slice(0, 10)}T12:00:00`) : new Date()
   const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0)
   const endLabel = `${monthEnd.getDate()} ${t('partner.of')} ${monthEnd.toLocaleDateString(loc, { month: 'long' })}`
@@ -69,6 +71,8 @@ function PartnerBody() {
   const from = partner.prizes_from ? new Date(`${String(partner.prizes_from).slice(0, 10)}T12:00:00`) : null
   const soon = prizes.length === 0 && from && from > new Date()
   const row = 'press flex min-h-[56px] items-center gap-3 px-3.5 py-2.5'
+  // Toques em ligar ou no mapa (só os links; o «Abrir com…» sozinho não conta).
+  const onContact = (e) => { if (e.target.closest?.('a')) trackPartner(partner.id, 'contact') }
 
   return (
     <div className="space-y-5 pb-6">
@@ -94,7 +98,7 @@ function PartnerBody() {
 
           {/* A morada (abre o mapa), o horário e o Instagram, em linhas. */}
           <div className="mt-4 divide-y divide-line overflow-hidden rounded-[16px] border border-line">
-            {partner.address && <LocationOpenWith location={partner.address} surface="white" className="!rounded-none" />}
+            {partner.address && <div onClickCapture={onContact}><LocationOpenWith location={partner.address} surface="white" className="!rounded-none" /></div>}
             {partner.hours && (
               <div className={`${row} !cursor-default`}>
                 <Clock size={18} className="shrink-0 text-ink-700" />
@@ -108,7 +112,7 @@ function PartnerBody() {
             )}
             {/* Os telefones, o email e o site (ficha da RM, Dev 3, 21 out). */}
             {phones.map((ph) => (
-              <a key={ph} href={`tel:${ph.replace(/\s+/g, '')}`} className={row}>
+              <a key={ph} href={`tel:${ph.replace(/\s+/g, '')}`} onClick={onContact} className={row}>
                 <Phone size={18} className="shrink-0 text-ink-700" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-[14px] font-bold text-ink-900 tabular-nums">{ph}</span>

@@ -1,12 +1,14 @@
 // O tipo de cada ronda de um jogo entre amigos (SPEC 2026-10-07-amigos-a-
 // jogar, aprovado pelo Francisco a 7 out): cada ronda é uma parte do jogo —
 // um set, um tie-break, um super tie-break ou pontos (com «até N» opcional).
+// O «Set sem fim» (SPEC 2026-10-26): 15-30-40, o set não acaba; regista-se em
+// jogos, até 99 (Dev 3).
 // As regras do resultado são as da base de dados (Dev 3,
 // friend_match_round_score_ok): uma parte pode ficar por acabar (4-4 num set).
 import { formatKey } from './friendScoring'
 import { setProblem, tiebreakProblem } from '../../lib/scoreRules'
 
-export const KINDS = ['set', 'tiebreak', 'super_tiebreak', 'pontos']
+export const KINDS = ['set', 'set_sem_fim', 'tiebreak', 'super_tiebreak', 'pontos']
 
 /** O tipo da ronda. Antes de a base de dados o mandar, vem do «Como se
  *  conta» do Criar: sets dá 'set', pontos dá 'pontos'. */

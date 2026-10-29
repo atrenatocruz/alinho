@@ -11,6 +11,7 @@ import { enablePush, disablePush } from '../lib/push'
 import { syncWatchSession, clearWatchSession } from '../lib/watchSession'
 import { WatchGames, hasWatchGames } from '../lib/watchGames'
 import { App as CapacitorApp } from '@capacitor/app'
+import { withSuperadminGroups, isSuperadminHiddenIn } from '../lib/superadminGroups'
 
 const AuthContext = createContext({})
 
@@ -39,6 +40,10 @@ const MOCK_ADMIN_PROFILE = {
   // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
   // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
   rating: 1450,
+  // «País onde vives» (23 out): localStorage.mockCountry = 'ES' e
+  // mockBirthday = '2013-05-01' para ver a janela «Não dá para mudar».
+  country: (typeof localStorage !== 'undefined' && localStorage.getItem('mockCountry')) || 'PT',
+  ...(typeof localStorage !== 'undefined' && localStorage.getItem('mockBirthday') ? { birthday: localStorage.getItem('mockBirthday') } : {}),
   // localStorage.mockConsentPending = 'true' → ainda sem aceitar a Política
   // (o ecrã de consentimento, #360).
   consent_accepted_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockConsentPending') === 'true' ? null : '2026-09-01T00:00:00Z',
@@ -212,6 +217,8 @@ export const AuthProvider = ({ children }) => {
       .catch(() => {})
     keep(CapacitorApp.addListener('resume', () => syncWatchSession(userId)))
     keep(WatchGames.addListener('sessionNeeded', () => syncWatchSession(userId)))
+    // A ligação ao relógio só fica ativa depois do arranque: tenta-se outra vez.
+    keep(WatchGames.addListener('watchStateChanged', () => syncWatchSession(userId)))
     return () => {
       removed = true
       handles.forEach((h) => h.remove())
@@ -312,6 +319,10 @@ export const AuthProvider = ({ children }) => {
         setProfile(profileData)
         // O modo superadmin, em paralelo com o resto (não atrasa o perfil).
         const platformPromise = supabase.rpc('get_my_platform_admin')
+        // Os grupos onde só tem o acesso de superadmin (memberships_superadmin_acesso,
+        // 18 out). Com o modo ligado vêm como antes de 18 out; com ele desligado,
+        // ou para quem não é superadmin, a base devolve [] (Dev 3, 29 out).
+        const superadminGroupsPromise = supabase.rpc('get_my_superadmin_groups')
         i18n.changeLanguage(profileData.language || 'pt')
 
         // Carry a pre-auth language choice (Landing/Login's toggle, stashed
@@ -367,7 +378,12 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        setMemberships(membershipData || [])
+        {
+          // Sem a função (PGRST202) ou com erro: só as inscrições, como até aqui.
+          const { data: hidden, error: hiddenError } = await superadminGroupsPromise
+          membershipData = withSuperadminGroups(membershipData, hiddenError ? null : hidden)
+        }
+        setMemberships(membershipData)
         {
           const { data: pa, error: paError } = await platformPromise
           setPlatformMode(!paError && pa && typeof pa === 'object' ? pa : null)
@@ -641,10 +657,16 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
+  // As inscrições que vêm só do acesso de superadmin (get_my_superadmin_groups):
+  // favorito, nível e sair não escrevem nada nelas.
+  const isSuperadminHidden = (organizationId) => isSuperadminHiddenIn(memberships, organizationId)
+
   // Updates the caller's membership row in the CURRENT organization (e.g.
   // skill level — that lives per-org now, not on `profiles`).
   const updateMembership = async (updates) => {
     if (!user || !currentOrganizationId) return { error: new Error('No active organization') }
+    // Acesso de superadmin: não há linha em memberships onde escrever.
+    if (isSuperadminHidden(currentOrganizationId)) return { data: null, error: null }
 
     const { data, error } = await supabase
       .from('memberships')
@@ -667,6 +689,7 @@ export const AuthProvider = ({ children }) => {
   // the top of Home's "Próximos jogos".
   const toggleFavoriteOrganization = async (organizationId, isFavorite) => {
     if (!user) return { error: new Error('No user logged in') }
+    if (isSuperadminHidden(organizationId)) return { data: null, error: null }
 
     const { data, error } = await supabase
       .from('memberships')
@@ -721,6 +744,8 @@ export const AuthProvider = ({ children }) => {
   // Leaves a club the caller currently belongs to. Blocked server-side if
   // the caller is that org's last admin.
   const leaveOrganization = async (organizationId) => {
+    // Não é membro: sair não se aplica (e a base diria que não pertence).
+    if (isSuperadminHidden(organizationId)) return { error: null }
     const { error } = await supabase.rpc('leave_organization', { p_organization_id: organizationId })
     if (!error && user) {
       await loadProfile(user.id)

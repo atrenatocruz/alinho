@@ -3,7 +3,7 @@ import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockL
 import { withManyOrgs, PLAYED_EVENTS } from './devMockGerir'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
-  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS, TOURNAMENT_HORARIO_TABLE_MOCKS,
+  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS, TOURNAMENT_HORARIO_TABLE_MOCKS, TOURNAMENT_UNICO_TABLE_MOCKS, TOURNAMENT_UNICO_RPC_MOCKS,
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 import { CLUB_PAGE_RPC_MOCKS, CLUB_PAGE_TABLE_MOCKS } from './devMockClubPage'
@@ -69,6 +69,10 @@ const COMMUNITY_ORGS = [
 
 const ACHIEVEMENTS_CATALOG = [
   { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 10 },
+  // Objetivo de jogos por mês (migration_objetivo_mensal.sql).
+  { key: 'goal_streak_3', category: 'jogo', rarity: 'raro', sort: 1033 },
+  { key: 'goal_streak_6', category: 'jogo', rarity: 'epico', sort: 1034 },
+  { key: 'goal_streak_12', category: 'jogo', rarity: 'lendario', sort: 1035 },
   { key: 'areia_nos_tenis', category: 'jogo', rarity: 'comum', sort: 11 },
   { key: 'cliente_da_casa', category: 'jogo', rarity: 'comum', sort: 12 },
   { key: 'residente', category: 'jogo', rarity: 'raro', sort: 13 },
@@ -256,6 +260,10 @@ const RPC_MOCKS = {
   // as mais recentes (conquistas animadas, 11 out). awarded_at: a 1.ª da
   // lista é a mais recente.
   get_player_achievements: () => [
+    // localStorage.mockGoalStreak = 'true' — «No Alvo» ganha (objetivo do mês).
+    ...(localStorage.getItem('mockGoalStreak') ? [
+      { achievement_key: 'goal_streak_3', category: 'jogo', rarity: 'raro', rarity_pct: 3.2, awarded_at: new Date().toISOString() },
+    ] : []),
     // localStorage.mockLongAchievements = 'true' — as de texto comprido primeiro
     // (o cartão aberto cortava a «% têm» no bico, 13 out).
     ...(localStorage.getItem('mockLongAchievements') ? [
@@ -310,6 +318,8 @@ const RPC_MOCKS = {
       : [],
     prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal',
   } : null),
+  // A lista do site alinho.pt/parceiros (Dev 1, 28 out): só a RM.
+  list_partners: () => [RPC_MOCKS.get_partner({ p_slug: 'rm-terapias' })],
   // A página de quem gere um parceiro (Dev 3, 22 out). localStorage.mockPartnerManager
   // = 'true' faz a conta de teste gerir a RM. mockRedeem = '<erro>' faz o
   // partner_redeem_voucher recusar com esse erro.
@@ -323,6 +333,20 @@ const RPC_MOCKS = {
       { voucher_id: 'pv-2', code: 'RM-Q4M8T', prize_place: 2, discount_pct: 10, prize_month: month, prize_district: 'Setúbal', status: 'por_usar', valid_until: end, used_at: null, created_at: `${month}T00:05:00Z` },
       { voucher_id: 'pv-3', code: 'RM-H2X5N', prize_place: 3, discount_pct: 5, prize_month: month, prize_district: 'Setúbal', status: 'expirado', valid_until: `${month.slice(0, 8)}20`, used_at: null, created_at: `${month}T00:05:00Z` },
     ]
+  },
+  // Os números do mês (peça 2 da RM). mockPartnerNumbers = 'empty' faz a
+  // página ainda não estar no ar (vazio). Contam desde o mês passado.
+  partner_month_numbers: (params) => {
+    const now = new Date()
+    const thisMonth = `${now.toISOString().slice(0, 7)}-01`
+    const month = params?.p_month || thisMonth
+    if (localStorage.getItem('mockPartnerNumbers') === 'empty') {
+      return { counting_since: `${new Date(now.getFullYear(), now.getMonth() + 1, 2).toISOString().slice(0, 7)}-01`, card_people: 0, page_people: 0, contact_taps: 0, prizes: 0, opened: 0, used: 0 }
+    }
+    const since = `${new Date(now.getFullYear(), now.getMonth() - 1, 2).toISOString().slice(0, 7)}-01`
+    return month < thisMonth
+      ? { counting_since: since, card_people: 1280, page_people: 143, contact_taps: 21, prizes: 3, opened: 2, used: 1 }
+      : { counting_since: since, card_people: 412, page_people: 57, contact_taps: 9, prizes: 0, opened: 0, used: 0 }
   },
   partner_redeem_voucher: () => (localStorage.getItem('mockRedeem')
     ? { __error: localStorage.getItem('mockRedeem') }
@@ -1011,7 +1035,7 @@ const RPC_MOCKS = {
   // abrem primeiro no cartão animado, depois a folha dos kudos).
   get_unseen_celebrations: () => {
     const nTrophies = Number(localStorage.getItem('mockTrophies') || 0)
-    const RAR = { residente: 'raro', meio_cento: 'epico', centuriao_do_vidro: 'lendario', semana_cheia: 'raro', mes_cheio: 'epico' }
+    const RAR = { residente: 'raro', meio_cento: 'epico', centuriao_do_vidro: 'lendario', semana_cheia: 'raro', mes_cheio: 'epico', podio_do_mes: 'raro' }
     // localStorage.mockTrophyKeys = 'equilibrista,ida_e_volta' — quais (para ver os textos compridos).
     const keys = localStorage.getItem('mockTrophyKeys')?.split(',')
       || ['residente', 'primeira_bola', 'centuriao_do_vidro', 'areia_nos_tenis', 'meio_cento', 'cliente_da_casa', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
@@ -1038,6 +1062,14 @@ const RPC_MOCKS = {
     }]
   },
   mark_celebrations_seen: () => null,
+  // mockPrizeOffer = 'on': a janela «Prémios de <mês>» do início do mês (Dev 3,
+  // migration_podio_do_mes). Uma vez por sessão do browser.
+  get_my_month_prize_offers: () => (localStorage.getItem('mockPrizeOffer') === 'on' ? [{
+    partner_id: 'p-rm', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', logo_url: '/parceiros/rm-logotipo.jpg',
+    district: 'Setúbal', month: `${new Date().toISOString().slice(0, 7)}-01`,
+    prizes: [1, 2, 3].map((place) => ({ place, discount_pct: { 1: 15, 2: 10, 3: 5 }[place], description: 'Desconto numa massagem desportiva' })),
+  }] : []),
+  mark_month_prize_offer_seen: () => null,
   // Avisos de mix (Trello #292) — a app regista, o sino lê.
   notify_mix_changes: (params) => (params?.p_changes || []).length,
   mark_notifications_read: () => null,
@@ -1734,7 +1766,13 @@ const TABLE_MOCKS = {
     { id: 'pn1', kind: 'partner_month_vouchers', created_at: new Date().toISOString(),
       data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', month: '2026-11-01', issued: 3 } },
     { id: 'pn2', kind: 'partner_prize_won', created_at: new Date().toISOString(),
-      data: { voucher_id: 'pv-2', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', prize_place: 2, discount_pct: 10, prize_month: '2026-11-01', valid_until: '2026-12-31' } },
+      data: { voucher_id: 'pv-2', partner_slug: 'rm-terapias', partner_name: 'RM Terapias', prize_place: 2, discount_pct: 10, prize_month: '2026-11-01', prize_district: 'Setúbal', valid_until: '2026-12-31',
+        description: 'Desconto numa massagem desportiva', partner_logo_url: '/parceiros/rm-logotipo.jpg' } },
+    // O «Pódio do Mês» (Dev 3, migration_podio_do_mes) e os prémios do mês, já lidos.
+    { id: 'pn3', kind: 'achievement_podio_mes', created_at: new Date().toISOString(),
+      data: { month: '2026-11-01', district: 'Setúbal', place: 2 } },
+    { id: 'pn4', kind: 'partner_month_offer', created_at: new Date().toISOString(), read_at: new Date().toISOString(),
+      data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', district: 'Setúbal', month: `${new Date().toISOString().slice(0, 7)}-01` } },
   ] : localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
@@ -1878,6 +1916,8 @@ const TABLE_MOCKS = {
     { key: 'parceiros', enabled: localStorage.getItem('mockParceiros') === 'true' },
     // localStorage.mockPlanosPagos = 'true' liga os planos pagos (#723).
     { key: 'planos_pagos', enabled: localStorage.getItem('mockPlanosPagos') === 'true' },
+    // localStorage.mockRaquete = 'true' liga o «Escolhe a tua raquete».
+    { key: 'raquete', enabled: localStorage.getItem('mockRaquete') === 'true' },
   ],
   // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
   // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).
@@ -2231,13 +2271,52 @@ TABLE_MOCKS.participants = (url) => {
 // Fechar categorias (#485, mockTClose): ganha aos outros mocks das mesmas
 // vistas só quando está ligado — devolve `undefined` quando não está, e
 // aí responde quem respondia antes.
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Object.entries(TOURNAMENT_REOPEN_RPC_MOCKS), ...Object.entries(CLUB_PAGE_RPC_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_RPC_MOCKS), ...Object.entries(VOUCHER_RPC_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_UNICO_RPC_MOCKS), ...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Object.entries(TOURNAMENT_REOPEN_RPC_MOCKS), ...Object.entries(CLUB_PAGE_RPC_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_RPC_MOCKS), ...Object.entries(VOUCHER_RPC_MOCKS)]) {
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
-for (const [name, fn] of [...Object.entries(TOURNAMENT_HORARIO_TABLE_MOCKS), ...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS), ...Object.entries(VOUCHER_TABLE_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_UNICO_TABLE_MOCKS), ...Object.entries(TOURNAMENT_HORARIO_TABLE_MOCKS), ...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS), ...Object.entries(VOUCHER_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
+}
+
+// localStorage.mockLeague = 'true': uma liga em inscrições, gerida por quem
+// está a ver, com duas equipas por aprovar (Dev 1, 27 out: separadores da
+// gestão e «Aos 40-40» da liga). mockLeagueDeuce escolhe o modo.
+{
+  const before = RPC_MOCKS.get_league_page
+  RPC_MOCKS.get_league_page = (params) => {
+    if (localStorage.getItem('mockLeague') !== 'true') return before?.(params) ?? null
+    const cat = { id: 'lg-cat-m4', gender: 'masculino', level: 4, status: 'inscricoes', home_away: false, matches_per_encounter: 3,
+      points_win: 3, points_draw: 1, points_loss: 0, points_walkover: -1 }
+    const team = (id, name, status) => ({ id, category_id: cat.id, name, status, applied_at: '2026-10-20T10:00:00Z', start_rating: null })
+    return {
+      league: { id: 'lg-1', slug: params?.p_slug || 'liga-mare-alta', name: 'Liga Maré Alta', kind: 'comunitaria', status: 'inscricoes',
+        scope: 'distrito', district: 'Lisboa', owner: { name: 'Maré Alta Padel', slug: 'mare-alta', logo: null },
+        deuce_mode: localStorage.getItem('mockLeagueDeuce') || 'ponto_de_ouro' },
+      viewer: { can_manage: true, is_owner: true, team_ids: [], admin_clubs: [] },
+      categories: [cat],
+      teams: [team('lg-t1', 'Maré Alta A', 'aprovada'), team('lg-t2', 'Serra Azul', 'aprovada'), team('lg-t3', 'Padel da Vila', 'pendente'), team('lg-t4', 'Os do Costume', 'pendente')],
+      rounds: [], encounters: [], tiebreaks: [],
+      organizers: [{ user_id: 'lg-o1', name: 'Rita Moura' }, { user_id: 'lg-o2', name: 'João Sá' }],
+    }
+  }
+  // O encontro da 1.ª jornada, marcado (Dev 1, 28 out: «Aos 40-40» do encontro).
+  const beforeEnc = RPC_MOCKS.get_league_encounter
+  RPC_MOCKS.get_league_encounter = (params) => {
+    if (localStorage.getItem('mockLeague') !== 'true') return beforeEnc?.(params) ?? null
+    return {
+      encounter: { id: params?.p_encounter_id || 'lg-e1', status: 'marcado', scheduled_at: '2026-11-01T10:00:00Z', venue: 'Padel Norte',
+        round_number: 1, submitted_by_team_id: null, walkover_team_id: null },
+      league: { slug: 'liga-mare-alta', name: 'Liga Maré Alta', kind: 'comunitaria',
+        ...(localStorage.getItem('mockLeagueEncNoDeuce') === 'true' ? {} : { deuce_mode: localStorage.getItem('mockLeagueDeuce') || 'ponto_de_ouro' }) },
+      category: { id: 'lg-cat-m4', gender: 'masculino', level: 4, matches_per_encounter: 3 },
+      home: { id: 'lg-t1', name: 'Maré Alta A', logo: null },
+      away: { id: 'lg-t2', name: 'Serra Azul', logo: null },
+      viewer: { can_manage: false, side: 'home' },
+      matches: [],
+    }
+  }
 }
 
 // localStorage.mockFriendGroup = 'true': o jogo entre amigos é de um grupo
@@ -2249,6 +2328,30 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_HORARIO_TABLE_MOCKS), ...
     if (localStorage.getItem('mockFriendGroup') !== 'true' || !r?.match) return r
     return { ...r, match: { ...r.match, organization_id: MOCK_ADMIN_ORG_ID, organization_name: 'Dev Org', organization_slug: 'dev-org' } }
   }
+}
+
+// «As tuas 3 raquetes» (localStorage.mockRaquetePick = 'done'): três raquetes
+// reais da Street Padel (alinho-dev, 28 out), com respostas e porquês.
+{
+  const SP = 'https://www.streetpadel.com/products/'
+  const CDN = 'https://cdn.shopify.com/s/files/1/0939/5991/3771/files/'
+  const RACKETS = [
+    { store_id: 'rq-1', name: 'WILSON ENDURE PRO V1 AZUL', brand: 'Wilson', url: `${SP}wilson-endure-pro-v1-azul-122475-p`, image_url: `${CDN}122475-pala-wilson-endure-pro-v1-wr190311u-1500x1500-1_1.jpg?v=1786110474`, price: '204.95', available: true, specs: { shape: 'redonda', weight: '355-370 g', balance: 'baixo', profile_mm: 38 } },
+    { store_id: 'rq-2', name: 'ROYAL PADEL M27 POLY 2026', brand: 'Royal Padel', url: `${SP}royal-padel-m27-poly-2026-122255-p`, image_url: `${CDN}122255-pala-royal-padel-m27-poly-2026-1500x1500-1.jpg?v=1786110632`, price: '261.95', available: true, specs: { shape: 'lagrima', weight: '360-375 g', balance: 'medio', profile_mm: null } },
+    { store_id: 'rq-3', name: 'Black Crown presenta el HURRICANE COMFORT 4.0, una pala que redefine el confort.', brand: 'Black Crown', url: `${SP}black-crown-hurricane-comfort-40-161988-p`, image_url: `${CDN}161988-pala-black-crown-hurricane-comfort-4-0-a006456-1500x1500-1.jpg?v=1786110449`, price: '167.95', available: true, specs: { shape: null, weight: null, balance: null, profile_mm: null } },
+  ]
+  const PICK = {
+    best_id: 'rq-1', created_at: new Date().toISOString(),
+    answers: { style: 'defensivo', pain: ['cotovelo'], budget: '150_220' },
+    picks: [
+      { id: 'rq-1', why: 'Redonda e macia: perdoa as bolas fora do centro e poupa o cotovelo. Dá-te controlo para defender.', pros: [], cons: [], hardness: 'intermedio', sweet_spot: 'generoso' },
+      { id: 'rq-2', why: 'Mais firme, para quando quiseres atacar sem perder o conforto.', pros: [], cons: [], hardness: 'intermedia-dura', sweet_spot: '' },
+      { id: 'rq-3', why: 'A mais barata das três e muito leve. Boa para jogar muitas vezes.', pros: [], cons: [], hardness: 'suave', sweet_spot: '' },
+    ],
+  }
+  const done = () => localStorage.getItem('mockRaquetePick') === 'done'
+  TABLE_MOCKS.racket_picks = () => (done() ? [PICK] : [])
+  TABLE_MOCKS.rackets = () => RACKETS
 }
 
 const jsonResponse = (data, status = 200) =>

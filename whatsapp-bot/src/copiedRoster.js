@@ -59,6 +59,43 @@ export function parseCopiedRoster(text) {
   return { names, gameId, title, label }
 }
 
+// Palavras de conversa que, com maiúscula, pareciam um nome («Boa Sorte»).
+const NOT_NAME_WORDS = new Set(['in', 'out', 'fora', 'alinho', 'sim', 'nao', 'ok', 'boa', 'bom', 'bons', 'boas', 'obrigado', 'obrigada',
+  'top', 'vou', 'eu', 'nos', 'quem', 'jogo', 'mix', 'hoje', 'amanha', 'campo', 'vaga', 'vagas', 'sorte', 'bora', 'vamos', 'ja', 'mais', 'tambem'])
+const PARTICLES = new Set(['de', 'da', 'do', 'dos', 'das', 'e'])
+
+/**
+ * Resposta ao cartão de um mix só com nomes (Renato, 28 out — A2N: «Bruno
+ * Ribeiro e Nuno Miguel» a responder ao cartão): devolve os nomes, ou null
+ * se o texto não for só nomes. Cada palavra com maiúscula (tirando «de»,
+ * «da»…), até 4 palavras por nome e 8 nomes — para a conversa normal em
+ * resposta ao cartão («boa sorte», «Quem falta?», «Fixe») não inscrever ninguém.
+ * `strict: false` quando já há um «In» na mensagem (é um pedido, não
+ * conversa): aceita minúsculas e um nome só de uma palavra.
+ */
+export function parseReplyNames(text, { strict = true } = {}) {
+  const s = String(text || '').trim()
+  if (!s || s.length > 200) return null
+  const parts = s.split(/\s*[,;\n&+/]\s*|\s+(?:e|and)\s+/i)
+    .map((p) => p.replace(/^\s*(?:\d{1,2}[.)]|[-•*])\s*/, '').trim())
+    .filter(Boolean)
+  if (parts.length === 0 || parts.length > 8) return null
+  for (const p of parts) {
+    const words = p.split(/\s+/)
+    if (words.length > 4) return null
+    for (const w of words) {
+      if (!/^\p{L}[\p{L}'’.-]*$/u.test(w)) return null
+      if (NOT_NAME_WORDS.has(normName(w))) return null
+      if (strict && !PARTICLES.has(w.toLowerCase()) && w[0] === w[0].toLowerCase()) return null
+    }
+    if (PARTICLES.has(words[0].toLowerCase())) return null
+  }
+  // Uma palavra só («Fixe», «Brutal») não chega: um nome sozinho tem de ser
+  // nome e apelido; vários («Bruno e Nuno») podem ser só o primeiro.
+  if (strict && parts.length === 1 && parts[0].split(/\s+/).length < 2) return null
+  return parts
+}
+
 /** Todas as palavras de `query` começam uma palavra de `fullName` (a regra do «In com …»). */
 export function nameMatches(fullName, query) {
   const words = normName(fullName).split(' ').filter(Boolean)

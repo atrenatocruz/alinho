@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { KIND_COLORS } from '../lib/kindColors'
 import { groupXpByGame } from '../lib/xpMonth'
+import { localeOf } from '../lib/formatDate'
 
 /* R15 · A página do XP de atividade (design-handoff/2026-10-13-redesign/
    R15-pagina-do-xp.md). Entra-se pelo cartão «XP DE ATIVIDADE» do Perfil.
@@ -63,7 +64,7 @@ export default function ProfileXp() {
   const tier = tierFromXp(xp)
   const progress = tier ?? preTierProgress(xp)
   const next = XP_TIERS.find((x) => x.min === progress.nextMin) || null
-  const loc = i18n.language?.startsWith('en') ? 'en-GB' : 'pt-PT'
+  const loc = localeOf(i18n.language)
 
   useEffect(() => {
     if (!profile?.id) return

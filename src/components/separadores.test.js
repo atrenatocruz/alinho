@@ -32,7 +32,9 @@ const EXCECOES = {
   // Os separadores do SITE são palavras com traço lima, como o menu do topo
   // (opção C, Francisco, 19 out; exceção escrita no SPEC dos separadores pela
   // UX). Na app continua a pílula do <Tabs>.
-  tablist: { 'src/pages/Plans.jsx': 'Dev 1 — site, opção C (19 out)' },
+  // Os Planos deixaram de ter separadores a 28 out (cada porta do menu abre
+  // a sua página): já não há exceções.
+  tablist: {},
 }
 
 const files = (dir) => readdirSync(dir).flatMap((name) => {

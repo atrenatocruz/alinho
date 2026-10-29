@@ -117,6 +117,8 @@ const TOURNAMENT = () => {
     // mockTShirt = 'sale' | 'gift': t-shirts do torneio (SPEC t-shirts, 8 out).
     rules: {
       scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockTTieBreak') || 'tiebreak',
+      // mockTDeuce = 'star_point' | 'vantagens': «Aos 40-40» (27 out). Sem ele, o torneio não traz o modo (ponto de ouro).
+      ...(localStorage.getItem('mockTDeuce') ? { deuce: localStorage.getItem('mockTDeuce') } : {}),
       ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
     },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
@@ -148,6 +150,9 @@ const categories = () => {
     ...(c.code === 'M4' && localStorage.getItem('mockTBracket') ? { format: { groups: 0 } } : {}),
     // Sorteio feito numa só categoria (ensaio do QA, 30 set): a M5 com formato.
     ...(c.code === 'M5' && localStorage.getItem('mockTDraw') === 'true' ? { format: { key: 'grupos', groups: 2, qualifiers: 4, qualifiers_per_group: 2 } } : {}),
+    // Um grupo só (23 out): a M5 com 5 duplas, todos contra todos.
+    ...(c.code === 'M5' && unicoBoard() ? { format: { key: 'grupo-unico-5', groups: 1, qualifiers: 0, qualifiers_per_group: 0, third_place: false },
+      status: localStorage.getItem('mockTUnico') === 'fim' ? 'terminada' : 'sorteada' } : {}),
   }))
 }
 
@@ -864,5 +869,85 @@ export const TOURNAMENT_HORARIO_TABLE_MOCKS = {
     if (!horarioOn()) return undefined
     const c = hCat(url)
     return H_MATCHES().filter((m) => m.category_id === c)
+  },
+}
+
+// ── Um grupo só, todos contra todos (23 out) ────────────────────────────
+// localStorage.mockTUnico:
+//   '3' | '5'          o passo do formato da M5 com 3 ou 5 duplas (Sorteio);
+//   'jogo'             a M5 sorteada num grupo só, a meio (6 de 10 jogos);
+//   'empate'           acabada, com três duplas empatadas em 1.º;
+//   'fim'              fechada, com a «Tabela final».
+function unicoBoard() { return ['jogo', 'empate', 'fim'].includes(localStorage.getItem('mockTUnico')) }
+const U_TEAMS = [['u1', 'Os do Vidro', 'Pedro Lima', 'Rui Costa'], ['en-me', 'Figueira / Lopes', 'Rita Figueira', 'Ana Lopes'],
+  ['u3', 'Pires / Rocha', 'Duarte Pires', 'Hugo Rocha'], ['u4', 'Sá / Gil', 'Marta Sá', 'João Gil'], ['u5', 'Os Primos', 'João Reis', 'Nuno Reis']]
+const U_RESULTS = {
+  // [a, b, resultado a, resultado b] por jogo; null = por jogar.
+  jogo: [[0, 1, 9, 5], [2, 3, 9, 7], [0, 2, 9, 6], [1, 4, 9, 2], [3, 4, 9, 5], [0, 4, 9, 3], [1, 2, null, null], [0, 3, null, null], [1, 3, null, null], [2, 4, null, null]],
+  // A ganha a B, B a C, C a A, e tudo igual: as regras não separam.
+  empate: [[0, 1, 9, 6], [1, 2, 9, 6], [2, 0, 9, 6], [0, 3, 9, 4], [1, 3, 9, 4], [2, 3, 9, 4], [0, 4, 9, 3], [1, 4, 9, 3], [2, 4, 9, 3], [3, 4, 9, 7]],
+  fim: [[0, 1, 9, 6], [0, 2, 9, 5], [0, 3, 9, 4], [0, 4, 9, 2], [1, 2, 9, 7], [1, 3, 9, 6], [1, 4, 9, 4], [2, 3, 9, 8], [2, 4, 9, 6], [3, 4, 9, 7]],
+}
+const U_CAT = 'cat-m5'
+const uCat = (url) => decodeURIComponent(url).match(/category_id=eq\.([a-z0-9-]+)/)?.[1]
+export const TOURNAMENT_UNICO_TABLE_MOCKS = {
+  tournament_public_groups: (url) => {
+    if (!unicoBoard() || uCat(url) !== U_CAT) return undefined
+    return U_TEAMS.map(([id], i) => ({ id: 'u-g1', category_id: U_CAT, number: 1, name: 'Grupo A', entry_id: id, position: i + 1 }))
+  },
+  tournament_public_entries: (url) => {
+    if (!unicoBoard() || uCat(url) !== U_CAT) return undefined
+    return U_TEAMS.map(([id, team, p1, p2]) => ({ id, category_id: U_CAT, team_name: team.includes('/') ? null : team, status: 'validada', player1_name: p1, player2_name: p2 }))
+  },
+  tournament_public_matches: (url) => {
+    if (!unicoBoard() || uCat(url) !== U_CAT) return undefined
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    return U_RESULTS[localStorage.getItem('mockTUnico')].map(([a, b, sa, sb], i) => {
+      const done = sa != null
+      const ea = U_TEAMS[a][0]
+      const eb = U_TEAMS[b][0]
+      return {
+        id: `u-m${i}`, category_id: U_CAT, stage: 'grupo', group_id: 'u-g1', round: null, bracket_slot: null,
+        entry_a_id: ea, entry_b_id: eb, source_a: null, source_b: null,
+        scheduled_at: new Date(`${day}T${String(9 + Math.floor(i * 0.75)).padStart(2, '0')}:${i % 4 === 0 ? '00' : i % 4 === 1 ? '45' : i % 4 === 2 ? '30' : '15'}:00`).toISOString(),
+        previous_scheduled_at: null, court_name: `Campo ${(i % 2) + 1}`,
+        status: done ? 'terminado' : 'marcado', score_a: sa, score_b: sb, sets: null, winner_entry_id: done ? ea : null,
+      }
+    })
+  },
+}
+const U_SEEDING = () => U_TEAMS.map(([id, team, p1, p2], i) => ({
+  entry_id: id, name: team, players: [p1, p2], points: 2000 - i * 90, points_incomplete: false, status: 'selecionada', seed_number: null, created_at: '2026-09-01T10:00:00Z',
+}))
+export const TOURNAMENT_UNICO_RPC_MOCKS = {
+  get_tournament_results: (params, before) => {
+    if (localStorage.getItem('mockTUnico') !== 'fim' || !before) return undefined
+    const data = before(params) || {}
+    const team = (i) => ({ entry_id: U_TEAMS[i][0], name: U_TEAMS[i][1], players: [U_TEAMS[i][2], U_TEAMS[i][3]] })
+    const pp = (i, place, won) => [2, 3].map((k) => ({ name: U_TEAMS[i][k], final_position: place, played_final: false, matches_played: 4, matches_won: won }))
+    const m5 = { id: U_CAT, code: 'M5', name: 'Masculinos 5', champion: team(0), runner_up: team(1), third: team(2), thirds: [team(2)],
+      prize_first: null, prize_second: null, podium_players: [...pp(0, 1, 4), ...pp(1, 2, 3), ...pp(2, 3, 2)] }
+    return { ...data, categories: [m5, ...(data.categories || []).filter((c) => c.id !== U_CAT)] }
+  },
+  list_tournament_categories_admin: (params, before) => {
+    // A barra do organizador (Fechar as categorias) com a M5 sorteada num
+    // grupo só: 'jogo' tem jogos por jogar, 'empate' para no «Empate no 1.º
+    // lugar», 'fim' já está fechada.
+    if (unicoBoard()) {
+      const st = localStorage.getItem('mockTUnico')
+      return { rules: { duration_max: 45, scoring: 'pro_set_9' }, days: [], categories: [{
+        id: U_CAT, code: 'M5', name: 'Masculinos 5', status: st === 'fim' ? 'terminada' : 'sorteada', position: 1, slots: 5,
+        format: { key: 'grupo-unico-5', groups: 1, qualifiers: 0, qualifiers_per_group: 0, third_place: false },
+        selected_count: 5, waiting_count: 0, waitlist_count: 0, group_count: 1, match_count: 10, played_count: st === 'jogo' ? 6 : 10 }] }
+    }
+    const n = Number(localStorage.getItem('mockTUnico'))
+    if (![3, 5].includes(n) || !before) return undefined
+    const data = before(params)
+    return { ...data, categories: (data?.categories || []).map((c) => (c.id === U_CAT ? { ...c, selected_count: n, format: null, status: 'fechada' } : c)) }
+  },
+  list_category_seeding: (params) => {
+    const n = Number(localStorage.getItem('mockTUnico'))
+    if (![3, 5].includes(n) || params?.p_category_id !== U_CAT) return undefined
+    return U_SEEDING().slice(0, n)
   },
 }

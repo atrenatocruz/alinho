@@ -7,7 +7,7 @@ import { Sheet } from '../components/agenda/AgendaControls'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
 import { getPartner } from '../lib/partners'
 import {
-  myManagedPartners, partnerListVouchers, partnerRedeemVoucher, updatePartnerProfile,
+  myManagedPartners, partnerListVouchers, partnerMonthNumbers, partnerRedeemVoucher, updatePartnerProfile,
   uploadPartnerImage, imageProblem, normalizeCode, codeKey,
 } from '../lib/partnerAdmin'
 
@@ -50,7 +50,7 @@ export default function PartnerManage() {
 
   const [allowed, setAllowed] = useState(undefined) // undefined = a carregar
   const [partner, setPartner] = useState(null)
-  const [tab, setTab] = useState('codes')
+  const [tab, setTab] = useState('numbers')
   const [vouchers, setVouchers] = useState(null)
   const [month, setMonth] = useState(null)
   const [validating, setValidating] = useState(false)
@@ -132,11 +132,17 @@ export default function PartnerManage() {
       </div>
 
       <Tabs value={tab} onChange={(v) => { setTab(v); setToast('') }} label={partner.name}
-        options={[{ value: 'codes', label: t('partneradmin.tab_codes') }, { value: 'profile', label: t('partneradmin.tab_profile') }]} />
+        options={[
+          { value: 'numbers', label: t('partneradmin.tab_numbers') },
+          { value: 'codes', label: t('partneradmin.tab_codes') },
+          { value: 'profile', label: t('partneradmin.tab_profile') },
+        ]} />
 
       {toast && <p role="status" className="rounded-ctrl bg-[#E7F6D5] px-3.5 py-2.5 text-[14px] font-bold text-[#3F6212]">{toast}</p>}
 
-      {tab === 'codes' ? (
+      {tab === 'numbers' ? (
+        <NumbersTab partner={partner} loc={loc} />
+      ) : tab === 'codes' ? (
         <div className="space-y-4">
           {months.length > 0 && (
             <Chips value={month} onChange={setMonth} label={t('partneradmin.month')}
@@ -184,6 +190,105 @@ export default function PartnerManage() {
           onClose={() => setValidating(false)}
           onUsed={(pct) => { setValidating(false); setToast(t('partneradmin.used_toast', { pct })); load() }} />
       )}
+    </div>
+  )
+}
+
+/* «Números»: o que o acordo promete à Rita, por mês e sem nomes
+   (design-handoff/2026-10-28-rm-tres-pecas, peça 2). Durante o mês, só as
+   vistas e os toques; depois do dia 1 do mês seguinte, também os prémios, o
+   «abriram» e os usados. Antes de a página estar no ar, o vazio. */
+const firstOfMonth = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+function NumbersTab({ partner, loc }) {
+  const { t } = useTranslation()
+  const thisMonth = firstOfMonth()
+  const [head, setHead] = useState(undefined) // undefined = a carregar; null = sem números
+  const [month, setMonth] = useState(thisMonth)
+  const [byMonth, setByMonth] = useState({})
+
+  useEffect(() => {
+    let alive = true
+    partnerMonthNumbers(partner.id, null)
+      .then((d) => { if (alive) { setHead(d); if (d) setByMonth({ [thisMonth]: d }) } })
+      .catch(() => { if (alive) setHead(null) })
+    return () => { alive = false }
+  }, [partner.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!head || byMonth[month]) return
+    let alive = true
+    partnerMonthNumbers(partner.id, month)
+      .then((d) => { if (alive) setByMonth((old) => ({ ...old, [month]: d })) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [head, month]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (head === undefined) return <div className="h-40" aria-hidden="true" />
+
+  const since = ymd(head?.counting_since || partner.prizes_from)
+  const today = new Date().toISOString().slice(0, 10)
+  if (!head || !since || since > today) {
+    return (
+      <p className="rounded-card bg-white px-4 py-4 text-[14px] leading-snug text-muted shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+        {since ? t('partneradmin.num_empty', { date: asDate(since).toLocaleDateString(loc, { day: 'numeric', month: 'long' }) }) : t('partneradmin.num_empty_nodate')}
+      </p>
+    )
+  }
+
+  // Os meses desde que se conta até ao de agora.
+  const months = []
+  for (let d = asDate(`${since.slice(0, 7)}-01`); firstOfMonth(d) <= thisMonth; d = new Date(d.getFullYear(), d.getMonth() + 1, 1, 12)) months.push(firstOfMonth(d))
+  const pill = (m) => asDate(m).toLocaleDateString(loc, { month: 'long', ...(m.slice(0, 4) !== thisMonth.slice(0, 4) ? { year: 'numeric' } : {}) })
+
+  const data = byMonth[month]
+  const closed = month < thisMonth
+  const name = asDate(month).toLocaleDateString(loc, { month: 'long' })
+  const next = new Date(asDate(month).getFullYear(), asDate(month).getMonth() + 1, 1, 12).toLocaleDateString(loc, { day: 'numeric', month: 'long' })
+  const fmt = new Intl.NumberFormat(loc, { useGrouping: 'always' })
+  const prizes = data?.prizes ?? 0
+  const rows = data ? [
+    ['card', data.card_people, t('partneradmin.unit_people', { count: data.card_people })],
+    ['page', data.page_people, t('partneradmin.unit_people', { count: data.page_people })],
+    ['taps', data.contact_taps, t('partneradmin.unit_times', { count: data.contact_taps })],
+    ...(closed ? [
+      ['prizes', prizes, t('partneradmin.unit_codes', { count: prizes })],
+      ['opened', data.opened, t('partneradmin.unit_of', { n: prizes })],
+      ['used', data.used, t('partneradmin.unit_of', { n: prizes })],
+    ] : []),
+  ] : []
+
+  return (
+    <div className="space-y-4">
+      {months.length > 1 && (
+        <Chips value={month} onChange={setMonth} label={t('partneradmin.month')}
+          options={months.map((m) => ({ value: m, label: pill(m) }))} />
+      )}
+      <section>
+        <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-widest text-ink-500">
+          {closed ? capitalize(name) : t('partneradmin.num_so_far', { month: capitalize(name) })}
+        </p>
+        {data ? (
+          <div className="overflow-hidden rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+            {rows.map(([key, value, unit]) => (
+              <div key={key} className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0">
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-[15px] font-extrabold text-ink-900">{t(`partneradmin.num_${key}`, { name: partner.name })}</span>
+                  <span className="block text-[13px] text-muted">{t(`partneradmin.num_${key}_sub`, { month: name })}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-display text-[28px] font-black leading-none tracking-[-0.02em] text-ink-900">{fmt.format(value ?? 0)}</span>
+                  <span className="mt-1 block text-[11px] text-muted">{unit}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : <div className="h-60" aria-hidden="true" />}
+        <p className="mt-2 text-[13px] text-muted">
+          {closed ? t('partneradmin.num_note_closed', { month: capitalize(name) }) : t('partneradmin.num_note_open', { next, month: name })}
+        </p>
+      </section>
     </div>
   )
 }

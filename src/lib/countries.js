@@ -23,7 +23,7 @@ const CODES = (
   'TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'
 ).split(' ')
 
-const LOCALE_MAP = { pt: 'pt-PT', en: 'en-GB' }
+const LOCALE_MAP = { pt: 'pt-PT', en: 'en-GB', es: 'es-ES' }
 
 // Cache por idioma: construir o DisplayNames e ordenar 250 nomes a cada
 // render de um <Select> seria desperdício, e a lista não muda.
