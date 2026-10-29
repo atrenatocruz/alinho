@@ -13,6 +13,7 @@ import { ClashNotice } from './Clashes'
 import { MonoLabel } from './TournamentBits'
 import { useScoreEntry, toMatchOrder } from './ScoreEntry'
 import { proSetTieBreakTarget } from './tieBreak'
+import { scoringForStage } from '../../lib/tournamentScore'
 import useCategoryBoard from './useCategoryBoard'
 import { myMatchesFromBoard } from '../../lib/myTournamentMatches'
 import TournamentShareFlow from './TournamentShareFlow'
@@ -224,7 +225,8 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
       {asking && (
         <CorrectionSheet
           match={asking}
-          scoring={tournament?.rules?.scoring || 'pro_set_9'}
+          // A pontuação da fase do jogo (26 out).
+          scoring={scoringForStage(tournament?.rules, asking)}
           tieTarget={proSetTieBreakTarget(tournament?.rules)}
           onClose={() => setAsking(null)}
           onSent={(id) => { setRequested((s) => new Set(s).add(id)); setAsking(null) }}

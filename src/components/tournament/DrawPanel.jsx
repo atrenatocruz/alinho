@@ -12,9 +12,12 @@ import useCategoryBoard from './useCategoryBoard'
 import { bracketRounds } from '../../lib/tournamentDraw'
 import BracketTree from './BracketTree'
 import { PanelSkeleton } from './TournamentSkeleton'
+import { phaseScorings, scoringName } from './scoringText'
 
-export default function DrawPanel({ category, myEntries , emptyPose }) {
+export default function DrawPanel({ tournament, category, myEntries , emptyPose }) {
   const { t } = useTranslation()
+  // A pontuação das eliminatórias, ao lado de cada fase (26 out).
+  const scoring = scoringName(t, phaseScorings(tournament?.rules).knockout, true)
   const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
@@ -44,7 +47,7 @@ export default function DrawPanel({ category, myEntries , emptyPose }) {
   const Bracket = ({ rounds, label }) => (
     <div className="mb-5">
       {secondary.length > 0 && <MonoLabel className="mb-1">{label}</MonoLabel>}
-      <BracketTree rounds={rounds} entries={entries} myIds={myIds} allMatches={matches} groups={groups} />
+      <BracketTree rounds={rounds} entries={entries} myIds={myIds} allMatches={matches} groups={groups} scoring={scoring} />
     </div>
   )
 

@@ -25,6 +25,7 @@ import { Chips, ConfirmSheet, EmptyState, LoadErrorState, NeedsYou, Tabs } from 
 import { Sheet } from '../components/agenda/AgendaControls'
 import { FieldLabel, MonoLabel } from '../components/tournament/TournamentBits'
 import { proSetTieBreakTarget } from '../components/tournament/tieBreak'
+import { scoringForStage } from '../lib/tournamentScore'
 import ScoreCard, { FINISHED } from '../components/tournament/ScoreCard'
 import { StickyTabs } from '../components/tournament/StickyBar'
 import { ScoreSkeleton } from '../components/tournament/TournamentSkeleton'
@@ -187,7 +188,9 @@ export default function TournamentScorePage() {
     return () => clearTimeout(timer)
   }, [wanted, allMatches])
 
-  const scoring = tournament?.rules?.scoring || 'pro_set_9'
+  // Cada jogo com a pontuação da sua fase (grupos ou eliminatórias, 26 out),
+  // a mesma regra da trava da base de dados.
+  const scoringOf = (m) => scoringForStage(tournament?.rules, m)
   const tieTarget = proSetTieBreakTarget(tournament?.rules)
   const isAdmin = !!tournament && (memberships || [])
     .some((m) => m.organization_id === tournament.organization_id && m.is_admin)
@@ -438,7 +441,7 @@ export default function TournamentScorePage() {
         <section key={h} className="space-y-2.5">
           <MonoLabel>{h}</MonoLabel>
           {list.map((m) => (
-            <ScoreCard key={m.match_id} match={m} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
+            <ScoreCard key={m.match_id} match={m} scoring={scoringOf(m)} tieTarget={tieTarget} busy={busy} t={t}
               saved={view === 'todo' && justSaved.has(m.match_id)}
               onSave={save} onWalkover={(match) => setSheet({ match })} onUndoWalkover={isAdmin ? setUndoing : null}
               onResolve={resolve} error={errorFor === m.match_id && !sheet ? error : null} />

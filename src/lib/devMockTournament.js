@@ -117,6 +117,8 @@ const TOURNAMENT = () => {
     // mockTShirt = 'sale' | 'gift': t-shirts do torneio (SPEC t-shirts, 8 out).
     rules: {
       scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockTTieBreak') || 'tiebreak',
+      // mockTScoringKO = 'melhor_2_sets' | …: as eliminatórias com outra pontuação (26 out).
+      ...(localStorage.getItem('mockTScoringKO') ? { scoring_knockout: localStorage.getItem('mockTScoringKO') } : {}),
       // mockTDeuce = 'star_point' | 'vantagens': «Aos 40-40» (27 out). Sem ele, o torneio não traz o modo (ponto de ouro).
       ...(localStorage.getItem('mockTDeuce') ? { deuce: localStorage.getItem('mockTDeuce') } : {}),
       ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
@@ -376,6 +378,9 @@ const resetMatches = () => {
   // mostra assinalado a vermelho ("ficava com 3 jogos seguidos").
   const m = (id, code, group, court, hhmm, status, a, b, score) => ({
     match_id: id, category_code: code, group_label: group, round_label: null,
+    // A fase, como a list_tournament_matches_to_score a manda: o marcador
+    // pede a pontuação dela (pontuação por fase, 26 out).
+    stage: group ? 'grupo' : 'principal',
     court, scheduled_at: at(hhmm), status,
     team_a: a, team_b: b,
     score_a: score ? score[0] : null, score_b: score ? score[1] : null,
@@ -408,6 +413,9 @@ const resetMatches = () => {
     m('m-6', 'M5', 'Grupo C', 'Campo 3', '12:00', 'marcado', santos, boss),
     m('m-7', 'M5', 'Grupo A', 'Campo 1', '13:00', 'marcado', nunes, boss),
     m('m-8', 'F4', 'Grupo B', 'Campo 2', '13:00', 'marcado', tapia, barao),
+    // Uma meia-final, para se ver o marcador com a pontuação das
+    // eliminatórias (mockTScoringKO).
+    { ...m('m-9', 'M5', null, 'Campo 1', '14:00', 'marcado', barros, lima), round_label: 'SF' },
   ]
   // localStorage.mockTUnscheduled = 'true' — quatro jogos acabados de
   // sortear, sem hora nem campo, como a draw_category os deixa (#487).
