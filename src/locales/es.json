@@ -4887,7 +4887,7 @@
   "tournament.draw.tiebreak_hint_2": "Quien no se presentó o se retiró queda por detrás de las parejas con las que empata.",
   "tournament.draw.tiebreak_hint_3": "Dos parejas empatadas: quien ganó el partido entre ellas.",
   "tournament.draw.tiebreak_hint_4": "Tres o más: solo cuentan los partidos entre ellas (diferencia de sets, después de juegos). Si quedan dos empatadas, se vuelve al punto 3.",
-  "tournament.draw.tiebreak_hint_5": "Si sigue el empate, se hace un sorteo y quien organiza fija el orden.",
+  "tournament.draw.tiebreak_hint_5": "Si sigue el empate: diferencia de sets en el grupo, después de juegos, juegos ganados y el ranking de la pareja el día del sorteo. Si siguen empatadas en todo, se juega un desempate en la pista o quien organiza fija el orden.",
   "tournament.draw.tiebreak_hint_note": "No presentarse cuenta como 6-0 6-0.",
   "tournament.draw.tied_for_now": "= empatadas por ahora: decide el partido entre ellas.",
   "tournament.stats.title": "Estadísticas",
