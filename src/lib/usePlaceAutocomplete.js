@@ -103,16 +103,28 @@ export async function geocodeAddress(text) {
    gm_authFailure ou um estado de erro), passa-se ao Photon nesta visita. */
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || null
 let googleFailed = !GOOGLE_KEY
+// Quando a Google recusa a chave, o pedido pendente nunca responde: só o
+// gm_authFailure avisa. Esta promessa resolve-se aí, para não ficar à espera.
+let onGoogleAuthFailure
+const googleAuthFailure = new Promise((resolve) => { onGoogleAuthFailure = resolve })
 if (GOOGLE_KEY) {
   setOptions({ key: GOOGLE_KEY, v: 'weekly', language: 'pt-PT', region: 'PT' })
   if (typeof window !== 'undefined') {
     const previous = window.gm_authFailure
     window.gm_authFailure = () => {
       googleFailed = true
+      onGoogleAuthFailure()
       if (typeof previous === 'function') previous()
     }
   }
 }
+const GOOGLE_TIMEOUT_MS = 5000
+/** O pedido à Google, ou { status: 'FAILED' } se a chave for recusada ou demorar demais. */
+const withGoogleGuard = (promise) => Promise.race([
+  promise,
+  googleAuthFailure.then(() => ({ status: 'FAILED' })),
+  new Promise((resolve) => { setTimeout(() => resolve({ status: 'FAILED' }), GOOGLE_TIMEOUT_MS) }),
+])
 let placesLib = null
 const loadPlaces = () => {
   placesLib ||= importLibrary('places')
@@ -125,9 +137,9 @@ async function googleSearch(q, cities, sessionToken) {
     const { AutocompleteService } = await loadPlaces()
     const request = { input: q, componentRestrictions: { country: 'pt' }, sessionToken }
     if (cities) request.types = ['(cities)']
-    const { predictions, status } = await new Promise((resolve) => {
+    const { predictions, status } = await withGoogleGuard(new Promise((resolve) => {
       new AutocompleteService().getPlacePredictions(request, (p, st) => resolve({ predictions: p, status: st }))
-    })
+    }))
     if (googleFailed || (status !== 'OK' && status !== 'ZERO_RESULTS')) throw new Error(`Google Places ${status}`)
     return (predictions || []).map((p) => {
       const main = p.structured_formatting?.main_text || p.description
@@ -153,12 +165,12 @@ async function googleSearch(q, cities, sessionToken) {
 async function googleDetails(item, cities, sessionToken) {
   try {
     const { PlacesService } = await loadPlaces()
-    const place = await new Promise((resolve) => {
+    const { place } = await withGoogleGuard(new Promise((resolve) => {
       new PlacesService(document.createElement('div')).getDetails(
         { placeId: item.placeId, fields: ['name', 'formatted_address', 'geometry.location'], sessionToken },
-        (p, status) => resolve(status === 'OK' ? p : null),
+        (p, status) => resolve({ place: status === 'OK' ? p : null }),
       )
-    })
+    }))
     if (!place) return null
     const loc = place.geometry?.location
     const value = cities
@@ -250,7 +262,9 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
       if (item.placeId) {
         const picked = await googleDetails(item, cities, sessionToken)
         sessionToken = null
-        onPlaceSelectedRef.current(picked || { value: item.value, name: item.name, latitude: null, longitude: null })
+        // Sem os detalhes da Google: o texto vale, e as coordenadas tentam-se no Photon.
+        const coords = picked ? null : await geocodeAddress(item.value)
+        onPlaceSelectedRef.current(picked || { value: item.value, name: item.name, latitude: coords?.latitude ?? null, longitude: coords?.longitude ?? null })
         return
       }
       // Clube do Alinho sem coordenadas guardadas: procura-se a morada dele.
