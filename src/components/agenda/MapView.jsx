@@ -27,8 +27,8 @@ const MAP_STYLE_URL = TOMTOM_KEY
   ? `https://api.tomtom.com/maps/orbis/assets/styles/0.*/style.json?key=${TOMTOM_KEY}&apiVersion=1&map=basic_street-light`
   : FALLBACK_STYLE_URL
 const RADIUS_COLOR = '#1E4FA8'
-// O mapa abre em mim, com 20 milhas à volta à vista (Renato, 29 out).
-const MAP_RADIUS_KM = 32
+// O mapa abre em mim, com 10 milhas à volta à vista (Renato, 29 out).
+const MAP_RADIUS_KM = 16
 // O MapLibre (~800 KB) só se carrega quando se abre o mapa.
 const loadMapLibre = () => Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m.default)
 
@@ -337,7 +337,7 @@ export function MapView({ events, today, location, linkFor, actionFor, onAction,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, dayKey, pins, gpsCenter, location])
 
-  // Onde estou e as 20 milhas à volta — só orientação.
+  // Onde estou e as 10 milhas à volta — só orientação.
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
