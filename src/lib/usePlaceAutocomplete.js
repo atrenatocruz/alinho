@@ -1,9 +1,9 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import { supabase } from './supabase'
 
-/* Sugestões de moradas e sítios enquanto se escreve — Photon (komoot), sobre
-   o OpenStreetMap, sem chave nem faturação (28 out: troca da Google, que
-   parava sempre que a faturação ou os referrers falhavam). Uso razoável:
+/* Sugestões de moradas e sítios enquanto se escreve — Google Places, com o
+   Photon (komoot, OpenStreetMap, sem chave) como reserva. Uso razoável:
    pede-se só depois de 300 ms sem escrever e com 3+ letras.
    A lista é um <ul> nosso por baixo do campo, posta no <body> (os campos
    vivem em folhas com overflow). O texto escrito à mão vale sempre — sem
@@ -96,34 +96,79 @@ export async function geocodeAddress(text) {
   return found
 }
 
-/* TomTom Search (28 out): pesquisa por nome de sítio muito melhor que o
-   OpenStreetMap. Quota grátis diária; a chave restringe-se por domínio no
-   painel do TomTom. Sem VITE_TOMTOM_API_KEY não se usa. Devolve null se
-   falhar, para se cair no Photon. */
-const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY || null
-async function tomtomSearch(q, signal) {
-  const params = new URLSearchParams({
-    key: TOMTOM_KEY, countrySet: 'PT', language: 'pt-PT', limit: '6', typeahead: 'true', idxSet: 'POI,PAD,Addr,Str',
-  })
+/* Google Places (29 out: de volta — o TomTom e o Photon encontravam
+   poucos clubes pelo nome). A lista continua a ser a nossa, com os clubes
+   do Alinho primeiro; da Google vêm só as sugestões, e as coordenadas pedem-
+   se ao escolher. Se a Google recusar (chave, referrer, faturação —
+   gm_authFailure ou um estado de erro), passa-se ao Photon nesta visita. */
+const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || null
+let googleFailed = !GOOGLE_KEY
+if (GOOGLE_KEY) {
+  setOptions({ key: GOOGLE_KEY, v: 'weekly', language: 'pt-PT', region: 'PT' })
+  if (typeof window !== 'undefined') {
+    const previous = window.gm_authFailure
+    window.gm_authFailure = () => {
+      googleFailed = true
+      if (typeof previous === 'function') previous()
+    }
+  }
+}
+let placesLib = null
+const loadPlaces = () => {
+  placesLib ||= importLibrary('places')
+  return placesLib
+}
+
+/** Sugestões da Google → itens sem coordenadas (vêm com o placeId). Null se falhar. */
+async function googleSearch(q, cities, sessionToken) {
   try {
-    const res = await fetch(`https://api.tomtom.com/search/2/search/${encodeURIComponent(q)}.json?${params}`, { signal })
-    if (!res.ok) throw new Error(`TomTom ${res.status}`)
-    const data = await res.json()
-    return (data.results || []).map((r) => {
-      const address = r.address?.freeformAddress || ''
-      const name = r.type === 'POI' ? r.poi?.name || null : null
+    const { AutocompleteService } = await loadPlaces()
+    const request = { input: q, componentRestrictions: { country: 'pt' }, sessionToken }
+    if (cities) request.types = ['(cities)']
+    const { predictions, status } = await new Promise((resolve) => {
+      new AutocompleteService().getPlacePredictions(request, (p, st) => resolve({ predictions: p, status: st }))
+    })
+    if (googleFailed || (status !== 'OK' && status !== 'ZERO_RESULTS')) throw new Error(`Google Places ${status}`)
+    return (predictions || []).map((p) => {
+      const main = p.structured_formatting?.main_text || p.description
+      const secondary = p.structured_formatting?.secondary_text || ''
       return {
-        value: name && address ? `${name} - ${address}` : address || name || '',
-        name,
-        latitude: r.position?.lat ?? null,
-        longitude: r.position?.lon ?? null,
-        line1: name || address,
-        line2: name ? address : (r.address?.municipality || ''),
+        placeId: p.place_id,
+        value: cities ? main : p.description,
+        name: main,
+        latitude: null,
+        longitude: null,
+        line1: main,
+        line2: secondary,
       }
     })
   } catch (error) {
-    if (error.name === 'AbortError') throw error
-    console.error('Error searching TomTom:', error)
+    console.error('Error searching Google Places:', error)
+    googleFailed = true
+    return null
+  }
+}
+
+/** O sítio escolhido da Google: { value, name, latitude, longitude }, ou null. */
+async function googleDetails(item, cities, sessionToken) {
+  try {
+    const { PlacesService } = await loadPlaces()
+    const place = await new Promise((resolve) => {
+      new PlacesService(document.createElement('div')).getDetails(
+        { placeId: item.placeId, fields: ['name', 'formatted_address', 'geometry.location'], sessionToken },
+        (p, status) => resolve(status === 'OK' ? p : null),
+      )
+    })
+    if (!place) return null
+    const loc = place.geometry?.location
+    const value = cities
+      ? place.name || item.value
+      : place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)
+        ? `${place.name} - ${place.formatted_address}`
+        : place.formatted_address || place.name || item.value
+    return { value, name: place.name || item.name, latitude: loc ? loc.lat() : null, longitude: loc ? loc.lng() : null }
+  } catch (error) {
+    console.error('Error loading Google place details:', error)
     return null
   }
 }
@@ -181,6 +226,12 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
     let index = -1
     let timer = null
     let controller = null
+    // Uma sessão da Google por escolha (as sugestões e os detalhes pagam-se juntos).
+    let sessionToken = null
+    const newSession = async () => {
+      if (googleFailed) return null
+      try { return new (await loadPlaces()).AutocompleteSessionToken() } catch { return null }
+    }
 
     const place = () => {
       const r = input.getBoundingClientRect()
@@ -196,6 +247,12 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
       const item = items[i]
       if (!item) return
       close()
+      if (item.placeId) {
+        const picked = await googleDetails(item, cities, sessionToken)
+        sessionToken = null
+        onPlaceSelectedRef.current(picked || { value: item.value, name: item.name, latitude: null, longitude: null })
+        return
+      }
       // Clube do Alinho sem coordenadas guardadas: procura-se a morada dele.
       const coords = item.latitude == null && item.address ? await geocodeAddress(item.address) : null
       onPlaceSelectedRef.current({
@@ -240,9 +297,13 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
       // Os clubes do Alinho primeiro (search_club_places); sem a função, só o Photon.
       const clubsPromise = cities ? Promise.resolve([]) : searchClubPlaces(q)
       try {
-        // Com chave do TomTom, os sítios vêm dele (dados próprios: encontra
-        // clubes pelo nome); se falhar, ou sem chave, do Photon.
-        let found = !cities && TOMTOM_KEY ? await tomtomSearch(q, signal) : null
+        // Os sítios vêm da Google; se falhar, ou sem chave, do Photon.
+        let found = null
+        if (!googleFailed) {
+          sessionToken ||= await newSession()
+          found = await googleSearch(q, cities, sessionToken)
+          if (signal.aborted) return
+        }
         if (!found) {
           const res = await fetch(`${PHOTON_URL}?${params}`, { signal })
           if (!res.ok) throw new Error(`Photon ${res.status}`)
@@ -252,7 +313,7 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
         if (signal.aborted) return
         const seen = new Set()
         items = [...clubs, ...found]
-          .filter((it) => it.value && (it.latitude != null || it.club) && !seen.has(it.value) && seen.add(it.value))
+          .filter((it) => it.value && (it.latitude != null || it.club || it.placeId) && !seen.has(it.value) && seen.add(it.value))
           .slice(0, 7)
         if (document.activeElement === input) render()
       } catch (error) {
