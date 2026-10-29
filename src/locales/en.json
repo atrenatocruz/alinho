@@ -4892,7 +4892,7 @@
   "tournament.draw.tiebreak_hint_2": "A pair that forfeited or retired goes behind the pairs it is tied with.",
   "tournament.draw.tiebreak_hint_3": "Two pairs tied: whoever won the match between them.",
   "tournament.draw.tiebreak_hint_4": "Three or more: only the matches between them count (set difference, then game difference). If two are still tied, go back to point 3.",
-  "tournament.draw.tiebreak_hint_5": "If still tied, there is a draw and the organiser sets the order.",
+  "tournament.draw.tiebreak_hint_5": "If still tied: set difference in the group, then game difference, games won and the pair's ranking on the day of the draw. If they are level on everything, they play a decider on court or the organiser sets the order.",
   "tournament.draw.tiebreak_hint_note": "A forfeit counts as 6-0 6-0.",
   "tournament.draw.tied_for_now": "= tied for now: the match between them decides.",
   "tournament.stats.title": "Stats",

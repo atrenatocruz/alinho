@@ -4896,7 +4896,7 @@
   "tournament.draw.tiebreak_hint_2": "Quem faltou ou desistiu fica atrás das duplas com quem empatou.",
   "tournament.draw.tiebreak_hint_3": "Duas duplas empatadas: quem ganhou o jogo entre elas.",
   "tournament.draw.tiebreak_hint_4": "Três ou mais: contam só os jogos entre elas (diferença de sets, depois de jogos). Se ficarem duas empatadas, volta-se ao ponto 3.",
-  "tournament.draw.tiebreak_hint_5": "Se ainda houver empate, faz-se um sorteio e o organizador marca a ordem.",
+  "tournament.draw.tiebreak_hint_5": "Se continuar o empate: diferença de sets no grupo, depois de jogos, jogos ganhos e o ranking da dupla no dia do sorteio. Se ficarem iguais em tudo, joga-se um desempate no campo ou o organizador escolhe a ordem.",
   "tournament.draw.tiebreak_hint_note": "Uma falta conta como 6-0 6-0.",
   "tournament.draw.tied_for_now": "= empatadas por agora: decide o jogo entre elas.",
   "tournament.stats.title": "Estatísticas",
