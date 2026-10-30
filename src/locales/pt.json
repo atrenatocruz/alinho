@@ -7263,5 +7263,7 @@
   "partneradmin.num_note_open": "Os prémios, o desconto aberto e os usados aparecem a {{next}}, quando sai o pódio de {{month}}. São pessoas diferentes, contadas uma vez por dia. Nunca aparecem nomes nem contactos.",
   "partneradmin.num_note_closed": "{{month}} fechado. São pessoas diferentes, contadas uma vez por dia. Nunca aparecem nomes nem contactos.",
   "partneradmin.num_empty": "Ainda não há números. Começam a contar no dia em que a tua página aparece na app, a {{date}}.",
-  "partneradmin.num_empty_nodate": "Ainda não há números. Começam a contar no dia em que a tua página aparece na app."
+  "partneradmin.num_empty_nodate": "Ainda não há números. Começam a contar no dia em que a tua página aparece na app.",
+  "tshare.adjust_hint": "Arrasta a foto para a posicionar · aperta ou afasta para o zoom",
+  "tshare.zoom_label": "Zoom da foto"
 }
