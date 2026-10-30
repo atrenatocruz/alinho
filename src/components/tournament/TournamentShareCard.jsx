@@ -65,8 +65,9 @@ export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5, height 
   gTop.addColorStop(1, 'rgba(11,11,12,0)')
   ctx.fillStyle = gTop
   ctx.fillRect(0, 0, w, h * 0.42)
-  const g = ctx.createLinearGradient(0, h * 0.45, 0, h)
+  const g = ctx.createLinearGradient(0, h * 0.38, 0, h)
   g.addColorStop(0, 'rgba(11,11,12,0)')
+  g.addColorStop(0.72, 'rgba(11,11,12,0.82)')
   g.addColorStop(1, 'rgba(11,11,12,1)')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, w, h)
