@@ -52,6 +52,7 @@ import { deuceModeOf, scoringHasDeuce } from '../lib/deuceMode'
 import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
+import MixWinnersShareCard, { MIX_HERO_H } from '../components/mix/MixWinnersShareCard'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
 import { duplasWinners, americanoWinners, rotatingWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
@@ -3749,13 +3750,26 @@ export default function GameDetails() {
       {winnersShareOpen && shownWinnersShare && (
         <TournamentShareFlow
           variant={shownWinnersShare.variant}
-          data={shownWinnersShare.data}
+          data={shownWinnersShare.premium ? {
+            ...shownWinnersShare.data,
+            // O contexto do cartão premium (briefing 30 out): só o que existe.
+            meta: {
+              headerDate: `${weekdayShort(game.date, i18n.language)} · ${shownWinnersShare.data.date}`.toUpperCase(),
+              club: winnersOrg?.name || null,
+              weekdayLong: (() => { const w = formatDateLib(game.date, i18n.language, { weekday: 'long' }); return w.charAt(0).toUpperCase() + w.slice(1) })(),
+              title: game.title,
+              players: people.length || null,
+              games: matches.filter((m) => m.winner_team_id).length || null,
+              durationMin: game.court_time_minutes || null,
+            },
+          } : shownWinnersShare.data}
           text={shownWinnersShare.text}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
           org={winnersOrg}
-          fallbackImage={game.image_url || null}
+          fallbackImage={game.image_url || (shownWinnersShare.premium ? '/topo/topo-mix.webp' : null)}
           onClose={() => setWinnersShareOpen(false)}
+          {...(shownWinnersShare.premium ? { Card: MixWinnersShareCard, photoH: MIX_HERO_H } : {})}
         />
       )}
 
