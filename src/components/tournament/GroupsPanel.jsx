@@ -14,6 +14,7 @@ import useCategoryBoard from './useCategoryBoard'
 import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
 import { PanelSkeleton } from './TournamentSkeleton'
 import { shortName } from './shareData'
+import { phaseScorings, scoringName } from './scoringText'
 
 const GROUP_DONE = ['terminado', 'falta', 'desistencia']
 // As medalhas da «Tabela final» do grupo único (UX, 23 out).
@@ -52,7 +53,7 @@ function NameWithTags({ text, children }) {
  *  são os da tabela dos grupos. No fim, «Tabela final» com medalhas. Um
  *  empate no 1.º que o desempate da FPP não separa fica marcado com «=» e a
  *  categoria não fecha: a regra está em revisão (Francisco, 23 out). */
-function SingleGroup({ group, matches, entries, myEntryId, category, t }) {
+function SingleGroup({ group, matches, entries, myEntryId, category, scoring, t }) {
   const rows = standingsOf(group, matches)
   const mine = matches.filter((m) => m.stage === 'grupo' && m.group_id === group.id)
   const played = mine.filter((m) => m.score_a != null).length
@@ -64,7 +65,7 @@ function SingleGroup({ group, matches, entries, myEntryId, category, t }) {
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3">
-        <MonoLabel>{closed ? t('tournament.single.final_table') : t('tournament.single.heading', { count: rows.length })}</MonoLabel>
+        <MonoLabel>{closed ? t('tournament.single.final_table') : t('tournament.single.heading', { count: rows.length })} · {scoring}</MonoLabel>
         <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-ink-500">{t('tournament.draw.played_of', { played, total: mine.length })}</span>
       </div>
 
@@ -124,7 +125,7 @@ function SingleGroup({ group, matches, entries, myEntryId, category, t }) {
 
 /** Uma tabela de grupo. As duplas que passam ficam marcadas à esquerda e
  *  com o lugar em destaque — é o que se lê de relance no telemóvel. */
-function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
+function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t }) {
   const rows = standingsOf(group, matches)
   const played = matches.filter(
     (m) => m.stage === 'grupo' && m.group_id === group.id && m.score_a != null,
@@ -153,7 +154,8 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
   return (
     <section className="card mb-3 !p-0 overflow-hidden">
       <header className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <b className="text-sm font-extrabold text-ink-900">{group.name}</b>
+        {/* «Grupo 1 · pro set a 9»: a forma de jogar da fase (26 out). */}
+        <b className="text-sm font-extrabold text-ink-900">{group.name}<span className="font-semibold text-muted"> · {scoring}</span></b>
         <span className="font-mono text-xs text-muted">
           {t('tournament.draw.played_of', { played, total })}
         </span>
@@ -244,8 +246,10 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
   )
 }
 
-export default function GroupsPanel({ category, my, emptyPose }) {
+export default function GroupsPanel({ tournament, category, my, emptyPose }) {
   const { t } = useTranslation()
+  // A pontuação dos grupos, por cima de cada tabela (pontuação por fase, 26 out).
+  const scoring = scoringName(t, phaseScorings(tournament?.rules).groups, true)
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
@@ -267,7 +271,7 @@ export default function GroupsPanel({ category, my, emptyPose }) {
   // Um grupo só, sem ninguém a passar: a tabela é o torneio todo.
   if (groups.length === 1 && qualifiers === 0) {
     return <SingleGroup group={groups[0]} matches={matches} entries={entries} myEntryId={my?.entry_id}
-      category={category} t={t} />
+      category={category} scoring={scoring} t={t} />
   }
 
   return (
@@ -282,6 +286,7 @@ export default function GroupsPanel({ category, my, emptyPose }) {
           entries={entries}
           qualifiers={qualifiers}
           myEntryId={my?.entry_id}
+          scoring={scoring}
           t={t}
         />
       ))}

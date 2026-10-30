@@ -2,31 +2,32 @@
 //   1. «↗ Partilhar resultado» (quem chama)
 //   2. «Juntar uma foto?» — Tirar foto agora · Escolher da galeria · Sem foto
 //      (a foto fica só no telemóvel: não vai para a app)
-//   3. Pré-visualização + «Texto (podes mudar)» + «Partilhar»
-//   4. O QR leva à página do torneio, com a referência de quem partilhou.
+//   3. Pré-visualização (com a foto ajustável: arrastar posiciona, pinça/
+//      roda do rato/slider faz zoom — Ruben, 30 out) + «Texto» + «Partilhar»
+// O QR saiu das partilhas a 30 out (Ruben: «não faz sentido»).
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react'
-import TournamentShareCard, { T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, bakeImageUrl } from './TournamentShareCard'
-import { qrDataUrl, readLocalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
-import { tournamentUrl } from '../../lib/tournamentPublic'
-import { useAuth } from '../../contexts/AuthContext'
-import { appOrigin } from '../../lib/native'
+import TournamentShareCard, { PHOTO_H, T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, bakeImageUrl } from './TournamentShareCard'
+import { readLocalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
 
 const PREVIEW_SCALE = 0.62
 
-/* #622 (vencedores em todos os jogos), tudo opcional: `qrUrl` (o QR vai para
-   a página do clube/grupo, ou alinho.pt; sem ele, a página do torneio),
-   `shareTitle`, `org` e `children` (passam ao cartão) e `fallbackImage` (a
-   imagem do mix, que entra no lugar da foto quando se escolhe «Sem foto»). */
+/* #622 (vencedores em todos os jogos), tudo opcional: `shareTitle`, `org` e
+   `children` (passam ao cartão) e `fallbackImage` (a imagem do mix, que
+   entra no lugar da foto quando se escolhe «Sem foto»). */
 export default function TournamentShareFlow({ tournament, variant, data, text, filenameParts = [], onClose,
-  qrUrl = null, shareTitle = null, org = null, fallbackImage = null, children = null }) {
+  shareTitle = null, org = null, fallbackImage = null, children = null,
+  Card = TournamentShareCard, photoH = PHOTO_H, photoTopScrim = true }) {
   const { t } = useTranslation()
-  const { profile } = useAuth()
   const [step, setStep] = useState('photo') // 'photo' | 'preview'
-  const [photo, setPhoto] = useState(null)
-  const [qr, setQr] = useState(null)
+  const [photo, setPhoto] = useState(null) // a foto já cozida (bakePhoto)
+  // O ajuste da foto (Ruben, 30 out): a original fica em `raw` e coze-se de
+  // novo a cada gesto — o cartão continua a receber píxeis prontos, que é o
+  // que o WebKit rasteriza sem estragar.
+  const [raw, setRaw] = useState(null)
+  const [adj, setAdj] = useState({ zoom: 1, ox: 0.5, oy: 0.5 })
   const [caption, setCaption] = useState(text || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -51,20 +52,13 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
 
-  // O QR: a página do torneio (ou a que vier em qrUrl), com a referência de
-  // quem partilhou.
-  useEffect(() => {
-    const base = qrUrl || tournamentUrl(tournament, appOrigin())
-    const url = `${base}${profile?.id ? `${base.includes('?') ? '&' : '?'}ref=${profile.id}` : ''}`
-    qrDataUrl(url, { size: 240 }).then(setQr).catch((err) => console.error('Error making the QR:', err))
-  }, [tournament, qrUrl, profile?.id])
   // A imagem do mix, já cortada como a foto, para o «Sem foto».
   const [fallback, setFallback] = useState(null)
   useEffect(() => {
     let alive = true
-    bakeImageUrl(fallbackImage).then((v) => { if (alive) setFallback(v) })
+    bakeImageUrl(fallbackImage, { height: photoH, topScrim: photoTopScrim }).then((v) => { if (alive) setFallback(v) })
     return () => { alive = false }
-  }, [fallbackImage])
+  }, [fallbackImage, photoH, photoTopScrim])
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -73,12 +67,59 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
     setBusy(true); setError('')
     try {
       const read = await readLocalPhoto(file)
-      setPhoto(await bakePhoto(read.dataUrl))
+      const start = { zoom: 1, ox: 0.5, oy: 0.5 }
+      setRaw(read.dataUrl)
+      setAdj(start)
+      setPhoto(await bakePhoto(read.dataUrl, { ...start, height: photoH, topScrim: photoTopScrim }))
       setStep('preview')
     } catch (err) {
       console.error('Error reading the photo:', err)
       setError(t('tshare.photo_error'))
     } finally { setBusy(false) }
+  }
+
+  // Coze de novo quando o ajuste muda (o canvas é barato; o último ganha).
+  useEffect(() => {
+    if (!raw) return undefined
+    let alive = true
+    bakePhoto(raw, { ...adj, height: photoH, topScrim: photoTopScrim }).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
+    return () => { alive = false }
+  }, [raw, adj, photoH, photoTopScrim])
+
+  // Gestos sobre a zona da foto no preview: 1 dedo arrasta (posição), 2
+  // dedos pinçam (zoom); no computador, a roda do rato também faz zoom.
+  const pointers = useRef(new Map())
+  const pinchStart = useRef(null)
+  const clamp01 = (v) => Math.min(Math.max(v, 0), 1)
+  const clampZoom = (v) => Math.min(Math.max(v, 1), 3)
+  const onPointerDown = (e) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()]
+      pinchStart.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: adj.zoom }
+    }
+  }
+  const onPointerMove = (e) => {
+    const prev = pointers.current.get(e.pointerId)
+    if (!prev) return
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2 && pinchStart.current) {
+      const [a, b] = [...pointers.current.values()]
+      const dist = Math.hypot(a.x - b.x, a.y - b.y)
+      setAdj((v) => ({ ...v, zoom: clampZoom(pinchStart.current.zoom * (dist / pinchStart.current.dist)) }))
+    } else if (pointers.current.size === 1) {
+      // 150 px de arrasto percorrem a folga toda — previsível a qualquer zoom.
+      setAdj((v) => ({ ...v, ox: clamp01(v.ox - (e.clientX - prev.x) / 150), oy: clamp01(v.oy - (e.clientY - prev.y) / 150) }))
+    }
+  }
+  const onPointerUp = (e) => {
+    pointers.current.delete(e.pointerId)
+    if (pointers.current.size < 2) pinchStart.current = null
+  }
+  const onWheel = (e) => {
+    e.preventDefault()
+    setAdj((v) => ({ ...v, zoom: clampZoom(v.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)) }))
   }
 
   const share = async () => {
@@ -87,6 +128,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
       const blob = await cardRef.current.exportPng()
       const out = await shareOrSaveImage(blob, { filename: shareFilename(...filenameParts), title: shareTitle ?? tournament?.name ?? '', text: caption })
       if (out === 'saved') setSaved(true)
+      // Enviado pela folha de partilha: fecha e volta à página de onde se veio
+      // (#742). Se fechou a folha sem enviar, fica para tentar outra vez.
+      if (out === 'shared') { onClose(); return }
     } catch (err) {
       console.error('Error sharing the card:', err)
       setError(t('tshare.share_error'))
@@ -141,18 +185,34 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
         </button>
         <h2 className="text-3xl text-ink-900">{t('tshare.preview_title')}</h2>
         {/* O cartão a sério, reduzido só no ecrã: o que se exporta é o de 360 × 640. */}
-        <div className="mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: T_CARD_W * PREVIEW_SCALE, height: T_CARD_H * PREVIEW_SCALE }}>
+        <div className="relative mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: T_CARD_W * PREVIEW_SCALE, height: T_CARD_H * PREVIEW_SCALE }}>
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <TournamentShareCard ref={cardRef} variant={variant} data={data} photo={photo || fallback} qr={qr} org={cardOrg}>{children}</TournamentShareCard>
+            <Card ref={cardRef} variant={variant} data={data} photo={photo || fallback} org={cardOrg}>{children}</Card>
           </div>
+          {/* A zona da foto aceita gestos (só com foto escolhida). */}
+          {raw && photo && (
+            <div className="absolute left-0 top-0 w-full cursor-move touch-none"
+              style={{ height: photoH * PREVIEW_SCALE }}
+              onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
+          )}
         </div>
+        {raw && photo && (
+          <div className="mx-auto" style={{ width: T_CARD_W * PREVIEW_SCALE }}>
+            <p className="text-center text-xs text-muted">{t('tshare.adjust_hint')}</p>
+            <input type="range" min="1" max="3" step="0.05" value={adj.zoom}
+              aria-label={t('tshare.zoom_label')}
+              onChange={(e) => setAdj((v) => ({ ...v, zoom: Number(e.target.value) }))}
+              className="mt-1.5 w-full accent-ink-900" />
+          </div>
+        )}
         <div>
           <p className="mb-2 text-sm font-medium text-gray-700">{t('tshare.text_label')}</p>
           <textarea rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} className="input-field" />
         </div>
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         <div>
-          <button type="button" onClick={share} disabled={busy || !qr} className="btn-primary w-full disabled:opacity-40">
+          <button type="button" onClick={share} disabled={busy} className="btn-primary w-full disabled:opacity-40">
             {t('tshare.share')}
           </button>
           <p className="mt-1.5 text-center text-xs text-muted">{saved ? t('tshare.saved_hint') : t('tshare.share_hint')}</p>

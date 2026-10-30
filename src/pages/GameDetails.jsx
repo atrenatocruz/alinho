@@ -52,6 +52,7 @@ import { deuceModeOf, scoringHasDeuce } from '../lib/deuceMode'
 import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
+import MixWinnersShareCard, { MIX_HERO_H } from '../components/mix/MixWinnersShareCard'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
 import { duplasWinners, americanoWinners, rotatingWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
@@ -3749,14 +3750,19 @@ export default function GameDetails() {
       {winnersShareOpen && shownWinnersShare && (
         <TournamentShareFlow
           variant={shownWinnersShare.variant}
-          data={shownWinnersShare.data}
+          data={shownWinnersShare.premium ? {
+            ...shownWinnersShare.data,
+            // O cartão premium só precisa do grupo — a data já vem no
+            // data.date (shortDate traz o dia da semana; 3.ª volta, 30 out).
+            meta: { club: winnersOrg?.name || null },
+          } : shownWinnersShare.data}
           text={shownWinnersShare.text}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
-          qrUrl={orgSlug ? `${appOrigin()}/clube/${orgSlug}` : appOrigin()}
           org={winnersOrg}
-          fallbackImage={game.image_url || null}
+          fallbackImage={game.image_url || (shownWinnersShare.premium ? '/topo/topo-mix.webp' : null)}
           onClose={() => setWinnersShareOpen(false)}
+          {...(shownWinnersShare.premium ? { Card: MixWinnersShareCard, photoH: MIX_HERO_H, photoTopScrim: false } : {})}
         />
       )}
 

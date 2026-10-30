@@ -62,7 +62,7 @@ function roundMeta(matches, t, lang) {
   return [when, matches.length > 1 ? t('tournament.tree.n_games', { count: matches.length }) : null].filter(Boolean).join(' · ')
 }
 
-export default function BracketTree({ rounds, entries, myIds = [], allMatches, groups = [] }) {
+export default function BracketTree({ rounds, entries, myIds = [], allMatches, groups = [], scoring = null }) {
   const { t, i18n } = useTranslation()
   const tree = useMemo(() => buildTree(rounds), [rounds])
   const { present, columns, third, current } = tree
@@ -79,6 +79,12 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
   ))
 
   const title = (r) => t(`tournament.tree.title_${r}`)
+  // «Meias-finais · 2 sets + super tie-break»: a forma de jogar das
+  // eliminatórias ao lado de cada fase (pontuação por fase, 26 out).
+  // No telemóvel ao lado do nome; no computador, numa coluna estreita, vai
+  // para a linha pequena por baixo (partia-se ao meio).
+  const titled = (r) => <>{title(r)}{scoring && <span className="whitespace-nowrap font-sans text-sm font-semibold tracking-normal text-muted"> · {scoring}</span>}</>
+  const metaOf = (matches) => [roundMeta(matches, t, i18n.language), scoring].filter(Boolean).join(' · ')
   const labelsOf = (m, round) => {
     const src = (side) => {
       const s = sourceOf(round, m.slot ?? m.bracket_slot ?? 1, side, present)
@@ -126,13 +132,13 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
   // Telemóvel: o título à esquerda e o dia à direita; computador: por baixo.
   const heading = (r, matches, phone = true) => (phone ? (
     <div className="flex items-baseline justify-between gap-3">
-      <h3 className="font-display text-[22px] font-extrabold text-ink-900">{title(r)}</h3>
+      <h3 className="min-w-0 font-display text-[22px] font-extrabold text-ink-900">{titled(r)}</h3>
       <span className="shrink-0 text-xs text-muted">{roundMeta(matches, t, i18n.language)}</span>
     </div>
   ) : (
     <div>
       <h3 className="font-display text-xl font-extrabold text-ink-900">{title(r)}</h3>
-      <p className="text-xs text-muted">{roundMeta(matches, t, i18n.language)}</p>
+      <p className="text-xs text-muted">{metaOf(matches)}</p>
     </div>
   ))
 
@@ -187,7 +193,7 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
                   <button type="button" onClick={() => setOpen((o) => ({ ...o, [c.round]: !o[c.round] }))} aria-expanded={isOpen}
                     className={`flex min-h-[48px] w-full items-center justify-between gap-2 rounded-ctrl px-3 text-left ${isOpen ? 'border border-ink-900' : 'border border-dashed'}`}
                     style={isOpen ? undefined : { borderColor: LILAC.border }}>
-                    <span className="font-display text-lg font-extrabold text-ink-900">{title(c.round)}</span>
+                    <span className="min-w-0 font-display text-lg font-extrabold text-ink-900">{titled(c.round)}</span>
                     <span className="flex shrink-0 items-center gap-1 text-xs font-extrabold text-ink-700">
                       {isOpen ? <>{t('tournament.tree.close')} <ChevronUp size={16} /></> : <>{t('tournament.tree.n_games', { count: c.matches.length })} <ChevronDown size={16} /></>}
                     </span>
@@ -227,7 +233,7 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
           <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-line pt-5">
             <div className="w-60">
               <h3 className="font-display text-xl font-extrabold text-ink-900">{title('3P')}</h3>
-              <p className="text-xs text-muted">{[roundMeta([third], t, i18n.language), t('tournament.tree.third_who')].filter(Boolean).join(' · ')}</p>
+              <p className="text-xs text-muted">{[metaOf([third]), t('tournament.tree.third_who')].filter(Boolean).join(' · ')}</p>
             </div>
             <div className="w-[260px]">{thirdCard(true)}</div>
           </div>
