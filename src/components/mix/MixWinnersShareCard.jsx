@@ -17,30 +17,12 @@ export const MIX_CARD_W = 360
 export const MIX_CARD_H = 640
 export const MIX_HERO_H = 320 // 50% do cartão (Ruben, 30 out: a foto mandava)
 const RATIO = 3
-const SAFE_TOP = 84
+// Topo a 68 (204 a 1080): acima da safe area «oficial» das Stories, por
+// pedido do Ruben (30 out) — o cabeçalho sai de cima da foto; a faixa
+// escura do bakePhoto garante a leitura. O fundo mantém os 300 px.
+const SAFE_TOP = 68
 const SAFE_BOTTOM = 100
 const LIME = '#C5DD01'
-
-const initialsOf = (name) =>
-  String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
-
-/** As iniciais da dupla em dois círculos sobrepostos (sem fotos: o corte
- *  redondo por CSS parte no WebKit ao rasterizar; iniciais são à prova). */
-function PairCircles({ pair, size = 24 }) {
-  const names = String(pair || '').split('/').map((s) => s.trim()).filter(Boolean).slice(0, 2)
-  if (!names.length) return null
-  return (
-    <span className="flex shrink-0">
-      {names.map((n, i) => (
-        <span key={i}
-          className="flex items-center justify-center rounded-full bg-[#26262B] font-extrabold text-white"
-          style={{ width: size, height: size, fontSize: size * 0.34, marginLeft: i ? -size * 0.25 : 0, boxShadow: '0 0 0 2px #0B0B0C' }}>
-          {initialsOf(n)}
-        </span>
-      ))}
-    </span>
-  )
-}
 
 /**
  * data: { date, rows: [{ place, pair, mine }], meta: { headerDate, club,
@@ -83,19 +65,23 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         ? <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />
         : <div className="absolute left-0 top-0 bg-[#131316]" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />}
 
-      {/* Cabeçalho: a marca à esquerda, o dia à direita (safe area). */}
-      <div className="absolute inset-x-0 flex items-center justify-between px-[18px]" style={{ top: SAFE_TOP }}>
-        <span className="flex items-end gap-[1px]">
-          <img src={logoWordmark} alt="alinho" className="h-[16px] w-auto" />
-          <span className="font-sans text-[13px] font-medium leading-[12px] text-white">.pt</span>
+      {/* Cabeçalho bem no topo (Ruben, 30 out): a marca com o grupo por
+          baixo, a data à direita — tudo sobre a faixa escura do topo da
+          foto, fora do miolo da imagem. */}
+      <div className="absolute inset-x-0 flex items-start justify-between px-[18px]" style={{ top: SAFE_TOP }}>
+        <span className="min-w-0">
+          <span className="flex items-end gap-[1px]">
+            <img src={logoWordmark} alt="alinho" className="h-[16px] w-auto" />
+            <span className="font-sans text-[13px] font-medium leading-[12px] text-white">.pt</span>
+          </span>
+          {meta.club && <span className="mt-1 block max-w-[200px] truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>}
         </span>
         <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</span>
       </div>
 
-      {/* O título sobre o fundo do hero. */}
-      <div className="absolute inset-x-0 px-[18px]" style={{ top: 234 }}>
-        {meta.club && <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-[#D1D5DB]">{t('mixshare.hero_kicker')} · {meta.club}</p>}
-        <p className="mt-1 font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
+      {/* O título sobre o fundo do hero (o clube vive agora no cabeçalho). */}
+      <div className="absolute inset-x-0 px-[18px]" style={{ top: 244 }}>
+        <p className="font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
         {(meta.weekdayLong || meta.title) && (
           <p className="mt-1.5 text-[9.5px] text-[#9CA3AF]">{[meta.weekdayLong, meta.title].filter(Boolean).join(' · ')}</p>
         )}
@@ -115,7 +101,6 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
                 <p className="mt-0.5 text-[10px] leading-none">🏆</p>
               </div>
               <p className="min-w-0 flex-1 text-[15.5px] font-extrabold leading-tight text-white">{first.pair}</p>
-              <PairCircles pair={first.pair} size={26} />
             </div>
           </div>
         )}
@@ -126,7 +111,6 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
               <div key={r.place} className="flex items-center gap-3.5 rounded-[12px] bg-[#111114] px-4 py-2">
                 <p className="w-7 shrink-0 font-display text-[16px] font-black leading-none text-[#6B7280]">{r.place}.º</p>
                 <p className={`min-w-0 flex-1 truncate text-[12.5px] font-extrabold ${r.mine ? '' : 'text-white'}`} style={r.mine ? { color: LIME } : undefined}>{r.pair}</p>
-                <PairCircles pair={r.pair} size={20} />
               </div>
             ))}
           </div>
