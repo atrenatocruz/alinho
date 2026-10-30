@@ -3758,9 +3758,6 @@ export default function GameDetails() {
               club: winnersOrg?.name || null,
               weekdayLong: (() => { const w = formatDateLib(game.date, i18n.language, { weekday: 'long' }); return w.charAt(0).toUpperCase() + w.slice(1) })(),
               title: game.title,
-              players: people.length || null,
-              games: matches.filter((m) => m.winner_team_id).length || null,
-              durationMin: game.court_time_minutes || null,
             },
           } : shownWinnersShare.data}
           text={shownWinnersShare.text}
