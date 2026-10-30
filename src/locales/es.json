@@ -7265,5 +7265,14 @@
   "partneradmin.num_empty": "Todavía no hay números. Empiezan a contar el {{date}}, el día en que tu página aparece en la app.",
   "partneradmin.num_empty_nodate": "Todavía no hay números. Empiezan a contar el día en que tu página aparece en la app.",
   "tshare.adjust_hint": "Arrastra la foto para colocarla · pellizca para hacer zoom",
-  "tshare.zoom_label": "Zoom de la foto"
+  "tshare.zoom_label": "Zoom de la foto",
+  "mixshare.hero_kicker": "Mix",
+  "mixshare.hero_title": "Ganadores",
+  "mixshare.winners_label": "Ganadores del mix",
+  "mixshare.ctx_players_one": "{{count}} jugador",
+  "mixshare.ctx_players_other": "{{count}} jugadores",
+  "mixshare.ctx_games_one": "{{count}} partido",
+  "mixshare.ctx_games_other": "{{count}} partidos",
+  "mixshare.played_here": "Jugamos en alinho.",
+  "mixshare.join_next": "Únete al próximo Mix."
 }

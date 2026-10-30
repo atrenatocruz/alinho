@@ -18,7 +18,8 @@ const PREVIEW_SCALE = 0.62
    `children` (passam ao cartão) e `fallbackImage` (a imagem do mix, que
    entra no lugar da foto quando se escolhe «Sem foto»). */
 export default function TournamentShareFlow({ tournament, variant, data, text, filenameParts = [], onClose,
-  shareTitle = null, org = null, fallbackImage = null, children = null }) {
+  shareTitle = null, org = null, fallbackImage = null, children = null,
+  Card = TournamentShareCard, photoH = PHOTO_H }) {
   const { t } = useTranslation()
   const [step, setStep] = useState('photo') // 'photo' | 'preview'
   const [photo, setPhoto] = useState(null) // a foto já cozida (bakePhoto)
@@ -55,9 +56,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   const [fallback, setFallback] = useState(null)
   useEffect(() => {
     let alive = true
-    bakeImageUrl(fallbackImage).then((v) => { if (alive) setFallback(v) })
+    bakeImageUrl(fallbackImage, photoH).then((v) => { if (alive) setFallback(v) })
     return () => { alive = false }
-  }, [fallbackImage])
+  }, [fallbackImage, photoH])
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -69,7 +70,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
       const start = { zoom: 1, ox: 0.5, oy: 0.5 }
       setRaw(read.dataUrl)
       setAdj(start)
-      setPhoto(await bakePhoto(read.dataUrl, start))
+      setPhoto(await bakePhoto(read.dataUrl, { ...start, height: photoH }))
       setStep('preview')
     } catch (err) {
       console.error('Error reading the photo:', err)
@@ -81,9 +82,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   useEffect(() => {
     if (!raw) return undefined
     let alive = true
-    bakePhoto(raw, adj).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
+    bakePhoto(raw, { ...adj, height: photoH }).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
     return () => { alive = false }
-  }, [raw, adj])
+  }, [raw, adj, photoH])
 
   // Gestos sobre a zona da foto no preview: 1 dedo arrasta (posição), 2
   // dedos pinçam (zoom); no computador, a roda do rato também faz zoom.
@@ -183,12 +184,12 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
         {/* O cartão a sério, reduzido só no ecrã: o que se exporta é o de 360 × 640. */}
         <div className="relative mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: T_CARD_W * PREVIEW_SCALE, height: T_CARD_H * PREVIEW_SCALE }}>
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <TournamentShareCard ref={cardRef} variant={variant} data={data} photo={photo || fallback} org={cardOrg}>{children}</TournamentShareCard>
+            <Card ref={cardRef} variant={variant} data={data} photo={photo || fallback} org={cardOrg}>{children}</Card>
           </div>
           {/* A zona da foto aceita gestos (só com foto escolhida). */}
           {raw && photo && (
             <div className="absolute left-0 top-0 w-full cursor-move touch-none"
-              style={{ height: PHOTO_H * PREVIEW_SCALE }}
+              style={{ height: photoH * PREVIEW_SCALE }}
               onPointerDown={onPointerDown} onPointerMove={onPointerMove}
               onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
           )}

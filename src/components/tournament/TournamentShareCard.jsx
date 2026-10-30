@@ -38,7 +38,7 @@ const LIME = '#C5DD01'
  *  `zoom` (1 = só cobrir; até 3) e `ox`/`oy` (0-1, posição da janela dentro
  *  da foto; 0.5 = centro) são o ajuste do utilizador (Ruben, 30 out) — a
  *  janela nunca sai de dentro da foto. */
-export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5 } = {}) {
+export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5, height = PHOTO_H } = {}) {
   const img = await new Promise((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -46,7 +46,7 @@ export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5 } = {}) 
     i.src = dataUrl
   })
   const w = T_CARD_W * RATIO
-  const h = PHOTO_H * RATIO
+  const h = height * RATIO
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
@@ -103,7 +103,7 @@ export async function bakeCircle(url, size = 64) {
 }
 
 /** A imagem do mix como «foto» (sem foto escolhida): o mesmo corte da foto. */
-export const bakeImageUrl = async (url) => {
+export const bakeImageUrl = async (url, height = PHOTO_H) => {
   if (!url) return null
   try {
     const blob = await (await fetch(url, { mode: 'cors' })).blob()
@@ -113,7 +113,7 @@ export const bakeImageUrl = async (url) => {
       r.onerror = reject
       r.readAsDataURL(blob)
     })
-    return await bakePhoto(dataUrl)
+    return await bakePhoto(dataUrl, { height })
   } catch {
     return null
   }
