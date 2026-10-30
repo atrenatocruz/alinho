@@ -59,22 +59,24 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         ? <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />
         : <div className="absolute left-0 top-0 bg-[#131316]" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />}
 
-      {/* A identidade no fade (Ruben, 30 out, 2.ª volta): à esquerda o
-          alinho.pt por cima do «Vencedores»; à direita a data e, por
-          baixo, o nome e o logótipo do grupo. O topo da foto fica limpo. */}
-      <div className="absolute inset-x-0 px-[18px]" style={{ top: 264 }}>
+      {/* Vencedores + branding — os cartões mordem bem o fade da foto
+          (−28), para a composição ler como uma peça só. */}
+      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 28, bottom: SAFE_BOTTOM }}>
+        {/* 3.ª volta (Ruben, 30 out): sem o «Vencedores» grande — o
+            alinho.pt fica por cima do rótulo lima, a data e o grupo à
+            direita, e a foto ganha o espaço todo até aqui. */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="flex items-end gap-[1px]">
               <img src={logoWordmark} alt="alinho" className="h-[12px] w-auto" />
               <span className="font-sans text-[10px] font-medium leading-[9px] text-white">.pt</span>
             </span>
-            <p className="mt-1.5 font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
+            <p className="mt-1.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]" style={{ color: LIME }}>{t('mixshare.winners_label')}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</p>
+            <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{(data.date || '').toUpperCase()}</p>
             {meta.club && (
-              <span className="mt-1.5 flex items-center justify-end gap-1.5">
+              <span className="mt-1 flex items-center justify-end gap-1.5">
                 <span className="max-w-[150px] truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>
                 {org?.logo
                   ? <img src={org.logo} alt="" className="block h-[14px] w-[14px] shrink-0 rounded-full" />
@@ -83,12 +85,6 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
             )}
           </div>
         </div>
-      </div>
-
-      {/* Vencedores + branding — os cartões mordem bem o fade da foto
-          (−28), para a composição ler como uma peça só. */}
-      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 28, bottom: SAFE_BOTTOM }}>
-        <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]" style={{ color: LIME }}>{t('mixshare.winners_label')}</p>
 
         {first && (
           <div className="relative mt-1.5 overflow-hidden rounded-[16px] bg-[#17171A] px-4 py-2">
