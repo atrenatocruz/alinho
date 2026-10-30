@@ -7262,5 +7262,8 @@
   "partneradmin.num_note_open": "Prizes, opened discounts and used codes appear on {{next}}, when the {{month}} podium comes out. Each person is counted once a day. Names and contact details never appear.",
   "partneradmin.num_note_closed": "{{month}} closed. Each person is counted once a day. Names and contact details never appear.",
   "partneradmin.num_empty": "No numbers yet. They start counting on {{date}}, the day your page appears in the app.",
-  "partneradmin.num_empty_nodate": "No numbers yet. They start counting on the day your page appears in the app."
+  "partneradmin.num_empty_nodate": "No numbers yet. They start counting on the day your page appears in the app.",
+  "tshare.adjust_hint": "Drag the photo to position it · pinch to zoom",
+  "tshare.zoom_label": "Photo zoom",
+  "mixshare.winners_label": "Mix winners"
 }
