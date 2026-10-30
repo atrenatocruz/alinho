@@ -23,7 +23,7 @@ export default function FriendSessionsList({ sessions: showSessions = true }) {
   useEffect(() => {
     // Só os por responder: os aceites sem equipas vêm agora na mesma lista
     // (my_status 'accepted', Dev 3, 13 out) e já aparecem nas sessões.
-    listMyFriendMatchInvites().then((rows) => setInvites(rows.filter((r) => r.my_status !== 'accepted'))).catch((err) => console.error('Error loading friend invites:', err))
+    listMyFriendMatchInvites().then((rows) => setInvites(rows.filter((r) => r.my_status !== 'accepted' && r.my_status !== 'organizer'))).catch((err) => console.error('Error loading friend invites:', err))
     listMyFriendSessions().then(setSessions).catch((err) => console.error('Error loading friend sessions:', err))
   }, [])
 

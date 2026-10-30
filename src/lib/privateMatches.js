@@ -160,7 +160,7 @@ export const getPublicRankings = async () => {
 export const createFriendMatch = async ({
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
   rankedIntent, scoringFormat = 'pontos_simples', numSets = null, teamsMode = 'manual', invitees = [], court = null,
-  organizationId = null, gameMinutes = null, showLive = false,
+  organizationId = null, gameMinutes = null, showLive = false, creatorPlays = true,
 }) => {
   const args = {
     p_scheduled_date: scheduledDate,
@@ -183,6 +183,10 @@ export const createFriendMatch = async ({
   if (gameMinutes) args.p_game_minutes = gameMinutes
   // «Mostrar a decorrer a toda a gente?» (27 set): só vai quando é «Sim».
   if (showLive) args.p_show_live = true
+  // «Vais jogar?» (#736, 29 out): só vai quando é «Não» — só num grupo, só o
+  // admin (Dev 3: p_creator_plays; recusa com os HINT not_group_admin e
+  // creator_must_play).
+  if (creatorPlays === false) args.p_creator_plays = false
   const { data, error } = await supabase.rpc('create_friend_match', args)
   if (error) throw error
   return data
@@ -318,7 +322,7 @@ export const recordFriendMatchResult = async (matchId, finalScore) => {
  *  criou; manda o formulário inteiro. Erros: not_allowed, format_locked. */
 export const updateFriendMatch = async (matchId, {
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
-  court = null, gameMinutes = null, scoringFormat, numSets = null, rankedIntent, teamsMode, showLive = null,
+  court = null, gameMinutes = null, scoringFormat, numSets = null, rankedIntent, teamsMode, showLive = null, creatorPlays,
 }) => {
   // «Conta para o ranking?» e «Equipas» no editar (27 set, Dev 3): só vão
   // quando a pessoa os muda — undefined fica de fora, e o editar continua a
@@ -327,6 +331,9 @@ export const updateFriendMatch = async (matchId, {
   const extra = {}
   if (rankedIntent !== undefined) extra.p_ranked_intent = rankedIntent
   if (teamsMode !== undefined) extra.p_teams_mode = teamsMode
+  // «Vais jogar?» (#736, Dev 3 724cb5b6): só quando muda. Erros:
+  // creator_plays_locked (já há rondas), HINT creator_must_play e friend_match_full.
+  if (creatorPlays !== undefined) extra.p_creator_plays = creatorPlays
   const { error } = await supabase.rpc('update_friend_match', {
     ...extra,
     p_match_id: matchId,

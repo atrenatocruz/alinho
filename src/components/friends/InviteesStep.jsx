@@ -23,7 +23,9 @@ export const MIN_PEOPLE = 4
 // amigos-convidado) — fica com «Criou o jogo» e não sai.
 // Sugestões antes de escrever (Francisco, 12 out): `suggestOrgId` /
 // `suggestOnlyIds` limitam-nas ao grupo num jogo de grupo.
-export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, creatorKey = null, collapsedSearch = false, suggestOrgId = null, suggestOnlyIds = null }) {
+// `mePlays` false (#736, «Vais jogar?» com «Não»): sai a linha «· tu» e o
+// número conta só os outros; quem organiza continua sem se poder juntar.
+export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, creatorKey = null, collapsedSearch = false, suggestOrgId = null, suggestOnlyIds = null, mePlays = true }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(!collapsedSearch)
@@ -41,7 +43,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
   }, [query, searchFn])
 
   const inList = new Set([me?.id, ...people.map((p) => p.user_id)].filter(Boolean))
-  const count = people.length + 1
+  const count = people.length + (mePlays ? 1 : 0)
 
   // «Não está na app?» — fechada por omissão; aberta pede nome e email.
   const [guestOpen, setGuestOpen] = useState(false)
@@ -98,10 +100,12 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
       <div>
         <p className={label}>{t('friends.who_plays', { count })}</p>
         <div className="space-y-2">
-          <div className="flex min-h-[48px] items-center gap-3 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] px-3 py-2">
-            <Avatar name={me?.name} url={me?.avatar_url} size="w-8 h-8 text-[11px]" />
-            <span className="text-sm font-extrabold text-[#14532D]">{t('friends.me_row', { name: me?.name || '' })}</span>
-          </div>
+          {mePlays && (
+            <div className="flex min-h-[48px] items-center gap-3 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] px-3 py-2">
+              <Avatar name={me?.name} url={me?.avatar_url} size="w-8 h-8 text-[11px]" />
+              <span className="text-sm font-extrabold text-[#14532D]">{t('friends.me_row', { name: me?.name || '' })}</span>
+            </div>
+          )}
           {people.map((p) => (
             <div key={p.key} className={row}>
               <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-[11px]" />

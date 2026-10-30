@@ -32,4 +32,11 @@ describe('eventFromFriendInvite', () => {
     expect(e.myState).toBe('in')
     expect(e.raw.isCreator).toBe(true)
   })
+
+  // #736: quem organiza sem jogar vê o jogo como quem disse «Vou», e não como convite.
+  it('quem organiza sem jogar', () => {
+    const e = eventFromFriendInvite({ ...invite, my_status: 'organizer', is_creator: true, creator_plays: false }, detail)
+    expect(e.myState).toBe('in')
+    expect(e.raw.isCreator).toBe(true)
+  })
 })
