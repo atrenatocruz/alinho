@@ -19,7 +19,7 @@ const PREVIEW_SCALE = 0.62
    entra no lugar da foto quando se escolhe «Sem foto»). */
 export default function TournamentShareFlow({ tournament, variant, data, text, filenameParts = [], onClose,
   shareTitle = null, org = null, fallbackImage = null, children = null,
-  Card = TournamentShareCard, photoH = PHOTO_H }) {
+  Card = TournamentShareCard, photoH = PHOTO_H, photoTopScrim = true }) {
   const { t } = useTranslation()
   const [step, setStep] = useState('photo') // 'photo' | 'preview'
   const [photo, setPhoto] = useState(null) // a foto já cozida (bakePhoto)
@@ -56,9 +56,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   const [fallback, setFallback] = useState(null)
   useEffect(() => {
     let alive = true
-    bakeImageUrl(fallbackImage, photoH).then((v) => { if (alive) setFallback(v) })
+    bakeImageUrl(fallbackImage, { height: photoH, topScrim: photoTopScrim }).then((v) => { if (alive) setFallback(v) })
     return () => { alive = false }
-  }, [fallbackImage, photoH])
+  }, [fallbackImage, photoH, photoTopScrim])
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -70,7 +70,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
       const start = { zoom: 1, ox: 0.5, oy: 0.5 }
       setRaw(read.dataUrl)
       setAdj(start)
-      setPhoto(await bakePhoto(read.dataUrl, { ...start, height: photoH }))
+      setPhoto(await bakePhoto(read.dataUrl, { ...start, height: photoH, topScrim: photoTopScrim }))
       setStep('preview')
     } catch (err) {
       console.error('Error reading the photo:', err)
@@ -82,9 +82,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   useEffect(() => {
     if (!raw) return undefined
     let alive = true
-    bakePhoto(raw, { ...adj, height: photoH }).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
+    bakePhoto(raw, { ...adj, height: photoH, topScrim: photoTopScrim }).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
     return () => { alive = false }
-  }, [raw, adj, photoH])
+  }, [raw, adj, photoH, photoTopScrim])
 
   // Gestos sobre a zona da foto no preview: 1 dedo arrasta (posição), 2
   // dedos pinçam (zoom); no computador, a roda do rato também faz zoom.
