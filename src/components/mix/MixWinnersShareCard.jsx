@@ -15,7 +15,7 @@ import iconMark from '../../logo/icon-mark.svg'
 
 export const MIX_CARD_W = 360
 export const MIX_CARD_H = 640
-export const MIX_HERO_H = 250 // ~39% do cartão (briefing: 35-40%)
+export const MIX_HERO_H = 320 // 50% do cartão (Ruben, 30 out: a foto mandava)
 const RATIO = 3
 const SAFE_TOP = 84
 const SAFE_BOTTOM = 100
@@ -93,7 +93,7 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
       </div>
 
       {/* O título sobre o fundo do hero. */}
-      <div className="absolute inset-x-0 px-[18px]" style={{ top: 172 }}>
+      <div className="absolute inset-x-0 px-[18px]" style={{ top: 234 }}>
         {meta.club && <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-[#D1D5DB]">{t('mixshare.hero_kicker')} · {meta.club}</p>}
         <p className="mt-1 font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
         {(meta.weekdayLong || meta.title) && (
@@ -101,12 +101,13 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         )}
       </div>
 
-      {/* Vencedores + contexto + branding. */}
-      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H + 16, bottom: SAFE_BOTTOM }}>
+      {/* Vencedores + contexto + branding — os cartões mordem o fade da
+          foto (−8), para a composição ler como uma peça só. */}
+      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 8, bottom: SAFE_BOTTOM }}>
         <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]" style={{ color: LIME }}>{t('mixshare.winners_label')}</p>
 
         {first && (
-          <div className="relative mt-2 overflow-hidden rounded-[16px] bg-[#17171A] px-4 py-3.5">
+          <div className="relative mt-2 overflow-hidden rounded-[16px] bg-[#17171A] px-4 py-3">
             <span className="absolute bottom-0 left-0 top-0 w-[3px]" style={{ background: LIME }} />
             <div className="flex items-center gap-3.5">
               <div className="shrink-0 text-center">
@@ -122,7 +123,7 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         {rest.length > 0 && (
           <div className="mt-1.5 space-y-1.5">
             {rest.map((r) => (
-              <div key={r.place} className="flex items-center gap-3.5 rounded-[12px] bg-[#111114] px-4 py-2.5">
+              <div key={r.place} className="flex items-center gap-3.5 rounded-[12px] bg-[#111114] px-4 py-2">
                 <p className="w-7 shrink-0 font-display text-[16px] font-black leading-none text-[#6B7280]">{r.place}.º</p>
                 <p className={`min-w-0 flex-1 truncate text-[12.5px] font-extrabold ${r.mine ? '' : 'text-white'}`} style={r.mine ? { color: LIME } : undefined}>{r.pair}</p>
                 <PairCircles pair={r.pair} size={20} />
@@ -133,8 +134,8 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
 
         <div className="mt-auto">
           {context && <p className="text-center text-[9px] font-bold tracking-[0.04em] text-[#9CA3AF]">{context}</p>}
-          <div className="mt-3 text-center">
-            <img src={iconMark} alt="" className="mx-auto mb-1.5 block h-[18px] w-[18px] rounded-full" />
+          <div className="mt-2 text-center">
+            <img src={iconMark} alt="" className="mx-auto mb-1 block h-[16px] w-[16px] rounded-full" />
             <p className="text-[13px] font-extrabold leading-tight text-white">{t('mixshare.played_here')}</p>
             <p className="mt-0.5 text-[8.5px] text-[#9CA3AF]">{t('mixshare.join_next')}</p>
           </div>
