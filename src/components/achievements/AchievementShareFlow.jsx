@@ -116,6 +116,9 @@ export default function AchievementShareFlow({ achievement: given, fresh = false
       } else {
         const out = await shareOrSaveImage(blob, { filename, title: name, text: caption })
         if (out === 'saved') setSaved(true)
+        // Enviado pela folha de partilha: fecha e volta à conquista, como nos
+        // vencedores (#742). Se fechou a folha sem enviar, fica para tentar outra vez.
+        if (out === 'shared') { onClose(); return }
       }
     } catch (err) {
       console.error('Error sharing the achievement:', err)
