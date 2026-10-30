@@ -2479,6 +2479,7 @@
   "playerdetails.results_private": "Este jugador mantiene sus resultados en privado.",
   "playerdetails.clubs_groups_heading": "Clubes y grupos",
   "playerdetails.clubs_private": "Este jugador mantiene sus clubes en privado.",
+  "playerdetails.superadmin_sees": "Privado para los demás. Lo ves porque estás en modo superadmin.",
   "playerdetails.no_clubs_title": "Sin clubes",
   "playerdetails.no_clubs_subtitle": "Este jugador aún no está en ningún club ni grupo.",
   "playerdetails.group_badge": "Grupo",

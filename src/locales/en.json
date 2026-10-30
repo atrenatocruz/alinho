@@ -2475,6 +2475,7 @@
   "playerdetails.results_private": "This player keeps their results private.",
   "playerdetails.clubs_groups_heading": "Clubs & Groups",
   "playerdetails.clubs_private": "This player keeps their clubs private.",
+  "playerdetails.superadmin_sees": "Private to others. You can see it because you're in superadmin mode.",
   "playerdetails.no_clubs_title": "No clubs",
   "playerdetails.no_clubs_subtitle": "This player doesn't belong to any club or group yet.",
   "playerdetails.group_badge": "Group",
