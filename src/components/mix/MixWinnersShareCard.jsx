@@ -15,7 +15,7 @@ import iconMark from '../../logo/icon-mark.svg'
 
 export const MIX_CARD_W = 360
 export const MIX_CARD_H = 640
-export const MIX_HERO_H = 360 // 56% do cartão (Ruben, 30 out: a foto manda)
+export const MIX_HERO_H = 376 // ~59% do cartão (Ruben, 30 out: a foto manda)
 const RATIO = 3
 // Topo a 68 (204 a 1080): acima da safe area «oficial» das Stories, por
 // pedido do Ruben (30 out) — o cabeçalho sai de cima da foto; a faixa
@@ -29,7 +29,7 @@ const LIME = '#C5DD01'
  *   weekdayLong, title, players, games, durationMin } }
  * photo: data URL já cozido (bakePhoto, height = MIX_HERO_H), ou null.
  */
-const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, photo }, ref) {
+const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, photo, org = null }, ref) {
   const { t } = useTranslation()
   const nodeRef = useRef(null)
   useImperativeHandle(ref, () => ({
@@ -67,26 +67,33 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
             <img src={logoWordmark} alt="alinho" className="h-[16px] w-auto" />
             <span className="font-sans text-[13px] font-medium leading-[12px] text-white">.pt</span>
           </span>
-          {meta.club && <span className="mt-1 block max-w-[200px] truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>}
+          {meta.club && (
+            <span className="mt-1.5 flex items-center gap-1.5">
+              {org?.logo
+                ? <img src={org.logo} alt="" className="block h-[16px] w-[16px] shrink-0 rounded-full" />
+                : <span className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border text-[6.5px] font-extrabold" style={{ borderColor: LIME, color: LIME }}>{org?.initials || '•'}</span>}
+              <span className="max-w-[190px] truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>
+            </span>
+          )}
         </span>
         <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</span>
       </div>
 
       {/* O título sobre o fundo do hero (o clube vive agora no cabeçalho). */}
-      <div className="absolute inset-x-0 px-[18px]" style={{ top: 282 }}>
+      <div className="absolute inset-x-0 px-[18px]" style={{ top: 290 }}>
         <p className="font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
         {(meta.weekdayLong || meta.title) && (
           <p className="mt-1.5 text-[9.5px] text-[#9CA3AF]">{[meta.weekdayLong, meta.title].filter(Boolean).join(' · ')}</p>
         )}
       </div>
 
-      {/* Vencedores + branding — os cartões mordem o fade da foto (−16),
-          para a composição ler como uma peça só. */}
-      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 16, bottom: SAFE_BOTTOM }}>
+      {/* Vencedores + branding — os cartões mordem bem o fade da foto
+          (−28), para a composição ler como uma peça só. */}
+      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 28, bottom: SAFE_BOTTOM }}>
         <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]" style={{ color: LIME }}>{t('mixshare.winners_label')}</p>
 
         {first && (
-          <div className="relative mt-2 overflow-hidden rounded-[16px] bg-[#17171A] px-4 py-2.5">
+          <div className="relative mt-1.5 overflow-hidden rounded-[16px] bg-[#17171A] px-4 py-2">
             <span className="absolute bottom-0 left-0 top-0 w-[3px]" style={{ background: LIME }} />
             <div className="flex items-center gap-3.5">
               <div className="shrink-0 text-center">
