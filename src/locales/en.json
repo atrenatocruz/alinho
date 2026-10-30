@@ -841,6 +841,7 @@
   "tshare.share": "Share",
   "tshare.share_hint": "Opens WhatsApp, Instagram… on your phone.",
   "tshare.saved_hint": "The image was saved. Paste the text when you post it.",
+  "tshare.save_photo": "Save the photo without the card",
   "tshare.share_error": "Could not create the image. Try again.",
   "mixwinners.block_kicker": "Finished · Winners",
   "mixwinners.share": "Share the winners",
