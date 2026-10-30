@@ -1918,6 +1918,9 @@ const TABLE_MOCKS = {
     { key: 'planos_pagos', enabled: localStorage.getItem('mockPlanosPagos') === 'true' },
     // localStorage.mockRaquete = 'true' liga o «Escolhe a tua raquete».
     { key: 'raquete', enabled: localStorage.getItem('mockRaquete') === 'true' },
+    // localStorage.mockVendedorPlanos = 'true' mostra «Quem vende os planos»
+    // nos Termos e «Pagamentos e faturas» na Privacidade.
+    { key: 'vendedor_planos', enabled: localStorage.getItem('mockVendedorPlanos') === 'true' },
   ],
   // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
   // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).

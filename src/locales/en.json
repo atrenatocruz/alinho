@@ -841,6 +841,7 @@
   "tshare.share": "Share",
   "tshare.share_hint": "Opens WhatsApp, Instagram… on your phone.",
   "tshare.saved_hint": "The image was saved. Paste the text when you post it.",
+  "tshare.save_photo": "Save the photo without the card",
   "tshare.share_error": "Could not create the image. Try again.",
   "mixwinners.block_kicker": "Finished · Winners",
   "mixwinners.share": "Share the winners",
@@ -7265,5 +7266,9 @@
   "partneradmin.num_empty_nodate": "No numbers yet. They start counting on the day your page appears in the app.",
   "tshare.adjust_hint": "Drag the photo to position it · pinch to zoom",
   "tshare.zoom_label": "Photo zoom",
-  "mixshare.winners_label": "Mix winners"
+  "mixshare.winners_label": "Mix winners",
+  "terms.section_seller_title": "Who sells the plans",
+  "terms.section_seller_body": "alinho plans are sold by {{seller}}, who issues the invoices. If you pay alinho directly, you get an invoice from {{seller}}, with your VAT number if you give it. If you pay through the App Store or Google Play, Apple or Google charges you, under their own rules: that is where you cancel the subscription and ask for a refund. For any question about a payment, write to {{email}}.",
+  "privacy.section_billing_title": "Payments and invoices",
+  "privacy.section_billing_body": "If you pay for a plan, we keep the name and VAT number you put on the invoice, the plan, the amount and the date of each payment. This data is handled by {{seller}}, who sells the plans and issues the invoices, and uses it only for that and to meet tax obligations. Invoices are reported to the Portuguese tax authority and kept for as long as the law requires, even if you delete your account. If you pay through the App Store or Google Play, the payment details stay with Apple or Google, and we only know that the plan is paid."
 }

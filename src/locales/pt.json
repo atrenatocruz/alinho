@@ -842,6 +842,7 @@
   "tshare.share": "Partilhar",
   "tshare.share_hint": "Abre o WhatsApp, o Instagram… do telemóvel.",
   "tshare.saved_hint": "A imagem ficou guardada. Cola o texto quando a publicares.",
+  "tshare.save_photo": "Guardar a foto sem o cartão",
   "tshare.share_error": "Não foi possível criar a imagem. Tenta outra vez.",
   "mixwinners.block_kicker": "Terminado · Vencedores",
   "mixwinners.share": "Partilhar os vencedores",
@@ -7280,5 +7281,9 @@
   "partneradmin.num_empty_nodate": "Ainda não há números. Começam a contar no dia em que a tua página aparece na app.",
   "tshare.adjust_hint": "Arrasta a foto para a posicionar · aperta ou afasta para o zoom",
   "tshare.zoom_label": "Zoom da foto",
-  "mixshare.winners_label": "Vencedores do mix"
+  "mixshare.winners_label": "Vencedores do mix",
+  "terms.section_seller_title": "Quem vende os planos",
+  "terms.section_seller_body": "Os planos do alinho são vendidos por {{seller}}, que passa as faturas. Se pagares diretamente ao alinho, a fatura sai em nome dele, com o teu NIF se o deres. Se pagares pela App Store ou pelo Google Play, quem cobra é a Apple ou a Google, com as regras delas: é lá que cancelas a subscrição e pedes um reembolso. Para qualquer questão sobre um pagamento, escreve para {{email}}.",
+  "privacy.section_billing_title": "Pagamentos e faturas",
+  "privacy.section_billing_body": "Se pagares um plano, guardamos o nome e o NIF que puseres na fatura, o plano, o valor e a data de cada pagamento. Quem trata estes dados é {{seller}}, que vende os planos e passa as faturas, e usa-os só para isso e para cumprir as obrigações fiscais. As faturas são comunicadas às Finanças e ficam guardadas pelo prazo que a lei obriga, mesmo que apagues a conta. Se pagares pela App Store ou pelo Google Play, os dados do pagamento ficam com a Apple ou a Google, e nós só sabemos que o plano está pago."
 }
