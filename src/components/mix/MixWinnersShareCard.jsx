@@ -21,7 +21,10 @@ const RATIO = 3
 // pedido do Ruben (30 out) — o cabeçalho sai de cima da foto; a faixa
 // escura do bakePhoto garante a leitura. O fundo mantém os 300 px.
 const SAFE_TOP = 68
-const SAFE_BOTTOM = 100
+// O rodapé desce até 64 do fundo (192 a 1080) — abaixo dos 100 «oficiais»
+// das Stories, por pedido do Ruben (30 out): havia preto a sobrar e o
+// branding colava ao 3.º classificado.
+const SAFE_BOTTOM = 64
 const LIME = '#C5DD01'
 
 /**
