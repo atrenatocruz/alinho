@@ -59,9 +59,9 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         ? <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />
         : <div className="absolute left-0 top-0 bg-[#131316]" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />}
 
-      {/* Vencedores + branding — os cartões mordem bem o fade da foto
-          (−28), para a composição ler como uma peça só. */}
-      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 28, bottom: SAFE_BOTTOM }}>
+      {/* Vencedores + branding — sobem bem pelo fade adentro (−48), para
+          a foto não dominar demasiado (Ruben, 30 out, 4.ª volta). */}
+      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: MIX_HERO_H - 48, bottom: SAFE_BOTTOM }}>
         {/* 3.ª volta (Ruben, 30 out): sem o «Vencedores» grande — o
             alinho.pt fica por cima do rótulo lima, a data e o grupo à
             direita, e a foto ganha o espaço todo até aqui. */}
@@ -71,7 +71,7 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
               <img src={logoWordmark} alt="alinho" className="h-[12px] w-auto" />
               <span className="font-sans text-[10px] font-medium leading-[9px] text-white">.pt</span>
             </span>
-            <p className="mt-1.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]" style={{ color: LIME }}>{t('mixshare.winners_label')}</p>
+            <p className="mt-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: LIME }}>{t('mixshare.winners_label')}</p>
           </div>
           <div className="shrink-0 text-right">
             <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{(data.date || '').toUpperCase()}</p>
@@ -90,11 +90,10 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
           <div className="relative mt-1.5 overflow-hidden rounded-[16px] bg-[#17171A] px-4 py-2">
             <span className="absolute bottom-0 left-0 top-0 w-[3px]" style={{ background: LIME }} />
             <div className="flex items-center gap-3.5">
-              <div className="shrink-0 text-center">
-                <p className="font-display text-[26px] font-black leading-none" style={{ color: LIME }}>1.º</p>
-                <p className="mt-0.5 text-[10px] leading-none">🏆</p>
-              </div>
+              <p className="shrink-0 font-display text-[26px] font-black leading-none" style={{ color: LIME }}>1.º</p>
               <p className="min-w-0 flex-1 text-[15.5px] font-extrabold leading-tight text-white">{first.pair}</p>
+              {/* A taça evidente, à direita (4.ª volta). */}
+              <p className="shrink-0 text-[22px] leading-none">🏆</p>
             </div>
           </div>
         )}
