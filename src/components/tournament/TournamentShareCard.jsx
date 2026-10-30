@@ -57,7 +57,14 @@ export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5 } = {}) 
   const cx = Math.min(Math.max(ox, 0), 1)
   const cy = Math.min(Math.max(oy, 0), 1)
   ctx.drawImage(img, -(dw - w) * cx, -(dh - h) * cy, dw, dh)
-  // O fundo escurecido, para o cartão se ler por cima.
+  // Escurecido em cima E em baixo (Ruben, 30 out): em cima para o logótipo,
+  // a data e o clube se lerem sobre qualquer foto; em baixo para a foto
+  // fundir com o cartão.
+  const gTop = ctx.createLinearGradient(0, 0, 0, h * 0.42)
+  gTop.addColorStop(0, 'rgba(11,11,12,0.82)')
+  gTop.addColorStop(1, 'rgba(11,11,12,0)')
+  ctx.fillStyle = gTop
+  ctx.fillRect(0, 0, w, h * 0.42)
   const g = ctx.createLinearGradient(0, h * 0.45, 0, h)
   g.addColorStop(0, 'rgba(11,11,12,0)')
   g.addColorStop(1, 'rgba(11,11,12,1)')
@@ -155,11 +162,13 @@ function OrgLine({ org }) {
 
 function Footer() {
   const { t } = useTranslation()
-  // O QR saiu (Ruben, 30 out): fica só o convite e a marca.
+  // Sem o QR (30 out), o rodapé fica centrado, numa linha, com a bola do
+  // alinho por cima a equilibrar o espaço.
   return (
-    <div>
-      <p className="text-[12px] font-extrabold leading-tight text-white">{t('share.play_padel')}<br />{t('share.on_alinho')}</p>
-      <p className="mt-0.5 text-[7.5px] text-[#9CA3AF]">alinho.pt · #alinhopadel</p>
+    <div className="text-center">
+      <img src={iconMark} alt="" className="mx-auto mb-1.5 block h-[20px] w-[20px] rounded-full" />
+      <p className="text-[12px] font-extrabold leading-tight text-white">{t('share.play_padel')} {t('share.on_alinho')}</p>
+      <p className="mt-1 text-[7.5px] text-[#9CA3AF]">alinho.pt · #alinhopadel</p>
     </div>
   )
 }
@@ -265,12 +274,16 @@ const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, d
   return (
     <div ref={nodeRef} className="relative overflow-hidden bg-[#0B0B0C] font-sans" style={{ width: T_CARD_W, height: T_CARD_H }}>
       {photo && <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: T_CARD_W, height: PHOTO_H }} />}
-      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: SAFE_TOP, bottom: SAFE_BOTTOM }}>
+      {/* O cabeçalho vive sempre no topo (sobre a faixa escura da foto). */}
+      <div className="absolute inset-x-0 px-[18px]" style={{ top: SAFE_TOP }}>
         <Header date={data.date} />
         <OrgLine org={org} />
-        {/* Sem foto, o bloco fica ao centro entre o logótipo e o rodapé;
-            com foto, em baixo, por baixo da foto (designer, 27 set). */}
-        <div className={compact ? 'mt-auto' : 'flex flex-1 flex-col justify-center'}>{children ? (typeof children === 'function' ? children({ compact }) : children) : <Body d={data} compact={compact} />}</div>
+      </div>
+      {/* O corpo centra-se no espaço que sobra — por baixo da foto quando a
+          há (Ruben, 30 out: sem o QR, o preto empoçava todo em baixo) — e o
+          rodapé fecha no limite da safe area. */}
+      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: compact ? PHOTO_H + 8 : 170, bottom: SAFE_BOTTOM }}>
+        <div className="flex flex-1 flex-col justify-center">{children ? (typeof children === 'function' ? children({ compact }) : children) : <Body d={data} compact={compact} />}</div>
         <div className="mt-3"><Footer /></div>
       </div>
     </div>
