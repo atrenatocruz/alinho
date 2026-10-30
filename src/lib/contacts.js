@@ -29,6 +29,11 @@ export const founderNames = (lang) => `${FOUNDERS.slice(0, -1).join(', ')} ${lan
 // e a «Última atualização» das duas páginas — uma constante só, para nunca
 // ficarem diferentes (PO, 13 out). Se o texto mudar, a data muda com ele.
 export const POLICY_VERSION = '2026-10-23'
+// A «Última atualização» da Política, quando o texto muda sem se pedir outra
+// vez o «Aceito» (os Números dos parceiros; BA e PO, 28 out). Só muda a data
+// que a página mostra: o «Aceito» (ConsentGate) e os Termos seguem o
+// POLICY_VERSION. Nunca antes do POLICY_VERSION. É o dia em que sai no main.
+export const PRIVACY_UPDATED = '2026-10-30'
 
 // O número do robô (decisão do Francisco, 25 set). O robô ignora as
 // mensagens privadas que não são um código, por isso quem escreve espera por

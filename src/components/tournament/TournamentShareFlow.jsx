@@ -10,7 +10,8 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react'
 import TournamentShareCard, { PHOTO_H, T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, bakeImageUrl } from './TournamentShareCard'
-import { readLocalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
+import { photoFilename, readLocalPhoto, saveOriginalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
+import { IS_NATIVE } from '../../lib/native'
 
 const PREVIEW_SCALE = 0.62
 
@@ -28,6 +29,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   // que o WebKit rasteriza sem estragar.
   const [raw, setRaw] = useState(null)
   const [adj, setAdj] = useState({ zoom: 1, ox: 0.5, oy: 0.5 })
+  // A foto tirada na hora, tal como saiu da câmara (sem a redução do raw),
+  // para a poder guardar sem o cartão (#742). A da galeria já está no telemóvel.
+  const [cameraFile, setCameraFile] = useState(null)
   const [caption, setCaption] = useState(text || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -60,7 +64,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
     return () => { alive = false }
   }, [fallbackImage, photoH, photoTopScrim])
 
-  const onFile = async (e) => {
+  const onFile = async (e, fromCamera = false) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -71,6 +75,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
       setRaw(read.dataUrl)
       setAdj(start)
       setPhoto(await bakePhoto(read.dataUrl, { ...start, height: photoH, topScrim: photoTopScrim }))
+      setCameraFile(fromCamera ? file : null)
       setStep('preview')
     } catch (err) {
       console.error('Error reading the photo:', err)
@@ -137,9 +142,19 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
     } finally { setBusy(false) }
   }
 
+  const savePhoto = async () => {
+    setBusy(true); setError('')
+    try {
+      await saveOriginalPhoto(cameraFile, photoFilename(cameraFile, ...filenameParts))
+    } catch (err) {
+      console.error('Error saving the photo:', err)
+      setError(t('tshare.share_error'))
+    } finally { setBusy(false) }
+  }
+
   const inputs = (
     <>
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e, true)} />
       <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
     </>
   )
@@ -165,7 +180,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
               className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
               <ImageIcon size={18} /> {t('tshare.photo_gallery')}
             </button>
-            <button type="button" disabled={busy} onClick={() => { setPhoto(null); setStep('preview') }}
+            <button type="button" disabled={busy} onClick={() => { setPhoto(null); setCameraFile(null); setStep('preview') }}
               className="w-full min-h-[44px] px-4 text-[15px] font-extrabold text-ink-700 disabled:opacity-40">
               {t('tshare.photo_none')}
             </button>
@@ -216,6 +231,14 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
             {t('tshare.share')}
           </button>
           <p className="mt-1.5 text-center text-xs text-muted">{saved ? t('tshare.saved_hint') : t('tshare.share_hint')}</p>
+          {/* Nas apps das lojas, guardar na galeria precisa de uma peça
+              nativa (Renato): por agora só no site. */}
+          {cameraFile && photo && !IS_NATIVE && (
+            <button type="button" onClick={savePhoto} disabled={busy}
+              className="press mt-3 w-full min-h-[52px] rounded-ctrl border-[1.5px] border-[#CFD2D7] bg-white px-4 font-display text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+              {t('tshare.save_photo')}
+            </button>
+          )}
         </div>
       </div>
     </div>,
