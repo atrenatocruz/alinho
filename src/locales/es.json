@@ -7277,5 +7277,8 @@
   "partneradmin.num_note_open": "Los premios, los descuentos abiertos y los usados aparecen el {{next}}, cuando sale el podio de {{month}}. Cada persona se cuenta una vez al día. Nunca aparecen nombres ni contactos.",
   "partneradmin.num_note_closed": "{{month}} cerrado. Cada persona se cuenta una vez al día. Nunca aparecen nombres ni contactos.",
   "partneradmin.num_empty": "Todavía no hay números. Empiezan a contar el {{date}}, el día en que tu página aparece en la app.",
-  "partneradmin.num_empty_nodate": "Todavía no hay números. Empiezan a contar el día en que tu página aparece en la app."
+  "partneradmin.num_empty_nodate": "Todavía no hay números. Empiezan a contar el día en que tu página aparece en la app.",
+  "tshare.adjust_hint": "Arrastra la foto para colocarla · pellizca para hacer zoom",
+  "tshare.zoom_label": "Zoom de la foto",
+  "mixshare.winners_label": "Ganadores del mix"
 }

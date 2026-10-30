@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toDayKey, fromDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch,
   applyFilters, eventsForDay, countByDay, nextMineDay, monthGrid, isAgendaGame,
-  DEFAULT_FILTERS, isDefaultFilters, normalizeFilters, groupByDay, eventFromExplore, distanceKm, eventDistance, withinReach,
+  DEFAULT_FILTERS, isDefaultFilters, normalizeFilters, groupByDay, eventFromExplore, exploreNotMine, distanceKm, eventDistance, withinReach,
   eventsToPins, eventFromLesson,
   eventFromTournament,
   eventFromTournamentMatch,
@@ -182,6 +182,14 @@ describe('explore (Fase 2)', () => {
     expect(e.latitude).toBeCloseTo(38.7223)
     const own = eventFromExplore(row({ game: { latitude: 41.1, longitude: -8.6 } }))
     expect(own.latitude).toBeCloseTo(41.1)
+  })
+  // Bug de 30 out: o superadmin via cada mix dos grupos do acesso duas vezes.
+  it('drops explore rows that are already mine (same game or one of my groups)', () => {
+    const rows = [row(), row({ game: { id: 'x2' }, organization: { id: 'org-sa' } }), row({ game: { id: 'x3' }, organization: { id: 'org-y' } })]
+    expect(exploreNotMine(rows, [{ id: 'x1' }], []).map((r) => r.game.id)).toEqual(['x2', 'x3'])
+    expect(exploreNotMine(rows, [], [{ organization_id: 'org-sa' }]).map((r) => r.game.id)).toEqual(['x1', 'x3'])
+    expect(exploreNotMine(rows, null, null)).toHaveLength(3)
+    expect(exploreNotMine(null)).toEqual([])
   })
   it('measures distance in km', () => {
     expect(distanceKm(lisboa, porto)).toBeGreaterThan(270)
