@@ -87,6 +87,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
       const blob = await cardRef.current.exportPng()
       const out = await shareOrSaveImage(blob, { filename: shareFilename(...filenameParts), title: shareTitle ?? tournament?.name ?? '', text: caption })
       if (out === 'saved') setSaved(true)
+      // Enviado pela folha de partilha: fecha e volta à página de onde se veio
+      // (#742). Se fechou a folha sem enviar, fica para tentar outra vez.
+      if (out === 'shared') { onClose(); return }
     } catch (err) {
       console.error('Error sharing the card:', err)
       setError(t('tshare.share_error'))
