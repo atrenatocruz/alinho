@@ -17,13 +17,11 @@ export const MIX_CARD_W = 360
 export const MIX_CARD_H = 640
 export const MIX_HERO_H = 376 // ~59% do cartão (Ruben, 30 out: a foto manda)
 const RATIO = 3
-// Topo a 68 (204 a 1080): acima da safe area «oficial» das Stories, por
-// pedido do Ruben (30 out) — o cabeçalho sai de cima da foto; a faixa
-// escura do bakePhoto garante a leitura. O fundo mantém os 300 px.
-const SAFE_TOP = 68
 // O rodapé desce até 64 do fundo (192 a 1080) — abaixo dos 100 «oficiais»
 // das Stories, por pedido do Ruben (30 out): havia preto a sobrar e o
-// branding colava ao 3.º classificado.
+// branding colava ao 3.º classificado. Em cima não há conteúdo nenhum:
+// a identidade vive toda no fade de baixo (opção 1, «à Strava», 30 out)
+// e o topo da foto fica limpo — adeus texto em cima das cabeças.
 const SAFE_BOTTOM = 64
 const LIME = '#C5DD01'
 
@@ -61,30 +59,29 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         ? <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />
         : <div className="absolute left-0 top-0 bg-[#131316]" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />}
 
-      {/* Cabeçalho bem no topo (Ruben, 30 out): a marca com o grupo por
-          baixo, a data à direita — tudo sobre a faixa escura do topo da
-          foto, fora do miolo da imagem. */}
-      <div className="absolute inset-x-0 flex items-start justify-between px-[18px]" style={{ top: SAFE_TOP }}>
-        <span className="min-w-0">
-          <span className="flex items-end gap-[1px]">
-            <img src={logoWordmark} alt="alinho" className="h-[16px] w-auto" />
-            <span className="font-sans text-[13px] font-medium leading-[12px] text-white">.pt</span>
-          </span>
-          {meta.club && (
-            <span className="mt-1.5 flex items-center gap-1.5">
-              {org?.logo
-                ? <img src={org.logo} alt="" className="block h-[16px] w-[16px] shrink-0 rounded-full" />
-                : <span className="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border text-[6.5px] font-extrabold" style={{ borderColor: LIME, color: LIME }}>{org?.initials || '•'}</span>}
-              <span className="max-w-[190px] truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>
+      {/* A identidade e o título, TODOS no fade de baixo (opção 1, «à
+          Strava»): a marca + grupo à esquerda, a data à direita, e o
+          «Vencedores» por baixo. O topo da foto fica limpo. */}
+      <div className="absolute inset-x-0 px-[18px]" style={{ top: 264 }}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="flex shrink-0 items-end gap-[1px]">
+              <img src={logoWordmark} alt="alinho" className="h-[12px] w-auto" />
+              <span className="font-sans text-[10px] font-medium leading-[9px] text-white">.pt</span>
             </span>
-          )}
-        </span>
-        <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</span>
-      </div>
-
-      {/* O título sobre o fundo do hero (o clube vive agora no cabeçalho). */}
-      <div className="absolute inset-x-0 px-[18px]" style={{ top: 290 }}>
-        <p className="font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
+            {meta.club && (
+              <>
+                <span className="text-[9px] text-[#9CA3AF]">·</span>
+                {org?.logo
+                  ? <img src={org.logo} alt="" className="block h-[14px] w-[14px] shrink-0 rounded-full" />
+                  : <span className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border text-[6px] font-extrabold" style={{ borderColor: LIME, color: LIME }}>{org?.initials || '•'}</span>}
+                <span className="min-w-0 truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>
+              </>
+            )}
+          </span>
+          <span className="shrink-0 font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</span>
+        </div>
+        <p className="mt-1.5 font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
         {(meta.weekdayLong || meta.title) && (
           <p className="mt-1.5 text-[9.5px] text-[#9CA3AF]">{[meta.weekdayLong, meta.title].filter(Boolean).join(' · ')}</p>
         )}

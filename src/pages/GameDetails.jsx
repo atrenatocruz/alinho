@@ -3766,7 +3766,7 @@ export default function GameDetails() {
           org={winnersOrg}
           fallbackImage={game.image_url || (shownWinnersShare.premium ? '/topo/topo-mix.webp' : null)}
           onClose={() => setWinnersShareOpen(false)}
-          {...(shownWinnersShare.premium ? { Card: MixWinnersShareCard, photoH: MIX_HERO_H } : {})}
+          {...(shownWinnersShare.premium ? { Card: MixWinnersShareCard, photoH: MIX_HERO_H, photoTopScrim: false } : {})}
         />
       )}
 

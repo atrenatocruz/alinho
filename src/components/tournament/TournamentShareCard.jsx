@@ -38,7 +38,7 @@ const LIME = '#C5DD01'
  *  `zoom` (1 = só cobrir; até 3) e `ox`/`oy` (0-1, posição da janela dentro
  *  da foto; 0.5 = centro) são o ajuste do utilizador (Ruben, 30 out) — a
  *  janela nunca sai de dentro da foto. */
-export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5, height = PHOTO_H } = {}) {
+export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5, height = PHOTO_H, topScrim = true } = {}) {
   const img = await new Promise((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -57,14 +57,16 @@ export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5, height 
   const cx = Math.min(Math.max(ox, 0), 1)
   const cy = Math.min(Math.max(oy, 0), 1)
   ctx.drawImage(img, -(dw - w) * cx, -(dh - h) * cy, dw, dh)
-  // Escurecido em cima E em baixo (Ruben, 30 out): em cima para o logótipo,
-  // a data e o clube se lerem sobre qualquer foto; em baixo para a foto
-  // fundir com o cartão.
-  const gTop = ctx.createLinearGradient(0, 0, 0, h * 0.42)
-  gTop.addColorStop(0, 'rgba(11,11,12,0.82)')
-  gTop.addColorStop(1, 'rgba(11,11,12,0)')
-  ctx.fillStyle = gTop
-  ctx.fillRect(0, 0, w, h * 0.42)
+  // Escurecido em baixo para fundir com o cartão; em cima só quando o
+  // cartão tem cabeçalho sobre a foto (topScrim) — o dos vencedores do mix
+  // vive todo no fade de baixo (Ruben, 30 out) e quer o topo limpo.
+  if (topScrim) {
+    const gTop = ctx.createLinearGradient(0, 0, 0, h * 0.42)
+    gTop.addColorStop(0, 'rgba(11,11,12,0.82)')
+    gTop.addColorStop(1, 'rgba(11,11,12,0)')
+    ctx.fillStyle = gTop
+    ctx.fillRect(0, 0, w, h * 0.42)
+  }
   const g = ctx.createLinearGradient(0, h * 0.38, 0, h)
   g.addColorStop(0, 'rgba(11,11,12,0)')
   g.addColorStop(0.72, 'rgba(11,11,12,0.82)')
@@ -104,7 +106,7 @@ export async function bakeCircle(url, size = 64) {
 }
 
 /** A imagem do mix como «foto» (sem foto escolhida): o mesmo corte da foto. */
-export const bakeImageUrl = async (url, height = PHOTO_H) => {
+export const bakeImageUrl = async (url, { height = PHOTO_H, topScrim = true } = {}) => {
   if (!url) return null
   try {
     const blob = await (await fetch(url, { mode: 'cors' })).blob()
@@ -114,7 +116,7 @@ export const bakeImageUrl = async (url, height = PHOTO_H) => {
       r.onerror = reject
       r.readAsDataURL(blob)
     })
-    return await bakePhoto(dataUrl, { height })
+    return await bakePhoto(dataUrl, { height, topScrim })
   } catch {
     return null
   }
