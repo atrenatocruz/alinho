@@ -59,32 +59,30 @@ const MixWinnersShareCard = forwardRef(function MixWinnersShareCard({ data, phot
         ? <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />
         : <div className="absolute left-0 top-0 bg-[#131316]" style={{ width: MIX_CARD_W, height: MIX_HERO_H }} />}
 
-      {/* A identidade e o título, TODOS no fade de baixo (opção 1, «à
-          Strava»): a marca + grupo à esquerda, a data à direita, e o
-          «Vencedores» por baixo. O topo da foto fica limpo. */}
+      {/* A identidade no fade (Ruben, 30 out, 2.ª volta): à esquerda o
+          alinho.pt por cima do «Vencedores»; à direita a data e, por
+          baixo, o nome e o logótipo do grupo. O topo da foto fica limpo. */}
       <div className="absolute inset-x-0 px-[18px]" style={{ top: 264 }}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="flex shrink-0 items-end gap-[1px]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <span className="flex items-end gap-[1px]">
               <img src={logoWordmark} alt="alinho" className="h-[12px] w-auto" />
               <span className="font-sans text-[10px] font-medium leading-[9px] text-white">.pt</span>
             </span>
+            <p className="mt-1.5 font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</p>
             {meta.club && (
-              <>
-                <span className="text-[9px] text-[#9CA3AF]">·</span>
+              <span className="mt-1.5 flex items-center justify-end gap-1.5">
+                <span className="max-w-[150px] truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>
                 {org?.logo
                   ? <img src={org.logo} alt="" className="block h-[14px] w-[14px] shrink-0 rounded-full" />
                   : <span className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border text-[6px] font-extrabold" style={{ borderColor: LIME, color: LIME }}>{org?.initials || '•'}</span>}
-                <span className="min-w-0 truncate font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#D1D5DB]">{meta.club}</span>
-              </>
+              </span>
             )}
-          </span>
-          <span className="shrink-0 font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{meta.headerDate || data.date}</span>
+          </div>
         </div>
-        <p className="mt-1.5 font-display text-[34px] font-black leading-none text-white">{t('mixshare.hero_title')}</p>
-        {(meta.weekdayLong || meta.title) && (
-          <p className="mt-1.5 text-[9.5px] text-[#9CA3AF]">{[meta.weekdayLong, meta.title].filter(Boolean).join(' · ')}</p>
-        )}
       </div>
 
       {/* Vencedores + branding — os cartões mordem bem o fade da foto
