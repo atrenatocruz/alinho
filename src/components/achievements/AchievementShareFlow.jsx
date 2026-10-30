@@ -13,7 +13,7 @@ import { FilterPill } from '../ui'
 import { medalUrl } from '../../lib/achievementMedals'
 import { RARITY_META, formatRarityPct } from '../../lib/achievements'
 import { formatDate } from '../../lib/formatDate'
-import { qrDataUrl, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
+import { shareFilename, shareOrSaveImage } from '../../lib/shareImage'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 
@@ -28,15 +28,14 @@ const longDay = (d, lang) => `${d.getDate()} ${formatDate(d, lang, { month: 'sho
 /** achievement: { key, rarity, pct?, at? (quando foi ganha) }. fresh: vem da
     festa de uma conquista nova («CONQUISTA NOVA»; nos outros sítios só
     «CONQUISTA», UX 16 out). owner: { id, name, avatar_url } quando é a
-    conquista de outra pessoa — a imagem e o texto são dela; o QR leva a
-    referência de quem partilha. */
+    conquista de outra pessoa — a imagem e o texto são dela. (O QR saiu das
+    partilhas a 30 out.) */
 export default function AchievementShareFlow({ achievement: given, fresh = false, owner = null, onClose }) {
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
   const who = owner || profile
   const lang = i18n.language
   const [format, setFormat] = useState('stories')
-  const [qr, setQr] = useState(null)
   const [photo, setPhoto] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -72,11 +71,6 @@ export default function AchievementShareFlow({ achievement: given, fresh = false
   const caption = edited ?? suggested
   const setCaption = setEdited
 
-  // O QR leva a https://alinho.pt (SPEC), com a referência de quem partilhou.
-  useEffect(() => {
-    qrDataUrl(`https://alinho.pt${profile?.id ? `/?ref=${profile.id}` : ''}`, { size: 240 })
-      .then(setQr).catch((err) => console.error('Error making the QR:', err))
-  }, [profile?.id])
   // A foto da pessoa, já redonda (o WebKit estraga o redondo por CSS).
   useEffect(() => {
     let alive = true
@@ -137,7 +131,7 @@ export default function AchievementShareFlow({ achievement: given, fresh = false
         {/* O cartão a sério, reduzido só no ecrã: o que se exporta é o de 360 de largura. */}
         <div className="mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: A_CARD_W * PREVIEW_SCALE, height: H * PREVIEW_SCALE }}>
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <AchievementShareCard ref={cardRef} rarity={rarity} data={data} format={format} qr={qr} />
+            <AchievementShareCard ref={cardRef} rarity={rarity} data={data} format={format} />
           </div>
         </div>
         <div className="flex justify-center gap-1.5" role="group" aria-label={t('achshare.format')}>
@@ -150,7 +144,7 @@ export default function AchievementShareFlow({ achievement: given, fresh = false
         </div>
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         <div className="space-y-2">
-          <button type="button" onClick={() => run('share')} disabled={busy || (format === 'stories' && !qr)}
+          <button type="button" onClick={() => run('share')} disabled={busy}
             className="press w-full min-h-[52px] rounded-ctrl bg-lime-400 px-4 font-display text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
             {t('achshare.share')}
           </button>

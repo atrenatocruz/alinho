@@ -3753,7 +3753,6 @@ export default function GameDetails() {
           text={shownWinnersShare.text}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
-          qrUrl={orgSlug ? `${appOrigin()}/clube/${orgSlug}` : appOrigin()}
           org={winnersOrg}
           fallbackImage={game.image_url || null}
           onClose={() => setWinnersShareOpen(false)}
