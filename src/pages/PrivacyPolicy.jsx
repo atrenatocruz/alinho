@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { SiteHeader, SiteFooter, usePageTop } from '../components/site/SiteChrome'
-import { founderNames, POLICY_VERSION, SUPPORT_EMAIL, mailtoLink, whatsappContactLink } from '../lib/contacts'
+import { founderNames, PLAN_SELLER, POLICY_VERSION, SUPPORT_EMAIL, mailtoLink, whatsappContactLink } from '../lib/contacts'
 import { formatDate } from '../lib/formatDate'
+import { useFeatureFlag } from '../lib/useFeatureFlag'
 
 /* alinho.pt/privacidade — o mesmo arranjo dos Termos (site arrumado,
    aprovado pelo Francisco a 17 out): topo creme, «Em poucas palavras» (o
@@ -18,6 +19,9 @@ const SECTIONS = [
   'cookies', 'retention', 'rights', 'changes', 'controller', 'contact',
 ]
 const SUMMARY = [1, 2, 3, 4, 5, 6]
+// «Pagamentos e faturas» entra a seguir a «Com quem partilhamos dados», só
+// com o interruptor «vendedor_planos» (Finanças e PO, 29 out).
+const withBilling = (on) => (on ? SECTIONS.flatMap((k) => (k === 'sharing' ? [k, 'billing'] : [k])) : SECTIONS)
 
 // O visto num círculo, como nos Termos: lima sobre preto no resumo.
 function Check() {
@@ -32,8 +36,9 @@ export default function PrivacyPolicy() {
   usePageTop()
   const { t, i18n } = useTranslation()
   const date = formatDate(`${POLICY_VERSION}T12:00:00`, i18n.language, { day: 'numeric', month: 'long', year: 'numeric' })
+  const sections = withBilling(useFeatureFlag('vendedor_planos').on)
   const kicker = 'font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
-  const body = (key) => t(`privacy.section_${key}_body`, { names: founderNames(i18n.language), email: SUPPORT_EMAIL })
+  const body = (key) => t(`privacy.section_${key}_body`, { names: founderNames(i18n.language), email: SUPPORT_EMAIL, seller: PLAN_SELLER })
   return (
     <div className="min-h-screen bg-white">
       <SiteHeader />
@@ -61,7 +66,7 @@ export default function PrivacyPolicy() {
         <nav id="indice" aria-label={t('terms.toc')} className="mt-9 scroll-mt-32">
           <p className={kicker}>{t('terms.toc')}</p>
           <ol className="mt-2.5 md:columns-2 md:gap-7">
-            {SECTIONS.map((key, i) => (
+            {sections.map((key, i) => (
               <li key={key} className="break-inside-avoid">
                 <a href={`#${key}`} className="flex items-baseline gap-3 border-b border-line py-2.5 text-[15px] font-semibold leading-snug text-ink-900">
                   <span className="w-5 flex-none font-mono text-xs font-medium text-muted">{i + 1}</span>
@@ -73,7 +78,7 @@ export default function PrivacyPolicy() {
         </nav>
 
         <div className="mt-4">
-          {SECTIONS.map((key, i) => (
+          {sections.map((key, i) => (
             <section key={key} id={key} className={`scroll-mt-32 pt-[30px] pb-[22px] ${i ? 'border-t border-line' : ''}`}>
               <h2 className="mb-2.5 text-[22px] font-extrabold leading-tight tracking-[-0.015em] text-ink-900">
                 <span className="mr-1 align-[2px] font-mono text-sm font-medium text-muted">{i + 1}.</span> {t(`privacy.section_${key}_title`)}
