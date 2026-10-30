@@ -2,7 +2,7 @@
 // Francisco a 18 out; regras da BA em PROPOSTA-BA.md). Os dados são do Dev 3
 // (list_my_partner_cards); aqui só as contas para o ecrã. Tudo atrás do
 // interruptor «parceiros» (feature_flags).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { useFeatureFlag } from './useFeatureFlag'
 
@@ -18,6 +18,33 @@ const fireAndForget = (fn, params) => {
 export const trackPartner = (partnerId, place) => { if (partnerId) fireAndForget('partner_track', { p_partner_id: partnerId, p_place: place }) }
 /** O «Mostrar na receção» aberto pelo dono do código (a base guarda só a 1.ª vez). */
 export const markVoucherOpened = (voucherId) => { if (voucherId) fireAndForget('voucher_mark_opened', { p_voucher_id: voucherId }) }
+
+/** «Viram o teu cartão» (place 'home_card' | 'ranking_row'): conta só quando o
+ *  cartão ou a linha aparece de facto no ecrã (metade à vista, com a app à
+ *  frente), uma vez por visita ao ecrã; a base conta cada pessoa uma vez por
+ *  dia (BA, 28 out). Devolve a ref para pôr no elemento. */
+export function usePartnerSeen(partnerId, place) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !partnerId || typeof IntersectionObserver === 'undefined') return undefined
+    let inView = false
+    let done = false
+    const track = () => {
+      if (done || !inView || document.visibilityState !== 'visible') return
+      done = true
+      trackPartner(partnerId, place)
+    }
+    const io = new IntersectionObserver((entries) => {
+      inView = entries.some((e) => e.isIntersecting)
+      track()
+    }, { threshold: 0.5 })
+    io.observe(el)
+    document.addEventListener('visibilitychange', track)
+    return () => { io.disconnect(); document.removeEventListener('visibilitychange', track) }
+  }, [partnerId, place])
+  return ref
+}
 
 /** O seletor do «Do mês» com um distrito: 'district:Setúbal'. */
 export const DISTRICT_SCOPE = 'district:'
