@@ -165,6 +165,20 @@ export async function entriesHidingResults(tournamentId) {
   return Array.isArray(data) ? data : []
 }
 
+/** As fases que já têm resultados, para o cadeado da pontuação de cada
+ *  fase no Editar (pontuação por fase, 26 out): { groups, knockout }. Conta
+ *  um jogo com vencedor ou com os dois números. */
+export async function phasesWithResults(categoryIds) {
+  const ids = (categoryIds || []).filter(Boolean)
+  if (!ids.length) return { groups: false, knockout: false }
+  const { data, error } = await supabase.from('tournament_public_matches').select('stage, winner_entry_id, score_a, score_b')
+    .in('category_id', ids)
+    .or('winner_entry_id.not.is.null,and(score_a.not.is.null,score_b.not.is.null)')
+  if (error) throw error
+  const rows = (data || []).filter((m) => m.winner_entry_id != null || (m.score_a != null && m.score_b != null))
+  return { groups: rows.some((m) => m.stage === 'grupo'), knockout: rows.some((m) => m.stage !== 'grupo') }
+}
+
 /** Mudar o nome da dupla depois da inscrição (nome-da-dupla, 27 set): os
  *  dois da dupla ou um admin do clube, até as inscrições fecharem. Vazio =
  *  sem nome (aparecem os dois nomes). Devolve o nome que ficou gravado.

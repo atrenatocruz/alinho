@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { XP_TIERS } from '../lib/xp'
 
 /* Escudos dos 10 níveis de XP (design-handoff/2026-10-16-escudos-niveis-xp,
-   aprovado pelo Francisco a 16 out). Imagens de 256 px em public/xp; lêem-se
-   de 20 a 104 px. O nome do nível está sempre ao lado, por isso alt vazio.
+   aprovado pelo Francisco a 16 out; refeitos sobre magenta a 21 out). Imagens
+   de 256 px em public/xp e as de 512 (@2x) para os tamanhos acima de 64 px,
+   como o topo da página do XP (104 px), para ficarem nítidas no telemóvel.
+   O nome do nível está sempre ao lado, por isso alt vazio.
    Se a imagem falhar, fica a bola de cor de sempre (dotClass), sem buraco.
    `dim`: nível que ainda não tens — cinzento e meio apagado. */
 export default function XpShield({ tierKey, size = 32, dim = false, className = '', style }) {
@@ -20,7 +22,8 @@ export default function XpShield({ tierKey, size = 32, dim = false, className = 
     )
   }
   return (
-    <img src={`/xp/escudo-${tier.key}.webp`} alt="" width={size} height={size} loading="lazy" draggable="false"
+    <img src={`/xp/escudo-${tier.key}.webp`} srcSet={size > 64 ? `/xp/escudo-${tier.key}.webp 1x, /xp/escudo-${tier.key}@2x.webp 2x` : undefined}
+      alt="" width={size} height={size} loading="lazy" draggable="false"
       onError={() => setFailed(true)} className={`shrink-0 select-none object-contain ${className}`}
       style={{ width: size, height: size, ...dimStyle, ...style }} />
   )

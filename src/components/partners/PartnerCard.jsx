@@ -5,7 +5,7 @@
 // parceiro, no máximo um por dia (quem chama escolhe com pickPartnerOfDay).
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { DISTRICT_SCOPE, partnerInitials, sortedPrizes, topDiscount, upcomingMonth } from '../../lib/partners'
+import { DISTRICT_SCOPE, partnerInitials, sortedPrizes, topDiscount, upcomingMonth, usePartnerSeen } from '../../lib/partners'
 
 const MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
@@ -26,12 +26,14 @@ export default function PartnerCard({ partner }) {
   const prizes = sortedPrizes(partner)
   const district = partner.prize_district || partner.district
   const open = () => navigate(`/parceiro/${partner.slug}`)
+  // Os Números da Rita: o cartão à vista na Home.
+  const seenRef = usePartnerSeen(partner.id, 'home_card')
   const openRanking = (e) => {
     e.stopPropagation()
     navigate('/rankings', { state: { tab: 'do-mes', scope: district ? `${DISTRICT_SCOPE}${district}` : undefined, scale: 'all' } })
   }
   return (
-    <article role="link" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter') open() }}
+    <article ref={seenRef} role="link" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter') open() }}
       className="press cursor-pointer rounded-card border border-line bg-white p-3.5">
       <div className="flex items-center gap-2.5">
         <PartnerLogo partner={partner} />

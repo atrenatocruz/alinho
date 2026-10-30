@@ -209,6 +209,19 @@ export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
 const num = (v) => (v == null || v === '' ? null : Number(v))
 
 /**
+ * Tira do explorar o que já é meu: os jogos que já vieram pelos meus grupos
+ * (pelo id) e os de um grupo onde já estou. O superadmin com o modo ligado
+ * tem os grupos do acesso nas memberships (withSuperadminGroups), mas a base
+ * não o vê como membro e list_explore_events devolve-os outra vez: cada mix
+ * aparecia duas vezes, um com «Entrar no clube» (bug de 30 out).
+ */
+export function exploreNotMine(rows, games = [], memberships = []) {
+  const gameIds = new Set((games || []).map((g) => g.id))
+  const orgIds = new Set((memberships || []).map((m) => m.organization_id))
+  return (rows || []).filter((r) => !gameIds.has(r?.game?.id) && !orgIds.has(r?.organization?.id))
+}
+
+/**
  * Evento de um clube/grupo da Comunidade onde o jogador ainda não está
  * (list_explore_events — Fase 2). Nunca é "meu". Sem nomes de participantes:
  * só quantos são, o nível médio e os amigos seguidos que são membros do clube.

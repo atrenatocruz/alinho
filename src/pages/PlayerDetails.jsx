@@ -8,6 +8,7 @@ import { SkeletonGate, SkBlock, SkCircle, SkLine } from '../components/Skeleton'
 import { sharePageLink } from '../lib/shareImage'
 import { Award, ChevronRight, UserPlus, UserCheck, Clock, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { achievementContext, loadPlayerAchievements } from '../lib/achievements'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, ConfirmSheet } from '../components/ui'
 import { countryName } from '../lib/countries'
@@ -49,6 +50,7 @@ const KICKER = 'mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.12e
 export default function PlayerDetails() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
+  const { profile } = useAuth()
   const goBack = useGoBack('/comunidade')
   const navigate = useNavigate()
   const [player, setPlayer] = useState(null)
@@ -250,11 +252,18 @@ export default function PlayerDetails() {
   // quem vê (com zero jogos vem 0) — vitórias e títulos vêm a null juntos.
   const resultsHidden = player.total_points === null
   // Atividade e clubes: a mesma regra can_view_section da base (público
-  // sempre; amigos só com seguir mútuo; privado nunca).
-  const isHidden = (visibility) =>
+  // sempre; amigos só com seguir mútuo; privado nunca). O superadmin com o
+  // modo ligado vê tudo (Francisco, 28 out); com o modo desligado,
+  // is_platform_admin vem falso e fica como para todos.
+  const closedToOthers = (visibility) =>
     !player.my_profile && (visibility === 'private' || (visibility === 'friends' && !player.is_mutual_follow))
-  const activityHidden = isHidden(player.activity_visibility)
-  const clubsHidden = isHidden(player.clubs_visibility)
+  const superadminView = profile?.is_platform_admin === true
+  const activityHidden = closedToOthers(player.activity_visibility) && !superadminView
+  const clubsHidden = closedToOthers(player.clubs_visibility) && !superadminView
+  // Só se vê por ser superadmin: diz-se, para não sair numa print sem querer (UX, 28 out).
+  const superadminNote = (visibility) => superadminView && closedToOthers(visibility) && (
+    <p className="mb-2 text-sm text-muted">🔓 {t('playerdetails.superadmin_sees')}</p>
+  )
   const gamesPlayed = (player.game_wins || 0) + (player.game_losses || 0)
   const winRate = winRatePct(player.game_wins || 0, gamesPlayed)
   const firstName = String(player.name || '').split(/\s+/)[0]
@@ -571,6 +580,7 @@ export default function PlayerDetails() {
           {/* «CLUBES E GRUPOS · N», cartões pequenos que deslizam. */}
           <section>
             <p className={KICKER}>{t('playerdetails.r13_clubs', { count: clubsHidden ? 0 : (player.clubs || []).length })}</p>
+            {superadminNote(player.clubs_visibility)}
             {clubsHidden ? (
               <p className="rounded-card border-[1.5px] border-dashed border-line px-4 py-3.5 text-sm text-muted">🔒 {t('playerdetails.clubs_private')}</p>
             ) : !(player.clubs || []).length ? (
@@ -601,6 +611,7 @@ export default function PlayerDetails() {
       {tab === 'jogos' && (
         <>
           {h2hCard}
+          {!resultsHidden && superadminNote(player.activity_visibility)}
           {resultsHidden || activityHidden ? privateBox : (
             played.state === 'missing'
               ? <p className="text-sm text-muted">{t('playerdetails.no_matches_title')}</p>

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { SiteHeader, SiteFooter, usePageTop } from '../components/site/SiteChrome'
-import { founderNames, POLICY_VERSION, SUPPORT_EMAIL, mailtoLink, whatsappContactLink } from '../lib/contacts'
+import { founderNames, PRIVACY_UPDATED, SUPPORT_EMAIL, mailtoLink, whatsappContactLink } from '../lib/contacts'
 import { formatDate } from '../lib/formatDate'
 
 /* alinho.pt/privacidade — o mesmo arranjo dos Termos (site arrumado,
@@ -31,7 +31,7 @@ function Check() {
 export default function PrivacyPolicy() {
   usePageTop()
   const { t, i18n } = useTranslation()
-  const date = formatDate(`${POLICY_VERSION}T12:00:00`, i18n.language, { day: 'numeric', month: 'long', year: 'numeric' })
+  const date = formatDate(`${PRIVACY_UPDATED}T12:00:00`, i18n.language, { day: 'numeric', month: 'long', year: 'numeric' })
   const kicker = 'font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
   const body = (key) => t(`privacy.section_${key}_body`, { names: founderNames(i18n.language), email: SUPPORT_EMAIL })
   return (

@@ -13,6 +13,7 @@ import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { FieldLabel, MonoLabel } from './TournamentBits'
 import { TshirtField } from './tshirt'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
+import { phasesWithResults } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
 import StepPage from '../steps/StepPage'
 import WhatsappHoursField from '../WhatsappHoursField'
@@ -28,7 +29,8 @@ import { DEFAULT_DEUCE_MODE } from '../../lib/deuceMode'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
-  scoring: 'pro_set_9',
+  scoring: 'pro_set_9',         // nos grupos (e em tudo, nos torneios antigos)
+  scoring_knockout: 'pro_set_9', // nas eliminatórias (Francisco, 26 out)
   tiebreak_8_8: 'tiebreak',   // em 8-8: tie-break a 7 | super tie-break a 10
   deuce: DEFAULT_DEUCE_MODE,  // aos 40-40: ponto_de_ouro | star_point | vantagens
   duration_min: 30,
@@ -42,6 +44,21 @@ const DEFAULT_RULES = {
 }
 
 const SCORINGS = ['pro_set_9', 'melhor_2_sets', 'melhor_3_sets']
+
+/** As três pontuações de uma fase. Com resultados nessa fase, trancadas
+ *  (também ao teclado, como o «Aos 40-40»); a frase do cadeado aparece uma
+ *  vez só, por baixo do «Aos 40-40», que é o último bloco trancado (UX). */
+function ScoringChips({ value, onChange, label, locked, t }) {
+  return (
+    <div>
+      <div className={locked ? 'pointer-events-none opacity-50' : ''} aria-disabled={locked || undefined} {...(locked ? { inert: '' } : {})}>
+        {/* Em duas filas, como no desenho: nunca saem do ecrã (Francisco, 14 out). */}
+        <Chips value={value} onChange={locked ? () => {} : onChange} label={label} className="!flex-wrap !overflow-visible"
+          options={SCORINGS.map((s) => ({ value: s, label: t(`tournament.create.scoring_${s}`) }))} />
+      </div>
+    </div>
+  )
+}
 const GENDERS = ['masculino', 'feminino', 'misto']
 
 const pad = (n) => String(n).padStart(2, '0')
@@ -317,7 +334,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     // preenche-o com as horas do último torneio do clube.
     whatsapp_post_times: Array.isArray(initial?.tournament?.whatsapp_post_times)
       ? initial.tournament.whatsapp_post_times.map((h) => String(h).slice(0, 5)) : null,
-    rules: { ...DEFAULT_RULES, ...(initial?.tournament?.rules || {}) },
+    rules: {
+      ...DEFAULT_RULES,
+      ...(initial?.tournament?.rules || {}),
+      // Um torneio de antes de 26 out não tem a das eliminatórias: joga-as
+      // como os grupos (a mesma regra da base de dados).
+      scoring_knockout: initial?.tournament?.rules?.scoring_knockout || initial?.tournament?.rules?.scoring || DEFAULT_RULES.scoring_knockout,
+    },
   }))
   const editing_existing = !!initial
 
@@ -366,6 +389,20 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       setDraft((d) => patch(d))
       setInitialDraft((json) => JSON.stringify(patch(JSON.parse(json))))
     })
+    return () => { cancelled = true }
+  }, [initial])
+  // A editar, a pontuação de uma fase que já tem resultados fica com o
+  // cadeado: a forma de contar não muda a meio (SPEC pontuação por fase,
+  // ponto 2). Sem a leitura, não tranca: a base de dados guarda o resto.
+  const [phaseLocks, setPhaseLocks] = useState({ groups: false, knockout: false })
+  // O 8-8 e o «Aos 40-40» valem para as duas fases: com resultados em
+  // qualquer uma, ou com o torneio a decorrer, já não mudam (UX, 29 out).
+  const sharedLocked = phaseLocks.groups || phaseLocks.knockout || ['a_decorrer', 'terminado'].includes(initial?.tournament?.status)
+  useEffect(() => {
+    const ids = (initial?.categories || []).map((c) => c.id).filter(Boolean)
+    if (!ids.length) return undefined
+    let cancelled = false
+    phasesWithResults(ids).then((locks) => { if (!cancelled) setPhaseLocks(locks) }).catch(() => {})
     return () => { cancelled = true }
   }, [initial])
   // O preço especial de uma categoria por acabar (sem valor, ou «Pessoas
@@ -942,26 +979,40 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               ]}
             />
           </Field>
-          {/* «2 sets + super tie-break» diz o que acontece no 1-1 — o mesmo
-              nome e a mesma frase no mix (UX, 7 out). */}
-          <Field label={t('tournament.create.scoring')}
-            hint={draft.rules.scoring === 'melhor_2_sets' ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
-            <Chips value={draft.rules.scoring} onChange={(v) => setRule('scoring', v)}
-              label={t('tournament.create.scoring')}
-              options={SCORINGS.map((s) => ({ value: s, label: t(`tournament.create.scoring_${s}`) }))} />
+          {/* A pontuação de cada fase (Francisco, 26 out; design-handoff/
+              2026-10-26-torneio-pontuacao-grupos-e-eliminatorias): «Nos
+              grupos» é a rules.scoring de sempre, «Nas eliminatórias» a
+              rules.scoring_knockout. «2 sets + super tie-break» diz o que
+              acontece no 1-1 por baixo da linha que o tiver (UX, 7 out). */}
+          <Field label={t('tournament.create.scoring_in_groups')}
+            hint={draft.rules.scoring === 'melhor_2_sets' && !phaseLocks.groups ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
+            <ScoringChips value={draft.rules.scoring} onChange={(v) => setRule('scoring', v)}
+              label={t('tournament.create.scoring_in_groups')} locked={phaseLocks.groups} t={t} />
+          </Field>
+          <Field label={t('tournament.create.scoring_in_knockout')}
+            hint={<>
+              {draft.rules.scoring_knockout === 'melhor_2_sets' && !phaseLocks.knockout && <>{t('tournament.create.scoring_melhor_2_sets_hint')}<br /></>}
+              {/* O formato só se escolhe depois de fechar as inscrições. */}
+              {t('tournament.create.scoring_phases_hint')}
+            </>}>
+            <ScoringChips value={draft.rules.scoring_knockout} onChange={(v) => setRule('scoring_knockout', v)}
+              label={t('tournament.create.scoring_in_knockout')} locked={phaseLocks.knockout} t={t} />
           </Field>
           {/* Pro set em 8-8: tie-break a 7 ou super tie-break a 10 — escolhe
-              quem organiza (Francisco, 25 set). Nos sets, o 6-6 é sempre a 7. */}
-          {draft.rules.scoring === 'pro_set_9' && (
+              quem organiza (Francisco, 25 set). Nos sets, o 6-6 é sempre a 7.
+              Vale para as duas fases; aparece se alguma for pro set. */}
+          {(draft.rules.scoring === 'pro_set_9' || draft.rules.scoring_knockout === 'pro_set_9') && (
             <Field label={t('tournament.create.tiebreak_8_8')}>
-              <Chips value={draft.rules.tiebreak_8_8 || 'tiebreak'} onChange={(v) => setRule('tiebreak_8_8', v)}
-                label={t('tournament.create.tiebreak_8_8')}
-                options={TIEBREAK_RULES.map((r) => ({ value: r, label: t(`tournament.create.tiebreak_8_8_${r}`) }))} />
+              <div className={sharedLocked ? 'pointer-events-none opacity-50' : ''} aria-disabled={sharedLocked || undefined} {...(sharedLocked ? { inert: '' } : {})}>
+                <Chips value={draft.rules.tiebreak_8_8 || 'tiebreak'} onChange={sharedLocked ? () => {} : (v) => setRule('tiebreak_8_8', v)}
+                  label={t('tournament.create.tiebreak_8_8')}
+                  options={TIEBREAK_RULES.map((r) => ({ value: r, label: t(`tournament.create.tiebreak_8_8_${r}`) }))} />
+              </div>
             </Field>
           )}
           <Field label={t('deuce.label')}>
             <DeuceModeChips value={draft.rules.deuce || DEFAULT_DEUCE_MODE} onChange={(v) => setRule('deuce', v)}
-              locked={['a_decorrer', 'terminado'].includes(initial?.tournament?.status)}
+              locked={sharedLocked}
               lockedText={t('tournament.create.locked_deuce')} />
           </Field>
           <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })} error={fieldError(['duration_order'])}>

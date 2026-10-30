@@ -50,7 +50,7 @@ import { loadLeagueHome, leagueForYouItems } from '../lib/leagueAgenda'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
-  toDayKey, fromDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
+  toDayKey, fromDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, exploreNotMine, eventFromLesson, eventFromLessonRequest, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
@@ -646,7 +646,7 @@ export default function Home() {
       // Um cartão por sessão de jogo entre amigos (bug de 27 set).
       ...eventsFromPrivateMatches(privateMatches, user.id, new Map((memberships || []).map((ms) => [ms.organization_id,
         { name: ms.organization?.name, kind: ms.organization?.kind, logo: ms.organization?.group_logo_url }]))),
-      ...exploreRows.map(eventFromExplore),
+      ...exploreNotMine(exploreRows, [...games, ...pastDayGames], memberships).map(eventFromExplore),
       ...lessonRows.map(eventFromLesson),
       ...lessonRequests.map(eventFromLessonRequest),
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
