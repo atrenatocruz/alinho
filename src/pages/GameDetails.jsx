@@ -3754,7 +3754,7 @@ export default function GameDetails() {
             ...shownWinnersShare.data,
             // O contexto do cartão premium (briefing 30 out): só o que existe.
             meta: {
-              headerDate: `${weekdayShort(game.date, i18n.language)} · ${shownWinnersShare.data.date}`.toUpperCase(),
+              headerDate: `${weekdayShort(new Date(game.date), i18n.language)} · ${shownWinnersShare.data.date}`.toUpperCase(),
               club: winnersOrg?.name || null,
               weekdayLong: (() => { const w = formatDateLib(game.date, i18n.language, { weekday: 'long' }); return w.charAt(0).toUpperCase() + w.slice(1) })(),
               title: game.title,
