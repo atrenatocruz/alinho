@@ -76,6 +76,21 @@ export function photoFilename(file, ...parts) {
   return shareFilename(...parts, 'foto').replace(/\.png$/, `.${ext}`)
 }
 
+/** O link no texto da partilha (#743): sem o QR, deixávamos de saber que
+ *  contas novas vinham das imagens. O «alinho.pt» solto do fim do texto
+ *  («alinho.pt @alinhopt #alinhopadel») passa a ser o link, que já vem com o
+ *  ?ref= de quem partilha; sem ele no texto, o link vai no fim. */
+export function withShareLink(text, link) {
+  const s = String(text || '')
+  if (!link) return s
+  const re = /(^|\s)alinho\.pt(?=\s|$)/g
+  let last = null
+  for (let m = re.exec(s); m; m = re.exec(s)) last = m
+  if (!last) return s ? `${s} ${link}` : link
+  const at = last.index + last[1].length
+  return `${s.slice(0, at)}${link}${s.slice(at + 'alinho.pt'.length)}`
+}
+
 /** O nome do ficheiro: «alinho-smash-cup-m5-final.png». */
 export function shareFilename(...parts) {
   const slug = parts.filter(Boolean).join('-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')

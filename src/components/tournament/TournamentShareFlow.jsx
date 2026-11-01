@@ -4,23 +4,29 @@
 //      (a foto fica só no telemóvel: não vai para a app)
 //   3. Pré-visualização (com a foto ajustável: arrastar posiciona, pinça/
 //      roda do rato/slider faz zoom — Ruben, 30 out) + «Texto» + «Partilhar»
-// O QR saiu das partilhas a 30 out (Ruben: «não faz sentido»).
+// O QR saiu das partilhas a 30 out (Ruben: «não faz sentido»); no lugar dele,
+// o texto leva o link com o ?ref= de quem partilha (#743).
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react'
-import TournamentShareCard, { PHOTO_H, T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, bakeImageUrl } from './TournamentShareCard'
-import { photoFilename, readLocalPhoto, saveOriginalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
-import { IS_NATIVE } from '../../lib/native'
+import TournamentShareCard, { PHOTO_H, T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, photoMode } from './TournamentShareCard'
+import { photoFilename, readLocalPhoto, saveOriginalPhoto, shareFilename, shareOrSaveImage, withShareLink } from '../../lib/shareImage'
+import { IS_NATIVE, appOrigin } from '../../lib/native'
+import { withMyRef } from '../../lib/myRef'
+import { tournamentUrl } from '../../lib/tournamentPublic'
 
 const PREVIEW_SCALE = 0.62
 
-/* #622 (vencedores em todos os jogos), tudo opcional: `shareTitle`, `org` e
-   `children` (passam ao cartão) e `fallbackImage` (a imagem do mix, que
-   entra no lugar da foto quando se escolhe «Sem foto»). */
+/* #622 (vencedores em todos os jogos), tudo opcional: `shareTitle`, `org`,
+   `children` e `hero` (passam ao cartão), `fallbackImage` (a imagem do
+   evento, no lugar da foto com «Sem foto»; por omissão, a do tipo). #743:
+   `kind` (a cor e a imagem do tipo de evento) e `link` (para onde o QR
+   levava: a página do clube ou do grupo; por omissão, a do torneio ou
+   alinho.pt). */
 export default function TournamentShareFlow({ tournament, variant, data, text, filenameParts = [], onClose,
-  shareTitle = null, org = null, fallbackImage = null, children = null,
-  Card = TournamentShareCard, photoH = PHOTO_H, photoTopScrim = true }) {
+  shareTitle = null, org = null, fallbackImage = null, children = null, hero = null,
+  kind = 'torneio', link = null }) {
   const { t } = useTranslation()
   const [step, setStep] = useState('photo') // 'photo' | 'preview'
   const [photo, setPhoto] = useState(null) // a foto já cozida (bakePhoto)
@@ -32,7 +38,8 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   // A foto tirada na hora, tal como saiu da câmara (sem a redução do raw),
   // para a poder guardar sem o cartão (#742). A da galeria já está no telemóvel.
   const [cameraFile, setCameraFile] = useState(null)
-  const [caption, setCaption] = useState(text || '')
+  const [caption, setCaption] = useState(() => withShareLink(text,
+    withMyRef(link || (tournament ? tournamentUrl(tournament, appOrigin()) : 'https://alinho.pt'))))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
@@ -56,14 +63,6 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
 
-  // A imagem do mix, já cortada como a foto, para o «Sem foto».
-  const [fallback, setFallback] = useState(null)
-  useEffect(() => {
-    let alive = true
-    bakeImageUrl(fallbackImage, { height: photoH, topScrim: photoTopScrim }).then((v) => { if (alive) setFallback(v) })
-    return () => { alive = false }
-  }, [fallbackImage, photoH, photoTopScrim])
-
   const onFile = async (e, fromCamera = false) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -71,10 +70,12 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
     setBusy(true); setError('')
     try {
       const read = await readLocalPhoto(file)
-      const start = { zoom: 1, ox: 0.5, oy: 0.5 }
+      const mode = photoMode(read.width, read.height)
+      // Deitada, a foto começa um pouco abaixo do meio da zona, junto aos nomes.
+      const start = { zoom: 1, ox: 0.5, oy: mode === 'alto' ? 0.5 : 0.62, mode }
       setRaw(read.dataUrl)
       setAdj(start)
-      setPhoto(await bakePhoto(read.dataUrl, { ...start, height: photoH, topScrim: photoTopScrim }))
+      setPhoto(await bakePhoto(read.dataUrl, start))
       setCameraFile(fromCamera ? file : null)
       setStep('preview')
     } catch (err) {
@@ -87,9 +88,9 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   useEffect(() => {
     if (!raw) return undefined
     let alive = true
-    bakePhoto(raw, { ...adj, height: photoH, topScrim: photoTopScrim }).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
+    bakePhoto(raw, adj).then((v) => { if (alive) setPhoto(v) }).catch(() => {})
     return () => { alive = false }
-  }, [raw, adj, photoH, photoTopScrim])
+  }, [raw, adj])
 
   // Gestos sobre a zona da foto no preview: 1 dedo arrasta (posição), 2
   // dedos pinçam (zoom); no computador, a roda do rato também faz zoom.
@@ -122,10 +123,20 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinchStart.current = null
   }
-  const onWheel = (e) => {
-    e.preventDefault()
-    setAdj((v) => ({ ...v, zoom: clampZoom(v.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)) }))
-  }
+  // A roda do rato faz zoom e não anda com a página (QA, 30 out): o React
+  // liga o onWheel como passivo, onde o preventDefault não pega.
+  const zoneRef = useRef(null)
+  const hasZone = !!(raw && photo)
+  useEffect(() => {
+    const el = zoneRef.current
+    if (!el) return undefined
+    const onWheel = (e) => {
+      e.preventDefault()
+      setAdj((v) => ({ ...v, zoom: clampZoom(v.zoom * (e.deltaY < 0 ? 1.06 : 1 / 1.06)) }))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [hasZone, step])
 
   const share = async () => {
     setBusy(true); setError(''); setSaved(false)
@@ -202,14 +213,15 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
         {/* O cartão a sério, reduzido só no ecrã: o que se exporta é o de 360 × 640. */}
         <div className="relative mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: T_CARD_W * PREVIEW_SCALE, height: T_CARD_H * PREVIEW_SCALE }}>
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <Card ref={cardRef} variant={variant} data={data} photo={photo || fallback} org={cardOrg}>{children}</Card>
+            <TournamentShareCard ref={cardRef} variant={variant} kind={kind} data={data} photo={photo}
+              heroImage={fallbackImage} hero={hero} org={cardOrg}>{children}</TournamentShareCard>
           </div>
           {/* A zona da foto aceita gestos (só com foto escolhida). */}
-          {raw && photo && (
-            <div className="absolute left-0 top-0 w-full cursor-move touch-none"
-              style={{ height: photoH * PREVIEW_SCALE }}
+          {hasZone && (
+            <div ref={zoneRef} className="absolute left-0 top-0 w-full cursor-move touch-none"
+              style={{ height: (photo.mode === 'alto' ? T_CARD_H : PHOTO_H) * PREVIEW_SCALE }}
               onPointerDown={onPointerDown} onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
+              onPointerUp={onPointerUp} onPointerCancel={onPointerUp} />
           )}
         </div>
         {raw && photo && (
@@ -223,7 +235,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
         )}
         <div>
           <p className="mb-2 text-sm font-medium text-gray-700">{t('tshare.text_label')}</p>
-          <textarea rows={4} value={caption} onChange={(e) => setCaption(e.target.value)} className="input-field" />
+          <textarea rows={6} value={caption} onChange={(e) => setCaption(e.target.value)} className="input-field" />
         </div>
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         <div>
