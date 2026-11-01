@@ -28,8 +28,10 @@ export default function EditFriendMatch() {
     return <StepSkeleton fallback="/jogos-privados" />
   }
   // Quem criou, ou quem disse «Vou» com o nome (SPEC 2026-10-07-amigos-convidado).
+  // Quem organiza sem jogar (#736) não está nos convidados.
   const mine = (data.invitees || []).some((i) => i.user_id && i.user_id === profile?.id
     && (i.is_creator || (i.status === 'accepted' && !i.is_anonymous)))
+    || (data.match?.creator_plays === false && !!profile?.id && data.match.creator_id === profile.id)
   if (!mine) return <EmptyState title={t('friends.edit_error_not_allowed')} />
   // Jogo de grupo (#586): juntar pessoas procura só nos membros do grupo,
   // como no criar. O grupo vem na get_friend_match (Dev 3); sem ele, como antes.

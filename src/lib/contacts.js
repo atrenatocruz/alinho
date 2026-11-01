@@ -17,6 +17,11 @@ export const SUPPORT_EMAIL_READY = true
 // David juntou-se no mesmo dia); todos aceitam aparecer antes de publicar.
 // Quando houver empresa, troca-se pelos dados dela.
 export const FOUNDERS = ['Francisco Barros', 'Renato Cruz', 'Ruben Bernardo', 'David Antunes']
+// Quem vende os planos e passa as faturas (texto das Finanças, 29 out;
+// design-handoff/2026-10-29-vendedor-dos-planos). Só aparece nos Termos e na
+// Privacidade com o interruptor «vendedor_planos» ligado, depois do sim
+// escrito do Renato. Quando houver empresa, troca-se aqui.
+export const PLAN_SELLER = 'Renato Cruz'
 /** «Francisco Barros, Renato Cruz e Ruben Bernardo» (en: «… and …»). */
 export const founderNames = (lang) => `${FOUNDERS.slice(0, -1).join(', ')} ${lang?.startsWith('en') ? 'and' : 'e'} ${FOUNDERS[FOUNDERS.length - 1]}`
 
@@ -24,6 +29,11 @@ export const founderNames = (lang) => `${FOUNDERS.slice(0, -1).join(', ')} ${lan
 // e a «Última atualização» das duas páginas — uma constante só, para nunca
 // ficarem diferentes (PO, 13 out). Se o texto mudar, a data muda com ele.
 export const POLICY_VERSION = '2026-10-23'
+// A «Última atualização» da Política, quando o texto muda sem se pedir outra
+// vez o «Aceito» (os Números dos parceiros; BA e PO, 28 out). Só muda a data
+// que a página mostra: o «Aceito» (ConsentGate) e os Termos seguem o
+// POLICY_VERSION. Nunca antes do POLICY_VERSION. É o dia em que sai no main.
+export const PRIVACY_UPDATED = '2026-10-30'
 
 // O número do robô (decisão do Francisco, 25 set). O robô ignora as
 // mensagens privadas que não são um código, por isso quem escreve espera por

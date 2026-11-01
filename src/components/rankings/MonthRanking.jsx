@@ -9,7 +9,7 @@ import RankPodium from './RankPodium'
 import RankingSkeleton from './RankingSkeleton'
 import { SkeletonGate } from '../Skeleton'
 import { PartnerLogo } from '../partners/PartnerCard'
-import { districtOf, hasPrizes, prizeFor, prizesLine } from '../../lib/partners'
+import { districtOf, hasPrizes, prizeFor, prizesLine, usePartnerSeen } from '../../lib/partners'
 import {
   MONTH_MIN_GAMES, monthGender, monthPoints, monthPointsMuted, splitMonthRanking,
   monthKey, monthTitle, monthName, nextMonthKey,
@@ -31,8 +31,10 @@ import {
 function PartnerLine({ partner, district }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // Os Números da Rita: a linha à vista no «Do mês».
+  const seenRef = usePartnerSeen(partner.id, 'ranking_row')
   return (
-    <button type="button" onClick={() => navigate(`/parceiro/${partner.slug}`)}
+    <button ref={seenRef} type="button" onClick={() => navigate(`/parceiro/${partner.slug}`)}
       className="flex w-full items-center gap-2.5 rounded-card border border-line bg-white px-3 py-2.5 text-left">
       {/* O logótipo no topo da 1.ª linha; a seta fica ao centro (Francisco, 28 out). */}
       <span className="self-start"><PartnerLogo partner={partner} size={28} /></span>

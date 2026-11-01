@@ -2,8 +2,8 @@
 // conquistas, versão B, aprovada pelo Francisco a 13 out): o fundo na cor da
 // raridade com raios atrás da medalha, a medalha 3D grande, o nome e a frase,
 // «Só X% dos jogadores a têm», quem a ganhou e desde quando, «Joga padel no
-// alinho.pt» e o QR. Como os outros cartões de partilha: desenhado a 360 ×
-// 640 (stories) ou 360 × 360 (quadrado, sem a pessoa nem o QR) e exportado
+// alinho.pt». Como os outros cartões de partilha: desenhado a 360 ×
+// 640 (stories) ou 360 × 360 (quadrado, sem a pessoa) e exportado
 // a 3× com o html-to-image.
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { toPng } from 'html-to-image'
@@ -55,9 +55,9 @@ function Logo() {
  * data: { name, desc, medal (url ou null), kicker («CONQUISTA NOVA · ÉPICA»),
  *         date («SÁB 27 SET»), pctLine («Só 13,1% dos jogadores a têm» ou null),
  *         person: { name, photo (bakeCircle) ou null, initials, sub («Desde 1 jul 2026») } }
- * format: 'stories' | 'square' · qr: data URL (só nas stories)
+ * format: 'stories' | 'square'
  */
-const AchievementShareCard = forwardRef(function AchievementShareCard({ rarity, data, format = 'stories', qr = null }, ref) {
+const AchievementShareCard = forwardRef(function AchievementShareCard({ rarity, data, format = 'stories' }, ref) {
   const { t } = useTranslation()
   const nodeRef = useRef(null)
   const square = format === 'square'
@@ -115,13 +115,6 @@ const AchievementShareCard = forwardRef(function AchievementShareCard({ rarity, 
               <p className="text-[12px] font-extrabold leading-tight">{t('share.play_padel')}<br />{t('share.on_alinho')}</p>
               <p className="mt-0.5 text-[7.5px] text-white/70">alinho.pt · #alinhopadel</p>
             </div>
-            {qr && (
-              // O quadrado branco do QR com 176 px a 1080 e a 262 px do fundo
-              // (SPEC; regra do Marketing).
-              <div className="rounded-[8px] bg-white p-[4px]">
-                <img src={qr} alt="" className="block h-[51px] w-[51px]" />
-              </div>
-            )}
           </div>
         )}
       </div>

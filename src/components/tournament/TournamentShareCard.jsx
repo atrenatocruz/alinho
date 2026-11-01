@@ -3,10 +3,13 @@
 // aprovado pelo Francisco a 27 set. Como o ShareCard do mix: desenhado a
 // 360 × 640 e exportado a 3× com o html-to-image.
 //
-// Topo e fundo livres (≈ 73 px a 360, os 220 px do Instagram a 1080): o
-// logótipo e o QR nunca ficam lá. Com foto, a foto ocupa a metade de cima e
-// o cartão fica compacto em baixo. A foto chega já cortada à medida (canvas):
-// o WebKit estraga fotos cortadas por CSS ao rasterizar (ver ShareCard.jsx).
+// Safe areas do Instagram (Ruben, 30 out): 252 px livres em cima e 300 em
+// baixo a 1080 (84/100 a 360) — é onde as Stories põem a câmara/perfil e a
+// caixa de resposta. O conteúdo nunca lá entra; a foto de fundo pode. O QR
+// saiu das partilhas a 30 out (Ruben: «não faz sentido»). Com foto, a foto
+// ocupa a metade de cima e o cartão fica compacto em baixo. A foto chega já
+// cortada à medida (canvas): o WebKit estraga fotos cortadas por CSS ao
+// rasterizar (ver ShareCard.jsx).
 //
 // Vencedores em todos os jogos (#622, design-handoff/2026-10-11-vencedores-
 // em-todos-os-jogos, aprovado pelo Francisco a 11 out): o mesmo cartão serve
@@ -24,14 +27,18 @@ import iconMark from '../../logo/icon-mark.svg'
 export const T_CARD_W = 360
 export const T_CARD_H = 640
 const RATIO = 3
-const SAFE = 73 // zona livre em cima e em baixo
+const SAFE_TOP = 84     // 252 px a 1080 — câmara/perfil das Stories
+const SAFE_BOTTOM = 100 // 300 px a 1080 — caixa de resposta das Stories
 export const PHOTO_H = 330 // a metade de cima, com foto
 
 const LIME = '#C5DD01'
 
 /** A foto cortada ao tamanho da metade de cima (cover), já em píxeis de
- *  exportação — nada de object-fit para o WebKit estragar. */
-export async function bakePhoto(dataUrl) {
+ *  exportação — nada de object-fit para o WebKit estragar.
+ *  `zoom` (1 = só cobrir; até 3) e `ox`/`oy` (0-1, posição da janela dentro
+ *  da foto; 0.5 = centro) são o ajuste do utilizador (Ruben, 30 out) — a
+ *  janela nunca sai de dentro da foto. */
+export async function bakePhoto(dataUrl, { zoom = 1, ox = 0.5, oy = 0.5, height = PHOTO_H, topScrim = true } = {}) {
   const img = await new Promise((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -39,18 +46,30 @@ export async function bakePhoto(dataUrl) {
     i.src = dataUrl
   })
   const w = T_CARD_W * RATIO
-  const h = PHOTO_H * RATIO
+  const h = height * RATIO
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')
-  const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight)
+  const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight) * Math.min(Math.max(zoom, 1), 3)
   const dw = img.naturalWidth * scale
   const dh = img.naturalHeight * scale
-  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh)
-  // O fundo escurecido, para o cartão se ler por cima.
-  const g = ctx.createLinearGradient(0, h * 0.45, 0, h)
+  const cx = Math.min(Math.max(ox, 0), 1)
+  const cy = Math.min(Math.max(oy, 0), 1)
+  ctx.drawImage(img, -(dw - w) * cx, -(dh - h) * cy, dw, dh)
+  // Escurecido em baixo para fundir com o cartão; em cima só quando o
+  // cartão tem cabeçalho sobre a foto (topScrim) — o dos vencedores do mix
+  // vive todo no fade de baixo (Ruben, 30 out) e quer o topo limpo.
+  if (topScrim) {
+    const gTop = ctx.createLinearGradient(0, 0, 0, h * 0.42)
+    gTop.addColorStop(0, 'rgba(11,11,12,0.82)')
+    gTop.addColorStop(1, 'rgba(11,11,12,0)')
+    ctx.fillStyle = gTop
+    ctx.fillRect(0, 0, w, h * 0.42)
+  }
+  const g = ctx.createLinearGradient(0, h * 0.38, 0, h)
   g.addColorStop(0, 'rgba(11,11,12,0)')
+  g.addColorStop(0.72, 'rgba(11,11,12,0.82)')
   g.addColorStop(1, 'rgba(11,11,12,1)')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, w, h)
@@ -87,7 +106,7 @@ export async function bakeCircle(url, size = 64) {
 }
 
 /** A imagem do mix como «foto» (sem foto escolhida): o mesmo corte da foto. */
-export const bakeImageUrl = async (url) => {
+export const bakeImageUrl = async (url, { height = PHOTO_H, topScrim = true } = {}) => {
   if (!url) return null
   try {
     const blob = await (await fetch(url, { mode: 'cors' })).blob()
@@ -97,7 +116,7 @@ export const bakeImageUrl = async (url) => {
       r.onerror = reject
       r.readAsDataURL(blob)
     })
-    return await bakePhoto(dataUrl)
+    return await bakePhoto(dataUrl, { height, topScrim })
   } catch {
     return null
   }
@@ -144,20 +163,15 @@ function OrgLine({ org }) {
   )
 }
 
-function Footer({ qr }) {
+function Footer() {
   const { t } = useTranslation()
+  // Sem o QR (30 out), o rodapé fica centrado, numa linha, com a bola do
+  // alinho por cima a equilibrar o espaço.
   return (
-    <div className="flex items-end justify-between gap-3">
-      <div>
-        <p className="text-[12px] font-extrabold leading-tight text-white">{t('share.play_padel')}<br />{t('share.on_alinho')}</p>
-        <p className="mt-0.5 text-[7.5px] text-[#9CA3AF]">alinho.pt · #alinhopadel</p>
-      </div>
-      {qr && (
-        <div className="rounded-[8px] bg-white p-[5px]">
-          {/* 72 px a 360 (216 a 1080): lê-se no ecrã de outro telemóvel (designer). */}
-          <img src={qr} alt="" className="block h-[72px] w-[72px]" />
-        </div>
-      )}
+    <div className="text-center">
+      <img src={iconMark} alt="" className="mx-auto mb-1.5 block h-[20px] w-[20px] rounded-full" />
+      <p className="text-[12px] font-extrabold leading-tight text-white">{t('share.play_padel')} {t('share.on_alinho')}</p>
+      <p className="mt-1 text-[7.5px] text-[#9CA3AF]">alinho.pt · #alinhopadel</p>
     </div>
   )
 }
@@ -236,12 +250,12 @@ function PodiumBody({ d, compact }) {
  * variant: 'result' | 'podium'
  * data (result): { kicker, date, mine, teamName, theirs, myScore, theirScore, won, sets, record }
  * data (podium): { kicker, date, place, rows: [{ place, pair, title, mine }], record }
- * photo: data URL já cortado (bakePhoto), ou null · qr: data URL
+ * photo: data URL já cortado (bakePhoto), ou null
  * org (#622, opcional): { name, logo (bakeCircle), initials, sub, place, mark (a bola da alinho) }
  * children (#622, opcional): um miolo próprio no lugar do pódio/resultado;
  *   como função, recebe { compact } (com foto, o miolo encolhe)
  */
-const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, data, photo, qr, org = null, children = null }, ref) {
+const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, data, photo, org = null, children = null }, ref) {
   const nodeRef = useRef(null)
   useImperativeHandle(ref, () => ({
     exportPng: async () => {
@@ -263,13 +277,17 @@ const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, d
   return (
     <div ref={nodeRef} className="relative overflow-hidden bg-[#0B0B0C] font-sans" style={{ width: T_CARD_W, height: T_CARD_H }}>
       {photo && <img src={photo} alt="" className="absolute left-0 top-0 block" style={{ width: T_CARD_W, height: PHOTO_H }} />}
-      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: SAFE, bottom: SAFE }}>
+      {/* O cabeçalho vive sempre no topo (sobre a faixa escura da foto). */}
+      <div className="absolute inset-x-0 px-[18px]" style={{ top: SAFE_TOP }}>
         <Header date={data.date} />
         <OrgLine org={org} />
-        {/* Sem foto, o bloco fica ao centro entre o logótipo e o rodapé;
-            com foto, em baixo, por baixo da foto (designer, 27 set). */}
-        <div className={compact ? 'mt-auto' : 'flex flex-1 flex-col justify-center'}>{children ? (typeof children === 'function' ? children({ compact }) : children) : <Body d={data} compact={compact} />}</div>
-        <div className="mt-3"><Footer qr={qr} /></div>
+      </div>
+      {/* O corpo centra-se no espaço que sobra — por baixo da foto quando a
+          há (Ruben, 30 out: sem o QR, o preto empoçava todo em baixo) — e o
+          rodapé fecha no limite da safe area. */}
+      <div className="absolute inset-x-0 flex flex-col px-[18px]" style={{ top: compact ? PHOTO_H + 8 : 170, bottom: SAFE_BOTTOM }}>
+        <div className="flex flex-1 flex-col justify-center">{children ? (typeof children === 'function' ? children({ compact }) : children) : <Body d={data} compact={compact} />}</div>
+        <div className="mt-3"><Footer /></div>
       </div>
     </div>
   )

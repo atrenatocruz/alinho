@@ -27,6 +27,9 @@ export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
     rows,
     share: {
       variant: 'podium',
+      // O cartão premium dos vencedores (MixWinnersShareCard, 30 out) —
+      // só o mix de duplas fixas; americano/aberto ficam no cartão comum.
+      premium: true,
       data: {
         kicker: t('mixwinners.kicker_mix'),
         date: shortDate(game.date, lang),

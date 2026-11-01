@@ -414,9 +414,10 @@ export default function TournamentPage() {
     // A pontuação e, por baixo, o modo dos 40-40; o «?» no canto e a caixa
     // inteira abrem «Como se joga o 40-40» (design-handoff/2026-10-22-aos-40-40-criar,
     // ponto 4 e «Caixa Pontuação», Francisco 28 out).
-    // Com uma pontuação em cada fase (26 out), uma linha por fase; iguais,
-    // como antes.
-    { key: 'scoring', label: t('tournament.create.scoring'),
+    // Com uma pontuação em cada fase (26 out), uma linha por fase e a caixa
+    // a toda a largura (UX 29 out: a meia largura partia em 5 linhas);
+    // iguais, como antes.
+    { key: 'scoring', label: t('tournament.create.scoring'), wide: !scorings.same,
       value: (
         <span className="flex flex-col">
           {scorings.same ? <span>{scoringName(t, scorings.groups)}</span> : <>
@@ -532,7 +533,7 @@ export default function TournamentPage() {
         {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
         {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
 
-        <EventFacts items={heroFacts} />
+        <EventFacts items={heroFacts} fillRows />
         {deuceHelp && <ScoringHelpSheet rules={tour.rules} mode={deuceMode} onClose={() => setDeuceHelp(false)} />}
 
         {/* Com o sorteio feito, o terminar de cada categoria (o passo seguinte

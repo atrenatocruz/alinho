@@ -90,11 +90,10 @@ export default function MonthPodiumShare({ share, org, onClose }) {
   // «Inês C.» já acaba em ponto: nada de «Inês C..».
   const text = `${t(`monthshare.text_${kind}${org ? '' : '_global'}`, { month: name, club: scopeName, names: list }).replace('..', '.')} ${t('friends.share_tags')}`
   const cardOrg = { name: scopeName, initials: org ? initials(org.name) : null, mark: !org, sub: t(`monthshare.org_sub_${kind}`) }
-  const qrUrl = org?.slug ? `${appOrigin()}/clube/${org.slug}` : 'https://alinho.pt'
 
   return (
     <TournamentShareFlow variant="custom" data={{ date }} text={text} filenameParts={['podio', kind, month.slice(0, 7)]}
-      shareTitle={t(`monthshare.kicker_${kind}`)} qrUrl={qrUrl} org={cardOrg} onClose={onClose}>
+      shareTitle={t(`monthshare.kicker_${kind}`)} org={cardOrg} onClose={onClose}>
       {({ compact }) => <MonthPodiumBody kind={kind} title={title} podium={podium} faces={faces} month={month} lang={lang} compact={compact} />}
     </TournamentShareFlow>
   )

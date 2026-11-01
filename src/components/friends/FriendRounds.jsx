@@ -60,7 +60,9 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   const courtsN = Math.max(1, ...games.map((g) => g.court_number || 1))
   const anon = new Set(invitees.filter((i) => i.is_anonymous).map((i) => i.invitee_id))
   const pending = invitees.filter((i) => i.status === 'pending').length
+  // Quem organiza sem jogar (#736) não está nos convidados.
   const creator = invitees.find((i) => i.is_creator)
+    || (match.creator_plays === false ? { name: match.creator_name } : undefined)
   const name = (p) => (anon.has(p.invitee_id) ? <i key={p.invitee_id} className="font-semibold text-muted">{t('friends.anon_name')}</i> : shortName(p.name))
   const pair = (team) => (team || []).map((p, i) => <span key={p.invitee_id || i}>{i > 0 && ' / '}{name(p)}</span>)
   // O resultado marca-se a partir da hora do jogo, durante ou depois

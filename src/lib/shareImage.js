@@ -45,6 +45,10 @@ export async function shareOrSaveImage(blob, { filename = 'alinho.png', title = 
       // Alguns telemóveis recusam a partilha com ficheiro: guarda-se.
     }
   }
+  return saveBlob(blob, filename)
+}
+
+function saveBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -54,6 +58,22 @@ export async function shareOrSaveImage(blob, { filename = 'alinho.png', title = 
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
   return 'saved'
+}
+
+/** Guardar no telemóvel a foto tirada na hora, sem o cartão (#742,
+ *  Francisco 29 out). No iPhone só a folha de partilha chega às Fotos
+ *  («Guardar imagem»); nos outros transfere-se e aparece na galeria.
+ *  Devolve 'shared', 'cancelled' ou 'saved'. */
+export async function saveOriginalPhoto(file, filename) {
+  const nav = typeof navigator !== 'undefined' ? navigator : {}
+  const ios = /iPad|iPhone|iPod/.test(nav.userAgent || '') || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
+  return ios ? shareOrSaveImage(file, { filename }) : saveBlob(file, filename)
+}
+
+/** O nome da foto: «alinho-clube-mix-de-quinta-foto.jpg». */
+export function photoFilename(file, ...parts) {
+  const ext = String(file?.type || '').split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'
+  return shareFilename(...parts, 'foto').replace(/\.png$/, `.${ext}`)
 }
 
 /** O nome do ficheiro: «alinho-smash-cup-m5-final.png». */

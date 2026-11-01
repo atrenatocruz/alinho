@@ -6,6 +6,7 @@ import { SITE_EYEBROW, SITE_H2, SITE_LEAD } from '../components/site/SiteWays'
 import { PartnerCard, usePublicPartners } from '../components/site/PartnerCards'
 import { PartnersForBrands } from './Plans'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
+import { trackPartner } from '../lib/partners'
 
 /* alinho.pt/parceiros — os parceiros do alinho.pt (design-handoff/2026-10-18-
    parceiros-primeiro, ecrã 5; aprovado pelo Francisco a 18 out). Um cartão por
@@ -22,6 +23,13 @@ export default function Parceiros() {
   const { hash } = useLocation()
   const { on, loading } = useFeatureFlag('parceiros')
   const partners = usePublicPartners(on)
+  // Os Números do parceiro: uma vista de cada cartão mostrado, uma vez por
+  // página aberta (só aqui, não na entrada do site; Dev 3 e PO, 28 out).  Sem
+  // sessão, a base conta pelo IP com um segredo do dia (privacidade v3).
+  const ids = (partners || []).map((p) => p.id).filter(Boolean).join(',')
+  useEffect(() => {
+    if (on) ids.split(',').filter(Boolean).forEach((id) => trackPartner(id, 'page_site'))
+  }, [on, ids])
   // Com #marcas, desce ao «Para marcas e lojas» quando a página já tem tudo.
   useEffect(() => {
     if (hash !== '#marcas' || loading || (on && partners === null)) return

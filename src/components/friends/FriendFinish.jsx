@@ -14,7 +14,6 @@ import { Check, X } from 'lucide-react'
 import { ConfirmSheet } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { finishFriendMatch } from '../../lib/privateMatches'
-import { qrDataUrl } from '../../lib/shareImage'
 import TournamentShareFlow from '../tournament/TournamentShareFlow'
 import TournamentShareCard, { T_CARD_W, T_CARD_H } from '../tournament/TournamentShareCard'
 import FriendWinnersBody from './FriendWinnersBody'
@@ -96,7 +95,7 @@ export function FinishBlock({ match, games, invitees, myUserId, hasLive, onSent,
 
 /** O cartão dos vencedores (#622): o cartão comum de todos os jogos (base do
  *  Dev 2), com o grupo — ou «📍 o sítio» sem grupo — por baixo do logótipo,
- *  o miolo dos amigos e o QR para alinho.pt. */
+ *  o miolo dos amigos (o QR saiu das partilhas a 30 out). */
 // O texto sugerido (UX, 11 out), como nos outros jogos: quem ganhou, «🏆
 // Tiago e eu ganhámos 3 rondas a 1!»; quem perdeu, «Hoje ganharam Rita F. /
 // Tiago L. Para a próxima é nossa.»; com vários pares (ou quem não jogou),
@@ -139,7 +138,7 @@ export function FriendWinnersShare({ match, games, me = null, onClose }) {
   const p = friendShareProps(t, i18n, match, games, me)
   return (
     <TournamentShareFlow variant="custom" data={p.data} text={p.text} filenameParts={p.filenameParts}
-      shareTitle={t('friends.card_kicker')} qrUrl="https://alinho.pt" org={p.org} onClose={onClose}>
+      shareTitle={t('friends.card_kicker')} org={p.org} onClose={onClose}>
       {({ compact }) => <FriendWinnersBody match={match} games={games} pairs={p.pairs} compact={compact} />}
     </TournamentShareFlow>
   )
@@ -151,12 +150,6 @@ export function FriendWinnersShare({ match, games, me = null, onClose }) {
 export function FinishedPage({ match, games, toast, me = null, onClose }) {
   const { t, i18n } = useTranslation()
   const [sharing, setSharing] = useState(false)
-  const [qr, setQr] = useState(null)
-  useEffect(() => {
-    let alive = true
-    qrDataUrl('https://alinho.pt', { size: 240 }).then((u) => { if (alive) setQr(u) }).catch(() => {})
-    return () => { alive = false }
-  }, [])
   const p = friendShareProps(t, i18n, match, games, me)
   return createPortal(
     <div className="fixed inset-0 z-[55] overflow-y-auto bg-white animate-fade-in">
@@ -173,7 +166,7 @@ export function FinishedPage({ match, games, toast, me = null, onClose }) {
         <h1 className="mt-3 font-display text-2xl text-ink-900">{t('friends.finished_title')}</h1>
         <div className="mx-auto mt-3 overflow-hidden rounded-card" style={{ width: T_CARD_W * PREVIEW, height: T_CARD_H * PREVIEW }}>
           <div style={{ transform: `scale(${PREVIEW})`, transformOrigin: 'top left', width: T_CARD_W, height: T_CARD_H }}>
-            <TournamentShareCard variant="custom" data={p.data} photo={null} qr={qr} org={p.org}>
+            <TournamentShareCard variant="custom" data={p.data} photo={null} org={p.org}>
               {({ compact }) => <FriendWinnersBody match={match} games={games} pairs={p.pairs} compact={compact} />}
             </TournamentShareCard>
           </div>
