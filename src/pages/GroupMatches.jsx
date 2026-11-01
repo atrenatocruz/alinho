@@ -305,9 +305,13 @@ export default function GroupMatches() {
             : <h2 className="text-3xl text-ink-900">{t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')}</h2>}
           {org && <p className="text-muted text-sm mt-0.5">{t('groupmatches.subtitle', { group: org.name })}</p>}
         </div>
-        <Link to={`/clube/${slug}/jogos/novo`} className="block">
-          <PrimaryButton type="button" className="w-full"><Plus size={18} className="shrink-0" /> {t(org?.kind === 'group' ? 'groupmatches.create_button_group' : 'groupmatches.create_button')}</PrimaryButton>
-        </Link>
+        {/* Só quem organiza cria jogos, nos grupos e nos clubes (Francisco,
+            29 out; a base recusa com not_group_admin). */}
+        {isOrgAdmin && (
+          <Link to={`/clube/${slug}/jogos/novo`} className="block">
+            <PrimaryButton type="button" className="w-full"><Plus size={18} className="shrink-0" /> {t(org?.kind === 'group' ? 'groupmatches.create_button_group' : 'groupmatches.create_button')}</PrimaryButton>
+          </Link>
+        )}
       </div>
 
       {loading ? (
@@ -322,7 +326,8 @@ export default function GroupMatches() {
         // Erro a carregar a página toda: o Alino «ups» (mascote, 12 out).
         <LoadErrorState title={loadError} />
       ) : matches.length === 0 && friendGames.length === 0 ? (
-        <EmptyState title={t('groupmatches.empty_title')} subtitle={t('groupmatches.empty_subtitle')} />
+        // «Sê o primeiro a criar…» só a quem pode criar.
+        <EmptyState title={t('groupmatches.empty_title')} subtitle={isOrgAdmin ? t('groupmatches.empty_subtitle') : null} />
       ) : (
         <div className="space-y-3.5">
           <GroupFriendGames games={friendGames} org={org} />

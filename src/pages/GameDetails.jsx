@@ -18,7 +18,7 @@ import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, Tabs, ConfirmSheet } from '../components/ui'
+import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, BadgePill, DateField, Tabs, ConfirmSheet } from '../components/ui'
 import { isDraftMix } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { isMixLimitError, planLimitMessage } from '../lib/plans'
@@ -3688,7 +3688,7 @@ export default function GameDetails() {
               { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
               { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
               { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
-              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
+              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <BadgePill text={`${lvl.scale}${lvl.num}`} /> : null },
               { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
             )
             return (

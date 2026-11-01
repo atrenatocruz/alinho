@@ -8,6 +8,7 @@ import { timeOptions, toMin } from '../lib/timeSlots'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand, peopleRatingBand } from '../lib/elo'
+import { levelColor, LEVEL_TEXT } from '../lib/levelColors'
 import { planName } from '../lib/plans'
 import { achievementIcon, RARITY_META, formatRarityPct } from '../lib/achievements'
 import { medalUrl } from '../lib/achievementMedals'
@@ -426,29 +427,22 @@ export function DateTimeField({ value, onChange, placeholder, min = null }) {
    ════════════════════════════════════════════════════════════════════════ */
 
 /* ─── BadgePill ──────────────────────────────────────────────────────────
-   Pill partilhado por RatingBadge e GroupLevelBadge — as várias famílias
-   de badge têm de se manter visualmente idênticas, por isso o markup vive
-   uma vez. */
-export function BadgePill({ text, title, me = false, size = 'sm', onDark = false }) {
+   Pill partilhado por RatingBadge, GroupLevelBadge e o LevelPill das aulas —
+   as várias famílias de badge têm de se manter visualmente idênticas, por
+   isso o markup vive uma vez. Cheia com a cor do número e o texto preto, no
+   fundo claro e no escuro (Francisco, 30 out: uma cor por nível; as cores
+   estão em lib/levelColors.js). */
+export function BadgePill({ text, title, size = 'sm' }) {
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5',
     md: 'text-sm px-3 py-1',
   }
-  // O badge normal e uma pilula ink-900 com texto lime. Sobre uma superficie
-  // ink-900 — o heroi do Perfil e o do PlayerDetails — isso e preto sobre
-  // preto: a pilula desaparece e fica so o texto a flutuar. `onDark` da-lhe
-  // uma superficie visivel sem lhe roubar a identidade: continua a ser texto
-  // lime, e o lime cheio fica reservado ao `me`, que e o sinal "este es tu".
-  const variant = me
-    ? 'bg-lime-400 text-ink-900'
-    : onDark
-      ? 'bg-lime-400/20 text-lime-400 ring-1 ring-lime-400/60'
-      : 'bg-ink-900 text-lime-400'
   return (
     <span
       title={title}
-      className={`inline-flex items-center rounded-full font-mono font-extrabold tracking-wide uppercase
-                  ${sizes[size]} ${variant}`}
+      style={{ backgroundColor: levelColor(text), color: LEVEL_TEXT }}
+      className={`inline-flex items-center whitespace-nowrap rounded-full font-mono font-extrabold tracking-wide uppercase
+                  ${sizes[size]}`}
     >
       {text}
     </span>
@@ -458,11 +452,11 @@ export function BadgePill({ text, title, me = false, size = 'sm', onDark = false
 /* ─── RatingBadge ────────────────────────────────────────────────────────
    Banda pública do Elo (M6, F4, INI…), derivada do rating do jogador. Não renderiza nada
    para contas ainda sem rating. */
-export function RatingBadge({ rating, gender, me = false, size = 'sm', onDark = false }) {
+export function RatingBadge({ rating, gender, size = 'sm' }) {
   const { t } = useTranslation()
   const band = ratingBand(rating, gender)
   if (!band) return null
-  return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} me={me} size={size} onDark={onDark} />
+  return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} size={size} />
 }
 
 /* ─── GroupLevelBadge ────────────────────────────────────────────────────

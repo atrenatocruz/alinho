@@ -520,7 +520,7 @@ export default function Rankings() {
             {/* O nível ao lado da posição: os pontos sozinhos não dizem se
                 se é M4 ou M5 (pedido do Francisco, 17 set). */}
             <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
-              {me.rating != null && <span className="shrink-0 flex"><RatingBadge rating={me.rating} gender={me.gender} onDark /></span>}
+              {me.rating != null && <span className="shrink-0 flex"><RatingBadge rating={me.rating} gender={me.gender} /></span>}
               <p className="text-[11px] text-white/60 truncate">
                 {me.position
                   ? `${t('rankings.your_position', { position: me.position, total: myTotal })}${byScale ? ` · ${t(`rankings.scale_${me.scale}`)}` : ''}`
