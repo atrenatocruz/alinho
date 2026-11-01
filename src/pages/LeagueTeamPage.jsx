@@ -4,15 +4,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BackBar, PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
+import { BackBar, BadgePill, PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
 import { getLeagueTeam, rosterCandidates, addToRoster, removeFromRoster, setCaptain, leagueErrorMessage } from '../lib/leagueApi'
 import { categoryCode } from '../lib/tournaments'
 
-const Level = ({ band, gender }) => (
-  <span className="rounded-full bg-ink-900 px-2 py-0.5 font-mono text-[10.5px] font-bold text-lime-400">
-    {band === 7 ? 'INI' : `${gender === 'feminino' ? 'F' : 'M'}${band}`}
-  </span>
-)
+const Level = ({ band, gender }) => <BadgePill text={band === 7 ? 'INI' : `${gender === 'feminino' ? 'F' : 'M'}${band}`} />
 
 const linkCls = 'min-h-[44px] font-display text-sm font-extrabold text-ink-900 underline underline-offset-[3px]'
 

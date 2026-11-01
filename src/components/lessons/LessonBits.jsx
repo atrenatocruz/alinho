@@ -4,18 +4,15 @@
 // vêm de src/lib/kindColors.js.
 import { ratingBand } from '../../lib/elo'
 import { KIND_COLORS } from '../../lib/kindColors'
-import { switchTrack, switchKnob } from '../ui'
+import { BadgePill, switchTrack, switchKnob } from '../ui'
 
 export const TEAL = { bg: KIND_COLORS.lesson.light, border: KIND_COLORS.lesson.line, text: KIND_COLORS.lesson.strong }
 
-/** "M5", "F2", "INI" — pastilha preta em mono, como nos wireframes. */
-export function LevelPill({ label, className = '' }) {
+/** "M5", "F2", "INI": a mesma pastilha do resto da app, com a cor do nível
+ *  (Francisco, 30 out; antes era quadrada, preta e com o texto branco). */
+export function LevelPill({ label }) {
   if (!label) return null
-  return (
-    <span className={`inline-flex items-center whitespace-nowrap font-mono text-[10px] font-bold bg-ink-900 text-white rounded-md px-1.5 py-0.5 leading-none ${className}`}>
-      {label}
-    </span>
-  )
+  return <BadgePill text={label} />
 }
 
 export const bandLabel = (rating, gender) => ratingBand(rating, gender)?.label || null

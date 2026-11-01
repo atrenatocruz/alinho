@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import TournamentShareFlow from '../tournament/TournamentShareFlow'
-import { bakeCircle } from '../tournament/TournamentShareCard'
+import { Row, TopRow, bakeCircle } from '../tournament/TournamentShareCard'
 import { shortName, monthName } from '../../lib/monthRanking'
 import { Crown } from './RankPodium'
 import { appOrigin } from '../../lib/native'
@@ -9,57 +9,50 @@ import { localeOf } from '../../lib/formatDate'
 
 /* A imagem do pódio para partilhar (design-handoff/2026-10-12-ranking-do-
    mes-podio, ponto 7 e acerto de 12 out): o fluxo de sempre (foto opcional,
-   pré-visualização, texto, Partilhar) com o cartão comum (#622). O miolo é o
-   pódio grande com os degraus clássicos 2·1·3 — o 1.º ao centro e mais alto,
-   com a coroa 3D. Serve os três separadores: Do mês, Ranking e Assiduidade. */
+   pré-visualização, texto, Partilhar) com o cartão comum de todas as
+   partilhas (#743, 30 out). Sem foto, o pódio desenhado com os degraus
+   clássicos 2·1·3 (o 1.º ao centro e mais alto, com a coroa) faz de foto; os
+   nomes e os pontos vão em lista por baixo, como nos outros. Serve os três
+   separadores: Do mês, Ranking e Assiduidade. */
 
 const LIME = '#C5DD01'
 const STEP = {
-  1: { h: 88, bg: '#3A4410', fg: LIME },
-  2: { h: 64, bg: '#2A2E35', fg: '#E5E7EB' },
-  3: { h: 46, bg: '#4A3326', fg: '#E7A57B' },
+  1: { h: 100, bg: LIME },
+  2: { h: 70, bg: '#D4D7DC' },
+  3: { h: 50, bg: '#E2A06B' },
 }
-const RING = { 1: '#E8B23A', 2: '#B8BEC7', 3: '#C98B5E' }
 
 // A primeira letra de cada palavra: «Admin (Dev)» → «AD», nunca «A(».
 const initials = (name) => String(name || '?').split(/\s+/).map((w) => w.match(/\p{L}/u)?.[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
 
-function Spot({ row, place, face, compact }) {
-  const size = (place === 1 ? 64 : 52) * (compact ? 0.8 : 1)
+function Spot({ row, place, face }) {
+  const size = place === 1 ? 56 : 46
   const step = STEP[place]
   return (
     <div className="flex flex-1 flex-col items-center justify-end">
-      {row ? (
-        <>
-          <div className="relative">
-            {place === 1 && <Crown ring={size + 4} />}
-            <div className="rounded-full p-[2px]" style={{ background: RING[place] }}>
-              {face
-                ? <img src={face} alt="" className="block rounded-full" style={{ width: size, height: size }} />
-                : <span className="flex items-center justify-center rounded-full bg-[#1A1A1D] text-[13px] font-extrabold text-white" style={{ width: size, height: size }}>{initials(row.name)}</span>}
-            </div>
+      {row && (
+        <div className="relative">
+          {place === 1 && <Crown ring={size + 4} />}
+          <div className="rounded-full p-[2px]" style={{ background: step.bg }}>
+            {face
+              ? <img src={face} alt="" className="block rounded-full" style={{ width: size, height: size }} />
+              : <span className="flex items-center justify-center rounded-full bg-[#1E2128] text-[13px] font-extrabold text-white" style={{ width: size, height: size }}>{initials(row.name)}</span>}
           </div>
-          <p className="mt-1 max-w-full truncate text-[10px] font-extrabold text-white">{shortName(row.name)}</p>
-          <p className="text-[9px] font-extrabold" style={{ color: LIME }}>{row.display}</p>
-        </>
-      ) : <div style={{ height: size }} />}
-      <div className="mt-1.5 flex w-full items-center justify-center rounded-t-[6px] font-display text-[22px] font-extrabold"
-        style={{ height: step.h * (compact ? 0.7 : 1), background: step.bg, color: step.fg }}>{place}</div>
+        </div>
+      )}
+      <div className="mt-2 flex w-full items-center justify-center rounded-t-[10px] font-display text-[22px] font-black text-[#0B0B0C]"
+        style={{ height: step.h, background: step.bg }}>{place}</div>
     </div>
   )
 }
 
-function MonthPodiumBody({ kind, podium, faces, month, lang, compact, title }) {
-  const { t } = useTranslation()
+/** O pódio desenhado, na zona da foto (sem foto). */
+function PodiumHero({ podium, faces }) {
   // Degraus 2·1·3: o 2.º à esquerda, o 1.º ao centro, o 3.º à direita.
   const order = [[podium[1], 2], [podium[0], 1], [podium[2], 3]]
   return (
-    <div>
-      <p className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">{t(`monthshare.kicker_${kind}`)}</p>
-      <p className={`mt-1 font-display font-extrabold leading-none ${compact ? 'text-[24px]' : 'text-[32px]'}`} style={{ color: LIME }}>{title}</p>
-      <div className={`flex items-end gap-1.5 ${compact ? 'mt-7' : 'mt-11'}`}>
-        {order.map(([row, place]) => <Spot key={place} row={row} place={place} face={row ? faces[row.user_id] : null} compact={compact} />)}
-      </div>
+    <div className="absolute flex items-end gap-2" style={{ left: 24, right: 24, top: 96, height: 210 }}>
+      {order.map(([row, place]) => <Spot key={place} row={row} place={place} face={row ? faces[row.user_id] : null} />)}
     </div>
   )
 }
@@ -80,8 +73,9 @@ export default function MonthPodiumShare({ share, org, onClose }) {
   }, [podium])
 
   const name = monthName(month, lang)
-  // O título grande: o mês, no Do mês; nos outros, o que vier (a escala ou «XP»).
-  const title = kind === 'month' ? name.charAt(0).toUpperCase() + name.slice(1) : share.title
+  // A faixa do título: «Pódio do mês»; nos outros, com a escala ou «XP»
+  // («Pódio do ranking · Masculino»). O mês já vai na data, à direita.
+  const label = [t(`monthshare.kicker_${kind}`), kind === 'month' ? null : share.title].filter(Boolean).join(' · ')
   const date = new Date(`${month.slice(0, 7)}-01T12:00:00`)
     .toLocaleDateString(localeOf(lang), { month: 'long', year: 'numeric' }).replace(' de ', ' ').toLocaleUpperCase(lang)
   const scopeName = org?.name || t('monthshare.global')
@@ -89,12 +83,19 @@ export default function MonthPodiumShare({ share, org, onClose }) {
   const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} ${t('monthshare.and')} ${names[names.length - 1]}` : names[0] || ''
   // «Inês C.» já acaba em ponto: nada de «Inês C..».
   const text = `${t(`monthshare.text_${kind}${org ? '' : '_global'}`, { month: name, club: scopeName, names: list }).replace('..', '.')} ${t('friends.share_tags')}`
-  const cardOrg = { name: scopeName, initials: org ? initials(org.name) : null, mark: !org, sub: t(`monthshare.org_sub_${kind}`) }
+  const cardOrg = { name: scopeName, initials: org ? initials(org.name) : null, mark: !org }
+  const rows = podium.map((r, i) => r && { place: i + 1, name: shortName(r.name), score: r.display }).filter(Boolean)
 
   return (
-    <TournamentShareFlow variant="custom" data={{ date }} text={text} filenameParts={['podio', kind, month.slice(0, 7)]}
-      shareTitle={t(`monthshare.kicker_${kind}`)} org={cardOrg} onClose={onClose}>
-      {({ compact }) => <MonthPodiumBody kind={kind} title={title} podium={podium} faces={faces} month={month} lang={lang} compact={compact} />}
+    <TournamentShareFlow variant="custom" kind="podio" data={{ date, label }} text={text} filenameParts={['podio', kind, month.slice(0, 7)]}
+      link={org?.slug ? `${appOrigin()}/clube/${org.slug}` : 'https://alinho.pt'}
+      shareTitle={t(`monthshare.kicker_${kind}`)} org={cardOrg} onClose={onClose}
+      hero={<PodiumHero podium={podium} faces={faces} />}>
+      <div>
+        {rows.map((r) => (r.place === 1
+          ? <TopRow key={r.place} lead="1.º" name={r.name} right={r.score} />
+          : <Row key={r.place} lead={`${r.place}.º`} name={r.name} right={r.score} />))}
+      </div>
     </TournamentShareFlow>
   )
 }

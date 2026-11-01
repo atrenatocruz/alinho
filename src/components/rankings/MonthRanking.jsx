@@ -189,7 +189,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare, partne
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-extrabold">{t('rankings.you_row')}</p>
                 <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-                  {me?.rating != null && <span className="flex shrink-0"><RatingBadge rating={me.rating} gender={me.gender} onDark /></span>}
+                  {me?.rating != null && <span className="flex shrink-0"><RatingBadge rating={me.rating} gender={me.gender} /></span>}
                   <p className="truncate text-[11px] text-white/60">
                     {me?.qualified
                       ? `${t('rankings.your_position', { position: me.place, total: qualifiedCount })} · ${t(`rankings.scale_${scale}`)}`

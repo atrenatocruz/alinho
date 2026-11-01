@@ -18,7 +18,7 @@ import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, Tabs, ConfirmSheet } from '../components/ui'
+import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, BadgePill, DateField, Tabs, ConfirmSheet } from '../components/ui'
 import { isDraftMix } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { isMixLimitError, planLimitMessage } from '../lib/plans'
@@ -52,7 +52,6 @@ import { deuceModeOf, scoringHasDeuce } from '../lib/deuceMode'
 import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
-import MixWinnersShareCard, { MIX_HERO_H } from '../components/mix/MixWinnersShareCard'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
 import { duplasWinners, americanoWinners, rotatingWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
@@ -3689,7 +3688,7 @@ export default function GameDetails() {
               { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
               { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
               { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
-              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
+              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <BadgePill text={`${lvl.scale}${lvl.num}`} /> : null },
               { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
             )
             return (
@@ -3750,19 +3749,17 @@ export default function GameDetails() {
       {winnersShareOpen && shownWinnersShare && (
         <TournamentShareFlow
           variant={shownWinnersShare.variant}
-          data={shownWinnersShare.premium ? {
-            ...shownWinnersShare.data,
-            // O cartão premium só precisa do grupo — a data já vem no
-            // data.date (shortDate traz o dia da semana; 3.ª volta, 30 out).
-            meta: { club: winnersOrg?.name || null },
-          } : shownWinnersShare.data}
+          // O cartão comum de todas as partilhas (#743): a cor e a imagem do
+          // tipo; o link do texto vai para onde o QR levava (o clube ou grupo).
+          kind={isOpenGame(game) ? 'aberto' : 'mix'}
+          data={shownWinnersShare.data}
           text={shownWinnersShare.text}
+          link={orgSlug ? `${appOrigin()}/clube/${orgSlug}` : appOrigin()}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
           org={winnersOrg}
-          fallbackImage={game.image_url || (shownWinnersShare.premium ? '/topo/topo-mix.webp' : null)}
+          fallbackImage={game.image_url}
           onClose={() => setWinnersShareOpen(false)}
-          {...(shownWinnersShare.premium ? { Card: MixWinnersShareCard, photoH: MIX_HERO_H, photoTopScrim: false } : {})}
         />
       )}
 
