@@ -375,6 +375,19 @@ const RPC_MOCKS = {
       : [],
     prize_month: `${new Date().toISOString().slice(0, 7)}-01`, prize_district: 'Setúbal',
   } : null),
+  // O parceiro na Home (#753): a RM, com o interruptor mockParceiros.
+  // mockHighlightSeen = 'true': já viu o destaque noutro aparelho (vem a linha).
+  // mockPartnerUpcoming = 'true': o acordo só começa no mês que vem (sem
+  // prémios). mockPartnerLongName = 'true': um nome comprido.
+  list_my_partner_cards: () => {
+    const p = RPC_MOCKS.get_partner({ p_slug: 'rm-terapias' })
+    const next = new Date(); next.setDate(1); next.setMonth(next.getMonth() + 1)
+    if (localStorage.getItem('mockPartnerUpcoming') === 'true') Object.assign(p, { prizes: [], prizes_from: next.toISOString().slice(0, 10) })
+    if (localStorage.getItem('mockPartnerLongName') === 'true') p.name = 'RM Terapias e Fisioterapia Desportiva'
+    return [p]
+  },
+  my_partner_highlights_seen: () => (localStorage.getItem('mockHighlightSeen') === 'true' ? ['pt-rm'] : []),
+  mark_partner_highlight_seen: () => null,
   // A lista do site alinho.pt/parceiros (Dev 1, 28 out): só a RM.
   list_partners: () => [RPC_MOCKS.get_partner({ p_slug: 'rm-terapias' })],
   // A página de quem gere um parceiro (Dev 3, 22 out). localStorage.mockPartnerManager

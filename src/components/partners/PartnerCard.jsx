@@ -9,25 +9,26 @@ import { DISTRICT_SCOPE, partnerInitials, sortedPrizes, topDiscount, upcomingMon
 
 const MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
-export function PartnerLogo({ partner, size = 28 }) {
+export function PartnerLogo({ partner, size = 28, radius = 7 }) {
   return partner?.logo_url
-    ? <img src={partner.logo_url} alt="" className="shrink-0 rounded-[7px] object-cover" style={{ width: size, height: size }} />
+    ? <img src={partner.logo_url} alt="" className="shrink-0 object-cover" style={{ width: size, height: size, borderRadius: radius }} />
     : (
-      <span className="flex shrink-0 items-center justify-center rounded-[7px] bg-ink-900 font-display font-black text-lime-400"
-        style={{ width: size, height: size, fontSize: size * 0.36 }}>
+      <span className="flex shrink-0 items-center justify-center bg-ink-900 font-display font-black text-lime-400"
+        style={{ width: size, height: size, borderRadius: radius, fontSize: size * 0.36 }}>
         {partnerInitials(partner?.name)}
       </span>
     )
 }
 
-export default function PartnerCard({ partner }) {
+// onDismiss: o «Já vi» no fundo (#753); onSeen: o cartão ficou à vista.
+export default function PartnerCard({ partner, onSeen, onDismiss }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const prizes = sortedPrizes(partner)
   const district = partner.prize_district || partner.district
   const open = () => navigate(`/parceiro/${partner.slug}`)
   // Os Números da Rita: o cartão à vista na Home.
-  const seenRef = usePartnerSeen(partner.id, 'home_card')
+  const seenRef = usePartnerSeen(partner.id, 'home_card', onSeen)
   const openRanking = (e) => {
     e.stopPropagation()
     navigate('/rankings', { state: { tab: 'do-mes', scope: district ? `${DISTRICT_SCOPE}${district}` : undefined, scale: 'all' } })
@@ -38,8 +39,9 @@ export default function PartnerCard({ partner }) {
       <div className="flex items-center gap-2.5">
         <PartnerLogo partner={partner} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-ink-900">{partner.name}</p>
-          <p className="truncate text-[12px] text-[#5B6068]">{t('partners.of_alinho', { city: partner.city || district || '' })}</p>
+          {/* Nada se corta com «…»: parte para baixo (UX, 2 nov, #753). */}
+          <p className="break-words font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-ink-900">{partner.name}</p>
+          <p className="break-words text-[12px] leading-snug text-[#5B6068]">{t('partners.of_alinho', { city: partner.city || district || '' })}</p>
         </div>
         <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] font-extrabold text-ink-900">{t('partners.tag')}</span>
       </div>
@@ -64,7 +66,7 @@ export default function PartnerCard({ partner }) {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#F4F5F1] text-[16px]" aria-hidden="true">{MEDAL[p.place]}</span>
             <span className="min-w-0 flex-1">
               <span className="block text-[13.5px] font-extrabold text-ink-900">{t('partners.place', { place: p.place })}</span>
-              {p.description && <span className="block truncate text-[12px] text-[#5B6068]">{p.description}</span>}
+              {p.description && <span className="block break-words text-[12px] leading-snug text-[#5B6068]">{p.description}</span>}
             </span>
             <span className="shrink-0 font-display text-[15px] font-black text-ink-900">−{p.discount_pct}%</span>
           </li>
@@ -73,6 +75,12 @@ export default function PartnerCard({ partner }) {
       <button type="button" onClick={openRanking} className="mt-1 inline-flex min-h-[40px] items-center text-[13.5px] font-extrabold text-ink-900">
         {t('partners.see_month_ranking')} ›
       </button>
+      {onDismiss && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onDismiss() }}
+          className="press mt-1 flex min-h-[44px] w-full items-center justify-center rounded-full border border-[#D5D7D0] bg-white text-[14px] font-extrabold text-ink-900">
+          {t('partners.seen_button')}
+        </button>
+      )}
     </article>
   )
 }
