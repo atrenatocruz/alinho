@@ -25,6 +25,17 @@ export const markPlanRequestPaid = (requestId) => rpc('mark_plan_request_paid', 
 export const startPlanTrial = (orgId, tier) => rpc('start_plan_trial', { p_organization_id: orgId, p_tier: tier })
 export const stopPlanTrial = (orgId) => rpc('stop_plan_trial', { p_organization_id: orgId })
 
+// Só superadmins («Planos pedidos», #723 envio 2).
+export const adminListPlanRequests = () => rpc('admin_list_plan_requests')
+export const adminListPlanRenewals = () => rpc('admin_list_plan_renewals')
+export const adminListPlanTrials = () => rpc('admin_list_plan_trials')
+export const adminAcceptPlanRequest = (requestId, paidUntil = null) =>
+  rpc('admin_accept_plan_request', { p_request_id: requestId, p_paid_until: paidUntil })
+export const adminDeclinePlanRequest = (requestId, reason, note = null) =>
+  rpc('admin_decline_plan_request', { p_request_id: requestId, p_reason: reason, p_note: note })
+// «Renovou: mais um mês» e «Passar ao Free» (pedidas ao Dev 3 a 22 out).
+export const adminRenewPlan = (orgId, paidUntil = null) => rpc('admin_renew_plan', { p_organization_id: orgId, p_paid_until: paidUntil })
+export const adminEndPaidPlan = (orgId) => rpc('admin_end_paid_plan', { p_organization_id: orgId })
 
 /** Hoje em Lisboa, 'YYYY-MM-DD' (as datas dos planos são de Lisboa). */
 export function lisbonToday() {

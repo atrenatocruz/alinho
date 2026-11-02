@@ -9,7 +9,7 @@ import PlayerSearch from '../components/PlayerSearch'
 import AdminDeleteAccountPanel from '../components/AdminDeleteAccountPanel'
 import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
-import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
+import { listPendingMembershipRequestsForAdmin, useMemberCounts } from '../lib/organizations'
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
 import { planName } from '../lib/plans'
@@ -21,6 +21,7 @@ import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 import { coverOf } from '../lib/orgCover'
 import SuperadminModeCard from '../components/gerir/SuperadminModeCard'
 import ManagedPartnersSection from '../components/partners/ManagedPartnersSection'
+import PlanRequestsCard from '../components/gerir/PlanRequestsCard'
 
 
 export default function Gerir() {
@@ -100,6 +101,9 @@ export default function Gerir() {
   }
 
   const clubsToShow = isPlatformAdmin ? allOrganizations : adminOrganizations
+  // Quantos membros tem cada um, nas linhas e nos cartões (#749).
+  const memberCounts = useMemberCounts(clubsToShow.map((o) => o.id))
+  const membersText = (org) => (memberCounts[org.id] != null ? t('gerirclube.member_count', { count: memberCounts[org.id] }) : null)
 
   // Criar grupo (Trello #279 — saiu da Comunidade). Cada dono pode ter UM
   // grupo grátis; os pagos (Squad, Community, Club) não contam — quem tem
@@ -381,6 +385,7 @@ export default function Gerir() {
           <p className="text-muted text-sm pt-1">{t('gerir.empty_subtitle')}</p>
         </div>
         <SuperadminModeCard />
+        <PlanRequestsCard />
         {createGroupPanel}
         {isPlatformAdmin && <AppFeaturesPanel />}
         {isPlatformAdmin && (
@@ -405,6 +410,8 @@ export default function Gerir() {
 
       {/* Antes de tudo, só para superadmins (UX, 18 out). */}
       <SuperadminModeCard />
+      {/* Os pedidos de plano dos grupos (#723), logo a seguir ao modo. */}
+      <PlanRequestsCard />
 
       {createdClubBanner}
 
@@ -415,7 +422,7 @@ export default function Gerir() {
 
       {/* Mais de 5: procurar, pastilhas e linhas curtas (design-handoff/
           2026-09-28-gerir-lista-de-clubes). Até 5, fica como estava. */}
-      {clubsToShow.length > 5 && <OrgFinder orgs={clubsToShow} joinRequestsByOrg={joinRequestsByOrg} />}
+      {clubsToShow.length > 5 && <OrgFinder orgs={clubsToShow} joinRequestsByOrg={joinRequestsByOrg} membersText={membersText} />}
 
       {/* Clubes and Grupos never share a list: someone who manages a friends
           group and a club at the same time has to see at a glance which is
@@ -447,9 +454,12 @@ export default function Gerir() {
                   <div className="mt-1 flex items-center gap-2">
                     <div className="min-w-0 flex-1">
                       <h3 className="font-display text-xl font-extrabold leading-tight text-ink-900 break-words">{org.name}</h3>
+                      {/* Duas linhas, para não partir em sítios diferentes
+                          conforme o plano (#749, 30 out). */}
                       <p className="mt-0.5 text-sm text-muted">
-                        {[t(group ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), t('gerir.plan_line', { plan: planName(org.plan_tier || 'free') }), t('gerir.you_admin')].join(' · ')}
+                        {[t(group ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), t('gerir.plan_line', { plan: planName(org.plan_tier || 'free') })].join(' · ')}
                       </p>
+                      <p className="text-sm text-muted">{[membersText(org), t('gerir.you_admin')].filter(Boolean).join(' · ')}</p>
                     </div>
                     <ChevronRight size={18} className="shrink-0 text-muted" />
                   </div>

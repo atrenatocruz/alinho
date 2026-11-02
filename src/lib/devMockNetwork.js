@@ -160,7 +160,7 @@ const PLAN_RPC_MOCKS = {
       organization_id: '00000000-0000-0000-0000-0000000000aa', plan_tier: localStorage.getItem('mockPlanTier') || 'plus',
       billing: null, open_request: null, last_invoice: { invoice_name: 'Maré Alta Padel, Lda', invoice_nif: '509123456' },
       trial: null, trials_used: st === 'usado' ? ['pro', 'club'] : [], trial_days: 90,
-      prices: { plus: { monthly: 4.99, yearly: 49.9 }, pro: { monthly: 14.99, yearly: 149.9 }, club: { monthly: 29.99, yearly: 299.9 } },
+      prices: { plus: { monthly: 4.99, yearly: 49.9 }, pro: { monthly: 14.99, yearly: 149.9 }, club: { monthly: 19.99, yearly: 199.9 } },
       billing_info: { company_name: 'Exemplo Desporto, Lda', company_nif: '500000000', company_address: 'Rua Exemplo, Lisboa' },
       billing_info_provisional: true,
     }
@@ -181,9 +181,66 @@ const PLAN_RPC_MOCKS = {
   cancel_plan_request: () => ({ ok: true }),
   start_plan_trial: () => ({ ok: true, trial_id: 'tr-1', days: 90 }),
   stop_plan_trial: () => ({ ok: true }),
+  // «Planos pedidos» dos superadmins (#723 envio 2). localStorage.mockPlanAdmin
+  // = 'vazio' → as três listas vazias; 'um' → um pedido só (o singular).
+  admin_list_plan_requests: () => {
+    if (localStorage.getItem('mockPlanAdmin') === 'vazio') return []
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+    // O último dia incluído, como a base: um mês (ou um ano) menos um dia.
+    const until = (from, period) => {
+      const d = new Date(`${from}T00:00:00Z`)
+      if (period === 'yearly') d.setUTCFullYear(d.getUTCFullYear() + 1); else d.setUTCMonth(d.getUTCMonth() + 1)
+      d.setUTCDate(d.getUTCDate() - 1)
+      return d.toISOString().slice(0, 10)
+    }
+    return [
+      { request_id: 'req-1', organization_id: 'org-1', group_name: 'Maré Alta Padel', from_tier: 'plus', requested_tier: 'pro', period: 'monthly',
+        kind: 'upgrade', amount: 14.99, reference: 'ALN-7K4Q', requested_by_name: 'Rita Figueira', created_at: new Date().toISOString(),
+        paid_claimed_at: new Date().toISOString(), invoice_name: 'Maré Alta Padel, Lda', invoice_nif: '509123456',
+        suggested_starts_on: day(0), suggested_paid_until: until(day(0), 'monthly') },
+      { request_id: 'req-2', organization_id: 'org-2', group_name: 'Serra Azul Padel', from_tier: 'free', requested_tier: 'plus', period: 'yearly',
+        kind: 'new', amount: 49.9, reference: 'ALN-3P9D', requested_by_name: 'Tiago Lopes', created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+        paid_claimed_at: null, invoice_name: 'Tiago Lopes', invoice_nif: null,
+        suggested_starts_on: day(12), suggested_paid_until: until(day(12), 'yearly') },
+    ].slice(0, localStorage.getItem('mockPlanAdmin') === 'um' ? 1 : undefined)
+  },
+  admin_list_plan_renewals: () => {
+    if (localStorage.getItem('mockPlanAdmin') === 'vazio') return []
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+    return [
+      { organization_id: 'org-4', group_name: 'Padel das Quintas', paid_tier: 'pro', period: 'monthly', paid_until: day(-2), days_left: -2,
+        open_request: false, amount: 14.99, reference: 'ALN-9H2W', noticed_on: day(-9) },
+      { organization_id: 'org-3', group_name: 'Clube do Rio', paid_tier: 'club', period: 'yearly', paid_until: day(3), days_left: 3,
+        open_request: false, amount: 199.9, reference: 'ALN-2M8T', noticed_on: day(-4) },
+    ]
+  },
+  admin_list_plan_trials: () => {
+    if (localStorage.getItem('mockPlanAdmin') === 'vazio') return []
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+    return [
+      { organization_id: 'org-1', group_name: 'Maré Alta Padel', tier: 'pro', previous_tier: 'plus', owner_id: 'u1', owner_name: 'Rita Figueira',
+        starts_on: day(-88), ends_on: day(1), paid_until: null },
+      { organization_id: 'org-2', group_name: 'Serra Azul Padel', tier: 'plus', previous_tier: 'free', owner_id: 'u2', owner_name: 'Tiago Lopes',
+        starts_on: day(-48), ends_on: day(42), paid_until: null },
+      { organization_id: 'org-5', group_name: 'Padel das Quintas', tier: 'club', previous_tier: 'plus', owner_id: 'u3', owner_name: 'Ana Moreira',
+        starts_on: day(-30), ends_on: day(60), paid_until: day(90) },
+    ]
+  },
+  admin_accept_plan_request: () => ({ ok: true }),
+  admin_decline_plan_request: () => ({ ok: true }),
+  admin_renew_plan: () => ({ ok: true }),
+  admin_end_paid_plan: () => ({ ok: true }),
 }
 
 const RPC_MOCKS = {
+  // Membros de cada clube ou grupo no Gerir (#749): um número fixo por id,
+  // para as prints terem 1, 24 e 212. localStorage.mockMemberCount força um.
+  org_visible_member_count: (params) => {
+    const forced = localStorage.getItem('mockMemberCount')
+    if (forced) return Number(forced)
+    const n = String(params?.p_organization_id || '').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+    return [24, 212, 1, 9, 57, 140][n % 6]
+  },
   ...PLAN_RPC_MOCKS,
   // Aprovar quem entra (2 out): o mix tem 8 lugares — com o mix cheio fica suplente.
   accept_mix_request: () => (localStorage.getItem('mockEventCount') && Number(localStorage.getItem('mockEventCount')) < 8 ? 'confirmed' : 'waitlisted'),
@@ -1773,7 +1830,22 @@ const TABLE_MOCKS = {
       data: { month: '2026-11-01', district: 'Setúbal', place: 2 } },
     { id: 'pn4', kind: 'partner_month_offer', created_at: new Date().toISOString(), read_at: new Date().toISOString(),
       data: { partner_slug: 'rm-terapias', partner_name: 'RM Terapias', district: 'Setúbal', month: `${new Date().toISOString().slice(0, 7)}-01` } },
-  ] : localStorage.getItem('mockNotices') === 'true' ? [
+  ] : localStorage.getItem('mockNotices') === 'planos' ? (() => {
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+    const g = { organization_id: '00000000-0000-0000-0000-0000000000aa', group_name: 'Maré Alta Padel' }
+    return [
+      ['plan_request_new', { ...g, tier: 'pro' }],
+      ['plan_request_paid', { ...g, tier: 'pro' }],
+      ['plan_request_accepted', { ...g, tier: 'pro', starts_on: day(0), paid_until: day(29) }],
+      ['plan_request_declined', { ...g, tier: 'pro', reason: 'nao_recebido' }],
+      ['plan_request_expired', { ...g, tier: 'pro' }],
+      ['plan_trial_ending', { ...g, tier: 'pro', ends_on: day(1), days_left: 1 }],
+      ['plan_trial_ended', { ...g, tier: 'pro', back_to: 'plus' }],
+      ['plan_renewal_due', { ...g, tier: 'pro', period: 'monthly', paid_until: day(5), days_left: 5, amount: 14.99 }],
+      ['plan_renewed', { ...g, tier: 'pro', paid_until: day(34) }],
+      ['plan_ended', { ...g, from_tier: 'pro' }],
+    ].map(([kind, data], i) => ({ id: `pn${i}`, kind, created_at: new Date().toISOString(), data }))
+  })() : localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
     { id: 'n2', kind: 'mix_joined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
