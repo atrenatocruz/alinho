@@ -19,7 +19,7 @@ const remember = (id) => {
 }
 const isGroup = (o) => o.kind === 'group'
 
-export default function OrgFinder({ orgs, joinRequestsByOrg }) {
+export default function OrgFinder({ orgs, joinRequestsByOrg, membersText = () => null }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [show, setShow] = useState('all')
@@ -52,7 +52,13 @@ export default function OrgFinder({ orgs, joinRequestsByOrg }) {
         <Avatar name={o.name} url={o.group_logo_url} size={opts.nested ? 'w-8 h-8 text-[11px]' : 'w-10 h-10 text-xs'} shape={orgAvatarShape(o.kind)} />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-extrabold text-ink-900"><Realce text={o.name} query={query} /></span>
-          <span className="block truncate text-xs text-muted">{subtitle(o, opts)}</span>
+          {/* Nada se corta (#749, UX 30 out): se não couber, passa para a linha
+              de baixo entre as partes, nunca a meio de uma, com o « · » em cima. */}
+          <span className="block text-xs text-muted">
+            {[...subtitle(o, opts).split(' · '), membersText(o)].filter(Boolean).map((part, i, all) => (
+              <span key={part}>{i > 0 && ' '}<span className="whitespace-nowrap">{part}{i < all.length - 1 && ' ·'}</span></span>
+            ))}
+          </span>
         </span>
         {pending > 0 && (
           <span className="inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-extrabold tabular-nums text-ink-900">{pending}</span>

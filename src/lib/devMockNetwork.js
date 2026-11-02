@@ -233,6 +233,14 @@ const PLAN_RPC_MOCKS = {
 }
 
 const RPC_MOCKS = {
+  // Membros de cada clube ou grupo no Gerir (#749): um número fixo por id,
+  // para as prints terem 1, 24 e 212. localStorage.mockMemberCount força um.
+  org_visible_member_count: (params) => {
+    const forced = localStorage.getItem('mockMemberCount')
+    if (forced) return Number(forced)
+    const n = String(params?.p_organization_id || '').split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+    return [24, 212, 1, 9, 57, 140][n % 6]
+  },
   ...PLAN_RPC_MOCKS,
   // Aprovar quem entra (2 out): o mix tem 8 lugares — com o mix cheio fica suplente.
   accept_mix_request: () => (localStorage.getItem('mockEventCount') && Number(localStorage.getItem('mockEventCount')) < 8 ? 'confirmed' : 'waitlisted'),
