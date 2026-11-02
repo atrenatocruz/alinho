@@ -33,7 +33,7 @@ export default function PlanRequestsCard() {
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-extrabold text-ink-900">{t('gerirplans.admin_title')}</span>
         <span className="block text-xs text-muted">
-          {t('gerirplans.admin_entry_line', { requests: counts.requests, renewals: counts.renewals, trials: counts.trials })}
+          {t('gerirplans.admin_entry_line', { requests: t('gerirplans.admin_entry_requests', { count: counts.requests }), renewals: counts.renewals, trials: counts.trials })}
         </span>
         {/* Por baixo, numa linha só dela: ao lado apertava as contagens. A
             verde-clara de «Diz que já pagou»: o lima é só para a ação (UX, 1 nov). */}

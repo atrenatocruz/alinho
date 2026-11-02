@@ -182,7 +182,7 @@ const PLAN_RPC_MOCKS = {
   start_plan_trial: () => ({ ok: true, trial_id: 'tr-1', days: 90 }),
   stop_plan_trial: () => ({ ok: true }),
   // «Planos pedidos» dos superadmins (#723 envio 2). localStorage.mockPlanAdmin
-  // = 'vazio' → as três listas vazias.
+  // = 'vazio' → as três listas vazias; 'um' → um pedido só (o singular).
   admin_list_plan_requests: () => {
     if (localStorage.getItem('mockPlanAdmin') === 'vazio') return []
     const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
@@ -202,7 +202,7 @@ const PLAN_RPC_MOCKS = {
         kind: 'new', amount: 49.9, reference: 'ALN-3P9D', requested_by_name: 'Tiago Lopes', created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
         paid_claimed_at: null, invoice_name: 'Tiago Lopes', invoice_nif: null,
         suggested_starts_on: day(12), suggested_paid_until: until(day(12), 'yearly') },
-    ]
+    ].slice(0, localStorage.getItem('mockPlanAdmin') === 'um' ? 1 : undefined)
   },
   admin_list_plan_renewals: () => {
     if (localStorage.getItem('mockPlanAdmin') === 'vazio') return []
