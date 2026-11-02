@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, ChevronRight, Mail, MessageCircle } from 'lucide-react'
+import { Check, ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import { MedalGrid, Highlights, SITE_DARK } from '../components/site/MedalShowcase'
 import { SiteHeader, SiteFooter, useLoginHref, usePageTop } from '../components/site/SiteChrome'
 import { WaysSection, BotSection, SITE_EYEBROW, SITE_H2, SITE_LEAD, SITE_ILL } from '../components/site/SiteWays'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 import { PartnerCard, YourBusinessCard, usePublicPartners } from '../components/site/PartnerCards'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
+import { formatCurrency } from '../lib/formatDate'
 
 /* alinho.pt antes de entrar (Trello #327) — desenho APROVADO pelo Francisco
    a 24 set: design-handoff/2026-09-24-alinho-pt-antes-de-entrar/SPEC.md e
@@ -175,60 +176,124 @@ function OrganizersBar() {
 // não há subscrições: só o Free tem botão, os pagos dizem "em breve". O que
 // não existe no produto vai marcado "em breve" — nada de "mais escolhido" ou
 // outros sinais inventados (PRODUCT.md). Preços de lançamento, por validar.
+//
+// Desde 29 out (#739, design-handoff/2026-10-29-planos-de-clube/SPEC-PAGINA.md,
+// aprovado pelo Francisco): os grupos (Free, Squad, Community) e os clubes
+// (Club e Club Premium «em breve») em separado, e o cartão com a faixa de cor
+// e o Alino em cima. `features` são as chaves inteiras das linhas.
 export const PLANS = [
-  // Todos os grupos têm jogos entre amigos do grupo (Francisco, 21 out); o
-  // Squad herda-os em «Tudo o que o Free tem».
-  { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3'], ['f4']] },
-  { key: 'plus', name: 'Squad', features: [['f1'], ['f2'], ['f3']] },
-  // O que cada plano inclui (Francisco, 21 out; design-handoff/2026-10-21-
-  // planos-o-que-inclui/REGRAS-BA.md): o Community tem torneios, liga e jogos
-  // entre amigos do grupo; o Club tem jogos em aberto, professores e a gestão
-  // do clube, e não os jogos entre amigos do grupo (por isso deixa de dizer
-  // «Tudo o que o Community tem»).
-  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5'], ['f6'], ['f7']] },
-  // «Aulas e professores» sem «em breve» (Francisco, 22 out); as reservas e os
-  // pagamentos continuam «em breve».
-  { key: 'club', name: 'Club', features: [['f1'], ['f5'], ['f2'], ['f3', 'soon'], ['f4', 'soon']] },
+  // Todos os grupos têm jogos do grupo (Francisco, 21 out); o Squad herda-os
+  // em «Tudo o que o Free tem».
+  { key: 'free', name: 'Free', kind: 'groups', band: '#E9F5C2', pose: 'ola',
+    features: ['landing.plan_free_f1', 'landing.plan_free_f2', 'landing.plan_free_f3', 'landing.plan_free_f4'] },
+  { key: 'plus', name: 'Squad', kind: 'groups', band: '#C5DF00', pose: 'polegar',
+    features: ['landing.plan_plus_f1', 'landing.plan_plus_f2', 'landing.plan_plus_f3'] },
+  { key: 'pro', name: 'Community', kind: 'groups', band: '#040404', dark: true, pose: 'telemovel',
+    features: ['landing.plan_pro_f1', 'landing.plan_pro_f2', 'landing.plan_pro_f3', 'landing.plan_pro_f4',
+      'landing.plan_community_tournaments_league', 'landing.plan_pro_f7'] },
+  // O Club é para clubes com campos; as reservas e os pagamentos passam ao
+  // Club Premium, que ainda não abriu (29 out).
+  { key: 'club', name: 'Club', kind: 'clubs', band: '#1F2A1A', dark: true, pose: 'trofeu',
+    features: ['landing.plan_club_f1', 'landing.plan_club_f5', 'landing.plan_club_f2'] },
+  { key: 'premium', name: 'Club Premium', kind: 'clubs', band: '#F4F5F1', soon: true, pose: 'a-espreitar',
+    features: ['landing.plan_premium_f1', 'landing.plan_premium_f2', 'landing.plan_premium_f3', 'landing.plan_premium_f4'] },
 ]
+export const GROUP_PLANS = PLANS.filter((p) => p.kind === 'groups')
+export const CLUB_PLANS = PLANS.filter((p) => p.kind === 'clubs')
 
-export function PlanCard({ plan }) {
+// O preço por ano, para a linha «ou … por ano» (os de plan_prices; o do mês
+// fica no texto landing.plan_*_price).
+export const PLAN_YEARLY = { plus: 49.9, pro: 149.9, club: 199.9 }
+
+// As medidas do site e, com `compact`, as da app (SPEC-PAGINA, ponto 3).
+const SIZES = {
+  site: { band: 'h-[158px] px-[22px] pt-5', name: 'text-[30px]', lead: 'max-w-[58%] text-[14px]', alino: 150, trophy: 160,
+    body: 'px-[22px] pb-[22px] pt-5', price: 'text-[40px]', soonPrice: 'text-[22px]', line: 'text-[14.5px]' },
+  app: { band: 'h-[118px] px-[18px] pt-4', name: 'text-[24px]', lead: 'max-w-[62%] text-[13px]', alino: 118, trophy: 116,
+    body: 'px-[18px] pb-[18px] pt-4', price: 'text-[32px]', soonPrice: 'text-[18px]', line: 'text-[13.5px]' },
+}
+
+function SoonPill() {
   const { t } = useTranslation()
-  const loginHref = useLoginHref()
-  const dark = plan.highlight
   return (
-    <div className={`rounded-card p-6 flex flex-col ${dark ? 'bg-ink-900 text-white' : 'bg-surface border border-line'}`}>
-      <h3 className={`text-xl ${dark ? 'text-white' : 'text-ink-900'}`}>{plan.name}</h3>
-      <p className={`text-sm mt-1 ${dark ? 'text-ink-200' : 'text-muted'}`}>{t(`landing.plan_${plan.key}_for`)}</p>
-      <p className="mt-5 flex items-baseline gap-1">
-        <span className={`text-3xl font-extrabold tabular-nums ${dark ? 'text-white' : 'text-ink-900'}`}>{t(`landing.plan_${plan.key}_price`)}</span>
-        {plan.key !== 'free' && (
-          <span className={`text-sm ${dark ? 'text-ink-200' : 'text-muted'}`}>{t('landing.pricing_per_month')}</span>
-        )}
-      </p>
-      <ul className="mt-5 space-y-2.5 flex-1">
-        {plan.features.map(([f, soon]) => (
-          <li key={f} className={`flex items-start gap-2 text-sm ${soon ? (dark ? 'text-ink-200' : 'text-muted') : (dark ? 'text-white' : 'text-ink-900')}`}>
-            <CheckCircle2 size={16} className={`shrink-0 mt-0.5 ${soon ? 'opacity-40' : (dark ? 'text-lime-400' : 'text-lime-600')}`} />
-            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              {t(`landing.plan_${plan.key}_${f}`)}
-              {soon && (
-                <span className={`rounded-full px-1.5 py-px text-[10px] leading-[14px] font-extrabold ${dark ? 'bg-white/10 text-ink-200' : 'bg-canvas border border-line text-ink-700'}`}>
-                  {t('landing.pricing_soon')}
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-6">
-        {plan.key === 'free' ? (
-          <Link to={loginHref('signup')} className={`${PRIMARY_CTA} w-full inline-flex items-center justify-center`}>
-            {t('landing.plan_free_cta')}
-          </Link>
+    <span className="inline-block shrink-0 rounded-full border border-[#CFD2D7] bg-white px-2 py-[3px] font-sans text-[10.5px] font-extrabold leading-none tracking-normal text-ink-700">
+      {t('landing.pricing_soon')}
+    </span>
+  )
+}
+
+/** O cartão de um plano. `compact`: as medidas da app. `chip`: a pastilha
+ *  lima na faixa, no lugar da frase («O teu plano», «Pedido enviado…»).
+ *  `mine`: contorno preto. `extra`: por baixo do preço (o «pago até» da app).
+ *  `children`: os botões da app (que pode não ter nenhum); no site, os do site. */
+export function PlanCard({ plan, compact = false, chip = null, mine = false, extra = null, children = null }) {
+  const { t, i18n } = useTranslation()
+  const loginHref = useLoginHref()
+  const s = SIZES[compact ? 'app' : 'site']
+  const trophy = plan.pose === 'trofeu'
+  const frame = mine ? 'border-[2.5px] border-ink-900' : plan.soon ? 'border-[1.5px] border-dashed border-[#CFD2D7]' : 'border border-[#E5E6E1]'
+  return (
+    <div className={`flex h-full flex-col overflow-hidden bg-white ${compact ? 'rounded-[20px]' : 'rounded-[22px]'} ${frame}`}>
+      <div className={`relative shrink-0 overflow-hidden ${s.band} ${plan.soon ? 'border-b-[1.5px] border-dashed border-[#CFD2D7]' : ''}`} style={{ backgroundColor: plan.band }}>
+        <h3 className={`relative z-[1] flex items-center gap-2 font-display font-black leading-none tracking-[-.02em] ${s.name} ${plan.dark ? 'text-white' : 'text-ink-900'}`}>
+          {plan.name}
+        </h3>
+        {chip ? (
+          // Na faixa lima do Squad, a pastilha lima não se via: lá vai branca.
+          <span className={`relative z-[1] mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-extrabold text-ink-900 ${plan.key === 'plus' ? 'bg-white' : 'bg-lime-400'}`}>{chip}</span>
         ) : (
-          <p className={`min-h-[48px] flex items-center justify-center rounded-ctrl text-sm font-extrabold border border-dashed ${dark ? 'border-white/20 text-ink-200' : 'border-line text-muted'}`}>
-            {t('landing.pricing_paid_soon')}
+          <p className={`relative z-[1] mt-2 font-semibold leading-snug ${s.lead} ${plan.dark ? 'text-[#D4D7CF]' : 'text-ink-900'}`}>{t(`landing.plan_${plan.key}_for`)}</p>
+        )}
+        {/* O Alino encostado ao fundo da faixa e cortado por ela; o da taça
+            mais para dentro e sem descer, para a taça não ficar cortada. O do
+            Club Premium mais para fora, cortado também à direita, para o nome
+            ficar a 8 px ou mais da fita (UX, 1 nov). */}
+        <img src={`/alino/alino-${plan.pose}${compact ? '' : '@2x'}.webp`} srcSet={compact ? `/alino/alino-${plan.pose}@2x.webp 2x` : undefined}
+          alt="" aria-hidden="true" loading="lazy" decoding="async" draggable={false}
+          className="pointer-events-none absolute select-none"
+          style={{ height: trophy ? s.trophy : s.alino, width: 'auto', right: trophy ? (compact ? 12 : 14) : plan.soon && !compact ? -50 : -6, bottom: trophy ? 0 : (compact ? -10 : -14) }} />
+      </div>
+      <div className={`flex flex-1 flex-col ${s.body}`}>
+        {plan.soon ? (
+          <p className="flex items-center gap-2">
+            <span className={`font-display font-extrabold leading-tight text-[#4B5563] ${s.soonPrice}`}>{t('landing.plan_premium_price')}</span>
+            {/* Sempre aqui, no site e na app: ao lado do nome tocava no Alino (UX, 1 nov). */}
+            <SoonPill />
           </p>
+        ) : (
+          <>
+            <p className="flex items-baseline gap-1">
+              <span className={`font-display font-black leading-none tabular-nums tracking-[-.02em] text-ink-900 ${s.price}`}>{t(`landing.plan_${plan.key}_price`)}</span>
+              {plan.key !== 'free' && <span className="text-[15px] text-[#6B7079]">{t('landing.pricing_per_month')}</span>}
+            </p>
+            <p className="mt-1.5 text-[13.5px] text-[#4B5563]">
+              {plan.key === 'free' ? t('landing.plan_free_forever') : t('landing.pricing_per_year', { price: formatCurrency(PLAN_YEARLY[plan.key], i18n.language) })}
+            </p>
+          </>
+        )}
+        {extra}
+        <ul className={`mt-4 space-y-2.5 border-t border-[#EEEFEA] pt-4 ${compact ? '' : 'flex-1'}`}>
+          {plan.features.map((key) => (
+            <li key={key} className={`flex items-start gap-2.5 font-medium leading-snug ${s.line} ${plan.soon ? 'text-[#4B5563]' : 'text-ink-900'}`}>
+              <span className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${plan.soon ? 'bg-[#E5E7E1] text-[#6B7079]' : 'bg-lime-400 text-ink-900'}`}>
+                <Check size={12} strokeWidth={3.5} />
+              </span>
+              {t(key)}
+            </li>
+          ))}
+        </ul>
+        {compact ? children : !plan.soon && (
+          <div className="mt-6">
+            {plan.key === 'free' ? (
+              <Link to={loginHref('signup')} className={`${PRIMARY_CTA} w-full inline-flex items-center justify-center`}>
+                {t('landing.plan_free_cta')}
+              </Link>
+            ) : (
+              <p className="flex min-h-[48px] items-center justify-center rounded-ctrl border border-dashed border-line text-sm font-extrabold text-muted">
+                {t('landing.pricing_paid_soon')}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -241,10 +306,25 @@ export function PlanCard({ plan }) {
 // Para os voltar a mostrar aqui, basta passar isto a true.
 const SHOW_PRICES_ON_HOME = false
 
-export function PlansGrid() {
+// Lado a lado só quando o nome não chega ao Alino (8 px de folga; UX, 1 nov),
+// e nunca um cartão sozinho numa fila: os dois dos clubes a partir de 768 px;
+// os três dos grupos a partir de 1100 px e, até lá, um por baixo do outro,
+// centrados e com 520 px no máximo, para a faixa não esticar.
+export function PlansGrid({ plans = GROUP_PLANS }) {
+  if (plans.length > 2) {
+    return (
+      <div className="grid grid-cols-1 gap-4 min-[1100px]:grid-cols-3">
+        {plans.map((plan) => (
+          <div key={plan.key} className="mx-auto w-full max-w-[520px] min-[1100px]:max-w-none">
+            <PlanCard plan={plan} />
+          </div>
+        ))}
+      </div>
+    )
+  }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {PLANS.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:max-w-[800px]">
+      {plans.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
     </div>
   )
 }

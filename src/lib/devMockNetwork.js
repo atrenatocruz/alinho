@@ -160,7 +160,7 @@ const PLAN_RPC_MOCKS = {
       organization_id: '00000000-0000-0000-0000-0000000000aa', plan_tier: localStorage.getItem('mockPlanTier') || 'plus',
       billing: null, open_request: null, last_invoice: { invoice_name: 'Maré Alta Padel, Lda', invoice_nif: '509123456' },
       trial: null, trials_used: st === 'usado' ? ['pro', 'club'] : [], trial_days: 90,
-      prices: { plus: { monthly: 4.99, yearly: 49.9 }, pro: { monthly: 14.99, yearly: 149.9 }, club: { monthly: 29.99, yearly: 299.9 } },
+      prices: { plus: { monthly: 4.99, yearly: 49.9 }, pro: { monthly: 14.99, yearly: 149.9 }, club: { monthly: 19.99, yearly: 199.9 } },
       billing_info: { company_name: 'Exemplo Desporto, Lda', company_nif: '500000000', company_address: 'Rua Exemplo, Lisboa' },
       billing_info_provisional: true,
     }
