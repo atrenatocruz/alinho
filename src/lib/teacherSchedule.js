@@ -86,7 +86,7 @@ export const slotProblem = (slots = [], slot) => {
 /** Resumo curto de um bloco para cartões: 9:00–13:00 → «9–13h», 18:30–21:00 → «18:30–21h». */
 export const shortRange = (start, end) => {
   const h = (v) => { const [hh, mm] = shortTime(v).split(':'); return mm === '00' ? String(Number(hh)) : `${Number(hh)}:${mm}` }
-  return `${h(start)}–${h(end)}h`
+  return `${h(start)}-${h(end)}h`
 }
 
 /**

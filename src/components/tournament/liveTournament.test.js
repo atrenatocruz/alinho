@@ -28,7 +28,7 @@ describe('«A decorrer agora» — cartão do torneio', () => {
       title: 'Smash Open 2026',
       meta: 'M4 · 4 jogos a decorrer',
       leadLabel: 'Último:',
-      lead: 'Serra / Mota 6–4',
+      lead: 'Serra / Mota 6-4',
       to: '/torneio/smash-open?cat=M4&tab=board&sec=draw',
     })
   })
@@ -38,14 +38,14 @@ describe('«A decorrer agora» — cartão do torneio', () => {
     expect(c.to).toBe('/torneio/smash-open?cat=M4&tab=board&sec=groups')
   })
   it('o resultado aparece do lado de quem ganhou', () => {
-    expect(winnerScore('4-6 6-3 8-10', false)).toBe('6–4 3–6 10–8')
-    expect(lastResultText({ ...row.last_result, score: '4-6', a_won: false }, t)).toBe('Lima / Pinto 6–4')
+    expect(winnerScore('4-6 6-3 8-10', false)).toBe('6-4 3-6 10-8')
+    expect(lastResultText({ ...row.last_result, score: '4-6', a_won: false }, t)).toBe('Lima / Pinto 6-4')
   })
   it('quem esconde os resultados aparece como «Dupla M4», como nos cartões', () => {
-    expect(lastResultText({ a_name: null, a_hidden: true, b_name: 'Lima / Pinto', score: '6-2', a_won: true }, t, 'M4')).toBe('Dupla M4 6–2')
+    expect(lastResultText({ a_name: null, a_hidden: true, b_name: 'Lima / Pinto', score: '6-2', a_won: true }, t, 'M4')).toBe('Dupla M4 6-2')
   })
   it('sets separados por «·», como os manda o list_live_events', () => {
-    expect(winnerScore('4-6 · 6-3 · 8-10', false)).toBe('6–4 · 3–6 · 10–8')
+    expect(winnerScore('4-6 · 6-3 · 8-10', false)).toBe('6-4 · 3-6 · 10-8')
   })
   it('sem jogo acabado, não há «Último»; sem jogos a decorrer, mostra o clube', () => {
     const c = liveTournamentCard({ ...row, matches_live: 0, last_result: null }, t)

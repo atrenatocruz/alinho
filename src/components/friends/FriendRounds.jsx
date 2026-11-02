@@ -97,7 +97,7 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
     if (res.length) {
       const text = res.map(({ game, won }) => {
         const [wa, wb] = won
-        return wa >= wb ? `${names(game.team_a)} ${wa}–${wb}` : `${names(game.team_b)} ${wb}–${wa}`
+        return wa >= wb ? `${names(game.team_a)} ${wa}-${wb}` : `${names(game.team_b)} ${wb}-${wa}`
       }).join(', ')
       return t('friends.remove_round_with_results', { results: text })
     }

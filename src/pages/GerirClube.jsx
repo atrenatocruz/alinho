@@ -3946,7 +3946,7 @@ export default function GerirClube() {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
                     Icone = GraduationCap
-                    linha = `${quando.day} · ${quando.start}–${quando.end}`
+                    linha = `${quando.day} · ${quando.start}-${quando.end}`
                     detalhe = [lessonTypeLabel(t, row.lesson_type, { series: true }), row.teacher_name, t('gerirclube.spots_of', { count: row.taken, max: row.capacity })]
                       .filter(Boolean).join(' · ')
                     abrir = () => setTurmaAberta(row.series_id)

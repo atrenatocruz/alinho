@@ -70,7 +70,7 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   const height = span * HOUR_PX
   const today = isoDate(now)
   const month = (d) => t(`lessons.month_short_${d.getMonth() + 1}`)
-  const dates = `${days[0].getDate()} ${days[0].getMonth() === days[6].getMonth() ? '' : `${month(days[0])} `}– ${days[6].getDate()} ${month(days[6])}`.replace('  ', ' ')
+  const dates = t('ui.date_range', { from: days[0].getMonth() === days[6].getMonth() ? `${days[0].getDate()}` : `${days[0].getDate()} ${month(days[0])}`, to: `${days[6].getDate()} ${month(days[6])}` })
   // Com o ícone de hoje ao lado, a partir da próxima semana basta a data
   // (no cartão do Perfil, «Próxima semana · …» partia em duas linhas).
   const title = offset === 0 ? `${t('calendar.this_week')} · ${dates}` : dates

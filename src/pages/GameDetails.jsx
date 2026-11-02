@@ -3672,7 +3672,7 @@ export default function GameDetails() {
             const items = isOpenGame(game) ? [
               { key: 'courts', label: t('homecard.fact_courts'), value: t('gamedetails.court_count', { count: numCourts }) },
               { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
-              { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
+              { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}-${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
             ] : [
               { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
               { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },

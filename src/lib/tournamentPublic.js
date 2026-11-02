@@ -56,7 +56,7 @@ export const tournamentUrl = (tournament, origin) => `${origin}/torneio/${tourna
 export function shareMessage(tournament, origin) {
   const when = [tournament?.starts_on, tournament?.ends_on].filter(Boolean)
   const dates = when.length === 2 && when[0] !== when[1]
-    ? `${when[0].slice(8, 10)}–${when[1].slice(8, 10)}`
+    ? `${when[0].slice(8, 10)}-${when[1].slice(8, 10)}`
     : (when[0] || '').slice(8, 10)
   return [
     tournament?.name,

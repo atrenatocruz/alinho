@@ -211,7 +211,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
 
       {hasResult && (
         <div className="pt-2 border-t border-line space-y-2">
-          <p className="text-center text-2xl font-extrabold text-ink-900 tabular-nums">{match.score_a} – {match.score_b}</p>
+          <p className="text-center text-2xl font-extrabold text-ink-900 tabular-nums">{match.score_a}-{match.score_b}</p>
 
           {hasPendingCorrection ? (
             <div className="bg-ink-50 rounded-ctrl p-3 space-y-2">

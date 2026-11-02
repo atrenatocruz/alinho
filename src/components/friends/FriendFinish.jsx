@@ -231,7 +231,7 @@ export function RoundsScoreSheet({ title, hint, match, games, initial = null, wi
               </span>
               {['a', 'b'].map((side, k) => (
                 <span key={side} className="flex items-center gap-2">
-                  {k === 1 && <span className="font-extrabold text-muted">–</span>}
+                  {k === 1 && <span aria-hidden="true" className="block h-[2px] w-3 shrink-0 rounded-full bg-muted" />}
                   <input inputMode="numeric" value={vals[g.id][side]} aria-label={t('friends.round_n', { n: g.round_number || g.n })}
                     onChange={(e) => setVals((v) => ({ ...v, [g.id]: { ...v[g.id], [side]: clean(e.target.value) } }))}
                     className={`${cell} ${changed ? 'border-ink-900 bg-white' : ''}`} />

@@ -351,7 +351,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
     <HomeCard colors={kindColorsOf(event.kind)} label={label} pill={pill} time={time} timeAside={timeAside}
       count={{ n: players.length, of: capacity, unit: t(isOpenSlot ? 'homecard.unit_players' : 'homecard.unit_signed') }}
       imageUrl={game.image_url || null} mine={event.myState === 'in'} past={past}
-      to={`/jogo/${game.id}`} ariaLabel={`${game.title} — ${time}`}>
+      to={`/jogo/${game.id}`} ariaLabel={`${game.title}, ${time}`}>
       <CardClub event={event} past={past} />
       <CardTitle past={past}>{openTitle || game.title}</CardTitle>
       <CardChips>

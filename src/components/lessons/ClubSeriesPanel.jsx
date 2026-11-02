@@ -80,7 +80,7 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
               ) : null}
             </div>
             <p className="font-display font-extrabold text-lg text-ink-900 mt-2 leading-none">
-              {when.start}<span className="text-sm text-ink-500 font-bold">–{when.end}</span>
+              {when.start}<span className="text-sm text-ink-500 font-bold">-{when.end}</span>
             </p>
             <p className="text-xs text-ink-500 mt-2 pt-2 border-t border-ink-900/10">
               {[s.teacher_name, `${s.taken}/${s.capacity}`, t('lessons.per_month', { price: euros(s.price_month) }), levelsText(t, s.level_from, s.level_to)]

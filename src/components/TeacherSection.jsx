@@ -201,8 +201,8 @@ export default function TeacherSection() {
   const closureLine = (c) => {
     const d = (iso) => { const x = new Date(`${iso}T12:00:00`); return `${t(`lessons.wd_short_${((x.getDay() + 6) % 7) + 1}`)} ${x.getDate()}` }
     const m = (iso) => t(`lessons.month_short_${new Date(`${iso}T12:00:00`).getMonth() + 1}`)
-    const days = c.from_date === c.to_date ? `${d(c.from_date)} ${m(c.from_date)}` : `${d(c.from_date)} – ${d(c.to_date)} ${m(c.to_date)}`
-    return `${days} · ${c.start_time ? `${compactTime(c.start_time.slice(0, 5))}–${compactTime(c.end_time.slice(0, 5))}` : t('close.all_day_lower')}`
+    const days = c.from_date === c.to_date ? `${d(c.from_date)} ${m(c.from_date)}` : t('ui.date_range', { from: d(c.from_date), to: `${d(c.to_date)} ${m(c.to_date)}` })
+    return `${days} · ${c.start_time ? `${compactTime(c.start_time.slice(0, 5))}-${compactTime(c.end_time.slice(0, 5))}` : t('close.all_day_lower')}`
   }
   const calendarClubs = active.map((p) => p.organization?.name || t('comunidade.teacher_no_club_short'))
 

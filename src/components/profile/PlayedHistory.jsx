@@ -282,7 +282,7 @@ function PlayedCard({ r, query = '', other = false }) {
   const draw = friends && myScore != null && myScore === theirScore
   const square = friends ? (
     <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-ink-50 font-display text-[22px] font-extrabold tabular-nums ${draw || pending ? 'text-muted' : 'text-ink-900'}`}>
-      {myScore ?? r.rounds_won ?? 0}–{theirScore ?? Math.max(0, (r.rounds_played || 0) - (r.rounds_won || 0))}
+      {myScore ?? r.rounds_won ?? 0}-{theirScore ?? Math.max(0, (r.rounds_played || 0) - (r.rounds_won || 0))}
     </div>
   ) : (
     <div className={`relative flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[18px] ${PLACE_BOX[r.place] || 'bg-ink-50 text-ink-900'}`}>

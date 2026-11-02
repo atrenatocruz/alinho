@@ -285,7 +285,7 @@ function EventRow({ event, member }) {
     : member && !event.locked ? `/jogo/${event.game.id}` : null
   const card = (
     <HomeCard colors={kindColorsOf(event.kind)} label={kindLabel} pill={pill} time={time} timeAside={timeAside} count={count}
-      imageUrl={event.game?.image_url || null} mine={event.myState === 'in'} to={to} ariaLabel={`${event.title} — ${time}`}>
+      imageUrl={event.game?.image_url || null} mine={event.myState === 'in'} to={to} ariaLabel={`${event.title}, ${time}`}>
       <CardClub event={{}} label={[kindLabel, recurring].filter(Boolean).join(' · ')} />
       <CardTitle>{event.title}</CardTitle>
       {chips && <CardChips>{chips}</CardChips>}

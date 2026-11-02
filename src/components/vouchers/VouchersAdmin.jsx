@@ -158,7 +158,7 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
       <div className="grid grid-cols-3 gap-2">
         {[[totals.given, 'vouchers.total_given'], [totals.unused, 'vouchers.total_unused'], [totals.used, 'vouchers.total_used']].map(([n, key]) => (
           <div key={key} className="card !p-3">
-            <b className="block font-display text-2xl font-extrabold leading-none text-ink-900">{rows ? n : '–'}</b>
+            <b className="block font-display text-2xl font-extrabold leading-none text-ink-900">{rows ? n : '-'}</b>
             <span className="text-xs text-muted">{t(key)}</span>
           </div>
         ))}

@@ -105,7 +105,7 @@ export default function MergeSheet({ open, requests = [], onSend, onClose }) {
               className={`flex-none whitespace-nowrap text-left rounded-2xl border px-3 py-1.5 ${b.key === blockKey ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-900'}`}>
               <span className="block text-sm font-extrabold">{dayLabel(t, b.date)}</span>
               <span className={`block text-xs ${b.key === blockKey ? 'text-white/80' : 'text-muted'}`}>
-                {compactTime(b.start).replace(':00', '')}–{compactTime(b.end).replace(':00', '')}{b.orgName ? ` · ${b.orgName}` : ''}
+                {compactTime(b.start).replace(':00', '')}-{compactTime(b.end).replace(':00', '')}{b.orgName ? ` · ${b.orgName}` : ''}
               </span>
             </button>
           ))}
@@ -150,14 +150,14 @@ export default function MergeSheet({ open, requests = [], onSend, onClose }) {
                 const ch = changesFor(r)
                 return (
                   <p key={r.id} className="text-sm text-ink-900">
-                    <b className="font-extrabold">{r.student?.name}</b>{' — '}
+                    <b className="font-extrabold">{r.student?.name}</b>{': '}
                     {ch.length === 0 ? t('merge.nothing_changes') : `${ch.join(' · ')}. ${t('merge.has_to_accept')}`}
                   </p>
                 )
               })}
             </div>
             <p className="text-sm text-muted mt-2">
-              {dayLabel(t, block.date)} · {compactTime(start)}–{compactTime(endTime(start, duration))} · {t(`lessons.price_row_${type}`)} · {t('booking.per_person', { price: euros(price) })}
+              {dayLabel(t, block.date)} · {compactTime(start)}-{compactTime(endTime(start, duration))} · {t(`lessons.price_row_${type}`)} · {t('booking.per_person', { price: euros(price) })}
             </p>
           </>
         )}

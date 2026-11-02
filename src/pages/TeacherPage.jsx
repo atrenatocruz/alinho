@@ -448,7 +448,7 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
                       )}
                     </div>
                     <p className="font-display font-extrabold text-lg text-ink-900 mt-2 leading-none">
-                      {hhmm(it.starts_at)}<span className="text-sm text-ink-500 font-bold">–{hhmm(it.ends_at)}</span>
+                      {hhmm(it.starts_at)}<span className="text-sm text-ink-500 font-bold">-{hhmm(it.ends_at)}</span>
                     </p>
                     {my.status === 'accepted' && (
                       <p className="text-xs text-ink-700 mt-1.5">{t('lessons.accepted_line', { name: teacher.name.split(' ')[0] })}</p>
@@ -497,7 +497,7 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
                       {from != null && <span className="text-xs text-ink-500">{t('lessons.from_price', { price: euros(from) })}</span>}
                     </div>
                     <p className="font-display font-extrabold text-lg text-ink-900 mt-2 leading-none">
-                      {hhmm(it.starts_at)}<span className="text-sm text-ink-500 font-bold">–{hhmm(it.ends_at)}</span>
+                      {hhmm(it.starts_at)}<span className="text-sm text-ink-500 font-bold">-{hhmm(it.ends_at)}</span>
                     </p>
                     <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t border-ink-900/10">
                       <span className="text-xs text-ink-500">{t('lessons.choose_time_hint')}</span>
@@ -512,7 +512,7 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
                 <div key={i} className="rounded-2xl bg-ink-50 p-3">
                   <p className="text-xs text-ink-500">{t('lessons.busy')}</p>
                   <p className="font-display font-extrabold text-lg text-ink-500 mt-2 leading-none">
-                    {hhmm(it.starts_at)}<span className="text-sm font-bold">–{hhmm(it.ends_at)}</span>
+                    {hhmm(it.starts_at)}<span className="text-sm font-bold">-{hhmm(it.ends_at)}</span>
                   </p>
                 </div>
               )

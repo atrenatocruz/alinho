@@ -313,7 +313,7 @@ export default function MixOffline() {
               className="input-field mb-4 w-24"
             />
             <p className="text-xs text-muted mb-4">
-              {t('mixoffline.player_count', { count: names.length })} — {t('mixoffline.need_min_people', { min: minPeople })}
+              {t('mixoffline.player_count', { count: names.length })}, {t('mixoffline.need_min_people', { min: minPeople })}
               {names.length % 2 !== 0 ? t('mixoffline.odd_number_note') : ''} {t('mixoffline.for_court_count', { count: numCourts })}
             </p>
             <PrimaryButton onClick={handleFormTeams} disabled={!canFormTeams} className="w-full">

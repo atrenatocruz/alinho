@@ -61,7 +61,7 @@ export default function CloseDaysSheet({ open, initialDay = null, busy = [], req
   const when = (r) => {
     const s = new Date(r.starts_at); const e = new Date(s.getTime() + r.duration_minutes * 60000)
     const hm = (x) => compactTime(`${pad(x.getHours())}:${pad(x.getMinutes())}`)
-    return `${dayName(isoOf(s), false)} ${month(isoOf(s))}, ${hm(s)}–${hm(e)}`
+    return `${dayName(isoOf(s), false)} ${month(isoOf(s))}, ${hm(s)}-${hm(e)}`
   }
   const firstName = (pending[0]?.student?.name || '').split(' ')[0]
 

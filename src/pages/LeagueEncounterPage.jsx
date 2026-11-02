@@ -77,7 +77,7 @@ export default function LeagueEncounterPage() {
         onBack={() => navigate(-1)}
         status={{
           tone: e.status === 'oficial' ? 'ok' : 'kind',
-          text: `${t(`league.enc_${e.status}`)}${totals ? ` · ${totals.homeMatches}–${totals.awayMatches}` : ''}`,
+          text: `${t(`league.enc_${e.status}`)}${totals ? ` · ${totals.homeMatches}-${totals.awayMatches}` : ''}`,
           meta: e.status === 'submetido' ? t('league.pending_answer', { name: submitter.name }) : proposer ? t('league.proposed_by', { name: proposer.name }) : null,
           note: e.status === 'submetido' ? t('league.counts_after_confirm') : e.resolution_note,
         }}

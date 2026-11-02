@@ -85,7 +85,7 @@ export default function FriendSetSheet({ game, roundNumber, format, onClose, onS
           <div key={i} className="grid grid-cols-[52px_1fr_16px_1fr] items-center gap-2">
             <span className="text-sm font-extrabold text-ink-900">{t('privatematches.set_label', { number: i + 1 })}</span>
             {['a', '-', 'b'].map((side) => (side === '-'
-              ? <span key={side} className="text-center font-extrabold text-muted">–</span>
+              ? <span key={side} aria-hidden="true" className="mx-auto block h-[2px] w-3 rounded-full bg-muted" />
               : (
                 <input key={side} inputMode="numeric" value={r[side]} placeholder="0"
                   aria-label={t('friends.set_score_aria', { n: i + 1, team: pair(side === 'a' ? game.team_a : game.team_b) })}

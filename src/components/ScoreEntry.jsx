@@ -189,7 +189,7 @@ export default function ScoreEntry({
               className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface"
               placeholder="0"
             />
-            <span className="text-muted">–</span>
+            <span aria-hidden="true" className="block h-[2px] w-3 shrink-0 rounded-full bg-muted" />
             <input
               type="number" min="0" inputMode="numeric"
               value={breakerScore.b}

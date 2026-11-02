@@ -8,6 +8,7 @@ import { countPeople, mixCapacity } from '../../lib/mixLogic'
 import { formatTime } from '../../lib/formatDate'
 import { KIND_STYLE } from './EventCard'
 import { dayParts } from './AgendaControls'
+import NoTime from '../NoTime'
 
 // Centro por omissão sem GPS nem localização escolhida — Lisboa, onde a
 // maioria dos clubes do piloto está.
@@ -74,7 +75,7 @@ function pinLabel(pin, t, lang) {
     return { text: [timeOf(evs[0], lang), s.text].filter(Boolean).join(' · '), tone: s.tone }
   }
   const times = evs.map((e) => timeOf(e, lang)).filter(Boolean)
-  const range = times.length > 1 ? `${times[0]}–${times[times.length - 1]}` : times[0]
+  const range = times.length > 1 ? `${times[0]}-${times[times.length - 1]}` : times[0]
   const tone = evs.some((e) => e.mine) ? 'mine' : evs.every((e) => eventStatus(e, t).tone === 'full') ? 'full' : null
   return { text: [t('homecard.day_count', { count: evs.length }), range].filter(Boolean).join(' · '), tone }
 }
@@ -114,7 +115,7 @@ function MiniCard({ event, active, distance, link, action, onAction, cardRef }) 
       className={`snap-center shrink-0 w-[84%] max-w-[340px] rounded-card bg-white shadow-lift p-3.5 flex flex-col gap-1 border-2 ${active ? 'border-ink-900' : 'border-transparent'}`}>
       <Link to={link || '#'} className="flex flex-col gap-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <b className="font-display text-[22px] font-black leading-none text-ink-900">{timeOf(event, i18n.language) || '—'}</b>
+          <b className="font-display text-[22px] font-black leading-none text-ink-900">{timeOf(event, i18n.language) || <NoTime />}</b>
           {distance != null && <span className="text-[12px] text-muted tabular-nums">{t('agenda.distance_km', { km: distance < 10 ? distance.toFixed(1).replace('.0', '') : Math.round(distance) })}</span>}
         </div>
         <span className="text-[14px] font-extrabold text-ink-900 truncate">{title}</span>

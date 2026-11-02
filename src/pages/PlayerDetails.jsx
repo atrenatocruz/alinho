@@ -313,7 +313,7 @@ export default function PlayerDetails() {
               <p className="font-display text-[40px] font-black leading-none text-lime-400 tabular-nums">{h2h.wins}</p>
               <p className="mt-1 text-[13px] text-white/80">{t('playerdetails.r13_you_won')}</p>
             </div>
-            <span className="pt-4 text-white/40">–</span>
+            <span className="pt-4 text-white/40">-</span>
             <div>
               <p className="font-display text-[40px] font-black leading-none tabular-nums">{h2h.losses}</p>
               <p className="mt-1 text-[13px] text-white/80">{t('playerdetails.r13_they_won', { name: firstName })}</p>

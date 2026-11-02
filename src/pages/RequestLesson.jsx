@@ -33,7 +33,7 @@ const dayLabel = (t, dateIso) => {
   const d = new Date(`${dateIso}T12:00:00`)
   return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`)} ${d.getDate()}/${d.getMonth() + 1}`
 }
-const shortHours = (a, b) => `${compactTime(a).replace(':00', '')}–${compactTime(b).replace(':00', '')}`
+const shortHours = (a, b) => `${compactTime(a).replace(':00', '')}-${compactTime(b).replace(':00', '')}`
 
 export default function RequestLesson() {
   const { t } = useTranslation()
@@ -152,7 +152,7 @@ export default function RequestLesson() {
   }, [wanted, data, blocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const monthOf = (d) => t(`lessons.month_short_${d.getMonth() + 1}`)
-  const weekTitle = `${weekDates[0].getDate()}${weekDates[0].getMonth() !== weekDates[6].getMonth() ? ` ${monthOf(weekDates[0])}` : ''} – ${weekDates[6].getDate()} ${monthOf(weekDates[6])}`
+  const weekTitle = t('ui.date_range', { from: `${weekDates[0].getDate()}${weekDates[0].getMonth() !== weekDates[6].getMonth() ? ` ${monthOf(weekDates[0])}` : ''}`, to: `${weekDates[6].getDate()} ${monthOf(weekDates[6])}` })
 
   // Mudar uma escolha de cima limpa as de baixo que deixaram de caber.
   const chooseBlock = (key) => { setBlockKey(key); setDuration(kind === 'trial' ? 60 : null); setStart(null); setType(null) }
@@ -229,7 +229,7 @@ export default function RequestLesson() {
     const d = new Date(iso)
     const di = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
     const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-    return `${dayLabel(t, di)} · ${compactTime(hm)}–${compactTime(endTime(hm, minutes))}`
+    return `${dayLabel(t, di)} · ${compactTime(hm)}-${compactTime(endTime(hm, minutes))}`
   }
   const acceptProposal = async (r) => {
     setCardError('')
@@ -301,7 +301,7 @@ export default function RequestLesson() {
         <span className="inline-flex rounded-full bg-ink-50 px-2 py-[3px] text-[11px] font-extrabold text-ink-700">{t('booking.sent_pill')}</span>
         <p className="font-display font-extrabold text-lg text-ink-900 leading-tight">{t('booking.sent_title', { name: shortName })}</p>
         <p className="text-sm text-muted">
-          {dayLabel(t, iso)} · {compactTime(hm)}–{compactTime(endTime(hm, r.duration_minutes))} · {t(`lessons.price_row_${r.lesson_type}`)}
+          {dayLabel(t, iso)} · {compactTime(hm)}-{compactTime(endTime(hm, r.duration_minutes))} · {t(`lessons.price_row_${r.lesson_type}`)}
           {r.price_per_person != null && ` · ${t('booking.per_person', { price: euros(r.price_per_person) })}`}
         </p>
         {r.org_name && <p className="text-sm text-muted">{r.org_name}</p>}
@@ -539,7 +539,7 @@ export default function RequestLesson() {
       {type && block && start && (
         <div className="space-y-2">
           <p className="flex justify-between gap-3 text-sm text-ink-900">
-            <span>{dayLabel(t, block.date)} · {compactTime(start)}–{compactTime(endTime(start, duration))} · {t(`lessons.price_row_${type}`)}</span>
+            <span>{dayLabel(t, block.date)} · {compactTime(start)}-{compactTime(endTime(start, duration))} · {t(`lessons.price_row_${type}`)}</span>
             <b className="font-extrabold shrink-0">{Number(price) === 0 ? t('lessons.free_price') : t('booking.per_person', { price: euros(price) })}</b>
           </p>
           {error && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{error}</p>}

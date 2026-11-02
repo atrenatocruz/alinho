@@ -57,7 +57,7 @@ describe('partilha', () => {
   })
   it('mensagem com nome, datas, clube e link', () => {
     expect(shareMessage(tour, 'https://alinho.pt'))
-      .toBe('Smash Cup by WFit\n09–11 · Smash Padel\nhttps://alinho.pt/torneio/smash-cup')
+      .toBe('Smash Cup by WFit\n09-11 · Smash Padel\nhttps://alinho.pt/torneio/smash-cup')
   })
   it('torneio de um dia só', () => {
     expect(shareMessage({ ...tour, ends_on: '2026-10-09' }, 'https://alinho.pt').split('\n')[1])

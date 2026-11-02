@@ -127,7 +127,7 @@ function ToCloseCard({ s }) {
             <p className="flex items-center gap-2"><Faces people={single.team_a} /><span className="truncate text-sm font-extrabold text-ink-900">{pairNames(single.team_a)}</span></p>
             <p className="flex items-center gap-2"><Faces people={single.team_b} faded /><span className="truncate text-sm font-extrabold text-muted">{pairNames(single.team_b)}</span></p>
           </div>
-          <span className="font-extrabold text-xl tabular-nums text-ink-900">{single.rounds_a}–{single.rounds_b}</span>
+          <span className="font-extrabold text-xl tabular-nums text-ink-900">{single.rounds_a}-{single.rounds_b}</span>
         </div>
       ) : pairs.length > 1 || s.pairing_mode === 'rotating' ? (
         <p className="mt-2.5 flex items-center gap-2"><Faces people={answered} /><span className="text-sm font-extrabold text-ink-900">{t('friends.list_rotating', { count: s.people || 0 })}</span></p>
@@ -179,7 +179,7 @@ function HistoryCard({ s }) {
             <p className="flex items-center gap-2"><Faces people={bottom} ring="ring-kind-friends-light" faded={!draw} />
               <span className={`truncate text-sm font-extrabold ${draw ? 'text-ink-900' : 'text-muted'}`}>{pairNames(bottom)}</span></p>
           </div>
-          <span className={`font-extrabold text-[34px] leading-none tabular-nums ${draw ? 'text-muted' : 'text-ink-900'}`}>{rTop}–{rBottom}</span>
+          <span className={`font-extrabold text-[34px] leading-none tabular-nums ${draw ? 'text-muted' : 'text-ink-900'}`}>{rTop}-{rBottom}</span>
         </div>
       ) : (
         <div className="mt-2.5">

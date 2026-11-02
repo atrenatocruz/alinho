@@ -30,9 +30,11 @@ export default function HomeCard({ colors = FALLBACK, label, pill = null, time, 
   )
   const hourRow = (
     <div className="flex items-end justify-between gap-2">
-      <span className="font-display text-[32px] font-extrabold leading-none tracking-[-.035em] tabular-nums">
+      {/* Os dias ao lado da hora nunca se partem a meio: sem lugar, passam
+          inteiros para baixo, alinhados à esquerda e encostados (UX, 2 nov). */}
+      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-[3px] font-display text-[32px] font-extrabold leading-none tracking-[-.035em] tabular-nums">
         {time}
-        {timeAside && <small className="ml-2 font-display text-[13px] font-medium tracking-normal opacity-85">{timeAside}</small>}
+        {timeAside && <small className="whitespace-nowrap font-display text-[13px] font-medium tracking-normal opacity-85">{timeAside}</small>}
       </span>
       {cnt}
     </div>

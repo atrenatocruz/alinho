@@ -27,7 +27,7 @@ function Team({ team, score, lead, hidden = false }) {
         ))}
       </span>
       <b className={`ml-2 min-w-0 flex-1 truncate font-display text-[14.5px] font-bold leading-[1.2] ${lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{names.join(' / ')}</b>
-      <em className={`min-w-[40px] text-right font-display text-[30px] font-black not-italic leading-none tracking-[-.02em] tabular-nums ${lead ? 'text-lime-400' : lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{score ?? '–'}</em>
+      <em className={`min-w-[40px] text-right font-display text-[30px] font-black not-italic leading-none tracking-[-.02em] tabular-nums ${lead ? 'text-lime-400' : lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{score ?? '-'}</em>
     </div>
   )
 }
@@ -87,7 +87,7 @@ export default function LiveBoard({ row, card, onOpen }) {
           <div className="mt-3 flex flex-wrap gap-1.5">
             {courts.slice(1).map((c) => (
               <span key={c.court} className="rounded-full bg-[#1C212B] px-2.5 py-1.5 font-display text-[12px] font-semibold leading-none text-[#C9CED6]">
-                {t('homecard.live_court_pill', { n: c.court })} · <b className="text-white">{c.score_a ?? '–'}–{c.score_b ?? '–'}</b>
+                {t('homecard.live_court_pill', { n: c.court })} · <b className="text-white">{c.score_a ?? '-'}-{c.score_b ?? '-'}</b>
               </span>
             ))}
           </div>

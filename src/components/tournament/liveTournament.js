@@ -19,7 +19,7 @@ export function winnerScore(score, aWon) {
   return String(score).trim().split(/\s+/).map((set) => {
     const [a, b] = set.split(/[-–]/)
     if (b === undefined) return set
-    return aWon ? `${a}–${b}` : `${b}–${a}`
+    return aWon ? `${a}-${b}` : `${b}-${a}`
   }).join(' ')
 }
 

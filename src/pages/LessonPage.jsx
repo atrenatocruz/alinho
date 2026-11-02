@@ -113,7 +113,7 @@ export default function LessonPage() {
         <h2 className="text-2xl text-ink-900 mt-2.5">{t(isSeries ? 'lessons.series_with' : 'lessons.lesson_with', { name: data.teacher?.name })}</h2>
         {l.organization && <p className="text-sm text-ink-700 mt-0.5">{l.organization.name} · {t(l.organization.kind === 'group' ? 'agenda.owner_group' : 'agenda.owner_club')}</p>}
         <p className="font-display text-[34px] font-extrabold leading-none text-ink-900 mt-3">
-          {hhmm(l.starts_at)}<span className="text-lg font-bold text-ink-500">–{hhmm(l.ends_at)}</span>
+          {hhmm(l.starts_at)}<span className="text-lg font-bold text-ink-500">-{hhmm(l.ends_at)}</span>
         </p>
         <p className="text-sm text-ink-700 mt-1">{formatDate(start, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         <p className="flex items-center gap-1.5 text-sm text-ink-700 mt-2">

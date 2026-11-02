@@ -833,7 +833,7 @@ export default function Profile() {
             <p className="mt-1 text-[11px] text-muted">{t('profile.r7_wins')}</p>
           </div>
           <div className="px-1">
-            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles === undefined ? '–' : (titles ?? stats?.mix_wins ?? 0)}</p>
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles === undefined ? '-' : (titles ?? stats?.mix_wins ?? 0)}</p>
             <p className="mt-1 text-[11px] text-muted">{t('profile.r7_titles')}</p>
           </div>
         </div>
