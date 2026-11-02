@@ -21,6 +21,7 @@ import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 import { coverOf } from '../lib/orgCover'
 import SuperadminModeCard from '../components/gerir/SuperadminModeCard'
 import ManagedPartnersSection from '../components/partners/ManagedPartnersSection'
+import PlanRequestsCard from '../components/gerir/PlanRequestsCard'
 
 
 export default function Gerir() {
@@ -381,6 +382,7 @@ export default function Gerir() {
           <p className="text-muted text-sm pt-1">{t('gerir.empty_subtitle')}</p>
         </div>
         <SuperadminModeCard />
+        <PlanRequestsCard />
         {createGroupPanel}
         {isPlatformAdmin && <AppFeaturesPanel />}
         {isPlatformAdmin && (
@@ -405,6 +407,8 @@ export default function Gerir() {
 
       {/* Antes de tudo, só para superadmins (UX, 18 out). */}
       <SuperadminModeCard />
+      {/* Os pedidos de plano dos grupos (#723), logo a seguir ao modo. */}
+      <PlanRequestsCard />
 
       {createdClubBanner}
 
