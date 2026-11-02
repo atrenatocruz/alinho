@@ -88,6 +88,7 @@ const CreateSeries = lazyPage(() => import('./pages/CreateSeries'))
 const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
 const GerirPlanos = lazyPage(() => import('./pages/GerirPlanos'))
+const GerirPlanosPedidos = lazyPage(() => import('./pages/GerirPlanosPedidos'))
 const Ajuda = lazyPage(() => import('./pages/Ajuda'))
 const LeaguePage = lazyPage(() => import('./pages/LeaguePage'))
 const LeagueEncounterPage = lazyPage(() => import('./pages/LeagueEncounterPage'))
@@ -844,6 +845,15 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <GerirPlanos />
+            </Guard>
+          }
+        />
+        {/* Os pedidos de plano, só superadmins (#723 envio 2). */}
+        <Route
+          path="/gerir/planos-pedidos"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <GerirPlanosPedidos />
             </Guard>
           }
         />
