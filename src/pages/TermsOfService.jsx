@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Nav, Footer, usePageTop } from './Landing'
-import { founderNames, POLICY_VERSION, SUPPORT_EMAIL, mailtoLink, whatsappContactLink } from '../lib/contacts'
+import { founderNames, PLAN_SELLER, POLICY_VERSION, SUPPORT_EMAIL, mailtoLink, whatsappContactLink } from '../lib/contacts'
 import { formatDate } from '../lib/formatDate'
+import { useFeatureFlag } from '../lib/useFeatureFlag'
 
 /* alinho.pt/termos — página mais fácil de ler (design-handoff/2026-10-13-
    termos-de-servico, SPEC do UX; aprovada pelo Francisco a 14 out). Topo
@@ -16,6 +17,10 @@ const SECTIONS = [
   'intro', 'pilot', 'responsibilities', 'admins', 'ranking', 'prizes',
   'whatsapp', 'account', 'liability', 'changes', 'law', 'contact',
 ]
+// «Quem vende os planos» entra a seguir a «Preços e planos», só com o
+// interruptor «vendedor_planos» (Finanças e PO, 29 out). Ao ligar, sobe o
+// POLICY_VERSION no mesmo main.
+const withSeller = (on) => (on ? SECTIONS.flatMap((k) => (k === 'pilot' ? [k, 'seller'] : [k])) : SECTIONS)
 const SUMMARY = [1, 2, 3, 4, 5, 6]
 
 // Visto num círculo: lima sobre preto no resumo, preto sobre lima na lista.
@@ -30,6 +35,7 @@ function Check({ dark }) {
 export default function TermsOfService() {
   usePageTop()
   const { t, i18n } = useTranslation()
+  const sections = withSeller(useFeatureFlag('vendedor_planos').on)
   const date = formatDate(`${POLICY_VERSION}T12:00:00`, i18n.language, { day: 'numeric', month: 'long', year: 'numeric' })
   const kicker = 'font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted'
   return (
@@ -56,11 +62,11 @@ export default function TermsOfService() {
           <p className="mt-4 text-[13px] leading-snug text-muted">{t('terms.summary_note')}</p>
         </div>
 
-        <nav id="indice" aria-label={t('terms.toc')} className="mt-9 scroll-mt-20">
+        <nav id="indice" aria-label={t('terms.toc')} className="mt-9 scroll-mt-32">
           <p className={kicker}>{t('terms.toc')}</p>
           {/* No computador, 2 colunas lidas de cima para baixo (1–6, 7–12). */}
           <ol className="mt-2.5 md:columns-2 md:gap-7">
-            {SECTIONS.map((key, i) => (
+            {sections.map((key, i) => (
               <li key={key} className="break-inside-avoid">
                 <a href={`#${key}`} className="flex items-baseline gap-3 border-b border-line py-2.5 text-[15px] font-semibold leading-snug text-ink-900">
                   <span className="w-5 flex-none font-mono text-xs font-medium text-muted">{i + 1}</span>
@@ -72,11 +78,11 @@ export default function TermsOfService() {
         </nav>
 
         <div className="mt-4">
-          {SECTIONS.map((key, i) => {
+          {sections.map((key, i) => {
             // Um texto com várias linhas é uma lista (as responsabilidades).
-            const lines = t(`terms.section_${key}_body`).split(/\n/)
+            const lines = t(`terms.section_${key}_body`, { seller: PLAN_SELLER, email: SUPPORT_EMAIL }).split(/\n/)
             return (
-              <section key={key} id={key} className={`scroll-mt-20 pt-[30px] pb-[22px] ${i ? 'border-t border-line' : ''}`}>
+              <section key={key} id={key} className={`scroll-mt-32 pt-[30px] pb-[22px] ${i ? 'border-t border-line' : ''}`}>
                 <h2 className="mb-2.5 text-[22px] font-extrabold leading-tight tracking-[-0.015em] text-ink-900">
                   <span className="mr-1 align-[2px] font-mono text-sm font-medium text-muted">{i + 1}.</span> {t(`terms.section_${key}_title`)}
                 </h2>

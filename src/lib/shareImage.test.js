@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { photoFilename, qrDataUrl, saveOriginalPhoto, shareFilename, shareOrSaveImage } from './shareImage'
+import { photoFilename, qrDataUrl, saveOriginalPhoto, shareFilename, shareOrSaveImage, withShareLink } from './shareImage'
 
 describe('shareImage', () => {
   afterEach(() => { vi.unstubAllGlobals() })
@@ -7,6 +7,16 @@ describe('shareImage', () => {
   it('o QR é gerado na app, como imagem', async () => {
     const url = await qrDataUrl('https://alinho.pt/torneio/smash-cup-by-wfit')
     expect(url.startsWith('data:image/png;base64,')).toBe(true)
+  })
+
+  it('o link entra no lugar do «alinho.pt» solto do fim (#743)', () => {
+    const link = 'https://www.alinho.pt/clube/padel?ref=AB12'
+    expect(withShareLink('🏆 Ganhámos o Viva! alinho.pt @alinhopt #alinhopadel', link))
+      .toBe(`🏆 Ganhámos o Viva! ${link} @alinhopt #alinhopadel`)
+    // O «no alinho.pt.» de uma frase fica; só o último solto muda.
+    expect(withShareLink('Registei no alinho.pt. Linha\nalinho.pt @alinhopt', link)).toBe(`Registei no alinho.pt. Linha\n${link} @alinhopt`)
+    expect(withShareLink('Parabéns!', link)).toBe(`Parabéns! ${link}`)
+    expect(withShareLink('Parabéns!', null)).toBe('Parabéns!')
   })
 
   it('o nome do ficheiro, sem acentos', () => {

@@ -17,6 +17,11 @@ export const SUPPORT_EMAIL_READY = true
 // David juntou-se no mesmo dia); todos aceitam aparecer antes de publicar.
 // Quando houver empresa, troca-se pelos dados dela.
 export const FOUNDERS = ['Francisco Barros', 'Renato Cruz', 'Ruben Bernardo', 'David Antunes']
+// Quem vende os planos e passa as faturas (texto das Finanças, 29 out;
+// design-handoff/2026-10-29-vendedor-dos-planos). Só aparece nos Termos e na
+// Privacidade com o interruptor «vendedor_planos» ligado, depois do sim
+// escrito do Renato. Quando houver empresa, troca-se aqui.
+export const PLAN_SELLER = 'Renato Cruz'
 /** «Francisco Barros, Renato Cruz e Ruben Bernardo» (en: «… and …»). */
 export const founderNames = (lang) => `${FOUNDERS.slice(0, -1).join(', ')} ${lang?.startsWith('en') ? 'and' : 'e'} ${FOUNDERS[FOUNDERS.length - 1]}`
 

@@ -92,7 +92,7 @@ export default function FriendSession() {
   const [invitedHere, setInvitedHere] = useState(false)
   const load = useCallback(() => {
     listMyFriendMatchInvites()
-      .then((rows) => setInvitedHere(rows.some((r) => r.match_id === id && r.my_status !== 'accepted')))
+      .then((rows) => setInvitedHere(rows.some((r) => r.match_id === id && r.my_status !== 'accepted' && r.my_status !== 'organizer')))
       .catch(() => setInvitedHere(false))
     // Quem não jogou mas é do grupo (ou o grupo é público) abre-o só para ler,
     // vindo dos «Já jogados» (27/28 set).
@@ -122,8 +122,11 @@ export default function FriendSession() {
   const invitees = data?.invitees || []
   const games = data?.games || []
   const me = invitees.find((i) => i.user_id && i.user_id === profile?.id)
+  // Quem organiza sem jogar (#736) não está nos convidados: vem do jogo.
+  const organizerOut = match?.creator_plays === false
   const creator = invitees.find((i) => i.is_creator)
-  const iAmCreator = !!me?.is_creator
+    || (organizerOut ? { name: match.creator_name, user_id: match.creator_id } : undefined)
+  const iAmCreator = !!me?.is_creator || (organizerOut && !!profile?.id && match.creator_id === profile.id)
   // Quem organiza: quem criou, ou quem disse «Vou» com o nome (Dev 3:
   // friend_match_is_organizer). «Vou, mas sem o meu nome» não conta.
   const iOrganize = iAmCreator || (me?.status === 'accepted' && !me?.is_anonymous)
@@ -582,6 +585,15 @@ export default function FriendSession() {
           // com uma linha fina, «+ Juntar pessoa» e a nota lá dentro (UX, 14 out).
           <div className="card">
             <h3 className="mb-1 text-lg text-ink-900">{t('friends.who_plays', { count: invitees.filter((i) => i.status !== 'declined').length })}</h3>
+            {/* Quem organiza sem jogar (#736): a linha logo por baixo do título. */}
+            {organizerOut && (
+              <p className="mb-1 text-[13px] text-muted">
+                {iAmCreator ? t('friends.organizer_not_playing_me') : (
+                  <Trans i18nKey="friends.organizer_not_playing" values={{ name: creator?.name || '' }}
+                    components={{ b: <b className="font-extrabold text-ink-900" /> }} />
+                )}
+              </p>
+            )}
             <div className="divide-y divide-line">
               {/* Quem disse «Não vou» sai de «Quem joga». */}
               {invitees.filter((i) => i.status !== 'declined').map((i) => (
@@ -620,7 +632,7 @@ export default function FriendSession() {
               </p>
             )}
             {addingPerson && (
-              <AddPersonSheet matchId={match.id} inGame={new Set(invitees.map((i) => i.user_id).filter(Boolean))}
+              <AddPersonSheet matchId={match.id} inGame={new Set([...invitees.map((i) => i.user_id), organizerOut ? match.creator_id : null].filter(Boolean))}
                 onClose={() => setAddingPerson(false)} onSaved={() => { setAddingPerson(false); load() }} />
             )}
           </div>

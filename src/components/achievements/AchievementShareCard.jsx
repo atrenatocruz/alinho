@@ -5,16 +5,21 @@
 // alinho.pt». Como os outros cartões de partilha: desenhado a 360 ×
 // 640 (stories) ou 360 × 360 (quadrado, sem a pessoa) e exportado
 // a 3× com o html-to-image.
+//
+// #743 (um desenho só para todas as partilhas, Francisco 30 out): nas
+// stories, a moldura comum (ShareFrame) — a medalha no lugar da foto, o fundo
+// liso na cor da raridade, «Conquista nova · Épica» a lima e, à direita, a
+// data e a pessoa; por baixo, o nome, a frase e «Só X%…». O quadrado fica
+// como estava.
 import { forwardRef, useImperativeHandle, useRef } from 'react'
-import { toPng } from 'html-to-image'
-import { useTranslation } from 'react-i18next'
 import logoWordmark from '../../logo/primary-dark-card.svg'
+import { ShareFrame, exportCard } from '../tournament/TournamentShareCard'
+import { shortName } from '../tournament/shareData'
 
 export const A_CARD_W = 360
 export const A_STORY_H = 640
 export const A_SQUARE_H = 360
 const RATIO = 3
-const SAFE = 73 // zona livre em cima e em baixo das stories (Instagram)
 
 // Versão B: o degradé radial de cada raridade, claro atrás da medalha e
 // escuro em baixo (SPEC, ponto 2).
@@ -23,6 +28,13 @@ export const RARITY_BG = {
   raro: ['#2563EB', '#0B2A6B'],
   epico: ['#6D28D9', '#2E1065'],
   lendario: ['#B8860B', '#4A3300'],
+}
+
+/** O fundo liso das stories: a meio caminho entre o claro e o escuro da raridade. */
+const flatBg = (rarity) => {
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+  const [a, b] = (RARITY_BG[rarity] || RARITY_BG.comum).map(hex)
+  return a.map((v, i) => Math.round((v + b[i]) / 2))
 }
 
 function Background({ rarity, cy }) {
@@ -58,64 +70,52 @@ function Logo() {
  * format: 'stories' | 'square'
  */
 const AchievementShareCard = forwardRef(function AchievementShareCard({ rarity, data, format = 'stories' }, ref) {
-  const { t } = useTranslation()
   const nodeRef = useRef(null)
   const square = format === 'square'
   const H = square ? A_SQUARE_H : A_STORY_H
-  useImperativeHandle(ref, () => ({
-    exportPng: async () => {
-      const node = nodeRef.current
-      if (!node) throw new Error('Card not ready')
-      const opts = { width: A_CARD_W, height: H, pixelRatio: RATIO, cacheBust: true }
-      // No iPhone, a primeira passagem do html-to-image pode sair sem as
-      // imagens: espera-se pela descodificação e deita-se a primeira fora.
-      await Promise.all([...node.querySelectorAll('img')].map((img) => (img.decode ? img.decode().catch(() => {}) : null)))
-      await toPng(node, opts).catch(() => {})
-      const dataUrl = await toPng(node, opts)
-      return (await fetch(dataUrl)).blob()
-    },
-  }))
+  useImperativeHandle(ref, () => ({ exportPng: () => exportCard(nodeRef.current, A_CARD_W, H) }))
 
-  const medalW = square ? 150 : 223 // ~670 px na imagem das stories
+  if (!square) {
+    const person = data.person
+    return (
+      <ShareFrame nodeRef={nodeRef} bg={flatBg(rarity)} label={data.kicker} date={data.date}
+        org={person ? { name: shortName(person.name), logo: person.photo, initials: person.initials, solid: true } : null}
+        top={(
+          <div className="absolute left-0 right-0 flex justify-center" style={{ top: 96 }}>
+            {data.medal
+              ? <img src={data.medal} alt="" className="block" style={{ width: 220, height: 220, filter: 'drop-shadow(0 14px 18px rgba(0,0,0,.45))' }} />
+              : <span className="mt-6 block rounded-full" style={{ width: 160, height: 160, background: 'rgba(255,255,255,.14)' }} />}
+          </div>
+        )}>
+        <p className="font-display text-[34px] font-black leading-none tracking-[-.01em]">{data.name}</p>
+        <p className="mt-1.5 text-[12px] leading-snug text-white/85">{data.desc}</p>
+        {data.pctLine && (
+          <span className="mt-2.5 self-start rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: 'rgba(255,255,255,.14)' }}>{data.pctLine}</span>
+        )}
+      </ShareFrame>
+    )
+  }
+
+  // O quadrado (360 × 360, sem a pessoa), como estava.
   const medal = data.medal
-    ? <img src={data.medal} alt="" className="block" style={{ width: medalW, height: medalW, filter: 'drop-shadow(0 14px 18px rgba(0,0,0,.45))' }} />
+    ? <img src={data.medal} alt="" className="block" style={{ width: 150, height: 150, filter: 'drop-shadow(0 14px 18px rgba(0,0,0,.45))' }} />
     // Sem medalha, fica só a cor, sem buraco (SPEC).
-    : <span className="block rounded-full" style={{ width: medalW * 0.7, height: medalW * 0.7, background: 'rgba(255,255,255,.14)' }} />
+    : <span className="block rounded-full" style={{ width: 105, height: 105, background: 'rgba(255,255,255,.14)' }} />
 
   return (
     <div ref={nodeRef} className="relative overflow-hidden font-sans text-white" style={{ width: A_CARD_W, height: H }}>
-      <Background rarity={rarity} cy={square ? '42%' : '38%'} />
-      <div className="absolute inset-x-0 flex flex-col items-center px-[18px]" style={square ? { top: 18, bottom: 18 } : { top: SAFE, bottom: SAFE }}>
+      <Background rarity={rarity} cy="42%" />
+      <div className="absolute inset-x-0 flex flex-col items-center px-[18px]" style={{ top: 18, bottom: 18 }}>
         <div className="flex w-full items-center justify-between">
           <Logo />
           <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em]">{data.date}</span>
         </div>
-        <p className={`${square ? 'mt-2' : 'mt-4'} font-mono text-[8.5px] font-bold uppercase tracking-[0.16em] text-white/85`}>{data.kicker}</p>
-        <div className={square ? 'mt-1' : 'mt-3'}>{medal}</div>
-        <p className={`${square ? 'mt-1 text-[22px]' : 'mt-3 text-[28px]'} text-center font-display font-black leading-[1.05] tracking-[-.01em]`}>{data.name}</p>
+        <p className="mt-2 font-mono text-[8.5px] font-bold uppercase tracking-[0.16em] text-white/85">{data.kicker}</p>
+        <div className="mt-1">{medal}</div>
+        <p className="mt-1 text-center font-display text-[22px] font-black leading-[1.05] tracking-[-.01em]">{data.name}</p>
         <p className="mt-1.5 max-w-[280px] text-center text-[11px] leading-snug text-white/85">{data.desc}</p>
         {data.pctLine && (
           <span className="mt-2.5 rounded-full px-3 py-1 text-[9.5px] font-extrabold" style={{ background: 'rgba(255,255,255,.18)' }}>{data.pctLine}</span>
-        )}
-        {!square && data.person && (
-          <div className="mt-4 flex items-center gap-2">
-            {data.person.photo
-              ? <img src={data.person.photo} alt="" className="block h-[28px] w-[28px] shrink-0" />
-              // Sem foto: as iniciais, brancas sobre #1F2937, como os avatares da app (SPEC).
-              : <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-[#1F2937] font-display text-[10px] font-extrabold text-white">{data.person.initials}</span>}
-            <span className="min-w-0">
-              <span className="block truncate text-[11px] font-extrabold leading-tight">{data.person.name}</span>
-              {data.person.sub && <span className="block truncate text-[9px] leading-tight text-white/80">{data.person.sub}</span>}
-            </span>
-          </div>
-        )}
-        {!square && (
-          <div className="mb-[14px] mt-auto flex w-full items-end justify-between gap-3">
-            <div>
-              <p className="text-[12px] font-extrabold leading-tight">{t('share.play_padel')}<br />{t('share.on_alinho')}</p>
-              <p className="mt-0.5 text-[7.5px] text-white/70">alinho.pt · #alinhopadel</p>
-            </div>
-          </div>
         )}
       </div>
     </div>

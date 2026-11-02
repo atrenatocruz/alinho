@@ -27,11 +27,10 @@ export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
     rows,
     share: {
       variant: 'podium',
-      // O cartão premium dos vencedores (MixWinnersShareCard, 30 out) —
-      // só o mix de duplas fixas; americano/aberto ficam no cartão comum.
-      premium: true,
       data: {
         kicker: t('mixwinners.kicker_mix'),
+        // A faixa do título do cartão (#743).
+        label: t('mixshare.winners_label'),
         date: shortDate(game.date, lang),
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
@@ -68,6 +67,7 @@ export function americanoWinners({ standings, firsts, myId, game, org, t, lang }
       variant: 'podium',
       data: {
         kicker: t('mixwinners.kicker_americano'),
+        label: t('mixwinners.kicker_americano'),
         date: shortDate(game.date, lang),
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
@@ -115,6 +115,7 @@ export function rotatingWinners({ placar, myId, game, org, t, lang }) {
       variant: 'podium',
       data: {
         kicker: t('mixwinners.kicker_mix'),
+        label: t('mixshare.winners_label'),
         date: shortDate(game.date, lang),
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
