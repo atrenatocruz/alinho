@@ -1,4 +1,26 @@
+import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+
+/** Quantos membros tem cada clube ou grupo, { [id]: n } (#749, Gerir; design-
+ *  handoff/2026-10-30-gerir-membros). O mesmo número da Comunidade e da página
+ *  do clube: org_visible_member_count, sem superadmins nem convidados. Um
+ *  pedido por organização, em paralelo: chega para as dezenas de hoje; se
+ *  passarem de umas dezenas, o Dev 3 faz uma versão em lote. Enquanto não
+ *  chega (ou se falhar), esse id não aparece e a linha fica como estava. */
+export function useMemberCounts(ids) {
+  const [counts, setCounts] = useState({})
+  const key = (ids || []).filter(Boolean).join(',')
+  useEffect(() => {
+    if (!key) { setCounts({}); return undefined }
+    let alive = true
+    Promise.all(key.split(',').map(async (id) => {
+      const { data, error } = await supabase.rpc('org_visible_member_count', { p_organization_id: id })
+      return error || data == null ? null : [id, Number(data)]
+    })).then((rows) => { if (alive) setCounts(Object.fromEntries(rows.filter(Boolean))) })
+    return () => { alive = false }
+  }, [key])
+  return counts
+}
 
 export const listGlobalOrganizations = async () => {
   const { data, error } = await supabase.rpc('list_global_organizations')

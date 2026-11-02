@@ -64,7 +64,7 @@ export function setSiteLanguage(lang) {
 // A Ajuda vive em /ajuda (o /instrucoes leva lá): sem sessão, a página do
 // site; com sessão, dentro da app.
 export const HELP_PATH = '/ajuda'
-/** As cinco portas, com `on` na página onde se está. A /parceiros existe
+/** As seis portas, com `on` na página onde se está. A /parceiros existe
  *  sempre: com o interruptor «parceiros» desligado mostra só o «Para marcas e
  *  lojas». */
 function useSiteLinks() {
@@ -72,6 +72,7 @@ function useSiteLinks() {
   return [
     { to: '/como-funciona', key: 'site.nav_players', on: pathname === '/como-funciona' },
     { to: '/planos', key: 'plans.tab_groups', on: pathname === '/planos' },
+    { to: '/clubes', key: 'plans.tab_clubs', on: pathname === '/clubes' },
     { to: '/professores', key: 'plans.tab_teachers', on: pathname === '/professores' },
     { to: '/parceiros', key: 'partners.footer_link', on: pathname === '/parceiros' },
     { to: HELP_PATH, key: 'site.help_link', on: ['/instrucoes', '/ajuda'].includes(pathname) },
@@ -159,16 +160,17 @@ export function SiteHeader({ sticky = true }) {
   }, [])
   return (
     <header ref={ref} className={`${sticky ? 'sticky top-0' : 'relative'} z-20 border-b border-black/5 bg-[#F7F7F4] pt-[env(safe-area-inset-top,0px)]`}>
-      <div ref={rowRef} className="mx-auto flex h-16 max-w-[1200px] items-center gap-[30px] px-4 sm:h-[76px] sm:px-10">
+      {/* No telemóvel, 12 px entre o logótipo e a ponta: com sessão, o «Ir a la
+          app ›» passava a linha e a página mexia para o lado a 360 px (QA, 2 nov). */}
+      <div ref={rowRef} className="mx-auto flex h-16 max-w-[1200px] items-center gap-3 px-4 sm:h-[76px] sm:gap-[30px] sm:px-10">
         <Link ref={logoRef} to="/" onClick={toTop(pathname, '/')} className="shrink-0 leading-none" aria-label="alinho.pt">
           <Wordmark variant="light" className="!h-[26px] sm:!h-[30px]" />
         </Link>
-        <span className="flex-1" />
-        {oneLine && <nav className="flex items-center gap-[30px]" aria-label={t('site.nav_label')}>{nav}</nav>}
+        {oneLine && <nav className="ml-auto flex items-center gap-[30px]" aria-label={t('site.nav_label')}>{nav}</nav>}
         {/* A língua ao lado do «Entrar», em todos os tamanhos (menu-lingua, 28 out). */}
-        <div ref={endRef} className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div ref={endRef} className={`flex shrink-0 items-center gap-2 sm:gap-4 ${oneLine ? '' : 'ml-auto'}`}>
           <LanguageMenu />
-          <Link to={cta.to} className="rounded-full bg-ink-900 px-5 py-3 font-display text-[15px] font-extrabold leading-none text-white">
+          <Link to={cta.to} className="whitespace-nowrap rounded-full bg-ink-900 px-4 py-3 font-display text-[15px] font-extrabold leading-none text-white sm:px-5">
             {cta.label}
           </Link>
         </div>
