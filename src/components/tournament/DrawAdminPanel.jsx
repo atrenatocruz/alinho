@@ -701,7 +701,7 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
         ) : (
           categories.map((c) => (
             <button key={c.id} type="button" onClick={() => setPickedId(c.id)}
-              className="mb-1.5 flex w-full items-center justify-between gap-2 card !px-4 !py-3 text-left">
+              className="mb-1.5 flex w-full items-center justify-between gap-2 card card-open !px-4 !py-3 text-left">
               <span className="min-w-0">
                 <b className="block truncate text-sm font-extrabold text-ink-900">{c.code} · {c.name}</b>
                 <span className="font-mono text-xs text-muted">

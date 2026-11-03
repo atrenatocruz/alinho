@@ -45,7 +45,7 @@ export default function StatsPreviewCard({ userId, to = '/perfil/estatisticas', 
   if (!rich) {
     return (
       <Link to={to}
-        className="press flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+        className="card-open flex items-center gap-3 rounded-card bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ctrl bg-surface">
           <TrendingUp size={18} className="text-ink-700" />
         </span>
@@ -73,7 +73,7 @@ export default function StatsPreviewCard({ userId, to = '/perfil/estatisticas', 
 
   return (
     <Link to={to} aria-label={t('playerstats.title')}
-      className="press block rounded-card bg-white px-3.5 pb-2.5 pt-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+      className="card-open block rounded-card bg-white px-3.5 pb-2.5 pt-3 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
       <div className="flex items-start gap-2">
         <span className="min-w-0 flex-1">
           <span className="block font-extrabold leading-tight text-ink-900">{t('playerstats.title')}</span>

@@ -13,7 +13,7 @@ export default function EncounterRow({ encounter: e, state, home, away, mine, to
     ? `${formatDate(e.scheduled_at, i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime(e.scheduled_at, i18n.language, { hour: '2-digit', minute: '2-digit' })}`
     : t('league.enc_por_marcar')
   return (
-    <Link to={to} className={`press block rounded-card bg-white px-3.5 py-3 ${mine ? 'shadow-[0_0_0_2px_#C8DC00]' : 'shadow-[0_1px_2px_rgba(17,17,17,.06)]'}`}>
+    <Link to={to} className={`card-open block rounded-card bg-white px-3.5 py-3 ${mine ? 'shadow-[0_0_0_2px_#C8DC00] [--card-ring:0_0_0_2px_#C8DC00]' : 'shadow-[0_1px_2px_rgba(17,17,17,.06)]'}`}>
       <div className="flex items-center justify-between gap-2 font-mono text-[10.5px] uppercase tracking-[.08em] text-ink-500">
         <span>{when}</span>
         {mine

@@ -25,7 +25,7 @@ function MiniCard({ mine }) {
 function Option({ mine, title, line, onClick }) {
   return (
     <button type="button" onClick={onClick}
-      className="press flex w-full items-center gap-3.5 rounded-card border-[1.5px] border-line bg-white px-4 py-3.5 text-left">
+      className="card-open flex w-full items-center gap-3.5 rounded-card border-[1.5px] border-line bg-white px-4 py-3.5 text-left">
       <MiniCard mine={mine} />
       <span className="min-w-0 flex-1">
         <span className="block text-[17px] font-extrabold leading-tight text-ink-900">{title}</span>

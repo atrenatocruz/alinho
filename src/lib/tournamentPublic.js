@@ -8,6 +8,7 @@
    Aqui só a parte pura — as frases e as contas. Quem as mostra é
    components/tournament/PublicInfo.jsx. */
 
+import i18n from './i18n'
 import { slotsLeft } from './tournamentSignup'
 
 /* O formato dito como um jogador o diria, não como está na base de dados.
@@ -53,14 +54,22 @@ export function slotsWords(category) {
    estável (SPEC §4.10). */
 export const tournamentUrl = (tournament, origin) => `${origin}/torneio/${tournament?.slug || tournament?.id || ''}`
 
-export function shareMessage(tournament, origin) {
-  const when = [tournament?.starts_on, tournament?.ends_on].filter(Boolean)
-  const dates = when.length === 2 && when[0] !== when[1]
-    ? `${when[0].slice(8, 10)}-${when[1].slice(8, 10)}`
-    : (when[0] || '').slice(8, 10)
+/** «9 nov», «9-11 nov» ou «30 nov a 2 dez»: as datas leem-se igual na lista de
+ *  torneios abertos e na mensagem de partilha. */
+export function tournamentWhen(x, locale) {
+  if (!x?.starts_on) return ''
+  const a = new Date(`${x.starts_on}T12:00`)
+  const b = x.ends_on ? new Date(`${x.ends_on}T12:00`) : a
+  const month = (d) => d.toLocaleDateString(locale, { month: 'short' }).replace('.', '')
+  if (a.getTime() === b.getTime()) return `${a.getDate()} ${month(a)}`
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}-${b.getDate()} ${month(b)}`
+  return i18n.t('ui.date_range', { from: `${a.getDate()} ${month(a)}`, to: `${b.getDate()} ${month(b)}` })
+}
+
+export function shareMessage(tournament, origin, locale = i18n.language) {
   return [
     tournament?.name,
-    [dates, tournament?.club_name].filter(Boolean).join(' · '),
+    [tournamentWhen(tournament, locale), tournament?.club_name].filter(Boolean).join(' · '),
     tournamentUrl(tournament, origin),
   ].filter(Boolean).join('\n')
 }

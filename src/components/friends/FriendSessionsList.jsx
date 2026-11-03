@@ -28,7 +28,7 @@ export default function FriendSessionsList({ sessions: showSessions = true }) {
   }, [])
 
   const row = (key, to, title, line) => (
-    <Link key={key} to={to} className="card press flex items-center gap-3">
+    <Link key={key} to={to} className="card card-open flex items-center gap-3">
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-extrabold text-ink-900">{title}</span>
         <span className="block text-xs text-muted">{line}</span>

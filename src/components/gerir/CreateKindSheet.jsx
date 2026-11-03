@@ -40,7 +40,7 @@ export default function CreateKindSheet({ orgName, kinds, onPick, onClose }) {
           const k = KIND_OF[tipo]
           return (
             <button key={tipo} type="button" onClick={() => onPick(tipo)}
-              className="press flex min-h-[76px] w-full items-center gap-3 rounded-[16px] px-3 py-2.5 text-left text-white"
+              className="card-open flex min-h-[76px] w-full items-center gap-3 rounded-[16px] px-3 py-2.5 text-left text-white"
               style={{ background: KIND_COLORS[k]?.strong }}>
               <span aria-hidden="true" className="h-12 w-14 shrink-0 overflow-hidden rounded-[10px] bg-black/15">
                 {KIND_HERO[k] && <img src={KIND_HERO[k]} alt="" loading="lazy" className="h-full w-full object-cover object-[70%_25%]" />}

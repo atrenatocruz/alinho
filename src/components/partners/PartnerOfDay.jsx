@@ -15,7 +15,7 @@ export function PartnerLine({ partner }) {
   const seenRef = usePartnerSeen(partner.id, 'home_card')
   return (
     <article ref={seenRef} role="link" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter') open() }}
-      className="press flex cursor-pointer items-center gap-2.5 rounded-card border border-line bg-white px-3 py-2.5">
+      className="card-open flex cursor-pointer items-center gap-2.5 rounded-card border border-line bg-white px-3 py-2.5">
       <PartnerLogo partner={partner} size={32} radius={8} />
       <div className="min-w-0 flex-1">
         {/* O nome nunca se corta: um nome comprido parte para baixo. */}

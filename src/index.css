@@ -193,8 +193,11 @@
     @apply transition-[transform,box-shadow] duration-fast active:scale-[0.985];
   }
   @media (hover: hover) {
-    .card-open:hover { box-shadow: var(--shadow-lift); }
+    /* --card-ring: o contorno feito de sombra de alguns cartões, que o rato não pode apagar. */
+    .card-open:hover { box-shadow: var(--card-ring, 0 0 #0000), var(--shadow-lift); }
   }
+  /* Um botão dentro do cartão tem o efeito dele; o cartão não encolhe por isso. */
+  .card-open:has(.press:active, button:active) { transform: none; }
 }
 
 @layer utilities {

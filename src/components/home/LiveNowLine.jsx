@@ -46,7 +46,7 @@ export default function LiveNowLine({ filters = null, onCount, show = true }) {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)}
-        className="press flex w-full items-center gap-3 rounded-2xl bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]">
+        className="card-open flex w-full items-center gap-3 rounded-2xl bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]">
         {/* R2: o ponto vermelho com halo; com «reduzir movimento», não pisca. */}
         <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#EF4444] shadow-[0_0_0_4px_rgba(239,68,68,.2)] motion-safe:animate-pulse" />
         <span className="min-w-0 flex-1">

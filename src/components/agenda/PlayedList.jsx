@@ -127,7 +127,7 @@ function PlayedCard({ row }) {
     : <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
   const mascot = mascotFor(kind)
   return (
-    <div className={`relative ${mascotCardClass(mascot)} rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card bg-surface p-3.5 card-open ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
       <Link to={to} className="absolute inset-0" aria-label={title || ''} />
       {/* O boneco do tipo (Dev 2, 12 out — o mesmo dos cartões da Home). */}
       <CardMascot type={mascot} />

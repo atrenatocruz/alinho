@@ -579,7 +579,7 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
                 onKeyDown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setError(''); setActionsFor(e) } },
               } : {})}
               className={`card flex items-center gap-3 py-3 ${
-              isAdmin && e.status !== 'desistiu' ? 'press cursor-pointer' : ''} ${
+              isAdmin && e.status !== 'desistiu' ? 'card-open cursor-pointer' : ''} ${
               (e.withdrawn || e.status === 'desistiu') ? 'opacity-60' : ''}`}>
               <div className="min-w-0 flex-1">
                 {/* Até duas linhas: com os botões ao lado, «Carla N…» não

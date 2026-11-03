@@ -276,7 +276,7 @@ export default function Comunidade() {
       org.member_count != null ? t('comunidade.member_count', { count: org.member_count }) : null,
     ].filter(Boolean).join(' · ')
     return (
-      <Link key={org.id} to={`/clube/${org.slug}`} className="block overflow-hidden rounded-[22px] bg-white shadow-card press">
+      <Link key={org.id} to={`/clube/${org.slug}`} className="block overflow-hidden rounded-[22px] bg-white shadow-card card-open">
         <KindHero kind="club" src={coverOf(org, covers[org.id])} className="relative h-[104px]">
           {org.open_join === false && (
             <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-xs font-extrabold text-white backdrop-blur-sm" title={t('comunidade.closed_aria')}>

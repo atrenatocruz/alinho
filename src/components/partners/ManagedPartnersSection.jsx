@@ -30,7 +30,7 @@ export default function ManagedPartnersSection() {
     <div className="space-y-3">
       <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-ink-500">{t('partneradmin.section')}</p>
       {rows.map((p) => (
-        <Link key={p.id} to={`/gerir/parceiro/${p.slug}`} className="press flex items-center gap-3 rounded-[22px] bg-white px-4 py-3.5 shadow-card">
+        <Link key={p.id} to={`/gerir/parceiro/${p.slug}`} className="card-open flex items-center gap-3 rounded-[22px] bg-white px-4 py-3.5 shadow-card">
           {p.logo_url
             ? <img src={p.logo_url} alt="" className="h-11 w-11 shrink-0 rounded-[28%] object-cover" />
             : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[28%] bg-ink-900 font-display text-sm font-extrabold text-lime-400">{String(p.name).slice(0, 2).toUpperCase()}</span>}
