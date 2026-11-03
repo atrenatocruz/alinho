@@ -39,6 +39,22 @@ export function FrameAround({ frame, photo, left = 0, top = 0 }) {
   )
 }
 
+/** A caixa da foto no cartão do perfil (design-handoff/2026-11-01-perfil-
+ *  moldura-folga, aprovado pelo Francisco a 1 nov). Sem moldura, 80 px como
+ *  sempre. Com moldura, a caixa passa a ter o tamanho da própria moldura,
+ *  para ela não sair por cima da folga: ficam sempre 16 px até ao texto e
+ *  até à borda do cartão. Lá dentro, o quadrado de 80 px de sempre (foto de
+ *  64 px a 8 px do canto, moldura, escudo) vai para onde a moldura o põe. */
+export function PhotoBox({ frame, children }) {
+  const box = frame ? frameAroundPhoto(frame, 64) : null
+  if (!box) return <div className="relative h-20 w-20 shrink-0">{children}</div>
+  return (
+    <div className="relative shrink-0" style={{ width: Math.ceil(box.width), height: Math.ceil(box.height) }}>
+      <div className="absolute h-20 w-20" style={{ left: -box.left - 8, top: -box.top - 8 }}>{children}</div>
+    </div>
+  )
+}
+
 const scopeLine = (t, lang, f) => `${f.scope_name || t('frames.global')} · ${monthName(String(f.month).slice(0, 10), lang)}`
 
 /** O título por baixo do nome; tocar abre a folha com todas. */
