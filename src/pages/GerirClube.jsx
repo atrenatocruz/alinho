@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
+import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronLeft, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
@@ -2997,10 +2997,24 @@ export default function GerirClube() {
           volta aos Jogos; nos Jogos/Membros volta à página anterior (só quem
           tem mais de um clube/grupo). */}
       {activeTab === 'redeem' ? (
-        <BackBar
-          onBack={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
-          label={t('gerirclube.back_button')} title={org?.name}
-          right={vouchersButton} solid />
+        // Os vouchers são uma página própria (design-handoff/2026-10-21-
+        // vouchers-topo, Francisco 21 out: «Parece que nem entrei em lado
+        // nenhum»): só a «‹» (volta ao Gerir, ou à lista quando se está a ler
+        // um QR), o título «Vouchers» e o grupo pequeno por baixo. Sem o
+        // botão dos vouchers nem o cabeçalho do Gerir; sobe com a página.
+        <div className="!-mt-3.5 -mb-2" style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+          <button type="button" aria-label={t('gerirclube.back_button')}
+            onClick={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
+            className="grid h-11 w-11 place-items-center rounded-full bg-white text-ink-900 shadow-[0_1px_4px_rgba(0,0,0,.16)]">
+            <ChevronLeft size={22} />
+          </button>
+          <h1 className="mt-[18px] font-display text-[30px] font-black leading-none tracking-[-.02em] text-ink-900">{t('vouchers.title')}</h1>
+          <p className="mt-1.5 flex items-center gap-[7px] text-sm font-semibold text-[#5B6068]">
+            <img src={org.group_logo_url || (isGroupOrg ? GROUP_AVATAR : CLUB_AVATAR)} alt="" loading="lazy"
+              className={`h-[22px] w-[22px] shrink-0 object-cover ${isGroupOrg ? 'rounded-full' : 'rounded-[6px]'}`} />
+            <span className="min-w-0 truncate">{org.name}</span>
+          </p>
+        </div>
       ) : (
         // A barra fica sempre, por causa do «Vouchers»; o «‹» só para quem
         // tem mais de um clube/grupo, como antes.
@@ -3015,6 +3029,7 @@ export default function GerirClube() {
           do grupo, R0), «GERIR», o nome e as pastilhas «Clube» e «Plano». */}
       {/* R12b (14 out): a barra do «‹» e este bloco leem-se como um topo só —
           os cantos de baixo e a sombra vão só aqui, no último. */}
+      {activeTab !== 'redeem' && (
       <div className={`!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2 ${TOP_EDGE}`}>
         <span className={`h-14 w-14 shrink-0 overflow-hidden ${isGroupOrg ? 'rounded-full' : 'rounded-[14px]'}`} aria-hidden="true">
           {/* Sem foto, a imagem própria do símbolo (14 out). */}
@@ -3070,6 +3085,7 @@ export default function GerirClube() {
         </div>
         </div>
       </div>
+      )}
 
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
           Hidden while the settings page or the voucher redeem screen is

@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { QrCode } from 'lucide-react'
-import { Avatar, Chips, ConfirmSheet, Select } from '../ui'
+import { Avatar, Chips, ConfirmSheet, Select, Tabs } from '../ui'
+import Alino from '../Alino'
 import { listClubVouchers, redeemVoucher, voucherTotals, voucherWithoutAccount } from '../../lib/vouchers'
 import { describeError } from '../../lib/errors'
 
@@ -152,13 +153,15 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-semibold text-ink-900">{t('vouchers.title')}</h3>
-
-      {/* Os totais, do clube todo. */}
+      {/* O título «Vouchers» e o grupo estão no topo da página (GerirClube,
+          vouchers-topo, 21 out). */}
+      {/* Os totais, do clube todo, e o «Ler QR code». Sem vouchers ainda, só
+          o cartão do Alino (vouchers-topo, 21 out). */}
+      {!(rows && list.length === 0) && (<>
       <div className="grid grid-cols-3 gap-2">
         {[[totals.given, 'vouchers.total_given'], [totals.unused, 'vouchers.total_unused'], [totals.used, 'vouchers.total_used']].map(([n, key]) => (
           <div key={key} className="card !p-3">
-            <b className="block font-display text-2xl font-extrabold leading-none text-ink-900">{rows ? n : '-'}</b>
+            <b className="block font-display text-[26px] font-black leading-none text-ink-900">{rows ? n : '-'}</b>
             <span className="text-xs text-muted">{t(key)}</span>
           </div>
         ))}
@@ -168,17 +171,22 @@ export default function VouchersAdmin({ organizationId, onScan, initialFilter = 
       <button type="button" onClick={onScan} className="btn-secondary w-full inline-flex items-center justify-center gap-2">
         <QrCode size={18} /> {t('vouchers.scan')}
       </button>
+      </>)}
 
       {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
 
       {rows && list.length === 0 ? (
-        <div className="card text-center">
-          <p className="font-display text-lg font-extrabold text-ink-900">{t('vouchers.empty_title')}</p>
-          <p className="mt-1 text-sm text-muted">{t('vouchers.empty_subtitle')}</p>
+        // Sem vouchers: o Alino a pensar a explicar (vouchers-topo, 21 out).
+        <div className="card !rounded-[20px] px-[18px] py-[22px] text-center">
+          <Alino pose="a-pensar" size={129} className="mx-auto" />
+          <p className="mt-3 font-display text-[17px] font-extrabold text-ink-900">{t('vouchers.empty_title')}</p>
+          <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] leading-[1.45] text-[#5B6068]">{t('vouchers.empty_subtitle')}</p>
         </div>
       ) : rows && (
         <>
-          <Chips value={view} onChange={setView} label={t('vouchers.view_label')}
+          {/* «Por dia | Por pessoa» muda a forma de agrupar: separador. Os
+              filtros por baixo continuam pastilhas (regra de 24 set). */}
+          <Tabs value={view} onChange={setView} label={t('vouchers.view_label')}
             options={VIEWS.map((v) => ({ value: v, label: t(`vouchers.view_${v}`) }))} />
           <Chips value={filter} onChange={setFilter} label={t('vouchers.filter_label')}
             options={FILTERS.map((f) => ({ value: f, label: t(`vouchers.filter_${f}`) }))} />
