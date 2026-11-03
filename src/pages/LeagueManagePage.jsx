@@ -127,7 +127,7 @@ export default function LeagueManagePage() {
           )}
           {disputes.map((e) => (
             <button key={e.id} type="button" onClick={() => navigate(`/liga/${slug}/encontro/${e.id}`)}
-              className="block w-full rounded-card bg-white p-3.5 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]">
+              className="card-open block w-full rounded-card bg-white p-3.5 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]">
               <b>{teamsById.get(e.home_team_id)?.name} vs {teamsById.get(e.away_team_id)?.name}</b>
               <span className="mt-1 block font-display text-[13px] font-bold text-[#B13A10]">{t('league.enc_contestado')}</span>
             </button>

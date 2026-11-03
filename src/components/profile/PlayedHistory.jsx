@@ -342,12 +342,14 @@ function PlayedCard({ r, query = '', other = false }) {
   const cheer = !friends && !pills.length && !FRAME_BY_PLACE[r.place] ? t('played.next_time') : null
 
   return (
-    <article className="overflow-hidden rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+    <article className="card-open relative overflow-hidden rounded-card bg-white shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+      {/* O cartão todo abre (UX, 3 nov): o link fica por cima de tudo menos de «Enviar» e da seta, que vão para o mesmo sítio. */}
+      <Link to={to} className="absolute inset-0 z-[1] rounded-card" aria-label={title || ''} />
       <div className="flex items-center justify-between gap-2 px-3.5 py-1.5 text-[12px] font-extrabold text-white" style={{ background: color.strong }}>
         <span className="flex min-w-0 items-center gap-1.5 truncate"><Icon size={13} className="shrink-0" /> {kindLabel}</span>
         <span className="shrink-0 font-bold">{dayShort(r.starts_at, lang)}</span>
       </div>
-      <Link to={to} className="flex items-center gap-3 px-3.5 pb-3 pt-4">
+      <div className="flex items-center gap-3 px-3.5 pb-3 pt-4">
         {square}
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-[17px] font-extrabold leading-tight text-ink-900">{friends ? title : <Realce text={title || ''} query={hit(title)} />}</p>
@@ -355,12 +357,12 @@ function PlayedCard({ r, query = '', other = false }) {
           {lines.map((l) => <p key={l} className="mt-0.5 text-[12.5px] leading-snug text-muted"><Realce text={l} query={hit(l)} /></p>)}
         </div>
         {!pending && <PointsCol delta={r.rating_delta} />}
-      </Link>
+      </div>
       <div className="flex items-center gap-2 border-t border-line px-3.5 py-2.5">
         {pending ? (
           <>
             <span className="flex-1 text-[12.5px] text-muted">{t('played.points_when_sent')}</span>
-            <Link to={to} className="shrink-0 text-[13px] font-extrabold text-ink-900">{t('played.send')} ›</Link>
+            <Link to={to} className="relative z-[2] shrink-0 text-[13px] font-extrabold text-ink-900">{t('played.send')} ›</Link>
           </>
         ) : (
           <>
@@ -372,7 +374,7 @@ function PlayedCard({ r, query = '', other = false }) {
             {/* No perfil de outra pessoa não há partilha (R13). */}
             {!other && (
               <Link to={to} aria-label={t('played.share_aria')}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-900">
+                className="relative z-[2] flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-900">
                 <ArrowUpRight size={15} />
               </Link>
             )}

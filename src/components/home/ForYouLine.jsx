@@ -116,7 +116,7 @@ export default function ForYouLine({ items, show = true }) {
   return (
     <section aria-label={t('home.foryou_title')}>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-        className={`press flex w-full items-center gap-3 bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)] ${open ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
+        className={`card-open flex w-full items-center gap-3 bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)] ${open ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
         <img src="/alino/alino-ola.webp" alt="" aria-hidden="true" className="h-10 w-10 shrink-0 object-contain" />
         <span className="min-w-0 flex-1">
           <b className="block font-display text-[15px] font-extrabold text-ink-900">{t('home.foryou_title')} · {items.length}</b>

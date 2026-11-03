@@ -112,8 +112,10 @@ function MiniCard({ event, active, distance, link, action, onAction, cardRef }) 
   const kind = KIND_STYLE[event.kind]
   return (
     <div ref={cardRef} data-key={event.key}
-      className={`snap-center shrink-0 w-[84%] max-w-[340px] rounded-card bg-white shadow-lift p-3.5 flex flex-col gap-1 border-2 ${active ? 'border-ink-900' : 'border-transparent'}`}>
-      <Link to={link || '#'} className="flex flex-col gap-1 min-w-0">
+      className={`${link ? 'card-open' : ''} relative snap-center shrink-0 w-[84%] max-w-[340px] rounded-card bg-white shadow-lift p-3.5 flex flex-col gap-1 border-2 ${active ? 'border-ink-900' : 'border-transparent'}`}>
+      {/* O cartão todo abre (UX, 3 nov); o botão fica por cima e faz só o dele. */}
+      {link && <Link to={link} className="absolute inset-0 z-[1] rounded-card" aria-label={title} />}
+      <div className="flex flex-col gap-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
           <b className="font-display text-[22px] font-black leading-none text-ink-900">{timeOf(event, i18n.language) || <NoTime />}</b>
           {distance != null && <span className="text-[12px] text-muted tabular-nums">{t('agenda.distance_km', { km: distance < 10 ? distance.toFixed(1).replace('.0', '') : Math.round(distance) })}</span>}
@@ -123,12 +125,12 @@ function MiniCard({ event, active, distance, link, action, onAction, cardRef }) 
           {kind && <span className={`${kind.text} font-extrabold`}>{t(kind.labelKey)}</span>}
           {event.orgName && title !== event.orgName ? ` · ${event.orgName}` : ''}
         </span>
-      </Link>
+      </div>
       <div className="flex items-center justify-between gap-2 min-h-[36px]">
         <span className={`text-[12px] font-extrabold ${s.tone === 'urgent' ? 'text-danger' : s.tone === 'mine' ? 'text-lime-600' : 'text-muted'}`}>{s.text}</span>
         {action && (
           <button type="button" disabled={action.busy} onClick={onAction}
-            className="press shrink-0 min-h-[36px] px-4 rounded-ctrl bg-lime-400 text-ink-900 text-[13px] font-extrabold disabled:opacity-40">
+            className="press relative z-[2] shrink-0 min-h-[36px] px-4 rounded-ctrl bg-lime-400 text-ink-900 text-[13px] font-extrabold disabled:opacity-40">
             {t(`ui.action_${action.kind}`)}
           </button>
         )}

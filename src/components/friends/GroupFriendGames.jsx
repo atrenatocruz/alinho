@@ -66,7 +66,7 @@ export default function GroupFriendGames({ games, org = null }) {
         const iPlay = [...(g.team_a || []), ...(g.team_b || [])].some((p) => p.user_id && p.user_id === user?.id)
         const Card = iPlay ? Link : 'div'
         return (
-          <Card key={g.id} {...(iPlay ? { to: `/jogos-privados/sessao/${g.root_id || g.id}` } : {})} className={`card block ${iPlay ? 'press' : ''}`}>
+          <Card key={g.id} {...(iPlay ? { to: `/jogos-privados/sessao/${g.root_id || g.id}` } : {})} className={`card block ${iPlay ? 'card-open' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <p className="min-w-0 text-sm font-extrabold text-ink-900">
                 {names(g.team_a)} <span className="font-semibold text-muted">×</span> {names(g.team_b)}

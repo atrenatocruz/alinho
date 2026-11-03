@@ -57,7 +57,7 @@ export default function LiveBoard({ row, card, onOpen }) {
     ? (Number(first.score_a) === Number(first.score_b) ? null : Number(first.score_a) > Number(first.score_b)) : null
   return (
     <Link to={card.to} onClick={onOpen}
-      className="press block overflow-hidden rounded-[20px] bg-[#0E1117] text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,.45)]">
+      className="card-open block overflow-hidden rounded-[20px] bg-[#0E1117] text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,.45)]">
       <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ background: kindColorsOf(kind).strong }}>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-black/30 px-[9px] py-1 font-mono text-[10.5px] font-extrabold uppercase leading-none tracking-[.1em]">
           <i className="h-[7px] w-[7px] rounded-full bg-[#FF4D4D] motion-safe:animate-pulse" /> {t('ui.status_live')}
