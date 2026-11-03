@@ -22,7 +22,8 @@ export default function DeleteAccountSection() {
     setError('')
     try {
       await requestAccountDeletion()
-      await signOut()
+      // A conta vai ser apagada: sai de todos os aparelhos.
+      await signOut({ everywhere: true })
       navigate('/login?conta=apagada', { replace: true })
     } catch (err) {
       console.error('Error requesting account deletion:', err)

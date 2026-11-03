@@ -568,7 +568,10 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }
 
-  const signOut = async () => {
+  // `everywhere`: sai de todos os aparelhos da conta (só ao apagar a conta).
+  // O «Sair» de sempre sai só deste: o signOut() sem scope é global, e sair
+  // num telemóvel desligava a app noutro, o computador e o relógio (30 out).
+  const signOut = async ({ everywhere = false } = {}) => {
     // Clear dev admin bypass if active.
     if (localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
       localStorage.removeItem(MOCK_ADMIN_KEY)
@@ -596,7 +599,7 @@ export const AuthProvider = ({ children }) => {
     // O relógio também sai (o SIGNED_OUT faz o mesmo, mas não chega quando
     // a chave tem de ser apagada à mão, mais abaixo).
     await clearWatchSession()
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: everywhere ? 'global' : 'local' })
     let forced = false
     if (error) {
       console.error('Sign out failed on the server, clearing this device only:', error)
