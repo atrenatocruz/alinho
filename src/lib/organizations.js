@@ -7,7 +7,7 @@ import { supabase } from './supabase'
  *  pedido por organização, em paralelo: chega para as dezenas de hoje; se
  *  passarem de umas dezenas, o Dev 3 faz uma versão em lote. Enquanto não
  *  chega (ou se falhar), esse id não aparece e a linha fica como estava. */
-export function useMemberCounts(ids) {
+export function useMemberCounts(ids, refresh) {
   const [counts, setCounts] = useState({})
   const key = (ids || []).filter(Boolean).join(',')
   useEffect(() => {
@@ -18,7 +18,7 @@ export function useMemberCounts(ids) {
       return error || data == null ? null : [id, Number(data)]
     })).then((rows) => { if (alive) setCounts(Object.fromEntries(rows.filter(Boolean))) })
     return () => { alive = false }
-  }, [key])
+  }, [key, refresh])
   return counts
 }
 

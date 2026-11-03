@@ -14,7 +14,7 @@ import CoverSheet from '../components/club/CoverSheet'
 import MemberSheet from '../components/club/MemberSheet'
 import KindHero from '../components/KindHero'
 import { createGroup } from '../lib/platformAdmin'
-import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
+import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan, useMemberCounts } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge, SWITCH_TRACK } from '../components/ui'
@@ -369,6 +369,9 @@ export default function GerirClube() {
   const [turmaAberta, setTurmaAberta] = useState(null)
   const [tournaments, setTournaments] = useState([])
   const [members, setMembers] = useState([])
+  // A pastilha «N membros» no topo (#749): o mesmo número da Comunidade.
+  // Volta a pedir quando a lista de membros muda (aceitar, remover).
+  const memberCount = useMemberCounts(org?.id ? [org.id] : [], members.length)[org?.id]
   const [linkCopied, setLinkCopied] = useState(false)
   const [requests, setRequests] = useState([])
   // Quantos membros tem o grupo (todos, como a base de dados conta), para
@@ -3064,6 +3067,12 @@ export default function GerirClube() {
                 {[t(isGroupOrg ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), t('gerir.plan_line', { plan: planName(org.plan_tier || 'free') })].map((txt) => (
                   <span key={txt} className="rounded-full border border-[#E3E4E6] px-2 py-1 font-display text-[11px] font-bold leading-none text-[#4F535A]">{txt}</span>
                 ))}
+                {memberCount != null && activeTab !== 'redeem' && (
+                  <button type="button" onClick={() => setActiveTab('members')}
+                    className="press relative rounded-full border border-[#E3E4E6] px-2 py-1 font-display text-[11px] font-bold leading-none text-[#4F535A] after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
+                    {t('gerirclube.member_count', { count: memberCount })}
+                  </button>
+                )}
               </div>
             )}
           </div>
