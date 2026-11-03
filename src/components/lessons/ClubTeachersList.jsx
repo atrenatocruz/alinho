@@ -30,7 +30,7 @@ export default function ClubTeachersList({ teachers }) {
           <Link
             key={teacher.teacher_profile_id}
             to={`/professor/${teacher.teacher_profile_id}/disponibilidade`}
-            className="block rounded-2xl border border-line bg-canvas p-3 transition-colors duration-fast hover:bg-ink-50"
+            className="card-open block rounded-2xl border border-line bg-canvas p-3"
           >
             <div className="flex items-center gap-2.5">
               <Avatar name={teacher.name} url={teacher.avatar_url} size="w-9 h-9 text-xs" colorClass="bg-ink-50 text-ink-500" />

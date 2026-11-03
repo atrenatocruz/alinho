@@ -40,8 +40,8 @@ export default function HomeCard({ colors = FALLBACK, label, pill = null, time, 
     </div>
   )
   return (
-    <div className={`relative overflow-hidden rounded-[20px] bg-white press ${mine && !past
-      ? 'shadow-[0_0_0_2px_#C8DC00,0_10px_24px_-16px_rgba(17,17,17,.3)]'
+    <div className={`relative overflow-hidden rounded-[20px] bg-white ${to ? 'card-open' : ''} ${mine && !past
+      ? 'shadow-[0_0_0_2px_#C8DC00,0_10px_24px_-16px_rgba(17,17,17,.3)] [--card-ring:0_0_0_2px_#C8DC00]'
       : 'shadow-[0_1px_2px_rgba(17,17,17,.06),0_10px_24px_-16px_rgba(17,17,17,.3)]'}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={ariaLabel} />}
       {imageUrl ? (

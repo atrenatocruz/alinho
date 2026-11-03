@@ -271,7 +271,7 @@ export default function PlayerStats() {
             {(hardest || favorite) && (
               <div className="grid grid-cols-2 gap-2.5">
                 {[[hardest, 'playerstats.hardest'], [favorite, 'playerstats.favorite']].map(([p, key]) => p && (
-                  <Link key={key} to={`/jogador/${p.id}`} className="press block rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
+                  <Link key={key} to={`/jogador/${p.id}`} className="card-open block rounded-card bg-white p-3.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]">
                     <p className="mb-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted">{t(key)}</p>
                     <div className="flex items-center gap-2.5">
                       <Avatar name={p.name} url={p.avatar_url} size="w-9 h-9 text-xs" />

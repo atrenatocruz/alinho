@@ -32,6 +32,25 @@ export function normalizeScannedVoucherId(value) {
   return segments[segments.length - 1].trim()
 }
 
+// O voucher de um grupo usa-se no clube onde foi o mix (#757, Francisco, 3 nov).
+// Do sítio escrito no mix mostra-se só o nome: o que está antes do último « - »
+// (o autocomplete escreve nome, « - », morada, e «Saldanha» em «Rackets Pro -
+// Saldanha» pode ser o que distingue o clube); sem isso, antes da primeira
+// vírgula; sem nenhum dos dois, tudo.
+export function placeName(location) {
+  const text = String(location || '').trim()
+  const dash = text.lastIndexOf(' - ')
+  const name = (dash >= 0 ? text.slice(0, dash) : text.split(',')[0]).trim()
+  return name || text
+}
+
+// Vazio quando não se diz onde: voucher de um clube (o nome na faixa já é o
+// sítio), de um parceiro (o prémio já o diz), já usado, ou mix sem sítio.
+export function voucherPlace(v) {
+  if (v?.status !== 'por_usar' || v.partner_id || v.game?.organization?.kind !== 'group') return ''
+  return placeName(v.game?.location)
+}
+
 // ── Lista do admin do clube (#406) ───────────────────────────────────────
 // list_club_vouchers (Dev 3) devolve os vouchers do clube, com o email e o
 // telemóvel SÓ de quem aceitou partilhar (#556). Enquanto a função não

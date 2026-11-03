@@ -35,7 +35,7 @@ export default function PartnerCard({ partner, onSeen, onDismiss }) {
   }
   return (
     <article ref={seenRef} role="link" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter') open() }}
-      className="press cursor-pointer rounded-card border border-line bg-white p-3.5">
+      className="card-open cursor-pointer rounded-card border border-line bg-white p-3.5">
       <div className="flex items-center gap-2.5">
         <PartnerLogo partner={partner} />
         <div className="min-w-0 flex-1">

@@ -13,22 +13,9 @@
 //     1, não 0), por isso não se volta a arredondar.
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import i18n from '../../lib/i18n'
+import { tournamentWhen } from '../../lib/tournamentPublic'
 import { ChevronRight } from 'lucide-react'
 import { Avatar } from '../ui'
-
-/** «9–11 out» quando é tudo no mesmo mês, «30 set – 2 out» quando não é. A
- *  mesma regra da página do torneio, para as datas se lerem igual nos dois
- *  sítios. */
-export function tournamentWhen(x, locale) {
-  if (!x?.starts_on) return ''
-  const a = new Date(`${x.starts_on}T12:00`)
-  const b = x.ends_on ? new Date(`${x.ends_on}T12:00`) : a
-  const month = (d) => d.toLocaleDateString(locale, { month: 'short' }).replace('.', '')
-  if (a.getTime() === b.getTime()) return `${a.getDate()} ${month(a)}`
-  if (a.getMonth() === b.getMonth()) return `${a.getDate()}-${b.getDate()} ${month(b)}`
-  return i18n.t('ui.date_range', { from: `${a.getDate()} ${month(a)}`, to: `${b.getDate()} ${month(b)}` })
-}
 
 export default function OpenTournamentRow({ tournament: x }) {
   const { t, i18n } = useTranslation()

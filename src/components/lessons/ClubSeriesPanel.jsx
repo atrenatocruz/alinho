@@ -64,7 +64,7 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
         const full = s.taken >= s.capacity
         return (
           <button key={s.series_id} type="button" onClick={() => setMode({ view: 'manage', id: s.series_id })}
-            className="block w-full text-left rounded-2xl border p-3 transition-colors duration-fast hover:brightness-[0.98]"
+            className="card-open block w-full text-left rounded-2xl border p-3"
             style={{ background: TEAL.bg, borderColor: TEAL.border }}>
             <div className="flex items-center justify-between gap-2">
               <span className="flex flex-wrap gap-1">

@@ -76,7 +76,7 @@ export default function FriendGameRow({ id, facts, line = null, pending = 0, cre
   return (
     <>
       {to
-        ? <Link to={to} className="card press flex items-start gap-3">{body}</Link>
+        ? <Link to={to} className="card card-open flex items-start gap-3">{body}</Link>
         : <div className="card flex items-start gap-3">{body}</div>}
 
       {menu === 'actions' && (
@@ -99,7 +99,7 @@ export default function FriendGameRow({ id, facts, line = null, pending = 0, cre
       {menu === 'locked' && (
         <Sheet title={sheetTitle} onClose={() => setMenu(null)}>
           <div className="space-y-3">
-            <button type="button" className={`${row} rounded-card border border-line`} onClick={() => { setMenu(null); if (to) navigate(to) }}>
+            <button type="button" className={`${row} card-open rounded-card border border-line`} onClick={() => { setMenu(null); if (to) navigate(to) }}>
               {t('friends.see_game')}
             </button>
             <p className="flex gap-2 rounded-card bg-ink-50 p-3 text-xs text-ink-700">
