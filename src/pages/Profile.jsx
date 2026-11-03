@@ -29,7 +29,7 @@ import ReceptionPass from '../components/vouchers/ReceptionPass'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory, useAllPlayed, playedTotals, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
 import { dayText } from '../components/friends/dayText'
-import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
+import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact, voucherPlace } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
 import { hasWatchGames } from '../lib/watchGames'
@@ -239,7 +239,7 @@ export default function Profile() {
       // antes e tudo fica como hoje.
       // Anulados não se usam (migration_vouchers_so_com_conta.sql e
       // juntar_convidado em migration_vouchers_para_todos.sql): ficam fora.
-      const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))'
+      const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, location, organization:organizations (name, kind))'
       // Os vouchers dos parceiros (18 out, Dev 3): o parceiro, o lugar, o mês,
       // a zona, o desconto, o código e a validade. Sem as colunas, como antes.
       const partnerCols = ', partner_id, prize_place, prize_month, prize_district, discount_pct, code, valid_until, partner:partners (name, slug, logo_url)'
@@ -302,7 +302,7 @@ export default function Profile() {
     if (v.status !== 'por_usar') return
     // Voucher de parceiro: «Mostrar na receção» em vez do QR (18 out).
     if (v.partner_id) { setReceptionVoucher(v); return }
-    setQrVoucher({ id: v.id, gameTitle: v.game?.title || '', organizationName: v.game?.organization?.name || '' })
+    setQrVoucher({ id: v.id, gameTitle: v.game?.title || '', organizationName: v.game?.organization?.name || '', place: voucherPlace(v) })
   }
 
   const loadMixHistory = async () => {
@@ -1213,6 +1213,7 @@ export default function Profile() {
                   prizeText={v.partner_id ? t('reception.ticket_prize', { pct: v.discount_pct, partner: v.partner?.name || '' }) : (v.game?.prize || '')}
                   gameTitle={v.game?.title || ''}
                   gameDate={v.game?.date ? shortDay(v.game.date) : ''}
+                  place={voucherPlace(v)}
                   organizationName={v.partner_id ? (v.partner?.name || '') : (v.game?.organization?.name || '')}
                   status={v.status}
                   usedAtLabel={v.used_at ? shortDay(v.used_at) : ''}
