@@ -18,6 +18,7 @@ import { describeError } from '../lib/errors'
 import Alino from './Alino'
 import { frameInsideBox, frameSrc } from '../lib/frames'
 import { useDragScroll } from '../lib/useDragScroll'
+import WhereToUse from './vouchers/WhereToUse'
 import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
 import TimeInput from './TimeInput'
 import { SkeletonGate, SkCircle, SkLine } from './Skeleton'
@@ -1323,7 +1324,7 @@ export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, 
 /* ─── VoucherQRModal ─────────────────────────────────────────────────────
    Shown when a player taps a por_usar VoucherCard. Purely presentational
    beyond generating the QR image itself — the caller (Profile.jsx) passes
-   a small { id, gameTitle, organizationName } object built from the row
+   a small { id, gameTitle, organizationName, place } object built from the row
    it already has, not something this modal re-fetches. Renders nothing
    without a voucher, matching PhotoViewerModal's own "always mounted,
    inert without its subject" convention. The QR encodes the bare voucher
@@ -1359,6 +1360,7 @@ export function VoucherQRModal({ voucher, onClose }) {
         {qrDataUrl && <img src={qrDataUrl} alt="" className="mx-auto rounded-lg" width={256} height={256} />}
         <p className="mt-3 text-sm font-extrabold text-ink-900">{voucher.gameTitle}</p>
         <p className="text-[11px] text-muted">{voucher.organizationName}</p>
+        <WhereToUse place={voucher.place} className="mt-2.5 inline-flex items-start text-left" />
         <p className="mt-2 text-xs text-muted">{t('profile.voucher_qr_hint')}</p>
       </div>
     </div>,

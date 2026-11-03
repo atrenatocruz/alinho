@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortVouchersForWallet, isValidVoucherId, normalizeScannedVoucherId, voucherWithoutAccount } from './vouchers'
+import { sortVouchersForWallet, isValidVoucherId, normalizeScannedVoucherId, voucherWithoutAccount, placeName, voucherPlace } from './vouchers'
 
 describe('sortVouchersForWallet', () => {
   it('sorts por_usar vouchers before usado ones', () => {
@@ -108,5 +108,63 @@ describe('voucherWithoutAccount', () => {
   it('is false before the migration runs (column missing)', () => {
     expect(voucherWithoutAccount({ player_name: 'Rita' })).toBe(false)
     expect(voucherWithoutAccount(null)).toBe(false)
+  })
+})
+
+describe('placeName', () => {
+  it('com « - », o que está antes do último', () => {
+    expect(placeName('Smash Padel Almada - Av. do Cristo Rei, 2800-057 Almada, Portugal')).toBe('Smash Padel Almada')
+    expect(placeName('Rackets Pro - Saldanha - 1050-094 Lisboa, Portugal')).toBe('Rackets Pro - Saldanha')
+    expect(placeName('Capital Padel Academy - CPA - R. Fonte da Carreira 144A, 2645-467 Alcabideche, Portugal')).toBe('Capital Padel Academy - CPA')
+  })
+
+  it('sem « - », o que está antes da primeira vírgula', () => {
+    expect(placeName('Av. do Cristo Rei, 2800-057 Almada, Portugal')).toBe('Av. do Cristo Rei')
+    expect(placeName('Vale-Flor Padel, Almada')).toBe('Vale-Flor Padel')
+  })
+
+  it('sem nenhum dos dois, tudo', () => {
+    expect(placeName('IPC')).toBe('IPC')
+    expect(placeName('  IPC  ')).toBe('IPC')
+  })
+
+  it('sem sítio, nada', () => {
+    expect(placeName('')).toBe('')
+    expect(placeName('   ')).toBe('')
+    expect(placeName(null)).toBe('')
+    expect(placeName(undefined)).toBe('')
+  })
+
+  it('nunca fica vazio quando há texto', () => {
+    expect(placeName(', Almada')).toBe(', Almada')
+  })
+})
+
+describe('voucherPlace', () => {
+  const v = {
+    status: 'por_usar',
+    game: { location: 'Smash Padel Almada - Av. do Cristo Rei', organization: { kind: 'group' } },
+  }
+
+  it('voucher por usar de um grupo: o nome do sítio', () => {
+    expect(voucherPlace(v)).toBe('Smash Padel Almada')
+  })
+
+  it('já usado: nada', () => {
+    expect(voucherPlace({ ...v, status: 'usado' })).toBe('')
+  })
+
+  it('voucher de um clube: nada', () => {
+    expect(voucherPlace({ ...v, game: { ...v.game, organization: { kind: 'club' } } })).toBe('')
+  })
+
+  it('voucher de um parceiro: nada', () => {
+    expect(voucherPlace({ ...v, partner_id: 'p1' })).toBe('')
+    expect(voucherPlace({ status: 'por_usar', partner_id: 'p1', game: null })).toBe('')
+  })
+
+  it('mix sem sítio: nada', () => {
+    expect(voucherPlace({ ...v, game: { ...v.game, location: '' } })).toBe('')
+    expect(voucherPlace({ ...v, game: { ...v.game, location: null } })).toBe('')
   })
 })
