@@ -306,10 +306,9 @@ export const AuthProvider = ({ children }) => {
 
     const promise = (async () => {
       try {
+        // O próprio perfil vem da função (#772): é a mesma linha, com todas as colunas.
         const { data: profileData, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
+          .rpc('get_my_profile')
           .single()
 
         // Right after signup the profile trigger may not have committed yet
@@ -646,18 +645,17 @@ export const AuthProvider = ({ children }) => {
       return { data: next, error: null }
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select()
-      .single()
+    if (error) return { data: null, error }
 
-    if (!error) {
-      setProfile(data)
-    }
+    // Já ficou gravado: se a releitura falhar, não é um erro para quem usa (#772).
+    const { data } = await supabase.rpc('get_my_profile').single()
+    setProfile((p) => data ?? { ...p, ...updates })
 
-    return { data, error }
+    return { data, error: null }
   }
 
   // As inscrições que vêm só do acesso de superadmin (get_my_superadmin_groups):
