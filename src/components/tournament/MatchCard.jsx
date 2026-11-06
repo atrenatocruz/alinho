@@ -142,7 +142,7 @@ export default function MatchCard({ match, entries, labels = {}, myIds = [], hea
       type="button"
       onClick={onOpen}
       data-mine={(myIds.includes(match.entry_a_id) || myIds.includes(match.entry_b_id)) || undefined}
-      className={`flex w-full flex-col rounded-card bg-white text-left transition-[box-shadow,transform] duration-fast hover:shadow-lift active:scale-[0.98] ${compact ? 'gap-0.5 px-3 pb-2 pt-2' : 'gap-1.5 px-3.5 py-3'} ${frame}`}
+      className={`card-open flex w-full flex-col rounded-card bg-white text-left ${compact ? 'gap-0.5 px-3 pb-2 pt-2' : 'gap-1.5 px-3.5 py-3'} ${frame}`}
       style={{
         background: final ? LILAC.bg : warn ? '#FFF6DC' : undefined,
         borderColor: !final && !live && !(done || known) ? LILAC.border : undefined,

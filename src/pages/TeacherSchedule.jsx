@@ -205,11 +205,11 @@ export default function TeacherSchedule() {
               {byDay[day].map((slot, j) => (
                 <span key={j} className={`inline-flex items-center gap-1.5 bg-ink-900 text-white text-[13px] font-extrabold pl-3 pr-1.5 py-1 ${manyClubs ? 'rounded-[14px]' : 'rounded-full'}`}>
                   <span className="flex flex-col leading-tight">
-                    {compactTime(slot.start)}–{compactTime(slot.end)}
+                    {compactTime(slot.start)}-{compactTime(slot.end)}
                     {manyClubs && <span className="text-[11px] font-bold text-white/75">{clubOf(slot.tp)}</span>}
                   </span>
                   <button type="button" onClick={() => removeSlot(day, j)}
-                    aria-label={t('teacher.schedule_remove', { hours: `${compactTime(slot.start)}–${compactTime(slot.end)}` })}
+                    aria-label={t('teacher.schedule_remove', { hours: `${compactTime(slot.start)}-${compactTime(slot.end)}` })}
                     className="w-6 h-6 inline-flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/15">
                     <X size={13} />
                   </button>

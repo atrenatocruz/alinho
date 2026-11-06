@@ -20,7 +20,7 @@ import { winRatePct } from '../lib/statsLogic'
 import { followPlayer, removeFollow } from '../lib/follows'
 import { getGlobalRankings, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
-import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
+import { useFrameList, FrameAround, FrameTitle, PhotoBox } from '../components/FrameBits'
 import { describeError } from '../lib/errors'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory } from '../components/profile/PlayedHistory'
@@ -313,7 +313,7 @@ export default function PlayerDetails() {
               <p className="font-display text-[40px] font-black leading-none text-lime-400 tabular-nums">{h2h.wins}</p>
               <p className="mt-1 text-[13px] text-white/80">{t('playerdetails.r13_you_won')}</p>
             </div>
-            <span className="pt-4 text-white/40">–</span>
+            <span className="pt-4 text-white/40">-</span>
             <div>
               <p className="font-display text-[40px] font-black leading-none tabular-nums">{h2h.losses}</p>
               <p className="mt-1 text-[13px] text-white/80">{t('playerdetails.r13_they_won', { name: firstName })}</p>
@@ -362,7 +362,7 @@ export default function PlayerDetails() {
             const r = 35
             const circumference = 2 * Math.PI * r
             return (
-              <div className={`relative w-20 h-20 shrink-0 ${myFrame ? 'mt-5 mb-3' : ''}`}>
+              <PhotoBox frame={myFrame}>
                 <FrameAround frame={myFrame} photo={64} left={8} top={8} />
                 {!myFrame && <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
                   <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
@@ -382,11 +382,13 @@ export default function PlayerDetails() {
                     <RatingBadge rating={rating} gender={gender} />
                   </span>
                 )}
-              </div>
+              </PhotoBox>
             )
           })()}
           <div className="flex-1 min-w-0 pt-1">
-            <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
+            {/* O nome não se corta com «…»: parte para a linha de baixo, no máximo 2 (1 nov).
+                Linhas de 23 px (UX, 2 nov); a folga à volta mantém os 28 px de uma linha só. */}
+            <div className="py-[2.5px]"><h2 className="text-xl leading-[23px] text-ink-900 line-clamp-2 break-words">{player.name}</h2></div>
             <FrameTitle list={frameList} mine={false} />
             {!resultsHidden && globalEntry && (() => {
               const bp = bandProgress(rating)

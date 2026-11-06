@@ -42,14 +42,14 @@ const shortDay = (date, locale) => {
 const FINISHED = ['terminado', 'falta', 'desistencia']
 const played = (m) => FINISHED.includes(m.status) || !!m.winner_entry_id
 const resultText = (m, t) => {
-  if (m.status === 'falta') return `${m.score_a ?? ''}–${m.score_b ?? ''} (${t('tprint.walkover_tag')})`
-  if (m.status === 'desistencia') return `${m.score_a ?? ''}–${m.score_b ?? ''} (${t('tprint.retired_tag')})`
+  if (m.status === 'falta') return `${m.score_a ?? ''}-${m.score_b ?? ''} (${t('tprint.walkover_tag')})`
+  if (m.status === 'desistencia') return `${m.score_a ?? ''}-${m.score_b ?? ''} (${t('tprint.retired_tag')})`
   // Com o tie-break (25 set): «9–8 (7-5)»; por sets, os sets todos:
   // «2–1 (6-4 · 6-7 (5-7) · 10-8)».
   const sets = m.sets || []
-  if (sets.length > 1) return `${m.score_a ?? ''}–${m.score_b ?? ''} (${sets.map(setText).join(' · ')})`
-  if (sets.length === 1 && sets[0].tiebreak_a != null) return `${m.score_a ?? ''}–${m.score_b ?? ''} (${sets[0].tiebreak_a}-${sets[0].tiebreak_b})`
-  return `${m.score_a ?? ''}–${m.score_b ?? ''}`
+  if (sets.length > 1) return `${m.score_a ?? ''}-${m.score_b ?? ''} (${sets.map(setText).join(' · ')})`
+  if (sets.length === 1 && sets[0].tiebreak_a != null) return `${m.score_a ?? ''}-${m.score_b ?? ''} (${sets[0].tiebreak_a}-${sets[0].tiebreak_b})`
+  return `${m.score_a ?? ''}-${m.score_b ?? ''}`
 }
 
 const dayLabel = (date, locale) => {
@@ -112,7 +112,7 @@ function GroupSheet({ group, matches, entries }) {
             <span className="w-16 shrink-0 font-mono text-[10px]">{m.court_name || '_______'}</span>
             <span className="flex-1">{nameOf(m.entry_a_id)} × {nameOf(m.entry_b_id)}</span>
             <span className="shrink-0">
-              {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={26} /> – <Blank w={26} /></>}
+              {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={26} /> - <Blank w={26} /></>}
             </span>
           </li>
         ))}
@@ -216,7 +216,7 @@ function DayGrid({ day, matches, entries, locale }) {
                           {nameOf(m.entry_b_id) || sourceText(m.source_b, null, t) || t('ui.empty_tbd')}
                         </span>
                         <span className="mt-0.5 block">
-                          {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={20} /> – <Blank w={20} /></>}
+                          {played(m) ? <b>{resultText(m, t)}</b> : <><Blank w={20} /> - <Blank w={20} /></>}
                         </span>
                       </>
                     ) : null}

@@ -13,7 +13,7 @@ export default function EncounterRow({ encounter: e, state, home, away, mine, to
     ? `${formatDate(e.scheduled_at, i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime(e.scheduled_at, i18n.language, { hour: '2-digit', minute: '2-digit' })}`
     : t('league.enc_por_marcar')
   return (
-    <Link to={to} className={`press block rounded-card bg-white px-3.5 py-3 ${mine ? 'shadow-[0_0_0_2px_#C8DC00]' : 'shadow-[0_1px_2px_rgba(17,17,17,.06)]'}`}>
+    <Link to={to} className={`card-open block rounded-card bg-white px-3.5 py-3 ${mine ? 'shadow-[0_0_0_2px_#C8DC00] [--card-ring:0_0_0_2px_#C8DC00]' : 'shadow-[0_1px_2px_rgba(17,17,17,.06)]'}`}>
       <div className="flex items-center justify-between gap-2 font-mono text-[10.5px] uppercase tracking-[.08em] text-ink-500">
         <span>{when}</span>
         {mine
@@ -23,7 +23,7 @@ export default function EncounterRow({ encounter: e, state, home, away, mine, to
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 font-display text-[15px] font-extrabold leading-tight">
         <span className="truncate">{home?.name}</span>
         <span className="min-w-[52px] text-center text-[22px] tracking-[-.02em]">
-          {e.walkover_team_id ? t('league.walkover') : totals ? `${totals.homeMatches}–${totals.awayMatches}` : <span className="text-sm text-ink-500">vs</span>}
+          {e.walkover_team_id ? t('league.walkover') : totals ? `${totals.homeMatches}-${totals.awayMatches}` : <span className="text-sm text-ink-500">vs</span>}
         </span>
         <span className="truncate text-right">{away?.name}</span>
       </div>

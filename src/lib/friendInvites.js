@@ -40,7 +40,8 @@ export function eventFromFriendInvite(invite, detail = null, orgsById = new Map(
   // 'guest'), como na lista «Jogos entre amigos» — um convidado sem conta
   // não é um lugar vazio (UX, 13 out).
   const accepted = invitees.filter((i) => i.status === 'accepted' || i.status === 'guest')
-  const going = invite.my_status === 'accepted'
+  // 'organizer' (#736): quem organiza sem jogar vê o jogo como quem disse «Vou».
+  const going = invite.my_status === 'accepted' || invite.my_status === 'organizer'
   return {
     key: `friend_invite:${invite.match_id}`,
     source: 'friend_invite',

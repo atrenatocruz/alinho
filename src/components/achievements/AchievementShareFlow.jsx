@@ -13,7 +13,8 @@ import { FilterPill } from '../ui'
 import { medalUrl } from '../../lib/achievementMedals'
 import { RARITY_META, formatRarityPct } from '../../lib/achievements'
 import { formatDate } from '../../lib/formatDate'
-import { shareFilename, shareOrSaveImage } from '../../lib/shareImage'
+import { shareFilename, shareOrSaveImage, withShareLink } from '../../lib/shareImage'
+import { withMyRef } from '../../lib/myRef'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 
@@ -60,12 +61,14 @@ export default function AchievementShareFlow({ achievement: given, fresh = false
   // «Só 13,1%…»; com 50% ou mais, sem o «Só» (SPEC).
   const pctLine = pct == null ? null : t(Number(achievement.pct) < 50 ? 'achshare.pct_only' : 'achshare.pct', { pct })
   const at = achievement.at ? new Date(achievement.at) : new Date()
-  const suggested = [
+  // O link com o ?ref= de quem partilha no lugar do «alinho.pt» (#743), para
+  // onde o QR levava.
+  const suggested = withShareLink([
     // De outra pessoa: sem artigo («Bruno ganhou…»), que não se sabe se é «o» ou «a» (UX).
     owner ? t('achshare.caption_lead_other', { who: String(owner.name || '').trim().split(/\s+/)[0], name }) : t('achshare.caption_lead', { name }),
     pct != null ? t(Number(achievement.pct) < 50 ? 'achshare.caption_pct_only' : 'achshare.caption_pct', { pct }) : null,
     'alinho.pt @alinhopt #alinhopadel',
-  ].filter(Boolean).join(' ')
+  ].filter(Boolean).join(' '), withMyRef('https://alinho.pt'))
   // O texto sugerido acompanha a «% têm» quando ela chega, até a pessoa o mudar.
   const [edited, setEdited] = useState(null)
   const caption = edited ?? suggested
@@ -140,7 +143,7 @@ export default function AchievementShareFlow({ achievement: given, fresh = false
         </div>
         <div>
           <p className="mb-2 text-sm font-medium text-gray-700">{t('tshare.text_label')}</p>
-          <textarea rows={3} value={caption} onChange={(e) => setCaption(e.target.value)} className="input-field" />
+          <textarea rows={6} value={caption} onChange={(e) => setCaption(e.target.value)} className="input-field" />
         </div>
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         <div className="space-y-2">

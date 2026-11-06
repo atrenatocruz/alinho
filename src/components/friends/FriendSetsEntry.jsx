@@ -41,7 +41,7 @@ export default function FriendSetsEntry({ mode, maxSets = null, teamA, teamB, on
           <span className="text-sm font-extrabold text-ink-900">{t('privatematches.set_label', { number: i + 1 })}</span>
           <input inputMode="numeric" value={s.a} onChange={(e) => update(i, 'a', e.target.value)} className={cell}
             aria-label={t('friends.set_score_aria', { n: i + 1, team: pair(teamA) })} />
-          <span className="text-center font-extrabold text-muted">–</span>
+          <span aria-hidden="true" className="mx-auto block h-[2px] w-3 rounded-full bg-muted" />
           <input inputMode="numeric" value={s.b} onChange={(e) => update(i, 'b', e.target.value)} className={cell}
             aria-label={t('friends.set_score_aria', { n: i + 1, team: pair(teamB) })} />
         </div>

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import i18n from '../../lib/i18n'
 import { Megaphone } from 'lucide-react'
 import { CardClub } from './EventCard'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from './HomeCard'
@@ -39,9 +40,9 @@ function daysOf(startsAt, endsOn, lang) {
   const wd = (d) => formatDate(d, lang, { weekday: 'short' }).replace(/\./g, '').replace(/-feira$/, '')
   const same = a.toDateString() === b.toDateString()
   const big = same ? `${a.getDate()} ${mon(a)}`
-    : a.getMonth() === b.getMonth() ? `${a.getDate()}–${b.getDate()} ${mon(b)}` : `${a.getDate()} ${mon(a)}–${b.getDate()} ${mon(b)}`
+    : a.getMonth() === b.getMonth() ? `${a.getDate()}-${b.getDate()} ${mon(b)}` : i18n.t('ui.date_range', { from: `${a.getDate()} ${mon(a)}`, to: `${b.getDate()} ${mon(b)}` })
   const days = Math.round((new Date(b.toDateString()) - new Date(a.toDateString())) / 86400000)
-  const aside = same ? wd(a) : days === 1 ? `${wd(a)} e ${wd(b)}` : `${wd(a)} a ${wd(b)}`
+  const aside = same ? wd(a) : days === 1 ? i18n.t('ui.days_pair', { a: wd(a), b: wd(b) }) : i18n.t('ui.weekday_range', { from: wd(a), to: wd(b) })
   return { big, aside }
 }
 

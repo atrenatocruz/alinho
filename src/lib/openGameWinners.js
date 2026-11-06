@@ -45,6 +45,7 @@ export function openGameWinners({ winner, other, match, myId, record, game, org,
       variant: 'result',
       data: {
         kicker: t('openwinners.kicker'),
+        label: t('openwinners.kicker'),
         date: shortDate(game.date, lang),
         heading: t('openwinners.heading'),
         wonBelow: t('openwinners.won_below'),

@@ -64,7 +64,7 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
         const full = s.taken >= s.capacity
         return (
           <button key={s.series_id} type="button" onClick={() => setMode({ view: 'manage', id: s.series_id })}
-            className="block w-full text-left rounded-2xl border p-3 transition-colors duration-fast hover:brightness-[0.98]"
+            className="card-open block w-full text-left rounded-2xl border p-3"
             style={{ background: TEAL.bg, borderColor: TEAL.border }}>
             <div className="flex items-center justify-between gap-2">
               <span className="flex flex-wrap gap-1">
@@ -80,7 +80,7 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
               ) : null}
             </div>
             <p className="font-display font-extrabold text-lg text-ink-900 mt-2 leading-none">
-              {when.start}<span className="text-sm text-ink-500 font-bold">–{when.end}</span>
+              {when.start}<span className="text-sm text-ink-500 font-bold">-{when.end}</span>
             </p>
             <p className="text-xs text-ink-500 mt-2 pt-2 border-t border-ink-900/10">
               {[s.teacher_name, `${s.taken}/${s.capacity}`, t('lessons.per_month', { price: euros(s.price_month) }), levelsText(t, s.level_from, s.level_to)]

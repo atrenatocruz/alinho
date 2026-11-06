@@ -41,7 +41,7 @@ export default function DaySheet({ day, segments = [], requests = [], onClose, c
           {rows.map((s) => (
             <div key={`${s.kind}-${s.start}`} className="flex items-center justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm font-extrabold tabular-nums text-ink-900">{time(s.start)}–{time(s.end)}</p>
+                <p className="text-sm font-extrabold tabular-nums text-ink-900">{time(s.start)}-{time(s.end)}</p>
                 {s.kind === 'lesson' && who(s) && <p className="text-xs text-muted truncate">{who(s)}</p>}
               </div>
               <span className={`shrink-0 rounded-full px-2 py-[3px] text-[11px] font-extrabold ${pill[s.kind]}`}>

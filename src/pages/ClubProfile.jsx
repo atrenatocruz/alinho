@@ -364,7 +364,7 @@ export default function ClubProfile() {
           {groups.map((group) => {
             const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
             return (
-              <Link key={group.id} to={`/clube/${group.slug}`} className={`${ROW} press`}>
+              <Link key={group.id} to={`/clube/${group.slug}`} className={`${ROW} card-open`}>
                 <Avatar name={group.name} url={group.group_logo_url} size="w-9 h-9 text-xs" colorClass="bg-ink-900 text-lime-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-display text-[14px] font-bold text-ink-900">{group.name}</span>
@@ -386,7 +386,7 @@ export default function ClubProfile() {
       {(club.my_status === 'member' || superadminView) && (
         <section className={BLOCK}>
           <h3 className={BLOCK_TITLE}>{t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}</h3>
-          <Link to={`/clube/${slug}/jogos`} className={`${ROW} press min-h-[48px]`}>
+          <Link to={`/clube/${slug}/jogos`} className={`${ROW} card-open min-h-[48px]`}>
             <span className="min-w-0 flex-1 font-display text-[14px] font-bold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</span>
             <ChevronRight size={16} className="shrink-0 text-ink-500" />
           </Link>

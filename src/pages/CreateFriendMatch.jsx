@@ -25,13 +25,14 @@ const personFrom = (i) => ({
   key: i.invitee_id, inviteeId: i.invitee_id, user_id: i.user_id, name: i.name, avatar_url: i.avatar_url,
   guest: i.is_guest || i.status === 'guest',
 })
-const EDIT_ERRORS = ['not_allowed', 'format_locked', 'has_results', 'in_first_game', 'ranked_locked', 'teams_locked']
+const EDIT_ERRORS = ['not_allowed', 'format_locked', 'has_results', 'in_first_game', 'ranked_locked', 'teams_locked', 'creator_plays_locked']
+const HINTS = ['not_group_admin', 'creator_must_play', 'friend_match_full']
 
 export default function CreateFriendMatch({ group = null, edit = null }) {
   const m = edit?.match
   const goBack = useGoBack(m ? `/jogos-privados/sessao/${m.id}` : group ? `/clube/${group.slug}/jogos` : '/jogos-privados')
   const { t } = useTranslation()
-  const { profile } = useAuth()
+  const { profile, memberships } = useAuth()
   const navigate = useNavigate()
   const routeLocation = useLocation()
 
@@ -72,6 +73,18 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const [gameMinutes, setGameMinutes] = useState(m?.game_minutes || 0)
   // «A decorrer agora» (27 set): só se quem criou deixar; «Não» por omissão.
   const [showLive, setShowLive] = useState(!!m?.show_live)
+  // «Vais jogar?» (#736, SPEC 2026-10-29-jogo-de-grupo-sem-jogar): só num
+  // grupo e só a quem é admin dele (o superadmin com o modo ligado conta,
+  // withSuperadminGroups). Num clube e fora de um grupo quem cria joga sempre.
+  // No editar, só para quem criou, e com o cadeado quando já há rondas (as
+  // equipas feitas: o lugar de quem organiza já lá está; Dev 3, 30 out).
+  const [creatorPlays, setCreatorPlays] = useState(m ? m.creator_plays !== false : true)
+  const isGroupAdmin = !!group && (group.kind || 'group') === 'group'
+    && (memberships || []).some((x) => x.organization_id === group.id && x.is_admin)
+  const askWillPlay = edit
+    ? !!profile?.id && m?.creator_id === profile.id && (isGroupAdmin || m?.creator_plays === false)
+    : isGroupAdmin
+  const willPlayLocked = !!edit && (edit.games?.length || 0) > 0
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -96,7 +109,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const memberIds = useMemo(() => (group ? new Set(members.map((m) => m.id)) : null), [group, members])
 
   const hasGuest = people.some((p) => p.guest)
-  const missing = Math.max(0, MIN_PEOPLE - (people.length + 1))
+  const playing = people.length + (creatorPlays ? 1 : 0)
+  const missing = Math.max(0, MIN_PEOPLE - playing)
 
   const handleCreate = async () => {
     setError('')
@@ -119,8 +133,9 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         numSets: FORMAT_DB[format].numSets,
         teamsMode,
         organizationId: group?.id || null,
-        gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
+        gameMinutes: playing > MIN_PEOPLE ? gameMinutes || null : null,
         showLive,
+        creatorPlays,
         invitees: people.map((p) => (p.guest
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
@@ -134,15 +149,17 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       navigate(`/jogos-privados/sessao/${id}`, { replace: true })
     } catch (err) {
       console.error('Error creating friend match:', err)
-      // As funções do Dev 3 recusam com a frase já escrita (P0001).
-      setError(err?.code === 'P0001' && err?.message ? err.message : describeError(t, err, 'createprivatematch.error_create'))
+      // Com HINT, a frase é nossa (#736); sem ele, as funções do Dev 3
+      // recusam com a frase já escrita (P0001).
+      if (HINTS.includes(err?.hint)) setError(t(`friends.error_${err.hint}`))
+      else setError(err?.code === 'P0001' && err?.message ? err.message : describeError(t, err, 'createprivatematch.error_create'))
     } finally {
       setSaving(false)
     }
   }
 
   // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
-  const snapshot = () => JSON.stringify([people.map((p) => p.inviteeId || p.user_id || p.name), rankedIntent, when, location, court, format, teamsMode, gameMinutes, showLive, deuceMode])
+  const snapshot = () => JSON.stringify([people.map((p) => p.inviteeId || p.user_id || p.name), rankedIntent, when, location, court, format, teamsMode, gameMinutes, showLive, deuceMode, creatorPlays])
   const [initialSnap, setInitialSnap] = useState(null)
   useEffect(() => { if (edit && initialSnap == null) setInitialSnap(snapshot()) }) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -158,13 +175,14 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         locationLatitude: locationCoords.latitude,
         locationLongitude: locationCoords.longitude,
         court: court.trim() || null,
-        gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
+        gameMinutes: playing > MIN_PEOPLE ? gameMinutes || null : null,
         // A forma de contar só vai mudada se a pessoa a mudou (#586, 12 out).
         ...formatToSave(format, m.scoring_format, m.num_sets),
         // Só vão quando mudam (a função recusa com o cadeado).
         rankedIntent: rankedIntent !== (m.ranked_intent !== false) ? rankedIntent : undefined,
         teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
         showLive,
+        creatorPlays: creatorPlays !== (m.creator_plays !== false) ? creatorPlays : undefined,
       })
       if (format !== 'points' && deuceMode !== deuceModeOf(m)) await setFriendDeuceMode(m.id, deuceMode)
       // As pessoas gravam-se DEPOIS do resto (#586, 13 out): é o resto que
@@ -188,7 +206,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     } catch (err) {
       console.error('Error editing friend match:', err)
       const code = EDIT_ERRORS.find((k) => String(err?.message || '').includes(k))
-      setError(code ? t(`friends.edit_error_${code}`) : describeError(t, err))
+      setError(HINTS.includes(err?.hint) ? t(`friends.error_${err.hint}`)
+        : code ? t(`friends.edit_error_${code}`) : describeError(t, err))
     } finally {
       setSaving(false)
     }
@@ -246,7 +265,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
 
   // «Cada jogo dura» — no criar depois da forma de contar, no editar antes
   // (os dois desenhos de 27 set). Com 4 não roda, por isso não aparece.
-  const durationBlock = people.length + 1 > MIN_PEOPLE && (
+  const durationBlock = playing > MIN_PEOPLE && (
     <div>
       <p className={label}>{t('friends.game_minutes_label')}</p>
       <Chips
@@ -303,10 +322,31 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         </PrimaryButton>
       )) : null}
     >
+      {step === 1 && askWillPlay && (
+        <div>
+          <p className={label}>{t('friends.will_play_label')}</p>
+          <div className={willPlayLocked ? 'pointer-events-none opacity-50' : ''} aria-disabled={willPlayLocked || undefined}>
+            <Chips
+              value={creatorPlays}
+              onChange={setCreatorPlays}
+              options={[
+                { value: true, label: t('steps.ranking_yes') },
+                { value: false, label: t('friends.show_live_no') },
+              ]}
+            />
+          </div>
+          {willPlayLocked ? (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
+              <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.will_play_locked_hint')}
+            </p>
+          ) : !creatorPlays && <p className="mt-2 text-xs text-muted">{t('friends.will_play_no_hint')}</p>}
+        </div>
+      )}
       {step === 1 && (
         <InviteesStep
           {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder'), suggestOrgId: group.id, suggestOnlyIds: memberIds } : {})}
           me={profile}
+          mePlays={creatorPlays}
           people={people}
           {...(edit ? { lockedKeys, creatorKey, collapsedSearch: true } : {})}
           onAdd={(p) => setPeople((list) => (list.some((x) => x.key === p.key) ? list : [...list, p]))}

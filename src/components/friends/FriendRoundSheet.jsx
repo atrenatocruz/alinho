@@ -113,7 +113,7 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
         <div className="grid grid-cols-[1fr_16px_1fr] items-center gap-2">
           <input inputMode="numeric" value={a} placeholder="0" onChange={(e) => setA(clean(e.target.value))}
             aria-label={t('friends.round_score_aria', { team: pair(game.team_a) })} className={`${cell} border-ink-900 bg-white`} />
-          <span className="text-center font-extrabold text-muted">–</span>
+          <span aria-hidden="true" className="mx-auto block h-[2px] w-3 rounded-full bg-muted" />
           <input inputMode="numeric" value={b} placeholder="0" onChange={(e) => setB(clean(e.target.value))}
             aria-label={t('friends.round_score_aria', { team: pair(game.team_b) })} className={`${cell} border-ink-900 bg-white`} />
         </div>

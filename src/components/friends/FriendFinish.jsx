@@ -128,7 +128,9 @@ export function friendShareProps(t, i18n, match, games, me = null) {
   const initials = String(match.org_name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
   const org = match.org_name ? { name: match.org_name, initials } : match.location ? { place: match.location } : null
   const text = shareText(t, pairs, me)
-  return { pairs, org, data: { date: day.toLocaleUpperCase(i18n.language) }, text, filenameParts: ['amigos', match.scheduled_date] }
+  // A faixa do título do cartão (#743): «Jogo entre amigos» (ou «· Empate»).
+  const label = t(pairs.length && pairs.every((x) => x.winner === 'draw') ? 'friends.card_kicker_draw' : 'friends.card_kicker')
+  return { pairs, org, data: { date: day.toLocaleUpperCase(i18n.language), label }, text, filenameParts: ['amigos', match.scheduled_date] }
 }
 
 /** «↗ Partilhar os vencedores»: o fluxo comum («Juntar uma foto?», a
@@ -137,9 +139,9 @@ export function FriendWinnersShare({ match, games, me = null, onClose }) {
   const { t, i18n } = useTranslation()
   const p = friendShareProps(t, i18n, match, games, me)
   return (
-    <TournamentShareFlow variant="custom" data={p.data} text={p.text} filenameParts={p.filenameParts}
-      shareTitle={t('friends.card_kicker')} org={p.org} onClose={onClose}>
-      {({ compact }) => <FriendWinnersBody match={match} games={games} pairs={p.pairs} compact={compact} />}
+    <TournamentShareFlow variant="custom" kind="amigos" data={p.data} text={p.text} filenameParts={p.filenameParts}
+      link="https://alinho.pt" shareTitle={t('friends.card_kicker')} org={p.org} onClose={onClose}>
+      <FriendWinnersBody match={match} games={games} pairs={p.pairs} />
     </TournamentShareFlow>
   )
 }
@@ -166,8 +168,8 @@ export function FinishedPage({ match, games, toast, me = null, onClose }) {
         <h1 className="mt-3 font-display text-2xl text-ink-900">{t('friends.finished_title')}</h1>
         <div className="mx-auto mt-3 overflow-hidden rounded-card" style={{ width: T_CARD_W * PREVIEW, height: T_CARD_H * PREVIEW }}>
           <div style={{ transform: `scale(${PREVIEW})`, transformOrigin: 'top left', width: T_CARD_W, height: T_CARD_H }}>
-            <TournamentShareCard variant="custom" data={p.data} photo={null} org={p.org}>
-              {({ compact }) => <FriendWinnersBody match={match} games={games} pairs={p.pairs} compact={compact} />}
+            <TournamentShareCard variant="custom" kind="amigos" data={p.data} photo={null} org={p.org}>
+              <FriendWinnersBody match={match} games={games} pairs={p.pairs} />
             </TournamentShareCard>
           </div>
         </div>
@@ -229,7 +231,7 @@ export function RoundsScoreSheet({ title, hint, match, games, initial = null, wi
               </span>
               {['a', 'b'].map((side, k) => (
                 <span key={side} className="flex items-center gap-2">
-                  {k === 1 && <span className="font-extrabold text-muted">–</span>}
+                  {k === 1 && <span aria-hidden="true" className="block h-[2px] w-3 shrink-0 rounded-full bg-muted" />}
                   <input inputMode="numeric" value={vals[g.id][side]} aria-label={t('friends.round_n', { n: g.round_number || g.n })}
                     onChange={(e) => setVals((v) => ({ ...v, [g.id]: { ...v[g.id], [side]: clean(e.target.value) } }))}
                     className={`${cell} ${changed ? 'border-ink-900 bg-white' : ''}`} />

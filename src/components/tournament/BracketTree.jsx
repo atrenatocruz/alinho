@@ -119,7 +119,7 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
     <p className="pt-1 text-xs text-ink-500">
       {t('tournament.tree.byes_lead')}{' '}
       <b className="font-extrabold text-ink-900">{byes.map((b) => entries[b.id]?.name || '?').join(', ')}</b>
-      {' — '}{t('tournament.tree.byes_tail', { round: t(`tournament.tree.round_${byes[0].round}`).toLowerCase() })}
+      {'. '}{t('tournament.tree.byes_tail', { round: t(`tournament.tree.round_${byes[0].round}`).toLowerCase() }).replace(/^./, (c) => c.toUpperCase())}
     </p>
   ) : null
 

@@ -87,8 +87,8 @@ describe('teacherSchedule', () => {
   })
 
   it('shortRange para os cartões da Comunidade', () => {
-    expect(shortRange('09:00', '13:00')).toBe('9–13h')
-    expect(shortRange('18:30:00', '21:00:00')).toBe('18:30–21h')
+    expect(shortRange('09:00', '13:00')).toBe('9-13h')
+    expect(shortRange('18:30:00', '21:00:00')).toBe('18:30-21h')
   })
 
   it('vários clubes: cada bloco guarda o perfil e grava-se por perfil', () => {

@@ -306,10 +306,9 @@ export const AuthProvider = ({ children }) => {
 
     const promise = (async () => {
       try {
+        // O próprio perfil vem da função (#772): é a mesma linha, com todas as colunas.
         const { data: profileData, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
+          .rpc('get_my_profile')
           .single()
 
         // Right after signup the profile trigger may not have committed yet
@@ -568,7 +567,10 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }
 
-  const signOut = async () => {
+  // `everywhere`: sai de todos os aparelhos da conta (só ao apagar a conta).
+  // O «Sair» de sempre sai só deste: o signOut() sem scope é global, e sair
+  // num telemóvel desligava a app noutro, o computador e o relógio (30 out).
+  const signOut = async ({ everywhere = false } = {}) => {
     // Clear dev admin bypass if active.
     if (localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
       localStorage.removeItem(MOCK_ADMIN_KEY)
@@ -596,7 +598,7 @@ export const AuthProvider = ({ children }) => {
     // O relógio também sai (o SIGNED_OUT faz o mesmo, mas não chega quando
     // a chave tem de ser apagada à mão, mais abaixo).
     await clearWatchSession()
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: everywhere ? 'global' : 'local' })
     let forced = false
     if (error) {
       console.error('Sign out failed on the server, clearing this device only:', error)
@@ -643,18 +645,17 @@ export const AuthProvider = ({ children }) => {
       return { data: next, error: null }
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select()
-      .single()
+    if (error) return { data: null, error }
 
-    if (!error) {
-      setProfile(data)
-    }
+    // Já ficou gravado: se a releitura falhar, não é um erro para quem usa (#772).
+    const { data } = await supabase.rpc('get_my_profile').single()
+    setProfile((p) => data ?? { ...p, ...updates })
 
-    return { data, error }
+    return { data, error: null }
   }
 
   // As inscrições que vêm só do acesso de superadmin (get_my_superadmin_groups):

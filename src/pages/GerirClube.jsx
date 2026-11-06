@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
+import { Plus, Calendar, Trash2, Check, X, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronLeft, ChevronRight, Ticket, Pencil, MoreHorizontal } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
@@ -14,7 +14,7 @@ import CoverSheet from '../components/club/CoverSheet'
 import MemberSheet from '../components/club/MemberSheet'
 import KindHero from '../components/KindHero'
 import { createGroup } from '../lib/platformAdmin'
-import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
+import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan, useMemberCounts } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge, SWITCH_TRACK } from '../components/ui'
@@ -369,6 +369,9 @@ export default function GerirClube() {
   const [turmaAberta, setTurmaAberta] = useState(null)
   const [tournaments, setTournaments] = useState([])
   const [members, setMembers] = useState([])
+  // A pastilha «N membros» no topo (#749): o mesmo número da Comunidade.
+  // Volta a pedir quando a lista de membros muda (aceitar, remover).
+  const memberCount = useMemberCounts(org?.id ? [org.id] : [], members.length)[org?.id]
   const [linkCopied, setLinkCopied] = useState(false)
   const [requests, setRequests] = useState([])
   // Quantos membros tem o grupo (todos, como a base de dados conta), para
@@ -881,7 +884,7 @@ export default function GerirClube() {
       const [membersRes, requestsRes] = await Promise.all([
         supabase
           .from('memberships')
-          .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+          .select('id, is_admin, is_guest, level, user_id, profile:profiles(id, name, avatar_url, rating, gender)')
           .eq('organization_id', groupId)
           .eq('is_guest', false),
         supabase.rpc('list_membership_requests', { p_organization_id: groupId }),
@@ -1149,7 +1152,7 @@ export default function GerirClube() {
     const [{ data, error }, { data: ownerRow }] = await Promise.all([
       supabase
         .from('memberships')
-        .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+        .select('id, is_admin, is_guest, level, user_id, profile:profiles(id, name, avatar_url, rating, gender)')
         .eq('organization_id', currentOrganizationId)
         .eq('is_guest', false),
       supabase
@@ -2997,10 +3000,24 @@ export default function GerirClube() {
           volta aos Jogos; nos Jogos/Membros volta à página anterior (só quem
           tem mais de um clube/grupo). */}
       {activeTab === 'redeem' ? (
-        <BackBar
-          onBack={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
-          label={t('gerirclube.back_button')} title={org?.name}
-          right={vouchersButton} solid />
+        // Os vouchers são uma página própria (design-handoff/2026-10-21-
+        // vouchers-topo, Francisco 21 out: «Parece que nem entrei em lado
+        // nenhum»): só a «‹» (volta ao Gerir, ou à lista quando se está a ler
+        // um QR), o título «Vouchers» e o grupo pequeno por baixo. Sem o
+        // botão dos vouchers nem o cabeçalho do Gerir; sobe com a página.
+        <div className="!-mt-3.5 -mb-2" style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+          <button type="button" aria-label={t('gerirclube.back_button')}
+            onClick={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
+            className="grid h-11 w-11 place-items-center rounded-full bg-white text-ink-900 shadow-[0_1px_4px_rgba(0,0,0,.16)]">
+            <ChevronLeft size={22} />
+          </button>
+          <h1 className="mt-[18px] font-display text-[30px] font-black leading-none tracking-[-.02em] text-ink-900">{t('vouchers.title')}</h1>
+          <p className="mt-1.5 flex items-center gap-[7px] text-sm font-semibold text-[#5B6068]">
+            <img src={org.group_logo_url || (isGroupOrg ? GROUP_AVATAR : CLUB_AVATAR)} alt="" loading="lazy"
+              className={`h-[22px] w-[22px] shrink-0 object-cover ${isGroupOrg ? 'rounded-full' : 'rounded-[6px]'}`} />
+            <span className="min-w-0 truncate">{org.name}</span>
+          </p>
+        </div>
       ) : (
         // A barra fica sempre, por causa do «Vouchers»; o «‹» só para quem
         // tem mais de um clube/grupo, como antes.
@@ -3015,6 +3032,7 @@ export default function GerirClube() {
           do grupo, R0), «GERIR», o nome e as pastilhas «Clube» e «Plano». */}
       {/* R12b (14 out): a barra do «‹» e este bloco leem-se como um topo só —
           os cantos de baixo e a sombra vão só aqui, no último. */}
+      {activeTab !== 'redeem' && (
       <div className={`!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2 ${TOP_EDGE}`}>
         <span className={`h-14 w-14 shrink-0 overflow-hidden ${isGroupOrg ? 'rounded-full' : 'rounded-[14px]'}`} aria-hidden="true">
           {/* Sem foto, a imagem própria do símbolo (14 out). */}
@@ -3064,12 +3082,19 @@ export default function GerirClube() {
                 {[t(isGroupOrg ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), t('gerir.plan_line', { plan: planName(org.plan_tier || 'free') })].map((txt) => (
                   <span key={txt} className="rounded-full border border-[#E3E4E6] px-2 py-1 font-display text-[11px] font-bold leading-none text-[#4F535A]">{txt}</span>
                 ))}
+                {memberCount != null && activeTab !== 'redeem' && (
+                  <button type="button" onClick={() => setActiveTab('members')}
+                    className="press relative rounded-full border border-[#E3E4E6] px-2 py-1 font-display text-[11px] font-bold leading-none text-[#4F535A] after:absolute after:inset-x-0 after:-inset-y-3 after:content-['']">
+                    {t('gerirclube.member_count', { count: memberCount })}
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
         </div>
       </div>
+      )}
 
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
           Hidden while the settings page or the voucher redeem screen is
@@ -3946,7 +3971,7 @@ export default function GerirClube() {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
                     Icone = GraduationCap
-                    linha = `${quando.day} · ${quando.start}–${quando.end}`
+                    linha = `${quando.day} · ${quando.start}-${quando.end}`
                     detalhe = [lessonTypeLabel(t, row.lesson_type, { series: true }), row.teacher_name, t('gerirclube.spots_of', { count: row.taken, max: row.capacity })]
                       .filter(Boolean).join(' · ')
                     abrir = () => setTurmaAberta(row.series_id)

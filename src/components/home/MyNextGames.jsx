@@ -63,7 +63,7 @@ function InviteNextCard({ event, todayKey, to }) {
   const r = event.raw
   const place = [event.orgName, r.location].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ')
   return (
-    <Link to={to} className="press flex w-[208px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_0_0_2px_#111111]">
+    <Link to={to} className="card-open flex w-[208px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_0_0_2px_#111111] [--card-ring:0_0_0_2px_#111111]">
       <Band kind="friends" time={event.hasTime === false ? <NoTime onBand /> : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
         sub={`${whenShort(event.dayKey, todayKey, t, i18n.language)} · ${t(SHORT_KIND.friends)}`} />
       <div className="flex flex-1 flex-col px-3 pb-2.5 pt-2">
@@ -112,7 +112,7 @@ function NextCard({ event, todayKey, userId, to }) {
     </>
   )
   const cls = 'flex w-[208px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]'
-  return to ? <Link to={to} className={`press ${cls}`}>{body}</Link> : <div className={cls}>{body}</div>
+  return to ? <Link to={to} className={`card-open ${cls}`}>{body}</Link> : <div className={cls}>{body}</div>
 }
 
 /** A pastilha «Personalizar» ao lado do título, com o ícone de linha Settings
@@ -166,7 +166,7 @@ export default function MyNextGames({ events, todayKey, userId, linkFor, onCusto
           <b className="text-ink-900">{t('home.next_empty_title')}</b> {t('home.next_empty_text')}
         </p>
       ) : (
-        <div className="-mx-4 flex snap-x scroll-pl-4 gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="-mx-4 -mb-6 -mt-2 flex snap-x scroll-pl-4 gap-2 overflow-x-auto px-4 pb-6 pt-2 [scrollbar-width:none]">
           {rows.map((e) => <NextCard key={e.key} event={e} todayKey={todayKey} userId={userId} to={linkFor(e)} />)}
         </div>
       )}

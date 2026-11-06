@@ -64,7 +64,7 @@ export default function PublicDaySheet({ day, segments = [], details = [], onBoo
           {rows.map((r) => (
             <div key={`${r.kind}-${r.start}`} className="py-3 space-y-1.5">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-extrabold tabular-nums text-ink-900">{time(r.start)}–{time(r.end)}</p>
+                <p className="text-sm font-extrabold tabular-nums text-ink-900">{time(r.start)}-{time(r.end)}</p>
                 {r.kind === 'free' && <span className="rounded-full bg-kind-lesson-light px-2 py-[3px] text-[11px] font-extrabold text-kind-lesson">{t('calendar.free')}</span>}
                 {r.kind === 'lesson' && (
                   <span className="rounded-full border border-kind-lesson px-2 py-[3px] text-[11px] font-extrabold text-kind-lesson">

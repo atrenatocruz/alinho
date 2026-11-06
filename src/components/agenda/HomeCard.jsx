@@ -30,16 +30,18 @@ export default function HomeCard({ colors = FALLBACK, label, pill = null, time, 
   )
   const hourRow = (
     <div className="flex items-end justify-between gap-2">
-      <span className="font-display text-[32px] font-extrabold leading-none tracking-[-.035em] tabular-nums">
+      {/* Os dias ao lado da hora nunca se partem a meio: sem lugar, passam
+          inteiros para baixo, alinhados à esquerda e encostados (UX, 2 nov). */}
+      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-[3px] font-display text-[32px] font-extrabold leading-none tracking-[-.035em] tabular-nums">
         {time}
-        {timeAside && <small className="ml-2 font-display text-[13px] font-medium tracking-normal opacity-85">{timeAside}</small>}
+        {timeAside && <small className="whitespace-nowrap font-display text-[13px] font-medium tracking-normal opacity-85">{timeAside}</small>}
       </span>
       {cnt}
     </div>
   )
   return (
-    <div className={`relative overflow-hidden rounded-[20px] bg-white press ${mine && !past
-      ? 'shadow-[0_0_0_2px_#C8DC00,0_10px_24px_-16px_rgba(17,17,17,.3)]'
+    <div className={`relative overflow-hidden rounded-[20px] bg-white ${to ? 'card-open' : ''} ${mine && !past
+      ? 'shadow-[0_0_0_2px_#C8DC00,0_10px_24px_-16px_rgba(17,17,17,.3)] [--card-ring:0_0_0_2px_#C8DC00]'
       : 'shadow-[0_1px_2px_rgba(17,17,17,.06),0_10px_24px_-16px_rgba(17,17,17,.3)]'}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={ariaLabel} />}
       {imageUrl ? (

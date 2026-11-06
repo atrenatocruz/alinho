@@ -17,7 +17,7 @@ const dayLabel = (t, dateIso) => {
   const d = new Date(`${dateIso}T12:00:00`)
   return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`)} ${d.getDate()}/${d.getMonth() + 1}`
 }
-const shortHours = (a, b) => `${compactTime(a).replace(':00', '')}–${compactTime(b).replace(':00', '')}`
+const shortHours = (a, b) => `${compactTime(a).replace(':00', '')}-${compactTime(b).replace(':00', '')}`
 
 export default function ProposeTimeSheet({ open, teacherProfileId, durationMinutes, onSend, onClose }) {
   const { t } = useTranslation()

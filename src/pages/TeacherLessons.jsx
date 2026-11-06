@@ -80,7 +80,7 @@ export default function TeacherLessons() {
   const accepted = rows.filter((r) => r.status === 'accepted')
   const when = (r, iso = r.starts_at, minutes = r.duration_minutes) => {
     const { d, hm } = parts(iso)
-    return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`).replace(/^./, (c) => c.toUpperCase())} ${d.getDate()}/${d.getMonth() + 1} · ${compactTime(hm)}–${compactTime(endTime(hm, minutes))}`
+    return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`).replace(/^./, (c) => c.toUpperCase())} ${d.getDate()}/${d.getMonth() + 1} · ${compactTime(hm)}-${compactTime(endTime(hm, minutes))}`
   }
   const ago = (iso) => {
     const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000))

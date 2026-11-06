@@ -18,7 +18,7 @@ import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, Tabs, ConfirmSheet } from '../components/ui'
+import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, BadgePill, DateField, Tabs, ConfirmSheet } from '../components/ui'
 import { isDraftMix } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { isMixLimitError, planLimitMessage } from '../lib/plans'
@@ -36,6 +36,7 @@ import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError, isGameFull } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges, splitByRoom } from '../lib/mixEdit'
+import { loadHiddenPeople, shownPerson } from '../lib/mixPeople'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import SwapGuestSheet from '../components/mix/SwapGuestSheet'
@@ -52,7 +53,6 @@ import { deuceModeOf, scoringHasDeuce } from '../lib/deuceMode'
 import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
-import MixWinnersShareCard, { MIX_HERO_H } from '../components/mix/MixWinnersShareCard'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
 import { duplasWinners, americanoWinners, rotatingWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
@@ -683,20 +683,24 @@ export default function GameDetails() {
         console.error('Error loading global points:', error)
       }
 
+      // Inscritos que não são membros do grupo: o select traz-os a null (#769).
+      const hiddenPeople = await loadHiddenPeople(supabase, id, participantsData || [], teamsData || [])
+      const personOf = (person, personId) => attachMembership(shownPerson(person, personId, hiddenPeople, t('gamedetails.fallback_player_name')))
+
       if (stale()) return
       setParticipants((confirmedRows || []).map((p) => ({
         ...p,
-        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
-        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
+        user: personOf(p.user, p.user_id) ?? guestAsProfile(p.guest),
+        partner: personOf(p.partner, p.partner_id) ?? guestAsProfile(p.partner_guest),
       })))
       setWaitlist((waitlistRows || []).map((p) => ({
         ...p,
-        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
+        user: personOf(p.user, p.user_id) ?? guestAsProfile(p.guest),
       })))
       setRequests(requestRows.map((p) => ({
         ...p,
-        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
-        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
+        user: personOf(p.user, p.user_id) ?? guestAsProfile(p.guest),
+        partner: personOf(p.partner, p.partner_id) ?? guestAsProfile(p.partner_guest),
       })))
       setMyRequestState(myRequestRow?.status ?? null)
       // Nas duplas, o estado guarda o id EFETIVO em playerX_id (conta ou
@@ -706,8 +710,8 @@ export default function GameDetails() {
         ...team,
         player1_id: team.player1_id ?? team.player1_guest_id,
         player2_id: team.player2_id ?? team.player2_guest_id,
-        player1: attachMembership(team.player1) ?? guestAsProfile(team.guest1),
-        player2: attachMembership(team.player2) ?? guestAsProfile(team.guest2),
+        player1: personOf(team.player1, team.player1_id) ?? guestAsProfile(team.guest1),
+        player2: personOf(team.player2, team.player2_id) ?? guestAsProfile(team.guest2),
       })))
       setMatches(matchesData || [])
 
@@ -1588,10 +1592,12 @@ export default function GameDetails() {
     if (oldError) throw oldError
 
     // Convidados sem conta → o mesmo perfil sintético do loadGameDetails.
+    const hiddenPeople = await loadHiddenPeople(supabase, id, rows || [], [])
+    const personOf = (person, personId) => shownPerson(person, personId, hiddenPeople, t('gamedetails.fallback_player_name'))
     const freshRows = (rows || []).map((p) => ({
       ...p,
-      user: p.user ?? (p.guest ? { id: p.guest.id, name: p.guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
-      partner: p.partner ?? (p.partner_guest ? { id: p.partner_guest.id, name: p.partner_guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
+      user: personOf(p.user, p.user_id) ?? (p.guest ? { id: p.guest.id, name: p.guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
+      partner: personOf(p.partner, p.partner_id) ?? (p.partner_guest ? { id: p.partner_guest.id, name: p.partner_guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
     }))
 
     const globalRankings = await getGlobalRankings()
@@ -3673,7 +3679,7 @@ export default function GameDetails() {
             const items = isOpenGame(game) ? [
               { key: 'courts', label: t('homecard.fact_courts'), value: t('gamedetails.court_count', { count: numCourts }) },
               { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
-              { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
+              { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}-${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
             ] : [
               { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
               { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
@@ -3689,7 +3695,7 @@ export default function GameDetails() {
               { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
               { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
               { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
-              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
+              { key: 'level', label: t('homecard.fact_level'), value: lvl ? <BadgePill text={`${lvl.scale}${lvl.num}`} /> : null },
               { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
             )
             return (
@@ -3750,19 +3756,17 @@ export default function GameDetails() {
       {winnersShareOpen && shownWinnersShare && (
         <TournamentShareFlow
           variant={shownWinnersShare.variant}
-          data={shownWinnersShare.premium ? {
-            ...shownWinnersShare.data,
-            // O cartão premium só precisa do grupo — a data já vem no
-            // data.date (shortDate traz o dia da semana; 3.ª volta, 30 out).
-            meta: { club: winnersOrg?.name || null },
-          } : shownWinnersShare.data}
+          // O cartão comum de todas as partilhas (#743): a cor e a imagem do
+          // tipo; o link do texto vai para onde o QR levava (o clube ou grupo).
+          kind={isOpenGame(game) ? 'aberto' : 'mix'}
+          data={shownWinnersShare.data}
           text={shownWinnersShare.text}
+          link={orgSlug ? `${appOrigin()}/clube/${orgSlug}` : appOrigin()}
           filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
           org={winnersOrg}
-          fallbackImage={game.image_url || (shownWinnersShare.premium ? '/topo/topo-mix.webp' : null)}
+          fallbackImage={game.image_url}
           onClose={() => setWinnersShareOpen(false)}
-          {...(shownWinnersShare.premium ? { Card: MixWinnersShareCard, photoH: MIX_HERO_H, photoTopScrim: false } : {})}
         />
       )}
 

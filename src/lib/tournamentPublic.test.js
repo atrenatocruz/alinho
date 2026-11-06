@@ -56,11 +56,18 @@ describe('partilha', () => {
     expect(tournamentUrl(tour, 'https://alinho.pt')).toBe('https://alinho.pt/torneio/smash-cup')
   })
   it('mensagem com nome, datas, clube e link', () => {
-    expect(shareMessage(tour, 'https://alinho.pt'))
-      .toBe('Smash Cup by WFit\n09–11 · Smash Padel\nhttps://alinho.pt/torneio/smash-cup')
+    expect(shareMessage(tour, 'https://alinho.pt', 'pt-PT'))
+      .toBe('Smash Cup by WFit\n9-11 out · Smash Padel\nhttps://alinho.pt/torneio/smash-cup')
   })
   it('torneio de um dia só', () => {
-    expect(shareMessage({ ...tour, ends_on: '2026-10-09' }, 'https://alinho.pt').split('\n')[1])
-      .toBe('09 · Smash Padel')
+    expect(shareMessage({ ...tour, ends_on: '2026-10-09' }, 'https://alinho.pt', 'pt-PT').split('\n')[1])
+      .toBe('9 out · Smash Padel')
+  })
+  it('entre dois meses e noutra língua', () => {
+    const fim = { ...tour, starts_on: '2026-11-30', ends_on: '2026-12-02' }
+    expect(shareMessage(fim, 'https://alinho.pt', 'pt-PT').split('\n')[1]).toContain('30 nov')
+    expect(shareMessage(fim, 'https://alinho.pt', 'pt-PT').split('\n')[1]).toContain('2 dez')
+    expect(shareMessage({ ...tour, ends_on: '2026-10-09' }, 'https://alinho.pt', 'en').split('\n')[1])
+      .toBe('9 Oct · Smash Padel')
   })
 })

@@ -285,7 +285,7 @@ function EventRow({ event, member }) {
     : member && !event.locked ? `/jogo/${event.game.id}` : null
   const card = (
     <HomeCard colors={kindColorsOf(event.kind)} label={kindLabel} pill={pill} time={time} timeAside={timeAside} count={count}
-      imageUrl={event.game?.image_url || null} mine={event.myState === 'in'} to={to} ariaLabel={`${event.title} — ${time}`}>
+      imageUrl={event.game?.image_url || null} mine={event.myState === 'in'} to={to} ariaLabel={`${event.title}, ${time}`}>
       <CardClub event={{}} label={[kindLabel, recurring].filter(Boolean).join(' · ')} />
       <CardTitle>{event.title}</CardTitle>
       {chips && <CardChips>{chips}</CardChips>}
@@ -547,7 +547,7 @@ export function ClubPeople({ club, members, teachers, follows, followActing, onF
         <div className={BLOCK}>
           <h3 className="font-display text-[15px] font-bold leading-tight text-ink-900">{t('clubprofile.organizers')}</h3>
           {admins.map((m) => (
-            <Link key={m.id} to={`/jogador/${m.id}`} className={ROW}>
+            <Link key={m.id} to={`/jogador/${m.id}`} className={`${ROW} card-open`}>
               <Avatar name={m.name} url={m.avatar_url} size="w-9 h-9 text-xs" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-display text-[14px] font-bold text-ink-900">{m.name}</span>
@@ -646,7 +646,7 @@ export function ClubAbout({ club, isAdmin, gerirHref }) {
           <div className="space-y-2">
             {contacts.map((c) => (
               <a key={c.href} href={c.href} target={c.external ? '_blank' : undefined} rel={c.external ? 'noopener noreferrer' : undefined}
-                className="press flex min-h-[48px] items-center gap-3 rounded-[12px] bg-white px-3 py-2.5 font-display text-[14px] font-bold text-ink-900">
+                className="card-open flex min-h-[48px] items-center gap-3 rounded-[12px] bg-white px-3 py-2.5 font-display text-[14px] font-bold text-ink-900">
                 <c.icon size={17} className="shrink-0 text-ink-700" />
                 <span className="min-w-0 flex-1 truncate">{c.label}</span>
                 <ChevronRight size={16} className="shrink-0 text-ink-500" />

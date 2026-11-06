@@ -198,7 +198,7 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
             {hasScore ? (
               <span className="whitespace-nowrap font-display text-[44px] font-extrabold leading-none tabular-nums">
                 <span className={winner && winner !== match.entry_a_id ? 'text-ink-200' : 'text-ink-900'}>{match.score_a}</span>
-                <span className="px-1.5 text-ink-200">–</span>
+                <span className="px-1.5 text-ink-200">-</span>
                 <span className={winner && winner !== match.entry_b_id ? 'text-ink-200' : 'text-ink-900'}>{match.score_b}</span>
               </span>
             ) : (
@@ -215,7 +215,7 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
             {hasStats ? (
               <div className="divide-y divide-line rounded-ctrl border border-line px-3">
                 <StatRow label={t('tournament.stats.record')} a={recA.wins} b={recB.wins}
-                  textA={`${recA.wins}–${recA.losses}`} textB={`${recB.wins}–${recB.losses}`} />
+                  textA={`${recA.wins}-${recA.losses}`} textB={`${recB.wins}-${recB.losses}`} />
                 <StatRow label={t('tournament.stats.win_pct')} a={recA.winPct} b={recB.winPct}
                   textA={recA.winPct == null ? '-' : `${recA.winPct}%`} textB={recB.winPct == null ? '-' : `${recB.winPct}%`} />
                 <StatRow label={t('tournament.stats.avg_games')} a={recA.avgGames} b={recB.avgGames}

@@ -324,7 +324,7 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
                 <span className="w-16 shrink-0 text-sm font-semibold text-ink-900">{t(`lessons.wd_long_${wd}`)}</span>
                 <TimeInput value={hours[wd]?.start || ''} aria-label={t('lessons.peak_start')} className={timeCls}
                   onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], start: e.target.value } }))} />
-                <span className="text-muted">–</span>
+                <span aria-hidden="true" className="block shrink-0 h-[2px] w-3 rounded-full bg-muted" />
                 <TimeInput value={hours[wd]?.end || ''} aria-label={t('lessons.peak_end')} className={timeCls}
                   onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], end: e.target.value } }))} />
               </div>

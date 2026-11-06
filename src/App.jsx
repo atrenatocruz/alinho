@@ -88,6 +88,7 @@ const CreateSeries = lazyPage(() => import('./pages/CreateSeries'))
 const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
 const GerirPlanos = lazyPage(() => import('./pages/GerirPlanos'))
+const GerirPlanosPedidos = lazyPage(() => import('./pages/GerirPlanosPedidos'))
 const Ajuda = lazyPage(() => import('./pages/Ajuda'))
 const LeaguePage = lazyPage(() => import('./pages/LeaguePage'))
 const LeagueEncounterPage = lazyPage(() => import('./pages/LeagueEncounterPage'))
@@ -410,9 +411,14 @@ const PUBLIC_HEAD = {
     description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
   '/planos': {
-    title: 'Grupos e clubes no alinho.pt: planos para quem organiza',
+    title: 'Grupos no alinho.pt: planos para quem organiza',
     canonical: 'https://www.alinho.pt/planos',
     description: 'Jogar é sempre grátis. Cada pessoa pode criar um grupo grátis. Os planos são para quando o grupo crescer.',
+  },
+  '/clubes': {
+    title: 'Clubes no alinho.pt: planos para clubes com campos',
+    canonical: 'https://www.alinho.pt/clubes',
+    description: 'Para clubes com campos. Jogos em aberto, torneios, liga e aulas, no sítio onde os jogadores já combinam os jogos.',
   },
   '/professores': {
     title: 'Professores de padel no alinho.pt: aulas e horário',
@@ -501,6 +507,7 @@ function AppRoutes() {
         <Route path="/apagar-conta" element={<DeleteAccountPage />} />
         {/* Página pública dos planos (Trello #327). */}
         <Route path="/planos" element={<Plans />} />
+        <Route path="/clubes" element={<Plans kind="clubs" />} />
         {/* Páginas do site (#619): «Como funciona» e «Novidades». */}
         <Route path="/como-funciona" element={<HowItWorks />} />
         <Route path="/novidades" element={<Novidades />} />
@@ -844,6 +851,15 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <GerirPlanos />
+            </Guard>
+          }
+        />
+        {/* Os pedidos de plano, só superadmins (#723 envio 2). */}
+        <Route
+          path="/gerir/planos-pedidos"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <GerirPlanosPedidos />
             </Guard>
           }
         />

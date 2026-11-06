@@ -17,7 +17,7 @@ const whenLine = (t, iso, minutes) => {
   const d = new Date(iso); const e = new Date(d.getTime() + minutes * 60000)
   const hm = (x) => `${x.getHours()}:${String(x.getMinutes()).padStart(2, '0')}`
   const wd = t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`)
-  return `${wd} ${d.getDate()}/${d.getMonth() + 1} · ${hm(d)}–${hm(e)}`
+  return `${wd} ${d.getDate()}/${d.getMonth() + 1} · ${hm(d)}-${hm(e)}`
 }
 
 export default function LessonEventCard({ event, past = false, onAttendance = null, onCancelRequest = null, busy = false }) {

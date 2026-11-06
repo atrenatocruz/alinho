@@ -46,7 +46,7 @@ export default function EnrolSheet({ item, teacher, onClose, onSent }) {
           <div>
             <h3 className="text-xl text-ink-900">{t('lessons.ask_to_join')}</h3>
             <p className="text-sm text-muted">
-              {lessonTypeLabel(t, item.lesson_type, { series: true })} · {t(`lessons.wd_plural_${item.weekday}`)} {hhmm(item.starts_at)}–{hhmm(item.ends_at)}
+              {lessonTypeLabel(t, item.lesson_type, { series: true })} · {t(`lessons.wd_plural_${item.weekday}`)} {hhmm(item.starts_at)}-{hhmm(item.ends_at)}
             </p>
             <p className="text-sm text-muted">{teacher.name}{teacher.org_name ? ` · ${teacher.org_name}` : ''}</p>
           </div>

@@ -1,11 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, MessageCircle } from 'lucide-react'
-import { Nav, Footer, PlansGrid, usePageTop } from './Landing'
+import { Nav, Footer, PlansGrid, GROUP_PLANS, CLUB_PLANS, usePageTop } from './Landing'
 import { SITE_H2, SITE_ILL } from '../components/site/SiteWays'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
-/* Página «Grupos e clubes» em /planos (Trello #327; desenho de 24 set).
+/* Página «Grupos» em /planos (Trello #327; desenho de 24 set), e desde 29 out
+   (#739, design-handoff/2026-10-29-planos-de-clube/SPEC-PAGINA.md) a página
+   «Clubes» em /clubes, com o Club e o Club Premium à parte.
    Desde 28 out (design-handoff/2026-10-28-site-paginas-sem-separadores,
    aprovado pelo Francisco) já não tem separadores: cada porta do menu abre a
    sua página. Os Professores vivem em /professores e o «Para marcas e lojas»
@@ -57,18 +59,31 @@ function Features({ prefix, count }) {
 const PANE_LEAD = 'mt-4 max-w-[44ch] text-[17px] leading-[1.5] text-[#2A2E35] lg:text-[19px]'
 const INTRO = 'mb-3 mt-[30px] font-display text-[16px] font-bold leading-[1.45] text-ink-900'
 
+const FOOTNOTE = 'mx-auto mt-5 max-w-[56ch] text-center text-[13px] text-[#5B6068]'
+
 function Groups() {
   const { t } = useTranslation()
   return (
     <>
       {/* A linha verde «Cada pessoa pode criar um grupo grátis» passou para a
-          frase de cima (28 out). */}
-      <PlansGrid />
-      <p className="mx-auto mt-5 max-w-[56ch] text-center text-[13px] text-[#5B6068]">{t('landing.pricing_footnote')}</p>
+          frase de cima (28 out). A caixa dos clubes passou para /clubes. */}
+      <PlansGrid plans={GROUP_PLANS} />
+      <p className={FOOTNOTE}>{t('landing.pricing_footnote')}</p>
+    </>
+  )
+}
+
+// Clubes: o Club e o Club Premium, e por baixo a caixa de contacto.
+function Clubs() {
+  const { t } = useTranslation()
+  return (
+    <>
+      <PlansGrid plans={CLUB_PLANS} />
       {/* «Quem escreve escolhe» (Francisco, 25 set): os dois iguais, com contorno. */}
-      <ContactCard className="mt-[26px]" dark={false} title={t('plans.club_title')}
+      <ContactCard className="mt-[26px]" dark={false} title={t('plans.clubs_contact_title')}
         text={t(SUPPORT_EMAIL_READY ? 'plans.club_text' : 'plans.club_text_whatsapp')}
         waText={t('plans.whatsapp_text')} emailSubject={t('plans.email_subject')} note={t('plans.human_reply')} />
+      <p className={FOOTNOTE}>{t('plans.clubs_footnote')}</p>
     </>
   )
 }
@@ -128,7 +143,8 @@ export function SiteTop({ title, lead }) {
   )
 }
 
-export default function Plans() {
+/** kind: 'groups' (/planos) ou 'clubs' (/clubes). */
+export default function Plans({ kind = 'groups' }) {
   const { t } = useTranslation()
   const { hash } = useLocation()
   usePageTop()
@@ -138,9 +154,11 @@ export default function Plans() {
   return (
     <div className="min-h-screen bg-white">
       <Nav />
-      <SiteTop title={t('plans.tab_groups')} lead={t('plans.groups_lead')} />
+      {kind === 'clubs'
+        ? <SiteTop title={t('plans.tab_clubs')} lead={t('plans.clubs_lead')} />
+        : <SiteTop title={t('plans.tab_groups')} lead={t('plans.groups_lead')} />}
       <main className="mx-auto max-w-[1200px] px-4 pb-20 pt-8 sm:px-10">
-        <Groups />
+        {kind === 'clubs' ? <Clubs /> : <Groups />}
       </main>
       <Footer />
     </div>

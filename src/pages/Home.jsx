@@ -29,7 +29,7 @@ import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
 import { useRaqueteForYou } from '../components/raquete/useRaqueteForYou'
 import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
 import FreeSlotsCard from '../components/home/FreeSlotsCard'
-import PartnerCard from '../components/partners/PartnerCard'
+import { usePartnerOfDay } from '../components/partners/PartnerOfDay'
 import { pickPartnerOfDay, useMyPartners } from '../lib/partners'
 import OpenSlotSheet from '../components/home/OpenSlotSheet'
 import { groupFreeSlots, markFreeSlots } from '../lib/freeSlots'
@@ -1265,11 +1265,11 @@ export default function Home() {
     )
   }
 
-  // Parceiros (18 out, atrás do interruptor «parceiros»): um cartão por dia,
-  // em «Hoje», a seguir ao 1.º jogo — só a quem joga na zona do parceiro.
+  // Parceiros (atrás do interruptor «parceiros»): um por dia, em «Hoje», só a
+  // quem joga na zona dele. Em grande no topo só na primeira vez; depois uma
+  // linha a seguir aos jogos (#753, Dev 4).
   const myPartners = useMyPartners()
-  const partnerToday = pickPartnerOfDay(myPartners, today)
-  const partnerCard = partnerToday ? <PartnerCard key={`partner-${partnerToday.id}`} partner={partnerToday} /> : null
+  const partnerSlots = usePartnerOfDay(user?.id, pickPartnerOfDay(myPartners, today))
 
   const renderEventWithError = (event) => (
     cardError?.key === event.key ? (
@@ -1395,10 +1395,11 @@ export default function Home() {
                 )
                 : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t(noClubs && dayKey === today ? 'home.no_clubs_today_empty' : 'agenda.today_empty')}</p>
-                : dayKey === today && partnerCard
-                  ? [...dayEvents.slice(0, 1).map(renderEventWithError), partnerCard, ...dayEvents.slice(1).map(renderEventWithError)]
+                : dayKey === today
+                  ? [partnerSlots.top, ...dayEvents.map(renderEventWithError)]
                   : dayEvents.map(renderEventWithError)}
-              {dayKey === today && dayEvents.length === 0 && partnerCard}
+              {dayKey === today && dayEvents.length === 0 && partnerSlots.top}
+              {dayKey === today && partnerSlots.bottom}
               {/* Os torneios abertos a quem chega (não pedem clube) e o convite. */}
               {dayKey === today && noClubs && openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
               {dayKey === today && noClubsCard}

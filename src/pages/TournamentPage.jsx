@@ -15,6 +15,7 @@ import { withMyRef, refInText } from '../lib/myRef'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import i18n from '../lib/i18n'
 import { BackBar } from '../components/ui'
 import { shareMessage, tournamentUrl } from '../lib/tournamentPublic'
 import { whatsappShare } from '../lib/partnerInvite'
@@ -58,8 +59,8 @@ function dateRange(startIso, endIso, locale) {
   const b = endIso ? new Date(`${endIso}T12:00`) : a
   const month = (d) => d.toLocaleDateString(locale, { month: 'short' }).replace('.', '')
   if (a.getTime() === b.getTime()) return `${a.getDate()} ${month(a)}`
-  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${month(b)}`
-  return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}-${b.getDate()} ${month(b)}`
+  return i18n.t('ui.date_range', { from: `${a.getDate()} ${month(a)}`, to: `${b.getDate()} ${month(b)}` })
 }
 
 // As datas do topo (R3): heroDates.js — aceitam data ou instante, e nunca rebentam.

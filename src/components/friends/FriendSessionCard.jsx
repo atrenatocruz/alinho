@@ -80,7 +80,7 @@ function LiveCard({ s }) {
     </div>
   )
   return (
-    <div className="relative rounded-card bg-ink-900 p-3.5 text-white">
+    <div className="card-open relative rounded-card bg-ink-900 p-3.5 text-white">
       <Link to={`/jogos-privados/sessao/${s.match_id}`} className="absolute inset-0 rounded-card" aria-label={topLine(t, i18n, s)} />
       <p className="flex items-center gap-2 text-[15px] font-extrabold">
         <span aria-hidden className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-danger" />
@@ -118,7 +118,7 @@ function ToCloseCard({ s }) {
     : (s.rounds_count || 0) > 0 || !before ? t('friends.list_missing_send') : null
   const send = !s.pending && ((s.rounds_count || 0) > 0 || !before)
   return (
-    <Link to={`/jogos-privados/sessao/${s.match_id}${send ? '?enviar=1' : ''}`} className="press block rounded-card border border-line bg-white p-3.5">
+    <Link to={`/jogos-privados/sessao/${s.match_id}${send ? '?enviar=1' : ''}`} className="card-open block rounded-card border border-line bg-white p-3.5">
       <p className="truncate text-xs font-extrabold text-ink-700">{topLine(t, i18n, s)}</p>
       {creatorText(t, s) && <p className="text-xs text-muted">{creatorText(t, s)}</p>}
       {single && (single.rounds_a + single.rounds_b > 0) ? (
@@ -127,7 +127,7 @@ function ToCloseCard({ s }) {
             <p className="flex items-center gap-2"><Faces people={single.team_a} /><span className="truncate text-sm font-extrabold text-ink-900">{pairNames(single.team_a)}</span></p>
             <p className="flex items-center gap-2"><Faces people={single.team_b} faded /><span className="truncate text-sm font-extrabold text-muted">{pairNames(single.team_b)}</span></p>
           </div>
-          <span className="font-extrabold text-xl tabular-nums text-ink-900">{single.rounds_a}–{single.rounds_b}</span>
+          <span className="font-extrabold text-xl tabular-nums text-ink-900">{single.rounds_a}-{single.rounds_b}</span>
         </div>
       ) : pairs.length > 1 || s.pairing_mode === 'rotating' ? (
         <p className="mt-2.5 flex items-center gap-2"><Faces people={answered} /><span className="text-sm font-extrabold text-ink-900">{t('friends.list_rotating', { count: s.people || 0 })}</span></p>
@@ -162,7 +162,7 @@ function HistoryCard({ s }) {
   const foot = dur ? `⏱ ${durationText(t, dur.minutes)}${rounds ? ` · ${rounds}` : ''}` : rounds
   const people = Array.isArray(s.people_list) ? s.people_list.filter((p) => p.status !== 'pending') : []
   return (
-    <div className={`relative rounded-card border p-3.5 ${BEGE}`}>
+    <div className={`card-open relative rounded-card border p-3.5 ${BEGE}`}>
       <Link to={`/jogos-privados/sessao/${s.match_id}`} className="absolute inset-0 rounded-card" aria-label={topLine(t, i18n, s)} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -179,7 +179,7 @@ function HistoryCard({ s }) {
             <p className="flex items-center gap-2"><Faces people={bottom} ring="ring-kind-friends-light" faded={!draw} />
               <span className={`truncate text-sm font-extrabold ${draw ? 'text-ink-900' : 'text-muted'}`}>{pairNames(bottom)}</span></p>
           </div>
-          <span className={`font-extrabold text-[34px] leading-none tabular-nums ${draw ? 'text-muted' : 'text-ink-900'}`}>{rTop}–{rBottom}</span>
+          <span className={`font-extrabold text-[34px] leading-none tabular-nums ${draw ? 'text-muted' : 'text-ink-900'}`}>{rTop}-{rBottom}</span>
         </div>
       ) : (
         <div className="mt-2.5">

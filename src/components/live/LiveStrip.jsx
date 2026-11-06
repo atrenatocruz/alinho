@@ -44,7 +44,7 @@ export function cardFields(row, t, wide) {
 export function LiveCard({ c, wide }) {
   const style = KIND_STYLE[c.kind] || KIND_STYLE.mix
   return (
-    <Link to={c.to} className={`press block rounded-card border p-3.5 ${style.card} ${wide ? 'w-full' : 'w-[78%] max-w-[300px] shrink-0 snap-start'}`}>
+    <Link to={c.to} className={`card-open block rounded-card border p-3.5 ${style.card} ${wide ? 'w-full' : 'w-[78%] max-w-[300px] shrink-0 snap-start'}`}>
       <span className={`inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-[11px] font-extrabold ${style.text}`}>
         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-danger" /> {c.tag}
       </span>
@@ -126,7 +126,7 @@ export default function LiveStrip({ organizationId = null, orgKind = 'club', onC
       {wide ? (
         <div className="space-y-2.5">{cards.map((c, i) => <LiveCard key={i} c={c} wide />)}</div>
       ) : (
-        <div ref={strip.ref} {...strip.handlers} className="-mx-4 flex snap-x scroll-pl-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:ml-0 md:scroll-pl-0 md:pl-0 md:cursor-grab md:select-none md:[mask-image:linear-gradient(to_right,black_88%,transparent)]">
+        <div ref={strip.ref} {...strip.handlers} className="-mx-4 -mb-5 -mt-2 flex snap-x scroll-pl-4 gap-2.5 overflow-x-auto px-4 pb-6 pt-2 [scrollbar-width:none] md:ml-0 md:scroll-pl-0 md:pl-0 md:cursor-grab md:select-none md:[mask-image:linear-gradient(to_right,black_88%,transparent)]">
           {cards.map((c, i) => <LiveCard key={i} c={c} />)}
         </div>
       )}

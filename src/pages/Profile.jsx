@@ -21,7 +21,7 @@ import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import XpShield from '../components/XpShield'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib, localeOf } from '../lib/formatDate'
-import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
+import { useFrameList, FrameAround, FrameTitle, PhotoBox } from '../components/FrameBits'
 import { loadMyPick, mergePickWithCatalog } from '../lib/raquete'
 import RaqueteProfileDone from '../components/raquete/RaqueteProfileDone'
 import VoucherTicket from '../components/vouchers/VoucherTicket'
@@ -29,7 +29,7 @@ import ReceptionPass from '../components/vouchers/ReceptionPass'
 import StatsPreviewCard from '../components/profile/StatsPreviewCard'
 import PlayedHistory, { usePlayedHistory, useAllPlayed, playedTotals, PlayedBar, MonthsSheet } from '../components/profile/PlayedHistory'
 import { dayText } from '../components/friends/dayText'
-import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
+import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact, voucherPlace } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
 import { hasWatchGames } from '../lib/watchGames'
@@ -239,7 +239,7 @@ export default function Profile() {
       // antes e tudo fica como hoje.
       // Anulados não se usam (migration_vouchers_so_com_conta.sql e
       // juntar_convidado em migration_vouchers_para_todos.sql): ficam fora.
-      const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))'
+      const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, location, organization:organizations (name, kind))'
       // Os vouchers dos parceiros (18 out, Dev 3): o parceiro, o lugar, o mês,
       // a zona, o desconto, o código e a validade. Sem as colunas, como antes.
       const partnerCols = ', partner_id, prize_place, prize_month, prize_district, discount_pct, code, valid_until, partner:partners (name, slug, logo_url)'
@@ -302,7 +302,7 @@ export default function Profile() {
     if (v.status !== 'por_usar') return
     // Voucher de parceiro: «Mostrar na receção» em vez do QR (18 out).
     if (v.partner_id) { setReceptionVoucher(v); return }
-    setQrVoucher({ id: v.id, gameTitle: v.game?.title || '', organizationName: v.game?.organization?.name || '' })
+    setQrVoucher({ id: v.id, gameTitle: v.game?.title || '', organizationName: v.game?.organization?.name || '', place: voucherPlace(v) })
   }
 
   const loadMixHistory = async () => {
@@ -678,7 +678,7 @@ export default function Profile() {
             const r = 35
             const circumference = 2 * Math.PI * r
             return (
-              <div className={`relative w-20 h-20 shrink-0 ${myFrame ? 'mt-5 mb-3' : ''}`}>
+              <PhotoBox frame={myFrame}>
                 <FrameAround frame={myFrame} photo={64} left={8} top={8} />
                 {!myFrame && <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
                   <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
@@ -772,11 +772,13 @@ export default function Profile() {
                   </div>,
                   document.body
                 )}
-              </div>
+              </PhotoBox>
             )
           })()}
           <div className="flex-1 min-w-0 pt-1">
-            <h2 className="text-xl text-ink-900 truncate">{profile?.name}</h2>
+            {/* O nome não se corta com «…»: parte para a linha de baixo, no máximo 2 (1 nov).
+                Linhas de 23 px (UX, 2 nov); a folga à volta mantém os 28 px de uma linha só. */}
+            <div className="py-[2.5px]"><h2 className="text-xl leading-[23px] text-ink-900 line-clamp-2 break-words">{profile?.name}</h2></div>
             <FrameTitle list={frameList} />
             {(() => {
               const bp = bandProgress(profile?.rating)
@@ -833,7 +835,7 @@ export default function Profile() {
             <p className="mt-1 text-[11px] text-muted">{t('profile.r7_wins')}</p>
           </div>
           <div className="px-1">
-            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles === undefined ? '–' : (titles ?? stats?.mix_wins ?? 0)}</p>
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles === undefined ? '-' : (titles ?? stats?.mix_wins ?? 0)}</p>
             <p className="mt-1 text-[11px] text-muted">{t('profile.r7_titles')}</p>
           </div>
         </div>
@@ -1213,6 +1215,7 @@ export default function Profile() {
                   prizeText={v.partner_id ? t('reception.ticket_prize', { pct: v.discount_pct, partner: v.partner?.name || '' }) : (v.game?.prize || '')}
                   gameTitle={v.game?.title || ''}
                   gameDate={v.game?.date ? shortDay(v.game.date) : ''}
+                  place={voucherPlace(v)}
                   organizationName={v.partner_id ? (v.partner?.name || '') : (v.game?.organization?.name || '')}
                   status={v.status}
                   usedAtLabel={v.used_at ? shortDay(v.used_at) : ''}

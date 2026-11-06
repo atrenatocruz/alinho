@@ -305,7 +305,10 @@ Any card or row where **the whole card** takes you to another page (Profile, Hom
   seems to disappear.
 - A button inside the card («Criar») keeps its own button effect; the card does not change because of it.
 - Cards that only show data and open nothing have no effect.
+- **Exception, rows inside a card or list** (members, ranking, notices), with no outline of their own: they turn grey on
+  hover and on press, with no shadow and no shrink. Francisco, 3 Nov.
 - Use the `card-open` class (`src/index.css`): it does the shadow and the shrink, so new cards don't write it by hand.
+  A card whose outline is made of shadow also sets `--card-ring`, so the mouse doesn't erase it.
 - Picture: `design-handoff/2026-10-28-cartoes-ao-tocar/regra.png`.
 
 ## Faces and empty places (the circles rule, 14 Oct)

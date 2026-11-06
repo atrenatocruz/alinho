@@ -27,7 +27,7 @@ function Team({ team, score, lead, hidden = false }) {
         ))}
       </span>
       <b className={`ml-2 min-w-0 flex-1 truncate font-display text-[14.5px] font-bold leading-[1.2] ${lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{names.join(' / ')}</b>
-      <em className={`min-w-[40px] text-right font-display text-[30px] font-black not-italic leading-none tracking-[-.02em] tabular-nums ${lead ? 'text-lime-400' : lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{score ?? '–'}</em>
+      <em className={`min-w-[40px] text-right font-display text-[30px] font-black not-italic leading-none tracking-[-.02em] tabular-nums ${lead ? 'text-lime-400' : lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{score ?? '-'}</em>
     </div>
   )
 }
@@ -57,7 +57,7 @@ export default function LiveBoard({ row, card, onOpen }) {
     ? (Number(first.score_a) === Number(first.score_b) ? null : Number(first.score_a) > Number(first.score_b)) : null
   return (
     <Link to={card.to} onClick={onOpen}
-      className="press block overflow-hidden rounded-[20px] bg-[#0E1117] text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,.45)]">
+      className="card-open block overflow-hidden rounded-[20px] bg-[#0E1117] text-white shadow-[0_10px_24px_-14px_rgba(0,0,0,.45)]">
       <div className="flex items-center gap-2 px-3.5 py-2.5" style={{ background: kindColorsOf(kind).strong }}>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-black/30 px-[9px] py-1 font-mono text-[10.5px] font-extrabold uppercase leading-none tracking-[.1em]">
           <i className="h-[7px] w-[7px] rounded-full bg-[#FF4D4D] motion-safe:animate-pulse" /> {t('ui.status_live')}
@@ -87,7 +87,7 @@ export default function LiveBoard({ row, card, onOpen }) {
           <div className="mt-3 flex flex-wrap gap-1.5">
             {courts.slice(1).map((c) => (
               <span key={c.court} className="rounded-full bg-[#1C212B] px-2.5 py-1.5 font-display text-[12px] font-semibold leading-none text-[#C9CED6]">
-                {t('homecard.live_court_pill', { n: c.court })} · <b className="text-white">{c.score_a ?? '–'}–{c.score_b ?? '–'}</b>
+                {t('homecard.live_court_pill', { n: c.court })} · <b className="text-white">{c.score_a ?? '-'}-{c.score_b ?? '-'}</b>
               </span>
             ))}
           </div>

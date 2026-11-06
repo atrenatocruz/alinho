@@ -2,7 +2,7 @@
 // Francisco a 18 out; regras da BA em PROPOSTA-BA.md). Os dados são do Dev 3
 // (list_my_partner_cards); aqui só as contas para o ecrã. Tudo atrás do
 // interruptor «parceiros» (feature_flags).
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { useFeatureFlag } from './useFeatureFlag'
 
@@ -23,8 +23,10 @@ export const markVoucherOpened = (voucherId) => { if (voucherId) fireAndForget('
  *  cartão ou a linha aparece de facto no ecrã (metade à vista, com a app à
  *  frente), uma vez por visita ao ecrã; a base conta cada pessoa uma vez por
  *  dia (BA, 28 out). Devolve a ref para pôr no elemento. */
-export function usePartnerSeen(partnerId, place) {
+export function usePartnerSeen(partnerId, place, onSeen) {
   const ref = useRef(null)
+  const onSeenRef = useRef(onSeen)
+  onSeenRef.current = onSeen
   useEffect(() => {
     const el = ref.current
     if (!el || !partnerId || typeof IntersectionObserver === 'undefined') return undefined
@@ -34,6 +36,7 @@ export function usePartnerSeen(partnerId, place) {
       if (done || !inView || document.visibilityState !== 'visible') return
       done = true
       trackPartner(partnerId, place)
+      onSeenRef.current?.()
     }
     const io = new IntersectionObserver((entries) => {
       inView = entries.some((e) => e.isIntersecting)
@@ -128,6 +131,50 @@ export function useMyPartners() {
     return () => { alive = false }
   }, [flag.on])
   return partners
+}
+
+/* O cartão grande só na primeira vez (#753, design-handoff/2026-11-01-
+   parceiro-na-home): uma vez por pessoa e por parceiro, em qualquer aparelho
+   (migration_parceiros_8_destaque_visto.sql). O aparelho guarda também a
+   marca, para não piscar enquanto a base responde e para valer sem ela. */
+const HIGHLIGHT_KEY = 'partnerHighlightSeen'
+const readHighlights = () => {
+  try { return JSON.parse(localStorage.getItem(HIGHLIGHT_KEY) || '{}') || {} } catch { return {} }
+}
+const highlightSeenHere = (userId, partnerId) => (readHighlights()[userId] || []).includes(partnerId)
+const keepHighlightHere = (userId, partnerId) => {
+  try {
+    const all = readHighlights()
+    const mine = all[userId] || []
+    if (!mine.includes(partnerId)) localStorage.setItem(HIGHLIGHT_KEY, JSON.stringify({ ...all, [userId]: [...mine, partnerId] }))
+  } catch { /* sem armazenamento: fica só a base */ }
+}
+
+/** featured: null enquanto não se sabe (não mostra nada), true = cartão
+ *  grande, false = linha. Decide-se ao abrir a Home e não muda até sair
+ *  (só o «Já vi» encolhe): markSeen (o cartão à vista) vale para a próxima. */
+export function usePartnerHighlight(userId, partnerId) {
+  const [featured, setFeatured] = useState(null)
+  useEffect(() => {
+    setFeatured(null)
+    if (!userId || !partnerId) return undefined
+    if (highlightSeenHere(userId, partnerId)) { setFeatured(false); return undefined }
+    let alive = true
+    Promise.resolve(supabase.rpc('my_partner_highlights_seen')).then(({ data, error }) => {
+      if (!alive) return
+      const seen = !error && Array.isArray(data) && data.includes(partnerId)
+      if (seen) keepHighlightHere(userId, partnerId)
+      setFeatured(!seen)
+    }, () => { if (alive) setFeatured(true) })
+    return () => { alive = false }
+  }, [userId, partnerId])
+  const markSeen = useCallback(() => {
+    if (!userId || !partnerId) return
+    keepHighlightHere(userId, partnerId)
+    fireAndForget('mark_partner_highlight_seen', { p_partner_id: partnerId })
+  }, [userId, partnerId])
+  const dismiss = useCallback(() => { markSeen(); setFeatured(false) }, [markSeen])
+  return { featured, markSeen, dismiss }
 }
 
 // Parceiros do alinho (design-handoff/2026-10-18-parceiros-primeiro). Os dados

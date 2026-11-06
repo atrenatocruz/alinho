@@ -100,7 +100,7 @@ export default function NextGameCard({ game, onOpenList }) {
     <div>
       {/* Sem o jogo no quadro (só no mock), abre a lista dos meus jogos. */}
       <button type="button" onClick={() => (match ? setOpen(true) : onOpenList?.())}
-        className="press block w-full rounded-card border-2 border-[#86EFAC] bg-white p-4 text-left">
+        className="card-open block w-full rounded-card border-2 border-[#86EFAC] bg-white p-4 text-left">
         <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-[#166534]">
           {t('tournament.next_game_label', { code: category?.code || '' })}
         </p>
