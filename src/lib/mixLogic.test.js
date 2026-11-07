@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  splitIntoPools, seedKnockoutFromPools,
+  gamesPerPerson, splitIntoPools, seedKnockoutFromPools,
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
@@ -1003,5 +1003,18 @@ describe('standings — desempates como a FPP (Francisco, 28 set, #592)', () => 
 
   it('sem jogos, fica a ordem de entrada', () => {
     expect(ids(standings(T, []))).toEqual(['A', 'B', 'C', 'D'])
+  })
+})
+
+describe('gamesPerPerson (#767)', () => {
+  it('jogos por pessoa e o que sobra para aquecer', () => {
+    expect(gamesPerPerson({ court_time_minutes: 90, game_time_minutes: 20, format: 'sobe_desce' })).toEqual({ count: 4, upTo: false, left: 10 })
+    expect(gamesPerPerson({ court_time_minutes: 120, game_time_minutes: 20, format: 'sobe_desce' })).toEqual({ count: 6, upTo: false, left: 0 })
+    expect(gamesPerPerson({ court_time_minutes: 120, game_time_minutes: 25, format: 'americano' })).toEqual({ count: 4, upTo: false, left: 20 })
+  })
+  it('«Até» só em Todos contra todos e Grupos, e nunca com 1 jogo', () => {
+    expect(gamesPerPerson({ court_time_minutes: 90, game_time_minutes: 20, format: 'todos_contra_todos' }).upTo).toBe(true)
+    expect(gamesPerPerson({ court_time_minutes: 90, game_time_minutes: 20, format: 'grupos_eliminatorias' }).upTo).toBe(true)
+    expect(gamesPerPerson({ court_time_minutes: 60, game_time_minutes: 45, format: 'todos_contra_todos' })).toEqual({ count: 1, upTo: false, left: 15 })
   })
 })
