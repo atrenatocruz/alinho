@@ -115,6 +115,22 @@ export function reverseClimbWarning({ numCourts, rounds }) {
 export const totalRounds = (game) =>
   Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))
 
+/** «Cada jogo» no Criar e Editar do mix (#767, SPEC design-handoff/2026-11-05-
+ *  mix-cada-jogo): quantos jogos dá por pessoa e quanto sobra para aquecer. A
+ *  conta é a de totalRounds (cada pessoa joga uma vez por ronda). Em Todos
+ *  contra todos e Grupos + Eliminatórias é «Até»: quem cai ou descansa joga
+ *  menos. Com 1 jogo, nunca «Até». */
+export function gamesPerPerson(game) {
+  const court = game.court_time_minutes || 90
+  const each = game.game_time_minutes || 20
+  const count = totalRounds(game)
+  return {
+    count,
+    upTo: count > 1 && ['todos_contra_todos', 'grupos_eliminatorias'].includes(game.format),
+    left: Math.max(0, court - count * each),
+  }
+}
+
 /**
  * Perfect-matching search over solos: tries to pair everyone without
  * repeating a past partnership. At each step, tries candidates for the

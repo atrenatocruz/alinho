@@ -85,11 +85,15 @@ const COURT_TIMES = [
   { value: 150, label: '2h30' },
   { value: 180, label: '3h' },
 ]
+// Só os números (#767): com «min» em cada uma, seis não cabiam a 360 px. O
+// título diz «em minutos».
 const GAME_TIMES = [
-  { value: 10, label: '10min' },
-  { value: 15, label: '15min' },
-  { value: 20, label: '20min' },
-  { value: 30, label: '30min' },
+  { value: 10, label: '10' },
+  { value: 15, label: '15' },
+  { value: 20, label: '20' },
+  { value: 25, label: '25' },
+  { value: 30, label: '30' },
+  { value: 45, label: '45' },
 ]
 // Labels resolve via mixLogic's FORMAT_LABEL_KEY/GENDER_RESTRICTION_LABEL_KEY
 // — the same keys the games list (below) and GameDetails.jsx use for these
