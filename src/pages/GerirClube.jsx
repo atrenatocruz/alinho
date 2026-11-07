@@ -884,7 +884,7 @@ export default function GerirClube() {
       const [membersRes, requestsRes] = await Promise.all([
         supabase
           .from('memberships')
-          .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+          .select('id, is_admin, is_guest, level, user_id, profile:profiles(id, name, avatar_url, rating, gender)')
           .eq('organization_id', groupId)
           .eq('is_guest', false),
         supabase.rpc('list_membership_requests', { p_organization_id: groupId }),
@@ -1152,7 +1152,7 @@ export default function GerirClube() {
     const [{ data, error }, { data: ownerRow }] = await Promise.all([
       supabase
         .from('memberships')
-        .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+        .select('id, is_admin, is_guest, level, user_id, profile:profiles(id, name, avatar_url, rating, gender)')
         .eq('organization_id', currentOrganizationId)
         .eq('is_guest', false),
       supabase

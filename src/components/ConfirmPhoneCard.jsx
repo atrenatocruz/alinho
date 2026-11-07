@@ -132,7 +132,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false,
     setBusy(true)
     setNotYet(false)
     try {
-      const { data } = await supabase.from('profiles').select('phone_verified_at').eq('id', profile.id).single()
+      const { data } = await supabase.rpc('get_my_profile').single()
       if (data?.phone_verified_at) retryProfile()
       else setNotYet(true)
     } finally {
