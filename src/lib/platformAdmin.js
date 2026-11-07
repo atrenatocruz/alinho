@@ -47,11 +47,13 @@ export const createGroup = async (name, parentOrgId, adminUserId) => {
   return { data, slug: used }
 }
 
-export const createSelfServeGroup = async (name) => {
+// O distrito (#731, Dev 3: p_district opcional) só vai quando foi escolhido:
+// sem ele, o grupo nasce sem distrito, como antes.
+export const createSelfServeGroup = async (name, district = null) => {
   let used = null
   const data = await withFreeSlug(name, (slug) => {
     used = slug
-    return supabase.rpc('create_self_serve_group', { p_name: name, p_slug: slug })
+    return supabase.rpc('create_self_serve_group', { p_name: name, p_slug: slug, ...(district ? { p_district: district } : {}) })
   })
   return { data, slug: used }
 }

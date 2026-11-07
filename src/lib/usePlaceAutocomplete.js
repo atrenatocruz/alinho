@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
 import { supabase } from './supabase'
+import { districtFromAddressComponents, districtFromPhoton } from './placeDistrict'
 
 /* Sugestões de moradas e sítios enquanto se escreve — Google Places, com o
    Photon (komoot, OpenStreetMap, sem chave) como reserva. Uso razoável:
@@ -39,20 +40,20 @@ function addressOf(p) {
   return [street, place].filter(Boolean).join(', ')
 }
 
-/** Uma sugestão do Photon → { value, name, latitude, longitude, line1, line2 }. */
+/** Uma sugestão do Photon → { value, name, latitude, longitude, district, line1, line2 }. */
 export function placeFromFeature(f, { cities = false } = {}) {
   const p = f.properties || {}
   const [longitude, latitude] = f.geometry?.coordinates || []
   if (cities) {
     const name = p.name || p.city || ''
     const region = p.county || p.state || ''
-    return { value: name, name, latitude, longitude, line1: name, line2: region }
+    return { value: name, name, latitude, longitude, district: districtFromPhoton(p), line1: name, line2: region }
   }
   const isPlace = p.osm_key && !['place', 'highway', 'building'].includes(p.osm_key) && p.name
   const address = addressOf(p)
   const name = isPlace ? p.name : null
   const value = name && address ? `${name} - ${address}` : address || p.name || ''
-  return { value, name, latitude, longitude, line1: name || address || p.name || '', line2: name ? address : (p.city || p.county || '') }
+  return { value, name, latitude, longitude, district: districtFromPhoton(p), line1: name || address || p.name || '', line2: name ? address : (p.city || p.county || '') }
 }
 
 /* Morada escrita à mão → coordenadas (o mapa da Home, para os jogos que
@@ -161,13 +162,13 @@ async function googleSearch(q, cities, sessionToken) {
   }
 }
 
-/** O sítio escolhido da Google: { value, name, latitude, longitude }, ou null. */
+/** O sítio escolhido da Google: { value, name, latitude, longitude, district }, ou null. */
 async function googleDetails(item, cities, sessionToken) {
   try {
     const { PlacesService } = await loadPlaces()
     const { place } = await withGoogleGuard(new Promise((resolve) => {
       new PlacesService(document.createElement('div')).getDetails(
-        { placeId: item.placeId, fields: ['name', 'formatted_address', 'geometry.location'], sessionToken },
+        { placeId: item.placeId, fields: ['name', 'formatted_address', 'geometry.location', 'address_components'], sessionToken },
         (p, status) => resolve({ place: status === 'OK' ? p : null }),
       )
     }))
@@ -178,7 +179,10 @@ async function googleDetails(item, cities, sessionToken) {
       : place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)
         ? `${place.name} - ${place.formatted_address}`
         : place.formatted_address || place.name || item.value
-    return { value, name: place.name || item.name, latitude: loc ? loc.lat() : null, longitude: loc ? loc.lng() : null }
+    return {
+      value, name: place.name || item.name, latitude: loc ? loc.lat() : null, longitude: loc ? loc.lng() : null,
+      district: districtFromAddressComponents(place.address_components),
+    }
   } catch (error) {
     console.error('Error loading Google place details:', error)
     return null
@@ -202,6 +206,8 @@ async function searchClubPlaces(q) {
     address: c.location,
     latitude: c.latitude == null ? null : Number(c.latitude),
     longitude: c.longitude == null ? null : Number(c.longitude),
+    // O distrito do clube (#731, coluna nova de search_club_places).
+    district: c.district ?? null,
     line1: c.name,
     line2: c.location,
   }))
@@ -209,9 +215,11 @@ async function searchClubPlaces(q) {
 
 /**
  * Liga as sugestões a um <input> simples, só enquanto `active` for true.
- * `onPlaceSelected` recebe `{ value, name, latitude, longitude }` — o texto
- * da morada mais as coordenadas, para o mapa e a distância. Quem grava tem
- * de limpar as coordenadas se a morada for depois editada à mão.
+ * `onPlaceSelected` recebe `{ value, name, latitude, longitude, district }` —
+ * o texto da morada mais as coordenadas, para o mapa e a distância, e o
+ * distrito (nome de leagueDistricts.js, ou null) para a zona do Ranking do mês
+ * (#731). Quem grava tem de limpar as coordenadas e o distrito se a morada
+ * for depois editada à mão.
  * `options.types`: ['(cities)'] para escolher uma cidade (localização da
  * Home); por omissão, moradas e sítios.
  */
@@ -264,7 +272,8 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
         sessionToken = null
         // Sem os detalhes da Google: o texto vale, e as coordenadas tentam-se no Photon.
         const coords = picked ? null : await geocodeAddress(item.value)
-        onPlaceSelectedRef.current(picked || { value: item.value, name: item.name, latitude: coords?.latitude ?? null, longitude: coords?.longitude ?? null })
+        // Sem os detalhes não se sabe a região: o jogo fica sem distrito.
+        onPlaceSelectedRef.current(picked || { value: item.value, name: item.name, latitude: coords?.latitude ?? null, longitude: coords?.longitude ?? null, district: null })
         return
       }
       // Clube do Alinho sem coordenadas guardadas: procura-se a morada dele.
@@ -274,6 +283,7 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
         name: item.name,
         latitude: item.latitude ?? coords?.latitude ?? null,
         longitude: item.longitude ?? coords?.longitude ?? null,
+        district: item.district ?? null,
       })
     }
     const render = () => {
