@@ -58,13 +58,28 @@ const RANKING_CASOS = [
 ]
 const MOCK_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa', 'Pedro Lima', 'Inês Rocha', 'Miguel Santos', 'Rui Santos']
 const communityOrg = (o) => ({ group_logo_url: null, parent_organization_id: null, parent_name: null, location: null, my_status: 'none', open_join: false, ...o })
+// Comunidade nova (18 out): o distrito, a frase, a capa, o selo e o que
+// organiza (as colunas do Dev 3, migration_comunidade_lista_colunas.sql).
+// A zona de quem vê é Lisboa (get_my_month_zone, abaixo).
 const COMMUNITY_ORGS = [
-  communityOrg({ id: 'co-1', name: 'Smash Padel', slug: 'smash-padel', kind: 'club', member_count: 340, avg_rating: 1180, my_status: 'member', open_join: true, location: 'Parque das Nações, Lisboa' }),
-  communityOrg({ id: 'co-2', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', member_count: 212, avg_rating: 1040, open_join: true, location: 'Oeiras' }),
-  communityOrg({ id: 'co-3', name: 'Lobos de Carcavelos', slug: 'lobos', kind: 'group', member_count: 24, avg_rating: 1260 }),
-  communityOrg({ id: 'co-4', name: 'Smash Manhãs', slug: 'smash-manhas', kind: 'group', parent_organization_id: 'co-1', parent_name: 'Smash Padel', member_count: null, avg_rating: null, open_join: true }),
-  communityOrg({ id: 'co-5', name: 'Racket Club', slug: 'racket', kind: 'club', member_count: 88, avg_rating: 980, my_status: 'pending' }),
-  communityOrg({ id: 'co-6', name: 'Terças à Noite', slug: 'tercas', kind: 'group', member_count: 9, avg_rating: null, open_join: true }),
+  communityOrg({ id: 'co-1', name: 'Smash Padel', slug: 'smash-padel', kind: 'club', member_count: 340, avg_rating: 1180, my_status: 'member', open_join: true, location: 'Parque das Nações, Lisboa',
+    district: 'Lisboa', club_verified: true, cover_url: '/capas/capa-esplanada.webp', organizes: ['mix', 'tournament', 'open_game'],
+    description: '6 campos cobertos, mixes todas as semanas e torneios ao fim de semana.' }),
+  communityOrg({ id: 'co-2', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', member_count: 212, avg_rating: 1040, open_join: true, location: 'Oeiras',
+    district: 'Lisboa', club_verified: true, cover_url: '/capas/capa-entrada.webp', organizes: ['mix', 'lesson'],
+    description: 'Clube familiar com aulas para todos os níveis e mixes à noite.' }),
+  communityOrg({ id: 'co-3', name: 'Lobos de Carcavelos', slug: 'lobos', kind: 'group', member_count: 24, avg_rating: 1260,
+    district: 'Lisboa', cover_url: '/capas/capa-malta.webp', description: 'Malta que joga às terças e quintas à noite.' }),
+  communityOrg({ id: 'co-4', name: 'Smash Manhãs', slug: 'smash-manhas', kind: 'group', parent_organization_id: 'co-1', parent_name: 'Smash Padel', member_count: null, avg_rating: null, open_join: true,
+    district: 'Lisboa', cover_url: '/capas/capa-manha.webp' }),
+  communityOrg({ id: 'co-5', name: 'Racket Club', slug: 'racket', kind: 'club', member_count: 88, avg_rating: 980, my_status: 'pending', location: 'Amadora',
+    district: 'Lisboa', club_verified: false }),
+  communityOrg({ id: 'co-6', name: 'Terças à Noite', slug: 'tercas', kind: 'group', member_count: 9, avg_rating: null, open_join: true,
+    district: 'Setúbal', cover_url: '/capas/capa-jantar.webp', description: 'Jogos às 7h antes do trabalho.' }),
+  communityOrg({ id: 'co-7', name: 'Maré Alta Padel', slug: 'mare-alta', kind: 'club', member_count: 48, avg_rating: null, open_join: true, location: 'Almada',
+    district: 'Setúbal', club_verified: true, cover_url: '/capas/capa-praia.webp', organizes: ['mix', 'tournament'] }),
+  // Sem distrito: vai para «Outros clubes e grupos» (UX, 7 nov).
+  communityOrg({ id: 'co-8', name: 'Padel ao Domingo', slug: 'padel-domingo', kind: 'group', member_count: 14, avg_rating: null, open_join: true, district: null }),
 ]
 
 const ACHIEVEMENTS_CATALOG = [
@@ -441,6 +456,9 @@ const RPC_MOCKS = {
   // fechado, grupo dentro de um clube (sem nº de membros para quem não é do
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
+  // A zona do mês (#731). Com mockCommunity, Lisboa; mockZoneNone = 'true',
+  // sem zona (a Comunidade pede «Escolhe a tua zona»).
+  get_my_month_zone: () => ({ month: `${new Date().toISOString().slice(0, 7)}-01`, district: community() && localStorage.getItem('mockZoneNone') !== 'true' ? 'Lisboa' : null, zone_games: 4, total_games: 5, final: false }),
   // Pessoas que talvez conheças (Home do futuro, 9 out; função do Dev 3 por
   // fazer): com mockCommunity, três pessoas; sem ele, como antes da função.
   suggest_people: () => (community() ? [
