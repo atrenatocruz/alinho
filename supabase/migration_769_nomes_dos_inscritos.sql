@@ -1,9 +1,7 @@
 -- #769: quem vê um mix vê o nome de todos os inscritos, mesmo dos que não são
 -- membros do grupo (regra do Francisco de 1 out: um perfil nunca desaparece).
 --
--- Porquê uma função e não abrir a política de leitura de `profiles`: as colunas
--- de profiles estão todas abertas a authenticated (email, phone_hash, birthday…),
--- por isso abrir a linha abria também isso. Aqui só sai o que o ecrã do mix usa.
+-- Porquê uma função: aqui só sai o que o ecrã do mix usa (nome, foto, lado, jogos).
 --
 -- Quem pode pedir: o mesmo que pode ler as inscrições deste mix (política «Org
 -- members can view participants»). Quem não é membro do grupo recebe zero linhas.
