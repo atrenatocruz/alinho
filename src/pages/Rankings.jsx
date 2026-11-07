@@ -15,6 +15,7 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
 import MonthRanking from '../components/rankings/MonthRanking'
 import { DISTRICT_SCOPE, isDistrictScope, showsPartner, useMyPartners } from '../lib/partners'
+import { getMyMonthZone } from '../lib/monthZone'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 import RankPodium from '../components/rankings/RankPodium'
 import RankingSkeleton from '../components/rankings/RankingSkeleton'
@@ -106,6 +107,17 @@ export default function Rankings() {
   ], [memberships, t, mode, zoneDistrict])
   // O distrito só existe no «Do mês»: fora dele volta ao Global.
   useEffect(() => { if (mode !== 'month' && isDistrictScope(scope)) setScope('global') }, [mode, scope])
+  // O «Do mês» abre já na minha zona do mês (#731), quando ela é o distrito
+  // da lista. Uma vez por visita, e só se ninguém escolheu outra coisa.
+  const zoneOpened = useRef(false)
+  useEffect(() => {
+    if (mode !== 'month' || !zoneDistrict || zoneOpened.current || scope !== 'global' || location.state?.scope) return
+    zoneOpened.current = true
+    // Sem cancelar: se entretanto se escolheu outra coisa, o «s === 'global'» não a troca.
+    getMyMonthZone().then((z) => {
+      if (z?.district === zoneDistrict) setScope((s) => (s === 'global' ? `${DISTRICT_SCOPE}${zoneDistrict}` : s))
+    })
+  }, [mode, zoneDistrict, scope]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Muda de âmbito → período volta a "Sempre" (os meses são de cada clube).
   useEffect(() => {

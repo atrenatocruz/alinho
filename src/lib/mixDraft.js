@@ -50,6 +50,8 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     title: game.title,
     date: nextDate.toISOString(),
     location: game.location,
+    // O distrito do sítio (#731), com o sítio.
+    ...(game.place_district ? { place_district: game.place_district } : {}),
     price_per_player: game.price_per_player,
     prize: game.prize,
     has_voucher: game.has_voucher,

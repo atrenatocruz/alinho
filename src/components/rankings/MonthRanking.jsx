@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Check, Trophy, Gift } from 'lucide-react'
+import { ChevronRight, Check, Trophy, Gift, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Avatar, RatingBadge, EmptyState } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
@@ -10,6 +10,7 @@ import RankingSkeleton from './RankingSkeleton'
 import { SkeletonGate } from '../Skeleton'
 import { PartnerLogo } from '../partners/PartnerCard'
 import { districtOf, hasPrizes, prizeFor, prizesLine, usePartnerSeen } from '../../lib/partners'
+import { getMyMonthZone, zoneLine, showsMeInZone } from '../../lib/monthZone'
 import {
   MONTH_MIN_GAMES, monthGender, monthPoints, monthPointsMuted, splitMonthRanking,
   monthKey, monthTitle, monthName, nextMonthKey,
@@ -86,6 +87,17 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare, partne
     return () => { off = true }
   }, [orgId, district, month, scale])
 
+  // A minha zona neste mês (#731): só se pede a ver a tabela de um distrito.
+  // undefined = a carregar (a barra «Tu» espera); null = sem resposta da base.
+  const [myZone, setMyZone] = useState(undefined)
+  useEffect(() => {
+    let off = false
+    setMyZone(district ? undefined : null)
+    if (!district) return undefined
+    getMyMonthZone(month).then((z) => { if (!off) setMyZone(z) })
+    return () => { off = true }
+  }, [district, month])
+
   const isCurrent = month === current
   const { podium, rest, me, qualifiedCount } = splitMonthRanking(rows)
   const thisMonth = isCurrent ? t('month.this_month') : t('month.in_month', { month: monthName(month, lang) })
@@ -106,6 +118,11 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare, partne
     if (inPodium) { document.getElementById('month-podium')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return }
     openPlayer(me.user_id)
   }
+
+  const zone = zoneLine(myZone, district, monthName(month, lang))
+  // O distrito a negrito, em qualquer língua: marca-se e parte-se a frase.
+  const zoneText = zone && t(zone.key, { ...zone.params, ...(zone.params.district ? { district: `\u0001${zone.params.district}\u0001` } : {}) })
+    .split('\u0001').map((p, i) => (i % 2 ? <b key={i} className="font-extrabold">{p}</b> : p))
 
   const fewText = qualifiedCount === 0
     ? t(club ? 'month.nobody' : 'month.nobody_global', { club })
@@ -136,6 +153,16 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare, partne
         <EmptyState icon={Trophy} pose="triste" title={t('month.unavailable')} />
       ) : (
         <>
+          {/* Para que zona conto este mês (#731): só texto, não abre nada. */}
+          {zone && (
+            <div className="flex items-start gap-2.5 rounded-[16px] bg-white px-[13px] py-[11px]">
+              <MapPin size={18} className="mt-px shrink-0 text-ink-900" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[13.5px] leading-snug text-ink-900">{zoneText}</p>
+                {zone.noteKey && <p className="mt-0.5 text-[12.5px] leading-snug text-[#62656A]">{t(zone.noteKey)}</p>}
+              </div>
+            </div>
+          )}
           {/* Sem prémios este mês (o acordo começa depois): sem a linha (UX, 22 out). */}
           {partner && isCurrent && hasPrizes(partner) && (
             <PartnerLine partner={partner} district={partnerDistrict} />
@@ -179,7 +206,8 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare, partne
 
           {/* A tua linha, presa por cima da barra de navegação: preta, igual à
               do Ranking (o Francisco escolheu a preta, 13 out). */}
-          {isCurrent && (
+          {/* Numa zona que não é a minha (ou sem zona), a barra não aparece (#731). */}
+          {isCurrent && myZone !== undefined && showsMeInZone(myZone, district) && (
             <button type="button" onClick={seeMe}
               className="sticky bottom-24 z-10 flex w-full items-center gap-3 rounded-card bg-ink-900 px-3.5 py-2.5 text-left text-white shadow-lift">
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-ctrl text-sm font-extrabold tabular-nums ${me?.qualified ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>

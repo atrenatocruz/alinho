@@ -36,6 +36,7 @@ import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError, isGameFull } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges, splitByRoom } from '../lib/mixEdit'
+import { loadHiddenPeople, shownPerson } from '../lib/mixPeople'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import SwapGuestSheet from '../components/mix/SwapGuestSheet'
@@ -682,20 +683,24 @@ export default function GameDetails() {
         console.error('Error loading global points:', error)
       }
 
+      // Inscritos que não são membros do grupo: o select traz-os a null (#769).
+      const hiddenPeople = await loadHiddenPeople(supabase, id, participantsData || [], teamsData || [])
+      const personOf = (person, personId) => attachMembership(shownPerson(person, personId, hiddenPeople, t('gamedetails.fallback_player_name')))
+
       if (stale()) return
       setParticipants((confirmedRows || []).map((p) => ({
         ...p,
-        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
-        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
+        user: personOf(p.user, p.user_id) ?? guestAsProfile(p.guest),
+        partner: personOf(p.partner, p.partner_id) ?? guestAsProfile(p.partner_guest),
       })))
       setWaitlist((waitlistRows || []).map((p) => ({
         ...p,
-        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
+        user: personOf(p.user, p.user_id) ?? guestAsProfile(p.guest),
       })))
       setRequests(requestRows.map((p) => ({
         ...p,
-        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
-        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
+        user: personOf(p.user, p.user_id) ?? guestAsProfile(p.guest),
+        partner: personOf(p.partner, p.partner_id) ?? guestAsProfile(p.partner_guest),
       })))
       setMyRequestState(myRequestRow?.status ?? null)
       // Nas duplas, o estado guarda o id EFETIVO em playerX_id (conta ou
@@ -705,8 +710,8 @@ export default function GameDetails() {
         ...team,
         player1_id: team.player1_id ?? team.player1_guest_id,
         player2_id: team.player2_id ?? team.player2_guest_id,
-        player1: attachMembership(team.player1) ?? guestAsProfile(team.guest1),
-        player2: attachMembership(team.player2) ?? guestAsProfile(team.guest2),
+        player1: personOf(team.player1, team.player1_id) ?? guestAsProfile(team.guest1),
+        player2: personOf(team.player2, team.player2_id) ?? guestAsProfile(team.guest2),
       })))
       setMatches(matchesData || [])
 
@@ -1587,10 +1592,12 @@ export default function GameDetails() {
     if (oldError) throw oldError
 
     // Convidados sem conta → o mesmo perfil sintético do loadGameDetails.
+    const hiddenPeople = await loadHiddenPeople(supabase, id, rows || [], [])
+    const personOf = (person, personId) => shownPerson(person, personId, hiddenPeople, t('gamedetails.fallback_player_name'))
     const freshRows = (rows || []).map((p) => ({
       ...p,
-      user: p.user ?? (p.guest ? { id: p.guest.id, name: p.guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
-      partner: p.partner ?? (p.partner_guest ? { id: p.partner_guest.id, name: p.partner_guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
+      user: personOf(p.user, p.user_id) ?? (p.guest ? { id: p.guest.id, name: p.guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
+      partner: personOf(p.partner, p.partner_id) ?? (p.partner_guest ? { id: p.partner_guest.id, name: p.partner_guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
     }))
 
     const globalRankings = await getGlobalRankings()

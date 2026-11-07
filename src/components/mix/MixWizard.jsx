@@ -491,7 +491,7 @@ export default function MixWizard({
             type="text"
             value={form.location}
             // Escrever a morada à mão invalida as coordenadas (Trello #203).
-            onChange={(e) => set({ location: e.target.value, latitude: null, longitude: null })}
+            onChange={(e) => set({ location: e.target.value, latitude: null, longitude: null, place_district: null })}
             className="input-field"
             placeholder={t('gerirclube.location_placeholder')}
           />

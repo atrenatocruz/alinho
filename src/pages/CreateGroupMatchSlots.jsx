@@ -8,6 +8,7 @@ import { getClubProfile } from '../lib/clubProfile'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { createGroupMatch } from '../lib/groupMatches'
 import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
+import { setPlaceDistrict } from '../lib/placeDistrictApi'
 import { DateTimeField, Select, PrimaryButton, Chips } from '../components/ui'
 import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import { describeError } from '../lib/errors'
@@ -40,9 +41,12 @@ export default function CreateGroupMatchSlots() {
   const [step, setStep] = useState(1)
   const locationInputRef = useRef(null)
 
-  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
+  // O distrito do sítio escolhido da lista (#731).
+  const [placeDistrict, setPlaceDistrictValue] = useState(null)
+  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude, district }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
+    setPlaceDistrictValue(district ?? null)
   })
 
   useEffect(() => {
@@ -87,6 +91,7 @@ export default function CreateGroupMatchSlots() {
         teamBPlayer1Id: teamBPlayer1Id || null,
         teamBPlayer2Id: teamBPlayer2Id || null,
       })
+      if (placeDistrict) await setPlaceDistrict('group_match', matchId, placeDistrict)
       navigate(`/clube/${slug}/jogos`, { replace: true, state: { createdMatchId: matchId } })
     } catch (err) {
       console.error('Error creating group match:', err)
@@ -143,7 +148,7 @@ export default function CreateGroupMatchSlots() {
             ref={locationInputRef}
             type="text"
             value={location}
-            onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }) }}
+            onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }); setPlaceDistrictValue(null) }}
             className="input-field"
             placeholder={t('creategroupmatch.location_placeholder')}
           />
