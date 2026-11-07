@@ -85,11 +85,15 @@ const COURT_TIMES = [
   { value: 150, label: '2h30' },
   { value: 180, label: '3h' },
 ]
+// Só os números (#767): com «min» em cada uma, seis não cabiam a 360 px. O
+// título diz «em minutos».
 const GAME_TIMES = [
-  { value: 10, label: '10min' },
-  { value: 15, label: '15min' },
-  { value: 20, label: '20min' },
-  { value: 30, label: '30min' },
+  { value: 10, label: '10' },
+  { value: 15, label: '15' },
+  { value: 20, label: '20' },
+  { value: 25, label: '25' },
+  { value: 30, label: '30' },
+  { value: 45, label: '45' },
 ]
 // Labels resolve via mixLogic's FORMAT_LABEL_KEY/GENDER_RESTRICTION_LABEL_KEY
 // — the same keys the games list (below) and GameDetails.jsx use for these
@@ -274,8 +278,11 @@ function Segmented({ options, value, onChange }) {
 function RequestPerson({ req, fallbackName }) {
   return (
     <Link to={`/jogador/${req.user_id}`} className="flex flex-1 min-w-0 items-center gap-3">
-      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-      <span className="min-w-0 truncate font-extrabold text-ink-900">{req.name || fallbackName} ›</span>
+      {/* Abaixo de 340 px sem a foto: com ela, o nome ficava com 64 px. */}
+      <span className="shrink-0 max-[339px]:hidden"><Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" /></span>
+      {/* Até 2 linhas, do tamanho dos nomes dos membros: a 360 px saía «Xico te…» (#776, UX 7 nov).
+          O «›» fica colado à última palavra, nunca sozinho na 2.ª linha. */}
+      <span className="min-w-0 line-clamp-2 text-sm font-extrabold text-ink-900">{req.name || fallbackName}{'\u00a0'}›</span>
     </Link>
   )
 }
