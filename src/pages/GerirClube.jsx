@@ -185,6 +185,10 @@ const EMPTY_GAME_FORM = {
   // para a BD junto com o resto do gameForm, via `...gameFields`.
   latitude: null,
   longitude: null,
+  // O distrito do sítio escolhido da lista (#731): a zona do Ranking do mês
+  // dos jogos de grupos sem distrito. Sai do payload e vai à parte, só
+  // quando há um (antes da migration_zona_de_cada_pessoa.sql não existe).
+  place_district: null,
   price_per_player: '',
   prize: '',
   has_voucher: false,
@@ -680,8 +684,8 @@ export default function GerirClube() {
   usePlaceAutocomplete(
     locationInputRef,
     showCreateGame || editingGame,
-    ({ value, latitude, longitude }) =>
-      setGameForm((form) => ({ ...form, location: value, latitude, longitude }))
+    ({ value, latitude, longitude, district }) =>
+      setGameForm((form) => ({ ...form, location: value, latitude, longitude, place_district: district ?? null }))
   )
 
   usePlaceAutocomplete(
@@ -1290,6 +1294,8 @@ export default function GerirClube() {
     ends_after_occurrences: recurrence.endsType === 'after_occurrences' ? parseInt(recurrence.endsAfterOccurrences, 10) : null,
     title: game.title,
     location: game.location,
+    // O distrito do sítio (#731): a série guarda-o e cada data nova copia-o.
+    ...('place_district' in game ? { place_district: game.place_district ?? null } : {}),
     price_per_player: game.price_per_player,
     prize: game.prize,
     has_voucher: game.has_voucher,
@@ -1539,7 +1545,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1611,6 +1617,7 @@ export default function GerirClube() {
             ...(gameForm.ranked === false ? { ranked: false } : {}),
             level: gameForm.level || null,
             created_by: user.id,
+            ...(placeDistrict ? { place_district: placeDistrict } : {}),
             // O 8-8 (#580): só vai quando é o super tie-break (antes da
             // migração a coluna não existe, e o tie-break a 7 é o de omissão).
             ...(gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
@@ -1810,7 +1817,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1872,6 +1879,8 @@ export default function GerirClube() {
           ...((gameForm.join_approval || editingGame.join_approval) ? { join_approval: !!gameForm.join_approval } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
+          // O distrito do sítio (#731): vai quando há um ou quando havia (para o limpar).
+          ...((placeDistrict || editingGame.place_district) ? { place_district: placeDistrict || null } : {}),
           ...((tieBreak88 === 'super_tiebreak' || editingGame.tiebreak_8_8) ? { tiebreak_8_8: gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? 'super_tiebreak' : null } : {}),
           ...(((gameForm.deuce_mode && gameForm.deuce_mode !== 'ponto_de_ouro') || (editingGame.deuce_mode && editingGame.deuce_mode !== 'ponto_de_ouro'))
             ? { deuce_mode: scoringHasDeuce(scoringFormatOf(gameForm)) && gameForm.deuce_mode ? gameForm.deuce_mode : 'ponto_de_ouro' } : {}),
@@ -1963,6 +1972,8 @@ export default function GerirClube() {
         for (const c of changes) {
           if (c.field === 'format') Object.assign(cols, { format: payload.format, seed_reverse: payload.seed_reverse, rotate_partners: payload.rotate_partners, respect_sides: payload.respect_sides })
           else if (c.field === 'num_courts') Object.assign(cols, { num_courts: payload.num_courts, max_players: payload.max_players })
+          // O sítio leva com ele o distrito (#731).
+          else if (c.field === 'location') Object.assign(cols, { location: payload.location, ...('place_district' in payload ? { place_district: payload.place_district } : {}) })
           else if (!['special', 'whatsapp_post_times'].includes(c.field) && c.field in payload) cols[c.field] = payload[c.field]
         }
         Object.keys(cols).forEach((k) => cols[k] === undefined && delete cols[k])
@@ -2639,6 +2650,7 @@ export default function GerirClube() {
       location: game.location || '',
       latitude: game.latitude ?? null,
       longitude: game.longitude ?? null,
+      place_district: game.place_district ?? null,
       price_per_player: game.price_per_player ?? '',
       prize: game.prize || '',
       has_voucher: game.has_voucher || false,
@@ -3306,7 +3318,7 @@ export default function GerirClube() {
                         value={gameForm.location}
                         // Escrever a morada a mao invalida as coordenadas: ficariam
                         // a apontar para o sitio escolhido antes (Trello #203).
-                        onChange={(e) => setGameForm({ ...gameForm, location: e.target.value, latitude: null, longitude: null })}
+                        onChange={(e) => setGameForm({ ...gameForm, location: e.target.value, latitude: null, longitude: null, place_district: null })}
                         className="input-field"
                         placeholder={t('gerirclube.location_placeholder')}
                       />

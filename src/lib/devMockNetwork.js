@@ -1637,6 +1637,25 @@ const monthRankingRows = () => {
   return [...list, me({ place: 14, points: 32, games: 6, qualified: true }), row(14, ['Vasco Reis', 'masculino', 1350, 18, 4, 2])]
 }
 RPC_MOCKS.get_month_ranking = () => monthRankingRows()
+// A zona de cada pessoa (#731, Dev 3). localStorage.mockMyZone: por omissão
+// Setúbal (5 de 7 jogos); 'few' — Setúbal com 3 jogos (ainda fora); 'none' —
+// sem zona; 'Lisboa' — conta para outra zona. mockZoneFinal = 'true': o mês
+// já fechou. A tabela da zona só traz o «tu» na zona dele.
+const zoneMode = () => localStorage.getItem('mockMyZone') || 'Setúbal'
+RPC_MOCKS.get_my_month_zone = (p) => {
+  const m = zoneMode()
+  const month = p?.p_month || `${new Date().toISOString().slice(0, 7)}-01`
+  const district = m === 'none' ? null : m === 'few' ? 'Setúbal' : m
+  return { month, district, zone_games: m === 'few' ? 2 : district ? 5 : 0, total_games: m === 'few' ? 3 : 7, final: localStorage.getItem('mockZoneFinal') === 'true' }
+}
+RPC_MOCKS.get_month_ranking_zone = (p) => {
+  const rows = monthRankingRows()
+  if (!Array.isArray(rows)) return rows
+  const z = RPC_MOCKS.get_my_month_zone({})
+  if (z.district !== p?.p_district) return rows.filter((r) => !r.is_me)
+  if (zoneMode() === 'few') return rows.map((r) => (r.is_me ? { ...r, place: null, points: 18, games: 3, qualified: false } : r))
+  return rows
+}
 RPC_MOCKS.get_month_ranking_months = () => {
   if ((localStorage.getItem('mockMonthRanking') || 'full') === 'off') return { __error: 'Could not find the function', __code: 'PGRST202' }
   return [{ month: '2026-10-01', people: 15 }]
