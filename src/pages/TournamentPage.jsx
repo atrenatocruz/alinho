@@ -23,7 +23,7 @@ import { ArrowLeft, Eye, HelpCircle, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, getTournamentResults, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../lib/tournamentApi'
+import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, getTournamentResults, scheduleTournamentOpening, updateTournament } from '../lib/tournamentApi'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { StickyTabs } from '../components/tournament/StickyBar'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
@@ -38,7 +38,6 @@ import { deuceModeOf } from '../lib/deuceMode'
 import { phaseScorings, scoringName } from '../components/tournament/scoringText'
 import ChampionsBlock from '../components/tournament/ChampionsBlock'
 import NextGameCard, { useMyNextGame } from '../components/tournament/NextGameCard'
-import { canCancel, cancelDanger } from '../components/tournament/cancelTournament'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
 import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
@@ -366,18 +365,6 @@ export default function TournamentPage() {
           initial={editing}
           locked={!!editing.has_entries}
           focusCode={params.get('cat')}
-          danger={canCancel(tour) ? cancelDanger(tour, t, (deleted) => {
-            if (deleted) { navigate('/gerir'); return }
-            closeAdmin()
-            window.dispatchEvent(new CustomEvent('tournament:reload'))
-          }, { everEntered: !!editing.has_entries }) : null}
-          // «Voltar a rascunho» (Francisco, 10 out): o formulário só o deixa
-          // carregar sem inscrições.
-          unpublish={async () => {
-            await setTournamentStatus(tour.id, 'rascunho')
-            closeAdmin()
-            window.dispatchEvent(new Event('tournament:reload'))
-          }}
           saving={savingEdit}
           error={adminError}
           onCancel={closeAdmin}

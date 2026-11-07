@@ -140,8 +140,10 @@ const categories = () => {
   const fri = nextFriday()
   // mockTDrawPartial (Trello #560): 'true' = M5 sorteada, M3 e M4 fechadas
   // por sortear, F4 e MX4 ainda abertas; 'all' = todas sorteadas.
+  // mockTNoDraw = 'true': nenhuma sorteada (o «Voltar a rascunho» fica ativo).
   const partial = localStorage.getItem('mockTDrawPartial')
-  const statusOf = (c) => (partial === 'all' ? 'sorteada'
+  const statusOf = (c) => (localStorage.getItem('mockTNoDraw') === 'true' ? 'inscricoes'
+    : partial === 'all' ? 'sorteada'
     : partial === 'true' && ['M3', 'M4'].includes(c.code) ? 'fechada' : c.status)
   return CATEGORIES.map(({ day_index, ...c }) => ({
     ...c,
@@ -385,6 +387,9 @@ const resetMatches = () => {
     team_a: a, team_b: b,
     score_a: score ? score[0] : null, score_b: score ? score[1] : null,
     sets: null, corrected_by_name: null,
+    // mockTCorrectedNoName = 'true': os terminados foram corrigidos por um
+    // superadmin escondido — vem a hora, mas não o nome (18 out).
+    ...(status === 'terminado' && localStorage.getItem('mockTCorrectedNoName') === 'true' ? { corrected_at: new Date().toISOString() } : {}),
   })
   const barros = team('Barros / Costa', ['Francisco Barros', 'Rui Costa'])
   const santos = team('Santos / Santos', ['José Santos', 'Rafael Santos'])

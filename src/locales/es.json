@@ -4817,6 +4817,7 @@
   "tournament.score.none_done": "Aún no hay partidos anotados este día.",
   "tournament.score.correct": "Corregir",
   "tournament.score.corrected_by": "corregido por {{name}}",
+  "tournament.score.corrected_by_org": "corregido por quien organiza",
   "tournament.score.walkover": "No presentado",
   "tournament.score.retirement": "Retirada",
   "tournament.score.walkover_hint": "No presentado: justificado o sin justificar.",

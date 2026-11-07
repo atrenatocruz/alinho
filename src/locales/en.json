@@ -4813,6 +4813,7 @@
   "tournament.score.none_done": "No matches scored on this day yet.",
   "tournament.score.correct": "Correct",
   "tournament.score.corrected_by": "corrected by {{name}}",
+  "tournament.score.corrected_by_org": "corrected by the organiser",
   "tournament.score.walkover": "No-show",
   "tournament.score.retirement": "Retirement",
   "tournament.score.walkover_hint": "No-show: justified or unjustified.",
