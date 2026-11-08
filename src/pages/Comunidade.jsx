@@ -23,6 +23,7 @@ import KindHero from '../components/KindHero'
 import { KIND_COLORS } from '../lib/kindColors'
 import { coverOf, useOrgCovers } from '../lib/orgCover'
 import { Realce } from '../components/SearchField'
+import { placeName } from '../lib/placeName'
 import { SkeletonGate, SkBlock, SkLine, SkRow } from '../components/Skeleton'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
@@ -418,13 +419,21 @@ export default function Comunidade() {
     )
   }
 
+  // «Sítio · N membros» (#787): o sítio é a localidade, nunca a morada
+  // inteira, e é a única parte que encolhe; os membros nunca são cortados.
   const subOf = (org) => {
     const group = org.kind === 'group'
-    return [
-      group ? (org.parent_name ? t('comunidade.group_of', { club: org.parent_name }) : t('comunidade.group_community')) : org.location,
-      org.member_count != null ? t('comunidade.member_count', { count: org.member_count }) : null,
-    ].filter(Boolean).join(' · ')
+    const place = group ? (org.parent_name ? t('comunidade.group_of', { club: org.parent_name }) : t('comunidade.group_community')) : placeName(org.location, org.district)
+    const members = org.member_count != null ? t('comunidade.member_count', { count: org.member_count }) : null
+    return (
+      <span className="flex min-w-0">
+        {place && <span className="min-w-0 truncate">{place}</span>}
+        {members && <span className="shrink-0 whitespace-nowrap">{place && ' · '}{members}</span>}
+      </span>
+    )
   }
+  // A frase não aparece quando é igual ao nome (o A2N tem «A2N Padel Academy»).
+  const sameText = (a, b) => semAcentos(String(a || '')).trim().toLowerCase() === semAcentos(String(b || '')).trim().toLowerCase()
 
   const coverFor = (org) => coverOf(org, covers[org.id] || org.cover_url)
 
@@ -467,8 +476,8 @@ export default function Comunidade() {
               </span>
             </div>
           )}
-          {org.description && <p className="mt-1.5 line-clamp-2 text-[13.5px] leading-[1.45] text-[#4B5563] [overflow-wrap:anywhere]">{org.description}</p>}
-          <p className="mt-1.5 truncate text-[13px] text-[#4B5563]">{subOf(org)}</p>
+          {org.description && !sameText(org.description, org.name) && <p className="mt-1.5 line-clamp-2 text-[13.5px] leading-[1.45] text-[#4B5563] [overflow-wrap:anywhere]">{org.description}</p>}
+          <p className="mt-1.5 text-[13px] text-[#4B5563]">{subOf(org)}</p>
           {kinds.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {kinds.map((k) => (
