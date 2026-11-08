@@ -14,14 +14,14 @@
    pontuação e tamanho dos grupos → Regras), sempre com o valor de hoje. */
 import { useEffect, useState } from 'react'
 import { describeError } from '../../lib/errors'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { Lock, Minus, Plus } from 'lucide-react'
 import StepPage, { StepMissingNote } from '../steps/StepPage'
 import MixImageField from './MixImageField'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
-import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople, scoringFormatOf, scoringForFormat, SCORING_FORMAT_HINT_KEY, SCORING_FORMAT_LABEL_KEY, AMERICANO_SCORING_FORMATS } from '../../lib/mixLogic'
+import { totalRounds, gamesPerPerson, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople, scoringFormatOf, scoringForFormat, SCORING_FORMAT_HINT_KEY, SCORING_FORMAT_LABEL_KEY, AMERICANO_SCORING_FORMATS } from '../../lib/mixLogic'
 import { DeuceModeChips } from '../DeuceMode'
 import { deuceModeOf, scoringHasDeuce } from '../../lib/deuceMode'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
@@ -491,7 +491,7 @@ export default function MixWizard({
             type="text"
             value={form.location}
             // Escrever a morada à mão invalida as coordenadas (Trello #203).
-            onChange={(e) => set({ location: e.target.value, latitude: null, longitude: null })}
+            onChange={(e) => set({ location: e.target.value, latitude: null, longitude: null, place_district: null })}
             className="input-field"
             placeholder={t('gerirclube.location_placeholder')}
           />
@@ -559,8 +559,20 @@ export default function MixWizard({
               onChange={(e) => set({ pool_size: e.target.value })} className="input-field" />
           </Field>
         )}
+        {/* Quantos jogos dá por pessoa e o que sobra para aquecer (#767). Sem
+            cor de aviso: não sobrar tempo não é um erro. */}
         <Field label={t('mixwizard.game_time_label')} locked={started}
-          hint={t('mixwizard.rounds_in', { count: totalRounds(form), time: options.courtTimes.find((c) => c.value === form.court_time_minutes)?.label || `${form.court_time_minutes}min` })}>
+          hint={(() => {
+            const g = gamesPerPerson(form)
+            const time = options.courtTimes.find((c) => c.value === form.court_time_minutes)?.label || `${form.court_time_minutes}min`
+            return (
+              <>
+                <Trans i18nKey={g.upTo ? 'mixwizard.games_up_to' : 'mixwizard.games_in'} count={g.count}
+                  values={{ count: g.count, time }} components={{ b: <b className="font-extrabold text-ink-900" /> }} />
+                {' '}{g.left > 0 ? t('mixwizard.warmup_left', { minutes: g.left }) : t('mixwizard.warmup_none')}
+              </>
+            )
+          })()}>
           <Chips label={t('mixwizard.game_time_label')} value={form.game_time_minutes}
             onChange={(v) => set({ game_time_minutes: v })} options={options.gameTimes} />
         </Field>

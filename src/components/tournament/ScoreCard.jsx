@@ -236,7 +236,13 @@ export default function ScoreCard({ match, scoring, tieTarget = 7, saved = false
         {match.score_a != null && match.score_a === match.score_b && !walkover && (
           <p className="mt-1.5 text-xs font-bold text-warning">{t('tournament.score.problem_tie')}</p>
         )}
-        {match.corrected_by_name && <p className="mt-1.5 text-xs text-ink-500">{t('tournament.score.corrected_by', { name: match.corrected_by_name })}</p>}
+        {/* Sem nome (os superadmins ficam escondidos, 18 out), diz «quem
+            organiza» em vez de ficar calado sobre a correção. */}
+        {(match.corrected_by_name || match.corrected_at) && (
+          <p className="mt-1.5 text-xs text-ink-500">
+            {match.corrected_by_name ? t('tournament.score.corrected_by', { name: match.corrected_by_name }) : t('tournament.score.corrected_by_org')}
+          </p>
+        )}
         {walkover ? (onUndoWalkover && (
           <button type="button" disabled={busy} onClick={() => onUndoWalkover(match)} className={`${BTN} ${OUTLINE} mt-3`}>
             {t(match.status === 'falta' ? 'tournament.score.undo_walkover' : 'tournament.score.undo_retirement')}

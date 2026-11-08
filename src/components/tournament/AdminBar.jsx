@@ -97,6 +97,10 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
     return () => { alive = false }
   }, [tournament?.id, tournament?.entry_count])
   const cancel = cancelDanger(tournament, t, (deleted) => (deleted ? navigate('/gerir') : onChanged?.()), { everEntered })
+  // Voltar a rascunho: com inscritos é um cancelar que guarda o torneio (PO,
+  // 13 out) — as duplas saem e cada pessoa recebe o aviso «retirado».
+  const pairs = categories.reduce((n, c) => n + (Number(c.entry_count) || 0), 0) || Number(tournament?.entry_count) || 0
+  const drawnCat = categories.find((c) => c.status && !['inscricoes', 'fechada'].includes(c.status))
 
   const go = async (to) => {
     setBusy(true); setError(null)
@@ -146,7 +150,18 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
       url.searchParams.set('ver', 'publico')
       navigate(`${url.pathname}${url.search}`)
     } },
-    canCancel(tournament) && { key: 'cancel', danger: true, label: cancel.label, hint: cancel.hint, onClick: () => setAsk('cancel') },
+    // «Voltar a rascunho» e «Cancelar/Eliminar» no fim, depois de uma linha,
+    // em texto (link: true, EventActionsSheet do Dev 2) — saíram do Editar
+    // (Francisco, 18 out; design-handoff/2026-10-18-editar-botoes). As
+    // mesmas regras e perguntas de antes.
+    ['inscricoes', 'fechado'].includes(status) && {
+      key: 'to_draft', link: true, label: t('eventactions.to_draft'),
+      // Com uma categoria sorteada já não volta (Dev 3, 14 out): fica à
+      // vista, apagado, com a razão.
+      disabled: !!drawnCat, hint: drawnCat ? t('tournament.edit.to_draft_drawn', { code: drawnCat.code }) : null,
+      onClick: () => setAsk('draft'),
+    },
+    canCancel(tournament) && { key: 'cancel', link: true, danger: true, label: cancel.label, hint: cancel.hint, onClick: () => setAsk('cancel') },
   ].filter(Boolean)
 
   // R3b (13 out, design-handoff/2026-10-13-acoes-de-quem-organiza): a caixa
@@ -198,6 +213,19 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           onConfirm={cancel.onConfirm}
           onClose={() => setAsk(null)}
           errorOf={cancel.errorOf}
+        />
+        <ConfirmSheet
+          open={ask === 'draft'}
+          // Sem inscritos, a pergunta é a preto; com eles, a vermelho.
+          danger={pairs > 0}
+          title={t('eventactions.to_draft_title')}
+          message={pairs > 0 ? `${t('tournament.edit.to_draft_pairs', { count: pairs })} ${t('tournament.edit.to_draft_message')}` : t('tournament.edit.to_draft_message')}
+          confirmLabel={t('eventactions.to_draft_confirm')}
+          cancelLabel={t('tournament.edit.to_draft_keep')}
+          onConfirm={async () => { await setTournamentStatus(tournament.id, 'rascunho'); onChanged?.() }}
+          onClose={() => setAsk(null)}
+          errorOf={(err) => (String(err?.message || '').includes('category_already_drawn')
+            ? t('tournament.edit.to_draft_drawn', { code: err?.hint || '' }) : describeError(t, err))}
         />
         <ConfirmSheet
           open={ask === 'close'}

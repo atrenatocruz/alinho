@@ -12,6 +12,7 @@ import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
 import { PrimaryButton, DateTimeField, Chips } from '../components/ui'
 import { usePlaceAutocomplete } from '../lib/usePlaceAutocomplete'
+import { setPlaceDistrict } from '../lib/placeDistrictApi'
 import { describeError } from '../lib/errors'
 import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
@@ -89,9 +90,13 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const [error, setError] = useState('')
 
   const locationInputRef = useRef(null)
-  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
+  // O distrito do sítio escolhido da lista (#731): a zona do Ranking do mês.
+  // undefined = o sítio não mexeu (no Editar não se toca no gravado).
+  const [placeDistrict, setPlaceDistrictValue] = useState(undefined)
+  usePlaceAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude, district }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
+    setPlaceDistrictValue(district ?? null)
   })
 
   // Os membros do grupo, para a pesquisa (sem mim).
@@ -140,6 +145,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
       })
+      if (placeDistrict) await setPlaceDistrict('friend_match', id, placeDistrict)
       // O modo dos 40-40 grava-se à parte; se falhar, o jogo fica com o ponto de ouro.
       if (format !== 'points' && deuceMode !== DEFAULT_DEUCE_MODE) {
         try { await setFriendDeuceMode(id, deuceMode) } catch (err) { console.error('Error saving deuce mode:', err) }
@@ -185,6 +191,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         creatorPlays: creatorPlays !== (m.creator_plays !== false) ? creatorPlays : undefined,
       })
       if (format !== 'points' && deuceMode !== deuceModeOf(m)) await setFriendDeuceMode(m.id, deuceMode)
+      // O sítio mudou: o distrito novo, ou nenhum (nada o limpa sozinho, #731).
+      if (placeDistrict !== undefined) await setPlaceDistrict('friend_match', m.id, placeDistrict)
       // As pessoas gravam-se DEPOIS do resto (#586, 13 out): é o resto que
       // pode ser recusado (format_locked, ranked_locked, teams_locked…), e
       // antes as pessoas já ficavam mudadas quando ele falhava.
@@ -373,7 +381,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
               // Escrever a morada à mão invalida as coordenadas — ficariam a
               // apontar para o sítio escolhido antes (mesmo cuidado que
               // GerirClube.jsx tem para o local dos mixes).
-              onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }) }}
+              onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }); setPlaceDistrictValue(null) }}
               placeholder={t('friends.where_placeholder')}
               className="input-field"
             />

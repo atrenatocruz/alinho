@@ -58,13 +58,28 @@ const RANKING_CASOS = [
 ]
 const MOCK_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa', 'Pedro Lima', 'Inês Rocha', 'Miguel Santos', 'Rui Santos']
 const communityOrg = (o) => ({ group_logo_url: null, parent_organization_id: null, parent_name: null, location: null, my_status: 'none', open_join: false, ...o })
+// Comunidade nova (18 out): o distrito, a frase, a capa, o selo e o que
+// organiza (as colunas do Dev 3, migration_comunidade_lista_colunas.sql).
+// A zona de quem vê é Lisboa (get_my_month_zone, abaixo).
 const COMMUNITY_ORGS = [
-  communityOrg({ id: 'co-1', name: 'Smash Padel', slug: 'smash-padel', kind: 'club', member_count: 340, avg_rating: 1180, my_status: 'member', open_join: true, location: 'Parque das Nações, Lisboa' }),
-  communityOrg({ id: 'co-2', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', member_count: 212, avg_rating: 1040, open_join: true, location: 'Oeiras' }),
-  communityOrg({ id: 'co-3', name: 'Lobos de Carcavelos', slug: 'lobos', kind: 'group', member_count: 24, avg_rating: 1260 }),
-  communityOrg({ id: 'co-4', name: 'Smash Manhãs', slug: 'smash-manhas', kind: 'group', parent_organization_id: 'co-1', parent_name: 'Smash Padel', member_count: null, avg_rating: null, open_join: true }),
-  communityOrg({ id: 'co-5', name: 'Racket Club', slug: 'racket', kind: 'club', member_count: 88, avg_rating: 980, my_status: 'pending' }),
-  communityOrg({ id: 'co-6', name: 'Terças à Noite', slug: 'tercas', kind: 'group', member_count: 9, avg_rating: null, open_join: true }),
+  communityOrg({ id: 'co-1', name: 'Smash Padel', slug: 'smash-padel', kind: 'club', member_count: 340, avg_rating: 1180, my_status: 'member', open_join: true, location: 'Parque das Nações, Lisboa',
+    district: 'Lisboa', club_verified: true, cover_url: '/capas/capa-esplanada.webp', organizes: ['mix', 'tournament', 'open_game'],
+    description: '6 campos cobertos, mixes todas as semanas e torneios ao fim de semana.' }),
+  communityOrg({ id: 'co-2', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', member_count: 212, avg_rating: 1040, open_join: true, location: 'Oeiras',
+    district: 'Lisboa', club_verified: true, cover_url: '/capas/capa-entrada.webp', organizes: ['mix', 'lesson'],
+    description: 'Clube familiar com aulas para todos os níveis e mixes à noite.' }),
+  communityOrg({ id: 'co-3', name: 'Lobos de Carcavelos', slug: 'lobos', kind: 'group', member_count: 24, avg_rating: 1260,
+    district: 'Lisboa', cover_url: '/capas/capa-malta.webp', description: 'Malta que joga às terças e quintas à noite.' }),
+  communityOrg({ id: 'co-4', name: 'Smash Manhãs', slug: 'smash-manhas', kind: 'group', parent_organization_id: 'co-1', parent_name: 'Smash Padel', member_count: null, avg_rating: null, open_join: true,
+    district: 'Lisboa', cover_url: '/capas/capa-manha.webp' }),
+  communityOrg({ id: 'co-5', name: 'Racket Club', slug: 'racket', kind: 'club', member_count: 88, avg_rating: 980, my_status: 'pending', location: 'Amadora',
+    district: 'Lisboa', club_verified: false }),
+  communityOrg({ id: 'co-6', name: 'Terças à Noite', slug: 'tercas', kind: 'group', member_count: 9, avg_rating: null, open_join: true,
+    district: 'Setúbal', cover_url: '/capas/capa-jantar.webp', description: 'Jogos às 7h antes do trabalho.' }),
+  communityOrg({ id: 'co-7', name: 'Maré Alta Padel', slug: 'mare-alta', kind: 'club', member_count: 48, avg_rating: null, open_join: true, location: 'Almada',
+    district: 'Setúbal', club_verified: true, cover_url: '/capas/capa-praia.webp', organizes: ['mix', 'tournament'] }),
+  // Sem distrito: vai para «Outros clubes e grupos» (UX, 7 nov).
+  communityOrg({ id: 'co-8', name: 'Padel ao Domingo', slug: 'padel-domingo', kind: 'group', member_count: 14, avg_rating: null, open_join: true, district: null }),
 ]
 
 const ACHIEVEMENTS_CATALOG = [
@@ -441,6 +456,9 @@ const RPC_MOCKS = {
   // fechado, grupo dentro de um clube (sem nº de membros para quem não é do
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
+  // A zona do mês (#731). Com mockCommunity, Lisboa; mockZoneNone = 'true',
+  // sem zona (a Comunidade pede «Escolhe a tua zona»).
+  get_my_month_zone: () => ({ month: `${new Date().toISOString().slice(0, 7)}-01`, district: community() && localStorage.getItem('mockZoneNone') !== 'true' ? 'Lisboa' : null, zone_games: 4, total_games: 5, final: false }),
   // Pessoas que talvez conheças (Home do futuro, 9 out; função do Dev 3 por
   // fazer): com mockCommunity, três pessoas; sem ele, como antes da função.
   suggest_people: () => (community() ? [
@@ -1637,6 +1655,25 @@ const monthRankingRows = () => {
   return [...list, me({ place: 14, points: 32, games: 6, qualified: true }), row(14, ['Vasco Reis', 'masculino', 1350, 18, 4, 2])]
 }
 RPC_MOCKS.get_month_ranking = () => monthRankingRows()
+// A zona de cada pessoa (#731, Dev 3). localStorage.mockMyZone: por omissão
+// Setúbal (5 de 7 jogos); 'few' — Setúbal com 3 jogos (ainda fora); 'none' —
+// sem zona; 'Lisboa' — conta para outra zona. mockZoneFinal = 'true': o mês
+// já fechou. A tabela da zona só traz o «tu» na zona dele.
+const zoneMode = () => localStorage.getItem('mockMyZone') || 'Setúbal'
+RPC_MOCKS.get_my_month_zone = (p) => {
+  const m = zoneMode()
+  const month = p?.p_month || `${new Date().toISOString().slice(0, 7)}-01`
+  const district = m === 'none' ? null : m === 'few' ? 'Setúbal' : m
+  return { month, district, zone_games: m === 'few' ? 2 : district ? 5 : 0, total_games: m === 'few' ? 3 : 7, final: localStorage.getItem('mockZoneFinal') === 'true' }
+}
+RPC_MOCKS.get_month_ranking_zone = (p) => {
+  const rows = monthRankingRows()
+  if (!Array.isArray(rows)) return rows
+  const z = RPC_MOCKS.get_my_month_zone({})
+  if (z.district !== p?.p_district) return rows.filter((r) => !r.is_me)
+  if (zoneMode() === 'few') return rows.map((r) => (r.is_me ? { ...r, place: null, points: 18, games: 3, qualified: false } : r))
+  return rows
+}
 RPC_MOCKS.get_month_ranking_months = () => {
   if ((localStorage.getItem('mockMonthRanking') || 'full') === 'off') return { __error: 'Could not find the function', __code: 'PGRST202' }
   return [{ month: '2026-10-01', people: 15 }]

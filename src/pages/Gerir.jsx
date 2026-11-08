@@ -4,7 +4,7 @@ import { Settings, Plus, Check, X, GraduationCap, ChevronRight } from 'lucide-re
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Avatar, EmptyState, PrimaryButton, PageHeader } from '../components/ui'
+import { Avatar, EmptyState, PrimaryButton, PageHeader, Select } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import AdminDeleteAccountPanel from '../components/AdminDeleteAccountPanel'
 import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
@@ -13,6 +13,7 @@ import { listPendingMembershipRequestsForAdmin, useMemberCounts } from '../lib/o
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
 import { planName } from '../lib/plans'
+import { districtOptions } from '../lib/leagueDistricts'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import AppFeaturesPanel from '../components/AppFeaturesPanel'
 import OrgFinder from '../components/gerir/OrgFinder'
@@ -119,6 +120,10 @@ export default function Gerir() {
   const ownsAGroup = adminOrganizations.some((o) => o.owner_id === profile?.id && !o.parent_organization_id)
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [groupName, setGroupName] = useState('')
+  // O distrito do grupo novo (design-handoff/2026-10-28-criar-grupo-distrito):
+  // null = por escolher (mostra «Escolhe o distrito»); '' = «Sem distrito».
+  // Não é obrigatório: sem escolha, o grupo nasce sem distrito.
+  const [groupDistrict, setGroupDistrict] = useState(null)
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
   const groupNameTaken = useOrgNameTaken(groupName, { enabled: showGroupForm })
@@ -131,7 +136,7 @@ export default function Gerir() {
     setGroupError('')
     setCreatingGroup(true)
     try {
-      const { slug: newGroupSlug } = await createSelfServeGroup(groupName.trim())
+      const { slug: newGroupSlug } = await createSelfServeGroup(groupName.trim(), groupDistrict || null)
       // create_self_serve_group insere a membership de admin do lado do
       // servidor — puxá-la antes de navegar, senão o GerirClube lê
       // memberships antigas e mostra "Sem acesso" até recarregar.
@@ -190,6 +195,12 @@ export default function Gerir() {
             />
             <OrgNameTakenHint taken={groupNameTaken} />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerirclube.district_label')}</label>
+            <Select value={groupDistrict} onChange={setGroupDistrict} placeholder={t('gerir.create_group_district_placeholder')}
+              options={districtOptions(t('gerirclube.district_none'))} title={t('gerirclube.district_label')} />
+            <p className="mt-1.5 text-[13px] leading-snug text-[#62656A]">{t('gerir.create_group_district_help')}</p>
+          </div>
           {groupError && (
             <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{groupError}</div>
           )}
@@ -205,7 +216,7 @@ export default function Gerir() {
             </PrimaryButton>
             <PrimaryButton
               variant="ghost"
-              onClick={() => { setShowGroupForm(false); setGroupName(''); setGroupError('') }}
+              onClick={() => { setShowGroupForm(false); setGroupName(''); setGroupDistrict(null); setGroupError('') }}
               disabled={creatingGroup}
               className="w-full"
             >

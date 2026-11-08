@@ -285,7 +285,7 @@ function Locked({ title, reason, children }) {
   )
 }
 
-export default function CreateTournamentForm({ club, initial = null, locked = false, focusCode = null, onCancel, onCreate, saving, error, danger = null, unpublish = null }) {
+export default function CreateTournamentForm({ club, initial = null, locked = false, focusCode = null, onCancel, onCreate, saving, error }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
   // O máximo de categorias por pessoa que o torneio tinha ao abrir o Editar:
@@ -614,32 +614,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
         saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`)
           : specialLoad === 'failed' ? t('tournament.create.special_load_failed')
           : specialLoad === 'loading' ? t('common.loading') : specialProblem,
-        // «Voltar a rascunho», como no mix (Francisco, 10 out). Com inscritos
-        // também (PO, 13 out; base de dados do Dev 3): é um cancelar que
-        // guarda o torneio — as inscrições saem e cada pessoa recebe o aviso
-        // «retirado». Só antes do sorteio (inscricoes ou fechado).
-        extra: unpublish && ['inscricoes', 'fechado'].includes(initial?.tournament?.status) ? (() => {
-          const pairs = (initial?.categories || []).reduce((n, c) => n + (Number(c.entry_count) || 0), 0)
-          // Com uma categoria sorteada já não volta (apagava os jogos do
-          // sorteio; Dev 3, 14 out): fica apagado e diz porquê.
-          const drawn = (initial?.categories || []).find((c) => c.status && !['inscricoes', 'fechada'].includes(c.status))
-          return {
-            label: t('eventactions.to_draft'),
-            disabled: !!drawn,
-            hint: drawn ? t('tournament.edit.to_draft_drawn', { code: drawn.code }) : null,
-            // Sem inscritos ninguém sai prejudicado: a pergunta é a preto;
-            // com eles, a vermelho (as confirmações destrutivas, UX).
-            danger: pairs > 0,
-            title: t('eventactions.to_draft_title'),
-            message: pairs > 0 ? `${t('tournament.edit.to_draft_pairs', { count: pairs })} ${t('tournament.edit.to_draft_message')}` : t('tournament.edit.to_draft_message'),
-            confirmLabel: t('eventactions.to_draft_confirm'), cancelLabel: t('tournament.edit.to_draft_keep'),
-            onConfirm: unpublish,
-            errorOf: (err) => (String(err?.message || '').includes('category_already_drawn')
-              ? t('tournament.edit.to_draft_drawn', { code: err?.hint || '' }) : describeError(t, err)),
-          }
-        })() : null,
-        // «Cancelar o torneio» / apagar, a mesma pergunta do «Mais ⋯» (1 out).
-        danger,
+        // «Voltar a rascunho» e «Cancelar/Eliminar o torneio» saíram do Editar
+        // e vivem no fim do «Mais ⋯» (AdminBar), longe de um toque por engano
+        // (Francisco, 18 out; design-handoff/2026-10-18-editar-botoes).
       } : null}
     >
       {/* Em rascunho, o Editar diz que ninguém o vê (Francisco, 10 out). */}
@@ -1010,6 +987,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               </div>
             </Field>
           )}
+          {/* «Aos 40-40» (design-handoff/2026-10-22-aos-40-40-criar): a seguir
+              à pontuação e ao 8-8. Com jogos a decorrer ou acabados, a cinzento
+              e com o cadeado: a forma de contar não muda a meio. */}
           <Field label={t('deuce.label')}>
             <DeuceModeChips value={draft.rules.deuce || DEFAULT_DEUCE_MODE} onChange={(v) => setRule('deuce', v)}
               locked={sharedLocked}

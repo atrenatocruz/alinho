@@ -110,17 +110,19 @@ const TEXT_LINK = 'font-extrabold text-ink-900 underline underline-offset-2'
 
 // Na app, o logótipo (30 px) e o botão de língua (40 px) ficam abaixo da barra das
 // horas, com o botão centrado na altura do logótipo (5 px acima dele): no iPhone o
-// botão ficava em cima da bateria (#773, UX 6 nov). Abaixo de 340 px o botão perde a
-// seta, para não encostar ao logótipo. No site fica tudo como estava.
+// botão ficava em cima da bateria (#773, UX 6 nov). No site fica no canto, como estava.
+// Abaixo de 340 px, na app e no site, o botão perde a seta, para não encostar ao
+// logótipo (#777).
 const NATIVE_TOP = 'pt-[max(48px,calc(var(--safe-top,env(safe-area-inset-top))+17px))]'
-const NATIVE_LANG = 'top-[max(43px,calc(var(--safe-top,env(safe-area-inset-top))+12px))] max-[339px]:[&_button>svg:last-child]:hidden'
+const NATIVE_LANG = 'top-[max(43px,calc(var(--safe-top,env(safe-area-inset-top))+12px))]'
+const LANG_NARROW = 'max-[339px]:[&_button>svg:last-child]:hidden'
 
 /** O topo creme (com o EN e o logótipo verdadeiro), comum a vários ecrãs. */
 function CreamTop({ children, compact = false }) {
   const { t } = useTranslation()
   return (
     <div className={`relative px-6 text-center ${IS_NATIVE ? NATIVE_TOP : 'pt-12'} ${compact ? 'pb-6' : 'pb-8'}`} style={{ background: CREAM }}>
-      <LanguageMenu className={`absolute right-3 z-10 ${IS_NATIVE ? NATIVE_LANG : 'top-3'}`} />
+      <LanguageMenu className={`absolute right-3 z-10 ${LANG_NARROW} ${IS_NATIVE ? NATIVE_LANG : 'top-3'}`} />
       {/* O logótipo leva à página inicial: sem sessão, o Login não tinha outra saída (15 set). */}
       <Link to="/" className="inline-block leading-none" aria-label="alinho.pt">
         <Wordmark variant="light" className="!h-[30px]" />
