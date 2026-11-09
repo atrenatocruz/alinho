@@ -9,7 +9,7 @@ import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, Chips, PrimaryButton } from '../ui'
 import { FieldLabel } from './TournamentBits'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
-import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
+import { slotsLeft, isCategoryFull, maxCategories, isAllCategories } from '../../lib/tournamentSignup'
 import { contemTexto } from '../../lib/semAcentos'
 import { searchPlayers } from '../../lib/privateMatches'
 import { CategorySpecialLine } from './CategorySpecialPrice'
@@ -162,12 +162,15 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
 
   const price = (chosen?.price_cents ?? tournament?.entry_fee_cents)
 
+  // Com «Todas» (8 nov) o título fica só «Categoria», sem «· até N».
+  const categoryTitle = isAllCategories(maxCategories(tournament)) ? t('tsignup.category_label_all') : t('tsignup.category_label', { max: categoriesLeft })
+
   return (
     <Sheet onClose={onClose} title={t('tsignup.sheet_title', { name: tournament.name })}>
       <div className="space-y-4">
         {/* Categoria */}
         <div>
-          <FieldLabel>{t('tsignup.category_label', { max: categoriesLeft })}</FieldLabel>
+          <FieldLabel>{categoryTitle}</FieldLabel>
           {/* Uma escolha de formulário: as pastilhas da regra única (#528).
               Cheia não fecha a porta: o servidor põe quem chega depois como
               suplente, por ordem de chegada — o ecrã só o diz. */}
@@ -176,7 +179,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
           <div className="-mx-5">
           <Chips
             className="!mx-0 !px-5"
-            label={t('tsignup.category_label', { max: categoriesLeft })}
+            label={categoryTitle}
             value={categoryId}
             onChange={setCategoryId}
             options={ordered.map((c) => {

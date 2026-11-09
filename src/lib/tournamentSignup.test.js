@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   takesSlot, slotsLeft, isCategoryFull, categoriesLeft,
+  ALL_CATEGORIES, isAllCategories, maxCategoryOptions, shownMaxCategories,
   entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, whoIsAlreadyIn, activeEntriesOf,
 } from './tournamentSignup'
 
@@ -151,5 +152,35 @@ describe('activeEntriesOf (QA, 13 out: convite por aceitar não é inscrição)'
   it('sem registered_by_me (migração por correr), fica como antes; desistidas nunca contam', () => {
     expect(activeEntriesOf({ my_entries: [{ entry_id: 'a', status: 'convite' }, { entry_id: 'b', status: 'desistiu' }] }).map((e) => e.entry_id)).toEqual(['a'])
     expect(activeEntriesOf({ my: { state: 'convite', registered_by_me: false } })).toEqual([])
+  })
+})
+
+describe('«Todas» no máximo de categorias (8 nov)', () => {
+  const cats = ['m4', 'f4', 'mx4'].map((id) => ({ id }))
+  const mineIn = (id, status = 'validada') => ({ status, category_id: id })
+  it('as pastilhas vão de 1 até uma a menos do que as categorias, e acabam em «Todas»', () => {
+    expect(maxCategoryOptions(0)).toEqual([])
+    expect(maxCategoryOptions(1)).toEqual([])
+    expect(maxCategoryOptions(2)).toEqual([1, ALL_CATEGORIES])
+    expect(maxCategoryOptions(3)).toEqual([1, 2, ALL_CATEGORIES])
+    expect(maxCategoryOptions(5)).toEqual([1, 2, 3, 4, ALL_CATEGORIES])
+  })
+  it('com inscritos só sobe, e «Todas» fica sempre', () => {
+    expect(maxCategoryOptions(4, 2)).toEqual([2, 3, ALL_CATEGORIES])
+    expect(maxCategoryOptions(3, 3)).toEqual([ALL_CATEGORIES])
+  })
+  it('um número que deixou de existir mostra-se como «Todas»', () => {
+    expect(shownMaxCategories(3, 3)).toBe(ALL_CATEGORIES)
+    expect(shownMaxCategories(2, 3)).toBe(2)
+    expect(shownMaxCategories(ALL_CATEGORIES, 2)).toBe(ALL_CATEGORIES)
+    expect(isAllCategories(ALL_CATEGORIES)).toBe(true)
+    expect(isAllCategories(3)).toBe(false)
+  })
+  it('com «Todas», falta o que ainda não tenho', () => {
+    const all = tour({ rules: { max_categories: ALL_CATEGORIES } })
+    expect(categoriesLeft(all, [], cats)).toBe(3)
+    expect(categoriesLeft(all, [mineIn('m4')], cats)).toBe(2)
+    expect(categoriesLeft(all, [mineIn('m4'), mineIn('f4'), mineIn('mx4')], cats)).toBe(0)
+    expect(categoriesLeft(all, [mineIn('m4', 'desistiu')], cats)).toBe(3)
   })
 })

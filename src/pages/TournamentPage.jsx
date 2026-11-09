@@ -44,7 +44,7 @@ import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
 import { TournamentPageSkeleton, PanelSkeleton } from '../components/tournament/TournamentSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
-import { activeEntriesOf, entriesOpen } from '../lib/tournamentSignup'
+import { activeEntriesOf, entriesOpen, isAllCategories } from '../lib/tournamentSignup'
 import EventHero from '../components/event/EventHero'
 import EventFacts from '../components/event/EventFacts'
 import { daysAside, longDate, shortDay } from '../components/event/heroDates'
@@ -329,7 +329,9 @@ export default function TournamentPage() {
     } catch (err) {
       setAdminError(err?.code === 'special_prices_failed' ? t('tournament.edit.special_failed')
         // Com inscritos, o máximo de categorias só sobe (Dev 3: o atual no hint).
-        : String(err?.message || '').includes('max_categories_only_up') ? t('tournament.edit.max_only_up', { n: err?.hint || '' })
+        // Com «Todas» o hint é 99, que nunca se mostra (UX, 8 nov): a frase sem número.
+        : String(err?.message || '').includes('max_categories_only_up')
+          ? (isAllCategories(err?.hint) ? t('tournament.create.max_categories_only_up') : t('tournament.edit.max_only_up', { n: err?.hint || '' }))
         // A hora de uma categoria com inscritos (Dev 3, 13 out): o código no hint.
         : String(err?.message || '').includes('category_already_drawn') ? t('tournament.edit.category_already_drawn', { code: err?.hint || '' })
         : String(err?.message || '').includes('day_outside_tournament') ? t('tournament.edit.day_outside_tournament', { code: err?.hint || '' })
