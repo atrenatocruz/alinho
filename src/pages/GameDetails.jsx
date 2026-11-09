@@ -5758,6 +5758,7 @@ export default function GameDetails() {
                   {t('gamedetails.age_birthday_help', { restriction: t(AGE_LABEL_KEY[game.age_restriction]) })}
                 </p>
                 <DateField
+                  birthday
                   value={birthdayValue}
                   onChange={setBirthdayValue}
                   max={new Date().toISOString().slice(0, 10)}

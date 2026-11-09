@@ -6,14 +6,17 @@
 //
 // É a ÚNICA peça que vê o número cru neste fluxo (como a hash-phone): o
 // que segue para a base de dados é só o HMAC, guardado na linha de
-// phone_verifications pelo start_phone_verification_for_hash (validade 15
-// min, limite 5/h, recusa números de outra conta real) chamado AQUI com o
-// JWT do utilizador — o código nunca passa pelo browser e segue no SMS.
+// phone_verifications pelo start_phone_verification_for_user (validade 15
+// min, limite 5/h, recusa números de outra conta real, guarda o canal)
+// chamado AQUI com o cliente de serviço e o id já validado por getUser() —
+// só esta função pede códigos (8 nov). O código do SMS nunca passa pelo
+// browser; o do canal WhatsApp volta à app, mas só o robô o aceita.
 //
 // Secrets necessários (por ambiente): PHONE_HASH_SECRET (o MESMO da
 // hash-phone e do robô), TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
 // TWILIO_FROM (número E.164 ou sender alfanumérico, ex. "Alinho").
-// SUPABASE_URL/SUPABASE_ANON_KEY são injetados pela plataforma.
+// SUPABASE_URL/SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY são injetados
+// pela plataforma.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -134,29 +137,44 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'server_misconfigured' }, 500)
   }
 
-  // Cliente COM O JWT do utilizador: o UPDATE do perfil passa pela RLS
-  // (linha própria, coluna phone_hash com grant) e o start_phone_verification
-  // corre com o auth.uid() dele — o rate-limit do #537 aplica-se tal-e-qual.
-  const supabase = createClient(
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!serviceRoleKey) {
+    console.error('send-otp misconfigured: falta SUPABASE_SERVICE_ROLE_KEY')
+    return jsonResponse({ error: 'server_misconfigured' }, 500)
+  }
+
+  // Cliente COM O JWT do utilizador: só para saber quem é (getUser valida
+  // o token no servidor de auth).
+  const userClient = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,
     { global: { headers: { Authorization: authHeader! } } }
   )
 
-  const { data: userData, error: userError } = await supabase.auth.getUser()
+  const { data: userData, error: userError } = await userClient.auth.getUser()
   if (userError || !userData?.user) {
     return jsonResponse({ error: 'Unauthorized' }, 401)
   }
+
+  // Cliente de serviço: o pedido de código só existe para a service role
+  // (8 nov) — com sessão ninguém o chama diretamente.
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
 
   const hash = await hmacSha256Hex(normalized, secret)
 
   // Sem estado «associado» (Ruben, 1 out): o perfil NÃO é tocado aqui — o
   // número só entra na conta quando a posse fica provada (confirmação). O
-  // RPC guarda o alvo na linha de verificação, aplica o rate-limit de 5/h
-  // e recusa números já confirmados noutra conta real (phone_taken).
-  const { data: ver, error: verError } = await supabase.rpc('start_phone_verification_for_hash', { p_hash: hash })
+  // RPC guarda o alvo e o canal na linha de verificação, aplica o rate-limit
+  // de 5/h e recusa números já confirmados noutra conta real (phone_taken).
+  const { data: ver, error: verError } = await admin.rpc('start_phone_verification_for_user', {
+    p_user_id: userData.user.id,
+    p_hash: hash,
+    p_channel: groupChannel ? 'whatsapp' : 'sms',
+  })
   if (verError) {
-    console.error('send-otp: start_phone_verification_for_hash falhou:', verError)
+    console.error('send-otp: start_phone_verification_for_user falhou:', verError)
     const message = verError.message || 'verification_failed'
     if (message.includes('phone_taken')) return jsonResponse({ error: 'phone_taken' }, 409)
     // Ex.: o limite de 5/h — a mensagem do RPC é legível e vai para a app.

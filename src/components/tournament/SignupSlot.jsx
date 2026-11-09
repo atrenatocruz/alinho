@@ -13,7 +13,7 @@ import TeamNameSheet from './TeamNameSheet'
 import { supabase } from '../../lib/supabase'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, maxCategories, tournamentInviteLink, canScoreTournament,
+  entriesOpen, categoriesLeft, maxCategories, isAllCategories, tournamentInviteLink, canScoreTournament,
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
 import { errorCode, signupErrorMessage } from '../../lib/tournamentError'
@@ -90,7 +90,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // A categoria escolhida manda (ensaio do QA, 30 set).
   const open = entriesOpen(tournament, category)
   const anyOpen = categories.some((c) => entriesOpen(tournament, c))
-  const left = categoriesLeft(tournament, myEntries)
+  const left = categoriesLeft(tournament, myEntries, categories)
+  // Com «Todas» (8 nov): desligado só quando já estou em todas as categorias.
+  const allCats = isAllCategories(maxCategories(tournament))
   // A inscrição que se mostra é a da categoria escolhida. Se não estou
   // nela e ainda posso ir a mais uma, aparece o botão de inscrever; se já
   // não posso, mostra-se a que tenho (Trello #451).
@@ -156,7 +158,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // O número vai na frase do máximo («Já estás no máximo de 2 categorias
   // deste torneio», PO 12 out); as outras frases ignoram-no.
   // e o nome de quem convido vai na do parceiro no máximo (Dev 3, 12 out).
-  const errorText = (err, name = '') => signupErrorMessage(t, err, undefined, { count: maxCategories(tournament), name })
+  const errorText = (err, name = '') => signupErrorMessage(t, err, undefined, { count: allCats ? undefined : maxCategories(tournament), name })
   const say = (err) => setError(errorText(err))
 
   const doSignUp = async (choice) => {
@@ -401,6 +403,12 @@ export default function SignupSlot({ tournament, categories, category, my: first
               {t('tsignup.another_category')} ›
             </button>
           )}
+          {/* Com «Todas» e já em todas, não há botão de inscrever em lado
+              nenhum (cada página de categoria mostra a minha inscrição):
+              diz-se aqui, no lugar do «noutra categoria» (SPEC 8 nov, ponto 4). */}
+          {anyOpen && allCats && left === 0 && (
+            <p className="text-[13px] font-bold text-ink-500">{t('tsignup.in_all_categories')}</p>
+          )}
         </div>
       ) : open && user ? (
         // Quem já tem jogos tem o lima no «Os meus jogos»: este passa a
@@ -408,7 +416,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         // Com um convite por responder, o lima é o «Aceitar» (UX/PO, 12 out).
         <div className="space-y-2.5">
           <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={() => startSignUp()} disabled={left === 0} className="w-full">
-            {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
+            {left === 0 ? t(allCats ? 'tsignup.in_all_categories' : 'tsignup.max_categories') : t('tsignup.cta')}
           </PrimaryButton>
           {/* O segundo botão, em contorno, por baixo (R3): nunca lado a lado. */}
           {left > 0 && (

@@ -134,7 +134,7 @@ export default function CreateGroupMatchSlots() {
       {step === 2 && (
         <>
           <div>
-            <p className={label}>{t('steps.datetime_label')}</p>
+
             <div id="step-group-date"><DateTimeField value={when} onChange={setWhen} /><StepMissingNote field="step-group-date" /></div>
             <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
           </div>

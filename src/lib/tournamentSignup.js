@@ -46,10 +46,41 @@ export const isCategoryFull = (category, entries) => slotsLeft(category, entries
    lia o antigo, e quem escolhia 1 ou 3 ficava sempre com 2. */
 export const maxCategories = (tournament) =>
   Number(tournament?.rules?.max_categories ?? tournament?.rules?.max_categories_per_person ?? 2)
-export function categoriesLeft(tournament, myEntries = []) {
+
+/* «Todas» no máximo de categorias (Francisco, 8 nov): grava-se 99. A base de
+   dados não tem teto para o número (Dev 3, 8 nov), o «só sobe» continua a
+   valer e «Todas» é o mais alto, por isso não precisou de migração. Quer dizer
+   todas, também as que se juntarem depois. */
+export const ALL_CATEGORIES = 99
+export const isAllCategories = (n) => Number(n) >= ALL_CATEGORIES
+
+/* As pastilhas do «Máximo de categorias por pessoa»: de 1 até uma a menos do
+   que o número de categorias, e a última é «Todas» (SPEC de 8 nov). Com uma
+   categoria (ou nenhuma) não há escolha: lista vazia, e o campo não aparece.
+   `min`: com inscritos, o máximo só sobe; «Todas» fica sempre. */
+export function maxCategoryOptions(categoryCount, min = 1) {
+  if (categoryCount <= 1) return []
+  const nums = []
+  for (let n = Math.max(1, min); n < categoryCount; n++) nums.push(n)
+  return [...nums, ALL_CATEGORIES]
+}
+
+/* O valor que as pastilhas mostram: um número que deixou de existir (era 3 e
+   passaram a ser 3 categorias) fica «Todas». */
+export const shownMaxCategories = (max, categoryCount) =>
+  isAllCategories(max) || Number(max) >= categoryCount ? ALL_CATEGORIES : Number(max)
+
+/* `categories`: as do torneio. Com «Todas», o que falta são as categorias
+   onde ainda não estou; sem elas, conta como sem limite. */
+export function categoriesLeft(tournament, myEntries = [], categories = null) {
   const max = maxCategories(tournament)
-  const mine = myEntries.filter((e) => e.status !== 'desistiu').length
-  return Math.max(0, max - mine)
+  const active = myEntries.filter((e) => e.status !== 'desistiu')
+  if (isAllCategories(max)) {
+    if (!categories) return ALL_CATEGORIES
+    const mineIds = new Set(active.map((e) => e.category_id))
+    return categories.filter((c) => !mineIds.has(c.id)).length
+  }
+  return Math.max(0, max - active.length)
 }
 
 /* As inscrições estão abertas? Com uma categoria, vale o estado DELA: o

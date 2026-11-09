@@ -122,6 +122,8 @@ const TOURNAMENT = () => {
       // mockTDeuce = 'star_point' | 'vantagens': «Aos 40-40» (27 out). Sem ele, o torneio não traz o modo (ponto de ouro).
       ...(localStorage.getItem('mockTDeuce') ? { deuce: localStorage.getItem('mockTDeuce') } : {}),
       ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
+      // mockTMax = '1' | '2' | '99': o máximo de categorias por pessoa (99 = «Todas», 8 nov).
+      ...(localStorage.getItem('mockTMax') ? { max_categories: Number(localStorage.getItem('mockTMax')) } : {}),
     },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
     // localhost não há Storage: carregar um cartaz a sério precisa de
@@ -313,7 +315,10 @@ export const TOURNAMENT_RPC_MOCKS = {
       : bad === 'past' ? { entries_deadline: `${iso(yesterday)}T22:59:00+00:00` }
       : bad === 'draw' ? { draw_on: iso(dayAfter(fri, -6)) }
         : {}
-    const rules = bad === 'duration' ? { duration_min: 90, duration_max: 60 } : {}
+    const rules = {
+      ...(bad === 'duration' ? { duration_min: 90, duration_max: 60 } : {}),
+      ...(localStorage.getItem('mockTMax') ? { max_categories: Number(localStorage.getItem('mockTMax')) } : {}),
+    }
     return {
       tournament: { ...t, draw_on: t.draw_on, ...edits, rules },
       days: [0, 1, 2].map((n) => ({
@@ -349,6 +354,11 @@ export const TOURNAMENT_RPC_MOCKS = {
             my_matches: [] }
         // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
         // inscrito — sem «Os meus jogos» (separadores, 28 set).
+        // localStorage.mockTInAll = 'true': estou em todas as categorias («Todas», 8 nov).
+        : localStorage.getItem('mockTInAll') === 'true'
+          ? { my: { category_id: 'cat-m3', state: 'validada', entry_id: 'all-m3' },
+              my_entries: categories().map((c) => ({ category_id: c.id, status: 'validada', state: 'validada', entry_id: `all-${c.id}` })),
+              my_matches: [] }
         : localStorage.getItem('mockTNotEntered') === 'true' ? { my: null, my_entries: [], my_matches: [] }
         : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
             my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),

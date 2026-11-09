@@ -3323,9 +3323,6 @@ export default function GerirClube() {
                       organizationId={editingGame?.organization_id || mixScopeId || currentOrganizationId} />
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.date_time_label')}
-                      </label>
                       <DateTimeField
                         value={gameForm.date}
                         onChange={(v) => setGameForm({ ...gameForm, date: v })}

@@ -50,7 +50,7 @@ function Field({ label, children, hint, locked = false }) {
   if (locked) children = <div className="pointer-events-none opacity-50" aria-disabled="true">{children}</div>
   return (
     <div>
-      <p className="text-sm font-medium text-gray-700 mb-2">{label}</p>
+      {label && <p className="text-sm font-medium text-gray-700 mb-2">{label}</p>}
       {children}
       {hint && <p className="text-sm text-muted mt-1.5">{hint}</p>}
     </div>
@@ -362,7 +362,8 @@ export default function MixWizard({
       </div>
 
       <div className={step === 2 ? 'space-y-5' : 'hidden'}>
-        <Field label={t('mixwizard.date_label')}>
+        {/* Sem título por cima: o campo já tem «Dia» e «Hora» (UX, 19 out). */}
+        <Field label={null}>
           <div id="step-mix-date">
             <DateTimeField value={form.date} onChange={(v) => set({ date: v })} min={new Date()} />
             <StepMissingNote field="step-mix-date" />

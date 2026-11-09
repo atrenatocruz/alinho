@@ -21,7 +21,7 @@ import OpensPicker, { openingDays } from './OpensPicker'
 import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
 import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
-import { maxCategories } from '../../lib/tournamentSignup'
+import { maxCategories, ALL_CATEGORIES, isAllCategories, maxCategoryOptions, shownMaxCategories } from '../../lib/tournamentSignup'
 import TimeInput from '../TimeInput'
 import { courtNames } from './courtNames'
 import { DeuceModeChips } from '../DeuceMode'
@@ -40,7 +40,7 @@ const DEFAULT_RULES = {
   early_notice: 30,
   tolerance: 10,
   selection: 'manual',        // manual | pontos
-  max_categories: 2,
+  max_categories: ALL_CATEGORIES, // «Todas» por omissão (Francisco, 8 nov)
 }
 
 const SCORINGS = ['pro_set_9', 'melhor_2_sets', 'melhor_3_sets']
@@ -346,6 +346,19 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
   const setRule = (key, value) => setDraft((d) => ({ ...d, rules: { ...d.rules, [key]: value } }))
+  // «Máximo de categorias por pessoa» (Francisco, 8 nov): as pastilhas
+  // acompanham as categorias criadas (1 até uma a menos, e «Todas»); com uma
+  // categoria o campo não aparece. Um número que deixou de existir fica
+  // «Todas», no ecrã e no que se grava.
+  const catCount = draft.categories.length
+  const shownMax = shownMaxCategories(draft.rules.max_categories, catCount)
+  const maxOptions = (min = 1) => maxCategoryOptions(catCount, isAllCategories(min) ? ALL_CATEGORIES : min)
+    .map((n) => ({ value: n, label: isAllCategories(n) ? t('tournament.create.max_categories_all') : String(n) }))
+  useEffect(() => {
+    if (catCount > 1 && !isAllCategories(draft.rules.max_categories) && Number(draft.rules.max_categories) >= catCount) {
+      setRule('max_categories', ALL_CATEGORIES)
+    }
+  }, [catCount]) // eslint-disable-line react-hooks/exhaustive-deps
   const hours = useMemo(() => totalCourtHours(draft.days), [draft.days])
   // O prazo que o torneio já tinha, a editar: se não mudar, não se trava.
   const [initialDeadline] = useState(() => isoToLocalInput(initial?.tournament?.entries_deadline))
@@ -680,11 +693,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
       {/* Com inscritos, o máximo por pessoa só sobe (Francisco, 13 out; a base
           de dados do Dev 3 recusa descer com max_categories_only_up). */}
-      {locked && (
+      {locked && maxOptions(initialMax).length > 0 && (
         <Field label={t('tournament.create.max_categories')} hint={t('tournament.create.max_categories_only_up')}>
-          <Chips value={draft.rules.max_categories} onChange={(n) => setRule('max_categories', n)}
+          <Chips value={shownMax} onChange={(n) => setRule('max_categories', n)}
             label={t('tournament.create.max_categories')}
-            options={[1, 2, 3].filter((n) => n >= initialMax).map((n) => ({ value: n, label: String(n) }))} />
+            options={maxOptions(initialMax)} />
         </Field>
       )}
       {/* Os prémios mudam-se com inscritos (Francisco, 28 set: «Sim, com aviso
@@ -784,11 +797,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             </div>
           )}
 
-          <Field label={t('tournament.create.max_categories')}>
-            <Chips value={draft.rules.max_categories} onChange={(n) => setRule('max_categories', n)}
-              label={t('tournament.create.max_categories')}
-              options={[1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
-          </Field>
+          {maxOptions().length > 0 && (
+            <Field label={t('tournament.create.max_categories')}>
+              <Chips value={shownMax} onChange={(n) => setRule('max_categories', n)}
+                label={t('tournament.create.max_categories')}
+                options={maxOptions()} />
+            </Field>
+          )}
 
           {/* T-shirt do torneio inteiro, não da categoria (SPEC t-shirts, 8 out). */}
           <TshirtField rules={draft.rules} onChange={(v) => setRule('tshirt', v)} FieldLabel={FieldLabel} />
