@@ -1,12 +1,32 @@
-// O sexo nunca bloqueia uma inscrição (Francisco, 26 set): quando não bate
-// com a categoria, pergunta-se «tens a certeza?» e, se sim, segue. O
-// organizador tira a dupla se for caso disso. A base de dados deixou de o
-// verificar (migration_tournament_sexo_nao_bloqueia.sql, Dev 3).
+// O sexo nos torneios (Francisco, 8 nov; SPEC 2026-11-08-torneio-sexo-bloqueia).
+// Masculinos: dois homens. Femininos: duas mulheres. Mistos: um homem e uma
+// mulher. Quem joga não se inscreve numa categoria que não é para si: quem
+// recusa é a base de dados, o ecrã só avisa antes. Quem organiza pode pôr na
+// mesma, depois de confirmar. Nos mixes não muda nada: continua só a pergunta.
 //
 // Quem não tem o sexo no perfil não conta como «não bate»: não se sabe.
 
-/** Devolve a chave do título da pergunta, ou null se não há nada a perguntar.
- *  `genders` são os sexos conhecidos da dupla (um ou dois; null = não se sabe). */
+/** Esta categoria é para quem tem este sexo? Sem sexo, não se sabe: sim. */
+export function fitsPlayer(category, gender) {
+  const rule = category?.gender
+  return !gender || !rule || rule === 'misto' || rule === gender
+}
+
+/** Quem tem este sexo pode fazer dupla comigo nesta categoria? */
+export function partnerFits(category, myGender, partnerGender) {
+  if (!partnerGender) return true
+  const rule = category?.gender
+  if (rule === 'masculino' || rule === 'feminino') return partnerGender === rule
+  if (rule === 'misto') return !myGender || partnerGender !== myGender
+  return true
+}
+
+/** «Só para mulheres» ou «Só para homens». */
+export const onlyForKey = (category) => (category?.gender === 'feminino' ? 'tsignup.only_women' : 'tsignup.only_men')
+
+/** Para quem organiza: a chave do título da pergunta «Inscrever na mesma?»,
+ *  ou null se não há nada a perguntar. `genders` são os sexos conhecidos da
+ *  dupla (um ou dois; null = não se sabe). */
 export function categoryGenderQuestion(category, genders = []) {
   const known = genders.filter(Boolean)
   const rule = category?.gender

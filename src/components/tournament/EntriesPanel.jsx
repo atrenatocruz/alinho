@@ -85,7 +85,7 @@ function NotInApp({ t, name, setName, email, setEmail }) {
 /* `mode`: 'new' é o «Inscrever à mão» inteiro; 'partner' é só o parceiro,
    para juntar a quem se inscreveu sozinho (Trello #515) — a mesma procura,
    o mesmo «Não está na app?» e o mesmo género, sem duplicar nada. */
-function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null, pickerLabel, confirmLabel, category = null, soloIds = [] }) {
+function AdminEntrySheet({ organizationId, otherPlayerId = null, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null, pickerLabel, confirmLabel, category = null, soloIds = [] }) {
   const newEntry = mode === 'new'
   const { t } = useTranslation()
   // A categoria escolhe-se aqui, à vista — antes vinha calada do painel e
@@ -151,15 +151,15 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   // gravado no perfil dela (decisão do Renato, 23 set).
   const [genders, setGenders] = useState({}) // { [userId]: 'masculino'|'feminino'|null }
   useEffect(() => {
-    const ids = [player1?.id, partner?.id].filter((id) => id && !(id in genders))
+    const ids = [player1?.id, partner?.id, otherPlayerId].filter((id) => id && !(id in genders))
     if (!ids.length) return
     supabase.from('profiles').select('id, gender').in('id', ids).then(({ data, error: err }) => {
       if (err) { console.error('Error loading gender:', err); return }
       setGenders((g) => ({ ...g, ...Object.fromEntries(ids.map((id) => [id, (data || []).find((r) => r.id === id)?.gender || null])) }))
     })
-  }, [player1?.id, partner?.id, genders])
-  // O sexo nunca bloqueia (Francisco, 26 set): escolhê-lo é opcional, e se
-  // não bater com a categoria pergunta-se antes de gravar.
+  }, [player1?.id, partner?.id, otherPlayerId, genders])
+  // Quem organiza pode pôr na mesma (SPEC sexo, 8 nov): se não bater com a
+  // categoria, pergunta-se «Inscrever na mesma?» antes de gravar.
   // Ninguém escolhe o género de outra pessoa (Francisco, 2 out: «you can't
   // define the gender for another person»). Sai a escolha do admin para quem
   // tem conta sem género (#433) e a do convidado sem conta (30 set): o género
@@ -286,10 +286,11 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
             const cat = newEntry ? categories.find((c) => c.id === categoryId) : category
             const ask = (payload, people) => {
               const key = categoryGenderQuestion(cat, people)
-              if (key) setGenderAsk({ key, then: () => onConfirm(payload) })
+              if (key) setGenderAsk({ key, then: () => onConfirm({ ...payload, forceGender: true }) })
               else onConfirm(payload)
             }
-            if (!newEntry) { ask(second, [sexOf2]); return }
+            // Num misto conta quem fica na dupla; nos outros, só quem entra.
+            if (!newEntry) { ask(second, cat?.gender === 'misto' ? [sexOf2, genders[otherPlayerId] || null] : [sexOf2]); return }
             ask({
               categoryId,
               player1Id: player1?.id || null,
@@ -755,6 +756,7 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
           category={category}
           // Nem quem fica nem quem sai aparecem na procura.
           excludeId={[swap.entry.player1_id, swap.entry.player2_id].filter(Boolean)}
+          otherPlayerId={swap.slot === 1 ? swap.entry.player2_id : swap.entry.player1_id}
           title={t('tentries.swap_in_title', {
             name: (swap.slot === 1 ? swap.entry.player1_name : swap.entry.player2_name || swap.entry.guest_name) || '?',
           })}
@@ -768,7 +770,7 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
             try {
               const res = await replaceTournamentPlayer(swap.entry.entry_id, swap.slot, {
                 playerId: choice.partnerId, guestName: choice.guestName,
-                guestEmail: choice.guestEmail, playerGender: choice.partnerGender,
+                guestEmail: choice.guestEmail, playerGender: choice.partnerGender, forceGender: choice.forceGender,
               })
               if (res?.invite_token && choice.guestName) {
                 setFresh([{ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null }])
@@ -852,6 +854,7 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
           mode="partner"
           category={category}
           excludeId={joinFor.player1_id}
+          otherPlayerId={joinFor.player1_id}
           soloIds={(searching ? (allRows || []).filter((r) => r.category_id === joinFor.category_id) : rows)
             .filter((r) => r.status === 'sem_parceiro' && r.entry_id !== joinFor.entry_id)
             .map((r) => r.player1_id).filter(Boolean)}

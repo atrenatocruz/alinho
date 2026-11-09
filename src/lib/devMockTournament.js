@@ -124,6 +124,8 @@ const TOURNAMENT = () => {
       ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
       // mockTMax = '1' | '2' | '99': o máximo de categorias por pessoa (99 = «Todas», 8 nov).
       ...(localStorage.getItem('mockTMax') ? { max_categories: Number(localStorage.getItem('mockTMax')) } : {}),
+      // mockTEntry = 'dupla' | 'as_duas': «Inscrição» do torneio (#790).
+      ...(localStorage.getItem('mockTEntry') ? { entry_mode: localStorage.getItem('mockTEntry') } : {}),
     },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
     // localhost não há Storage: carregar um cartaz a sério precisa de
@@ -355,9 +357,10 @@ export const TOURNAMENT_RPC_MOCKS = {
         // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
         // inscrito — sem «Os meus jogos» (separadores, 28 set).
         // localStorage.mockTInAll = 'true': estou em todas as categorias («Todas», 8 nov).
-        : localStorage.getItem('mockTInAll') === 'true'
+        // mockTInAll = 'semF': em todas menos as femininas, as que um homem pode jogar (8 nov).
+        : ['true', 'semF'].includes(localStorage.getItem('mockTInAll'))
           ? { my: { category_id: 'cat-m3', state: 'validada', entry_id: 'all-m3' },
-              my_entries: categories().map((c) => ({ category_id: c.id, status: 'validada', state: 'validada', entry_id: `all-${c.id}` })),
+              my_entries: categories().filter((c) => localStorage.getItem('mockTInAll') !== 'semF' || c.gender !== 'feminino').map((c) => ({ category_id: c.id, status: 'validada', state: 'validada', entry_id: `all-${c.id}` })),
               my_matches: [] }
         : localStorage.getItem('mockTNotEntered') === 'true' ? { my: null, my_entries: [], my_matches: [] }
         : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },

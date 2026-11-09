@@ -29,7 +29,8 @@ const MOCK_ADMIN_PROFILE = {
   email: 'admin@dev.local',
   name: 'Admin (Dev)',
   // localStorage.mockNoGender = 'true' → perfil sem sexo (mix só de homens, 26 set).
-  gender: typeof localStorage !== 'undefined' && localStorage.getItem('mockNoGender') === 'true' ? null : 'masculino',
+  // localStorage.mockGender = 'feminino' → quem vê é uma mulher (torneios, 8 nov).
+  gender: typeof localStorage !== 'undefined' && localStorage.getItem('mockNoGender') === 'true' ? null : (localStorage.getItem('mockGender') || 'masculino'),
   phone_hash: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneUnconfirmed') === 'true' ? 'hash-de-teste' : 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass; mockPhoneUnconfirmed mostra o «Confirma o teu número» (#537)
   phone_verified_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneConfirmed') === 'true' ? '2026-09-24T20:00:00Z' : null,
   // localStorage.mockXp = '8100' → XP de atividade do perfil de teste (R15).

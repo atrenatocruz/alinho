@@ -9,10 +9,11 @@ import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, Chips, PrimaryButton } from '../ui'
 import { FieldLabel } from './TournamentBits'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
-import { slotsLeft, isCategoryFull, maxCategories, isAllCategories } from '../../lib/tournamentSignup'
+import { slotsLeft, isCategoryFull, maxCategories, isAllCategories, pairsOnly } from '../../lib/tournamentSignup'
 import { contemTexto } from '../../lib/semAcentos'
 import { searchPlayers } from '../../lib/privateMatches'
 import { CategorySpecialLine } from './CategorySpecialPrice'
+import { fitsPlayer, partnerFits, onlyForKey } from './genderCheck'
 
 /** «25 €» e «12,50 €», nunca «25.00 €»: as casas decimais só aparecem
  *  quando existem, e a vírgula é a do idioma de quem lê. */
@@ -48,7 +49,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   const categories = allCategories.filter((c) => !takenIds.includes(c.id))
   const category = categories.find((c) => c.id === pageCategory?.id) || null
   const myNum = Number(String(ratingBand(profile?.rating, profile?.gender)?.label || '').replace(/\D/g, '')) || null
-  const fitsGender = (c) => !profile?.gender || c.gender === 'misto' || c.gender === profile.gender
+  const fitsGender = (c) => fitsPlayer(c, profile?.gender)
   const ordered = [...categories].sort((a, b) => {
     const g = Number(fitsGender(b)) - Number(fitsGender(a))
     if (g) return g
@@ -58,11 +59,18 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
     }
     return (a.position ?? 0) - (b.position ?? 0)
   })
-  const [categoryId, setCategoryId] = useState(category?.id || ordered[0]?.id || null)
-  const [mode, setMode] = useState(initialMode) // 'partner' | 'named' | 'alone'
+  // A do outro sexo não se escolhe (8 nov): a página pode ser essa, mas a
+  // folha abre na primeira que serve.
+  const [categoryId, setCategoryId] = useState((category && fitsGender(category) ? category.id : null) || ordered.find(fitsGender)?.id || null)
+  const pairs = pairsOnly(tournament)
+  const [mode, setMode] = useState(pairs ? 'partner' : initialMode) // 'partner' | 'named' | 'alone'
   const [members, setMembers] = useState([])
   const [query, setQuery] = useState('')
   const [partnerId, setPartnerId] = useState(null)
+  // O sexo que o perfil do parceiro já tem, e a resposta a «É homem ou
+  // mulher?» quando não tem ou não há conta (SPEC 8 nov, ponto 3).
+  const [partnerKnownSex, setPartnerKnownSex] = useState(null)
+  const [partnerSex, setPartnerSex] = useState(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [teamName, setTeamName] = useState('')
@@ -110,19 +118,35 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
     let alive = true
     const timer = setTimeout(() => {
       searchPlayers(q)
-        .then((rows) => { if (alive) setFound(rows.filter((r) => r.id !== user?.id)) })
+        .then(async (rows) => {
+          const list = rows.filter((r) => r.id !== user?.id)
+          // A procura só traz nome e foto; o sexo lê-se à parte, para a
+          // lista mostrar só quem pode fazer dupla (8 nov).
+          const { data } = list.length ? await supabase.from('profiles').select('id, gender').in('id', list.map((r) => r.id)) : { data: [] }
+          const sex = Object.fromEntries((data || []).map((r) => [r.id, r.gender || null]))
+          if (alive) setFound(list.map((r) => ({ ...r, gender: sex[r.id] || null })))
+        })
         .catch((err) => { console.error('Error searching players:', err); if (alive) setFound([]) })
     }, 250)
     return () => { alive = false; clearTimeout(timer) }
   }, [q, isPublic, user?.id])
+  const chosen = categories.find((c) => c.id === categoryId)
+  const myGender = profile?.gender || null
+  // Só quem pode fazer dupla na categoria escolhida; sem sexo no perfil
+  // aparece, e pergunta-se depois de o escolher.
   const shown = useMemo(() => {
-    const mine = q ? members.filter((m) => contemTexto(m.name, q)) : members
+    const canPair = (m) => partnerFits(chosen, myGender, m.gender)
+    const mine = (q ? members.filter((m) => contemTexto(m.name, q)) : members).filter(canPair)
     if (!q) return mine.slice(0, 6)
     const seen = new Set(mine.map((m) => m.id))
-    return [...mine, ...found.filter((p) => !seen.has(p.id))].slice(0, 8)
-  }, [members, found, q])
-
-  const chosen = categories.find((c) => c.id === categoryId)
+    return [...mine, ...found.filter((p) => !seen.has(p.id) && canPair(p))].slice(0, 8)
+  }, [members, found, q, chosen, myGender])
+  // Mudou a categoria e o parceiro já não serve: tira-se a escolha.
+  useEffect(() => {
+    if (partnerKnownSex && !partnerFits(chosen, myGender, partnerKnownSex)) { setPartnerId(null); setPartnerKnownSex(null) }
+  }, [chosen, myGender, partnerKnownSex])
+  const needsPartnerSex = mode === 'named' || (mode === 'partner' && !!partnerId && !partnerKnownSex)
+  const partnerSexWrong = needsPartnerSex && !!partnerSex && !partnerFits(chosen, myGender, partnerSex)
   // Categorias que chocam (9 out): a escolhida começa quase à mesma hora que
   // uma onde já estou. Avisa; não impede.
   const clashWith = chosen ? allCategories.find((c) => takenIds.includes(c.id) && categoriesClash(c, chosen)) : null
@@ -141,7 +165,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   const payingShirts = [myExistingShirt ? null : myShirt, mode === 'named' ? guestShirt : null]
   const ready = categoryId && shirtsReady && (
     mode === 'alone' ? true : mode === 'partner' ? !!partnerId : !nameError && !emailError
-  )
+  ) && (!needsPartnerSex || (!!partnerSex && !partnerSexWrong))
 
   const confirm = () => {
     setTouched(true)
@@ -149,8 +173,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
     onConfirm({
       categoryId,
       partnerId: mode === 'partner' ? partnerId : null,
-      // Só para a pergunta do sexo (SignupSlot); não vai para a base de dados.
-      partnerGender: mode === 'partner' ? members.find((m) => m.id === partnerId)?.gender || null : null,
+      // Só quando o perfil não diz: o resto a base de dados já sabe.
+      partnerGender: needsPartnerSex ? partnerSex : null,
       // Só para a frase do partner_max_categories_reached (Dev 3, 12 out).
       partnerName: mode === 'partner' ? ((members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name || '').split(/\s+/)[0] : null,
       guestName: mode === 'named' ? name.trim() : null,
@@ -164,6 +188,24 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
 
   // Com «Todas» (8 nov) o título fica só «Categoria», sem «· até N».
   const categoryTitle = isAllCategories(maxCategories(tournament)) ? t('tsignup.category_label_all') : t('tsignup.category_label', { max: categoriesLeft })
+
+  // Chamado como função: dentro da caixa de quem não tem conta, ou por baixo
+  // da lista quando o parceiro não tem o sexo no perfil.
+  const partnerSexQuestion = () => (
+    <div>
+      <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('tsignup.partner_gender_question')}</p>
+      <Chips
+        label={t('tsignup.partner_gender_question')}
+        value={partnerSex}
+        onChange={setPartnerSex}
+        options={[
+          { value: 'masculino', label: t('tsignup.partner_gender_man') },
+          { value: 'feminino', label: t('tsignup.partner_gender_woman') },
+        ]}
+      />
+      {partnerSexWrong && <p className="mt-1.5 text-sm text-danger font-extrabold">{t('tsignup.error_gender_mismatch')}</p>}
+    </div>
+  )
 
   return (
     <Sheet onClose={onClose} title={t('tsignup.sheet_title', { name: tournament.name })}>
@@ -184,6 +226,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
             onChange={setCategoryId}
             options={ordered.map((c) => {
               const left = slotsLeft(c)
+              // A do outro sexo fica à vista, desligada (SPEC 8 nov, ponto 1).
+              if (!fitsGender(c)) return { value: c.id, disabled: true, label: `${c.code} · ${t(onlyForKey(c))}` }
               return {
                 value: c.id,
                 label: `${c.code} · ${isCategoryFull(c) ? t('tsignup.category_full_waitlist') : left == null ? c.name : t('tsignup.category_slots', { count: left })}`,
@@ -223,7 +267,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
               return (
                 <button
                   key={m.id}
-                  onClick={() => { setMode('partner'); setPartnerId(m.id) }}
+                  onClick={() => { setMode('partner'); setPartnerId(m.id); setPartnerKnownSex(m.gender || null); setPartnerSex(null) }}
                   className={`press w-full flex items-center gap-2.5 rounded-ctrl px-3 py-2 text-left border-2 ${
                     picked ? 'border-ok bg-ok/5' : 'border-transparent bg-ink-50'
                   }`}
@@ -234,6 +278,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
               )
             })}
           </div>
+          {mode === 'partner' && !!partnerId && !partnerKnownSex && partnerSexQuestion()}
 
           {/* Sem conta */}
           <div className={`rounded-ctrl border-2 p-3 ${mode === 'named' ? 'border-ok bg-ok/5' : 'border-line'}`}>
@@ -266,9 +311,10 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
                     por link enquanto o envio de emails nao existir (#479). */}
                 <p className="text-xs text-muted">{t('partner.email_hint')}</p>
                 <p className="text-xs text-muted">{t('tsignup.guest_hint')}</p>
+                {partnerSexQuestion()}
               </div>
             ) : (
-              <button onClick={() => { setMode('named'); setPartnerId(null) }} className="press w-full text-left">
+              <button onClick={() => { setMode('named'); setPartnerId(null); setPartnerKnownSex(null); setPartnerSex(null) }} className="press w-full text-left">
                 <p className="text-sm font-extrabold text-ink-900 flex items-center gap-2">
                   <UserPlus size={16} /> {t('partner.not_in_app_title')}
                 </p>
@@ -277,13 +323,15 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
             )}
           </div>
 
-          <button
-            onClick={() => { setMode('alone'); setPartnerId(null) }}
-            className={`press w-full rounded-ctrl border-2 p-3 text-left ${mode === 'alone' ? 'border-ok bg-ok/5' : 'border-line'}`}
-          >
-            <p className="text-sm font-extrabold text-ink-900">{t('tsignup.alone_title')}</p>
-            <p className="text-sm text-muted">{t('tsignup.alone_hint')}</p>
-          </button>
+          {!pairs && (
+            <button
+              onClick={() => { setMode('alone'); setPartnerId(null); setPartnerKnownSex(null); setPartnerSex(null) }}
+              className={`press w-full rounded-ctrl border-2 p-3 text-left ${mode === 'alone' ? 'border-ok bg-ok/5' : 'border-line'}`}
+            >
+              <p className="text-sm font-extrabold text-ink-900">{t('tsignup.alone_title')}</p>
+              <p className="text-sm text-muted">{t('tsignup.alone_hint')}</p>
+            </button>
+          )}
         </div>
 
         {/* Nome da equipa */}

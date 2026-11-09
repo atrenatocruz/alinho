@@ -13,11 +13,11 @@ import TeamNameSheet from './TeamNameSheet'
 import { supabase } from '../../lib/supabase'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, maxCategories, isAllCategories, tournamentInviteLink, canScoreTournament,
+  entriesOpen, categoriesLeft, maxCategories, isAllCategories, pairsOnly, tournamentInviteLink, canScoreTournament,
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
 import { errorCode, signupErrorMessage } from '../../lib/tournamentError'
-import { categoryGenderQuestion } from './genderCheck'
+import { fitsPlayer, onlyForKey } from './genderCheck'
 import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
 import { setMyTshirtSize } from '../../lib/tournamentApi'
 import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
@@ -47,6 +47,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const { t, i18n } = useTranslation()
   const { user, profile, updateProfile } = useAuth()
   const [genderSheet, setGenderSheet] = useState(false)
+  // O que continua depois de responder ao sexo (aceitar um convite); sem
+  // isto, abre a folha de inscrever.
+  const [genderThen, setGenderThen] = useState(null)
   const [invites, setInvites] = useState([])
   const [sheet, setSheet] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -63,8 +66,6 @@ export default function SignupSlot({ tournament, categories, category, my: first
     const id = setTimeout(() => { setToast(''); setToastLong(false) }, toastLong ? 8000 : 3000)
     return () => clearTimeout(id)
   }, [toast, toastLong])
-  // O sexo não bate com a categoria: pergunta-se, não se bloqueia (26 set).
-  const [genderAsk, setGenderAsk] = useState(null) // { key, then }
 
   const reloadInvites = () => {
     if (!user) return
@@ -90,7 +91,13 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // A categoria escolhida manda (ensaio do QA, 30 set).
   const open = entriesOpen(tournament, category)
   const anyOpen = categories.some((c) => entriesOpen(tournament, c))
-  const left = categoriesLeft(tournament, myEntries, categories)
+  // Só contam as categorias em que a pessoa pode jogar (SPEC sexo, 8 nov).
+  const playable = categories.filter((c) => fitsPlayer(c, profile?.gender))
+  const left = Math.min(
+    categoriesLeft(tournament, myEntries, playable),
+    playable.filter((c) => !myEntries.some((e) => e.category_id === c.id && e.status !== 'desistiu')).length,
+  )
+  const notForMe = !!category && !fitsPlayer(category, profile?.gender)
   // Com «Todas» (8 nov): desligado só quando já estou em todas as categorias.
   const allCats = isAllCategories(maxCategories(tournament))
   // A inscrição que se mostra é a da categoria escolhida. Se não estou
@@ -172,8 +179,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
     finally { setBusy(false) }
   }
 
-  // Sem género no perfil pergunta-se ali mesmo, com «Agora não»: o sexo
-  // nunca bloqueia (Francisco, 26 set; antes era obrigatório, #433).
+  // Sem género no perfil pergunta-se ali mesmo, e nos torneios é obrigatório
+  // (SPEC sexo, 8 nov): sem «Agora não».
   // «Ainda não tenho parceiro» (R3, 13 out) abre a mesma folha já em
   // «Procuro parceiro»: é a escolha que já lá estava, um toque mais perto.
   const [sheetMode, setSheetMode] = useState('partner')
@@ -189,13 +196,10 @@ export default function SignupSlot({ tournament, categories, category, my: first
     setBusy(false)
     if (err) { console.error('Error saving gender:', err); say(err); return }
     setGenderSheet(false)
-    setSheet(true)
-  }
-  // Antes de gravar: se o sexo da dupla não bate com a categoria, pergunta.
-  const trySignUp = (choice) => {
-    const key = categoryGenderQuestion(categories.find((c) => c.id === choice.categoryId), [profile?.gender, choice.partnerGender])
-    if (key) setGenderAsk({ key, then: () => doSignUp(choice) })
-    else doSignUp(choice)
+    const next = genderThen
+    setGenderThen(null)
+    if (next) next()
+    else setSheet(true)
   }
 
   // A t-shirt de quem aceita (SPEC t-shirts, ponto 3): «Aceitar» só fica
@@ -235,6 +239,12 @@ export default function SignupSlot({ tournament, categories, category, my: first
       window.dispatchEvent(new CustomEvent('tournament:reload'))
     } catch (err) {
       console.error('Error answering tournament invite:', err)
+      // Aceitar sem o sexo no perfil: pergunta-se e aceita-se a seguir.
+      if (accept && errorCode(err) === 'player_gender_required') {
+        setGenderThen(() => () => answer(entryId, true))
+        setGenderSheet(true)
+        return
+      }
       setInviteError({ entryId, text: errorText(err), code: errorCode(err) })
     }
     finally { setBusy(false) }
@@ -415,11 +425,11 @@ export default function SignupSlot({ tournament, categories, category, my: first
         // contorno, por baixo (um lima por ecrã, UX 1 out).
         // Com um convite por responder, o lima é o «Aceitar» (UX/PO, 12 out).
         <div className="space-y-2.5">
-          <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={() => startSignUp()} disabled={left === 0} className="w-full">
-            {left === 0 ? t(allCats ? 'tsignup.in_all_categories' : 'tsignup.max_categories') : t('tsignup.cta')}
+          <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={() => startSignUp()} disabled={left === 0 || notForMe} className="w-full">
+            {notForMe ? t(onlyForKey(category)) : left === 0 ? t(allCats ? 'tsignup.in_all_categories' : 'tsignup.max_categories') : t('tsignup.cta')}
           </PrimaryButton>
           {/* O segundo botão, em contorno, por baixo (R3): nunca lado a lado. */}
-          {left > 0 && (
+          {left > 0 && !notForMe && !pairsOnly(tournament) && (
             <PrimaryButton variant="ghost" onClick={() => startSignUp('alone')} className="w-full !border-ink-900 !bg-white">
               {t('tsignup.no_partner_yet')}
             </PrimaryButton>
@@ -455,7 +465,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
       {withInfo && <PublicInfo tournament={tournament} categories={categories} entriesOpen={anyOpen} />}
 
       {genderSheet && (
-        <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>
+        <Sheet title={t('tsignup.gender_title')} onClose={() => { setGenderSheet(false); setGenderThen(null) }}>
           <div className="space-y-3">
             <p className="text-sm text-ink-900">{t('tsignup.gender_body')}</p>
             {/* Uma resposta, não duas ações: pastilhas, sem lima (revisão da
@@ -469,10 +479,6 @@ export default function SignupSlot({ tournament, categories, category, my: first
                 { value: 'feminino', label: t('login.gender_female') },
               ]}
             />
-            <button type="button" onClick={() => { setGenderSheet(false); setSheet(true) }} disabled={busy}
-              className="w-full min-h-[44px] text-sm font-extrabold text-ink-900 underline underline-offset-2">
-              {t('gamedetails.gender_skip')}
-            </button>
             {error && <p className="text-sm text-danger font-extrabold">{error}</p>}
           </div>
         </Sheet>
@@ -490,7 +496,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           myExistingShirt={myEntries.find((e) => e.state !== 'desistiu' && e.tshirt)?.tshirt || null}
           busy={busy}
           error={error}
-          onConfirm={trySignUp}
+          onConfirm={doSignUp}
           onClose={() => { setSheet(false); setError('') }}
         />
       )}
@@ -521,15 +527,6 @@ export default function SignupSlot({ tournament, categories, category, my: first
           </div>
         </Sheet>
       )}
-      <ConfirmSheet
-        open={!!genderAsk}
-        title={genderAsk ? t(genderAsk.key) : ''}
-        message={t('tsignup.gender_confirm_message')}
-        confirmLabel={t('tsignup.gender_confirm_yes')}
-        cancelLabel={t('gamedetails.gender_confirm_cancel')}
-        onConfirm={() => { const next = genderAsk?.then; setGenderAsk(null); if (next) next() }}
-        onClose={() => setGenderAsk(null)}
-      />
       <ConfirmSheet
         open={askLeave}
         danger

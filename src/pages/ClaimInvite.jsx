@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, EmptyState } from '../components/ui'
+import { Chips, PrimaryButton, EmptyState } from '../components/ui'
 import Alino from '../components/Alino'
 import { claimPartnerInvite, getPartnerInvite, getInviteLinkStatus } from '../lib/partnerInvite'
 import { claimEntry } from '../lib/tournamentSignup'
@@ -30,7 +30,14 @@ export default function ClaimInvite() {
   // nem sobreviveria à ida ao email para confirmar a conta. Mesmo buraco
   // do botao da pagina do torneio (Trello #454, ponto 3).
   const claimPath = isTournament ? `/convite-torneio/${token}` : isFriends ? `/convite-amigos/${token}` : `/convite/${token}`
-  const { user } = useAuth()
+  const { user, updateProfile } = useAuth()
+  // Torneio sem o sexo no perfil (8 nov): pergunta-se aqui e tenta-se outra vez.
+  const [claimTry, setClaimTry] = useState(0)
+  const chooseGender = async (gender) => {
+    const { error: err } = await updateProfile({ gender })
+    if (err) { console.error('Error saving gender:', err); setError(t('partner.claim_error_generic')); setState('error'); return }
+    setClaimTry((n) => n + 1)
+  }
   const { t } = useTranslation()
   const navigate = useNavigate()
   // Sem sessão, primeiro vê-se se o link ainda vale ('peeking'): um código
@@ -101,6 +108,7 @@ export default function ClaimInvite() {
         // O código vem no fim da mensagem, mesmo quando o servidor lhe junta
         // texto à frente (os avisos das regras novas, b417e61) — #497.
         const code = errorCode(err)
+        if (isTournament && code === 'player_gender_required') { setState('gender'); return }
         const ns = isTournament ? 'tsignup' : 'partner'
         const keys = [`${ns}.claim_error_${code}`]
         if (isTournament) keys.push(`tsignup.error_${code}`)
@@ -111,7 +119,7 @@ export default function ClaimInvite() {
         setState('error')
       })
     return () => { cancelled = true }
-  }, [user, token, navigate, t, isTournament, isFriends, isMix, confirmed])
+  }, [user, token, navigate, t, isTournament, isFriends, isMix, confirmed, claimTry])
 
   if (state === 'peeking') return null
   // Link que já não vale, sem sessão: como o /m/ com um código errado —
@@ -163,6 +171,22 @@ export default function ClaimInvite() {
         )}
 
         {(state === 'claiming' || state === 'checking') && <p className="text-sm text-muted">{t('partner.claim_working')}</p>}
+
+        {state === 'gender' && (
+          <div className="space-y-3">
+            <p className="text-sm font-extrabold text-ink-900">{t('tsignup.gender_title')}</p>
+            <p className="text-sm text-ink-900">{t('tsignup.gender_body')}</p>
+            <Chips
+              label={t('tsignup.gender_title')}
+              value={null}
+              onChange={chooseGender}
+              options={[
+                { value: 'masculino', label: t('login.gender_male') },
+                { value: 'feminino', label: t('login.gender_female') },
+              ]}
+            />
+          </div>
+        )}
 
         {state === 'error' && (
           <>

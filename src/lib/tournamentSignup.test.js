@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   takesSlot, slotsLeft, isCategoryFull, categoriesLeft,
   ALL_CATEGORIES, isAllCategories, maxCategoryOptions, shownMaxCategories,
-  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, whoIsAlreadyIn, activeEntriesOf,
-} from './tournamentSignup'
+  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, whoIsAlreadyIn, activeEntriesOf, pairsOnly } from './tournamentSignup'
 
 const cat = (o = {}) => ({ id: 'c1', slots: 16, status: 'inscricoes', entry_count: 0, ...o })
 const tour = (o = {}) => ({ status: 'inscricoes', entries_deadline: null, rules: {}, ...o })
@@ -182,5 +181,18 @@ describe('«Todas» no máximo de categorias (8 nov)', () => {
     expect(categoriesLeft(all, [mineIn('m4')], cats)).toBe(2)
     expect(categoriesLeft(all, [mineIn('m4'), mineIn('f4'), mineIn('mx4')], cats)).toBe(0)
     expect(categoriesLeft(all, [mineIn('m4', 'desistiu')], cats)).toBe(3)
+  })
+})
+
+describe('«Em dupla» (#790)', () => {
+  it('só «dupla» obriga a ter parceiro', () => {
+    expect(pairsOnly({ rules: { entry_mode: 'dupla' } })).toBe(true)
+    expect(pairsOnly({ rules: { entry_mode: 'as_duas' } })).toBe(false)
+    expect(pairsOnly({ rules: { entry_mode: 'sozinho' } })).toBe(false)
+  })
+
+  it('sem o valor guardado, fica como sempre foi', () => {
+    expect(pairsOnly({ rules: {} })).toBe(false)
+    expect(pairsOnly(null)).toBe(false)
   })
 })

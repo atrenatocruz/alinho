@@ -320,11 +320,12 @@ export function Chips({ options, value, onChange, label, className = '' }) {
             key={String(o.value)}
             type="button"
             aria-pressed={on}
+            disabled={o.disabled}
             onClick={() => onChange(o.value)}
-            className="inline-flex min-h-[44px] flex-none items-center"
+            className="inline-flex min-h-[44px] flex-none items-center disabled:cursor-not-allowed"
           >
             <span className={`inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-extrabold transition-colors duration-fast ${
-              on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'
+              on ? 'border-ink-900 bg-ink-900 text-white' : o.disabled ? 'border-line bg-ink-50 text-muted' : 'border-line bg-canvas text-ink-700'
             }`}>
               {o.label}
             </span>

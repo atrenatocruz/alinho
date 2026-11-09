@@ -437,10 +437,11 @@ export async function listOpenTournaments({ limit = 20, organizationId = null, i
  *  Função do Dev 3, com este nome combinado a 26 set. Erros: player_required,
  *  player_already_in_category, same_player, player_gender_required,
  *  gender_mismatch, not_admin, entry_not_found. */
-export async function replaceTournamentPlayer(entryId, slot, { playerId = null, guestName = null, guestEmail = null, playerGender = null } = {}) {
+export async function replaceTournamentPlayer(entryId, slot, { playerId = null, guestName = null, guestEmail = null, playerGender = null, forceGender = false } = {}) {
   const { data, error } = await supabase.rpc('tournament_admin_replace_player', {
     p_entry_id: entryId, p_slot: slot, p_player_id: playerId,
     p_guest_name: guestName, p_guest_email: guestEmail, p_player_gender: playerGender,
+    ...(forceGender ? { p_force_gender: true } : {}),
   })
   if (error) throw error
   return data

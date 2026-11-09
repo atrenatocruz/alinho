@@ -537,7 +537,8 @@ const RPC_MOCKS = {
   }],
   // Filtra pelo que se escreve, como a real (parceiro do torneio, 1 out).
   search_people_basic: (params) => [{ id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null }, { id: 'fake-invite-1', name: 'Rui Pinto', avatar_url: null },
-    { id: 'fake-joana', name: 'Joana Martins', avatar_url: null }, { id: 'fake-martim', name: 'Martim Sousa', avatar_url: null }]
+    { id: 'fake-joana', name: 'Joana Martins', avatar_url: null }, { id: 'fake-martim', name: 'Martim Sousa', avatar_url: null },
+    { id: 'fake-sem-sexo', name: 'Sam Lopes', avatar_url: null }]
     .filter((p) => !params?.p_query || p.name.toLowerCase().includes(String(params.p_query).trim().toLowerCase())),
   list_players: () => [{
     id: FAKE_MEMBER_ID, name: longNames() ? 'Marta Sofia Costa de Vasconcelos Rodrigues' : 'Marta Costa', avatar_url: null, rating: 1380,
@@ -2214,6 +2215,15 @@ const gamesSemFiltro = TABLE_MOCKS.games
 // #447: o pedido pendente (ninguém é membro do grupo cheio) e, com
 // localStorage.mockGroupFull = 'true', um grupo Free com 40 pessoas.
 const membershipsSemFiltro = TABLE_MOCKS.memberships
+// O sexo das pessoas (torneios, 8 nov): a procura de parceiro e o «Inscrever
+// à mão» leem-no à parte. Quem não está aqui (Sam Lopes) não o tem.
+const MOCK_SEX = { 'fake-joana': 'feminino', 'fake-martim': 'masculino', 'fake-invite-1': 'masculino' }
+TABLE_MOCKS.profiles = (url) => {
+  const u = decodeURIComponent(url || '')
+  if (!/select=id,gender/.test(u)) return []
+  const ids = (u.match(/id=in\.\(([^)]*)\)/)?.[1] || '').split(',').map((s) => s.replace(/"/g, '')).filter(Boolean)
+  return ids.map((id) => ({ id, gender: MOCK_SEX[id] || FAKE_PEOPLE[id]?.gender || null }))
+}
 TABLE_MOCKS.memberships = (url) => {
   const u = decodeURIComponent(url)
   if (u.includes('organization_id=eq.org-cheio')) return []

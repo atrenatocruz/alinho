@@ -72,6 +72,10 @@ export const shownMaxCategories = (max, categoryCount) =>
 
 /* `categories`: as do torneio. Com «Todas», o que falta são as categorias
    onde ainda não estou; sem elas, conta como sem limite. */
+/* «Em dupla» (#790, 9 nov): não há inscrição sem parceiro. Sem o valor
+   guardado, fica como sempre foi. */
+export const pairsOnly = (tournament) => tournament?.rules?.entry_mode === 'dupla'
+
 export function categoriesLeft(tournament, myEntries = [], categories = null) {
   const max = maxCategories(tournament)
   const active = myEntries.filter((e) => e.status !== 'desistiu')
@@ -110,7 +114,7 @@ export const tournamentInviteLink = (token, origin) => `${origin}/convite-tornei
 
 // ── Chamadas ────────────────────────────────────────────────────────────
 
-export async function signUp({ categoryId, partnerId = null, guestName = null, guestEmail = null, teamName = null, tshirtSize, partnerTshirtSize }) {
+export async function signUp({ categoryId, partnerId = null, guestName = null, guestEmail = null, teamName = null, tshirtSize, partnerTshirtSize, partnerGender = null }) {
   const { data, error } = await supabase.rpc('tournament_signup', {
     p_category_id: categoryId,
     p_partner_id: partnerId,
@@ -120,6 +124,9 @@ export async function signUp({ categoryId, partnerId = null, guestName = null, g
     // As t-shirts (Dev 3) só vão quando o torneio as tem: sem elas, a chamada
     // fica igual à de sempre.
     ...(tshirtSize !== undefined ? { p_player1_tshirt: tshirtSize, p_player2_tshirt: partnerTshirtSize ?? null } : {}),
+    // O sexo do parceiro sem conta, ou sem sexo no perfil (8 nov): quem
+    // inscreve responde «É homem ou mulher?».
+    ...(partnerGender ? { p_partner_gender: partnerGender } : {}),
   })
   if (error) throw error
   return data
@@ -194,7 +201,7 @@ export async function removeEntry(entryId) {
   if (error) throw error
 }
 
-export async function adminSignUp({ categoryId, player1Id = null, player1GuestName = null, player1GuestEmail = null, partnerId = null, guestName = null, guestEmail = null, teamName = null, paid = false, player1Gender = null, partnerGender = null }) {
+export async function adminSignUp({ categoryId, player1Id = null, player1GuestName = null, player1GuestEmail = null, partnerId = null, guestName = null, guestEmail = null, teamName = null, paid = false, player1Gender = null, partnerGender = null, forceGender = false }) {
   const args = {
     p_category_id: categoryId, p_player1_id: player1Id, p_partner_id: partnerId,
     p_guest_name: guestName, p_guest_email: guestEmail, p_team_name: teamName, p_paid: paid,
@@ -209,6 +216,8 @@ export async function adminSignUp({ categoryId, player1Id = null, player1GuestNa
   // quando existe, para a chamada sem ele continuar igual.
   if (player1Gender) args.p_player1_gender = player1Gender
   if (partnerGender) args.p_partner_gender = partnerGender
+  // O organizador confirmou «Inscrever na mesma?» (8 nov).
+  if (forceGender) args.p_force_gender = true
   const { data, error } = await supabase.rpc('tournament_admin_signup', args)
   if (error) throw error
   return data
@@ -217,10 +226,11 @@ export async function adminSignUp({ categoryId, player1Id = null, player1GuestNa
 /* Juntar o parceiro a quem se inscreveu sozinho (Trello #515). Devolve
    { entry_id, status, invite_token } — o token quando o parceiro entrou só
    pelo nome. */
-export async function adminSetPartner(entryId, { partnerId = null, guestName = null, guestEmail = null, partnerGender = null }) {
+export async function adminSetPartner(entryId, { partnerId = null, guestName = null, guestEmail = null, partnerGender = null, forceGender = false }) {
   const { data, error } = await supabase.rpc('tournament_admin_set_partner', {
     p_entry_id: entryId, p_partner_id: partnerId, p_guest_name: guestName,
     p_guest_email: guestEmail, p_partner_gender: partnerGender,
+    ...(forceGender ? { p_force_gender: true } : {}),
   })
   if (error) throw error
   return data
