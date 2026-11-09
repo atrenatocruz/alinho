@@ -15,6 +15,7 @@ import { parseLevel } from './mixLevels'
 // Pela ordem em que aparecem nas pastilhas.
 export const RULE_FIELDS = [
   'title', 'format', 'price_per_player', 'special', 'num_courts', 'court_time_minutes', 'game_time_minutes',
+  'warmup_minutes', 'changeover_minutes',
   'level', 'gender_restriction', 'age_restriction', 'prize', 'has_voucher', 'ranked', 'location',
   'pairing_mode', 'respect_sides', 'allow_pair_signup', 'join_approval', 'scoring_format', 'tiebreak_8_8', 'deuce_mode',
   'pool_size', 'auto_start_hours_before', 'image_url', 'whatsapp_post_times',
@@ -29,6 +30,8 @@ const norm = (field, v) => {
     case 'price_per_player': case 'num_courts': case 'court_time_minutes': case 'game_time_minutes':
     case 'pool_size': case 'auto_start_hours_before':
       return v == null ? null : Number(String(v).replace(',', '.'))
+    // Aquecimento e troca (#768): «Sem» é null (0 também).
+    case 'warmup_minutes': case 'changeover_minutes': return Number(v) > 0 ? Number(v) : null
     case 'has_voucher': case 'respect_sides': case 'allow_pair_signup': case 'join_approval':
       return !!v
     case 'ranked': return v !== false
@@ -88,6 +91,7 @@ function changeValue(t, { field, value }, lang) {
     case 'price_per_player': return value == null || value === '' ? t('seriescope.value_free') : formatCurrency(Number(value), lang)
     case 'num_courts': return t('gamedetails.court_count', { count: Number(value) || 1 })
     case 'court_time_minutes': case 'game_time_minutes': return value ? `${value} min` : null
+    case 'warmup_minutes': case 'changeover_minutes': return value ? `${value} min` : t('mixwizard.phase_none')
     case 'level': { const l = parseLevel(value); return l ? `${l.scale}${l.num}` : t('seriescope.value_any_level') }
     case 'gender_restriction': return GENDER_RESTRICTION_LABEL_KEY[value || 'indiferente'] ? t(GENDER_RESTRICTION_LABEL_KEY[value || 'indiferente']) : null
     case 'age_restriction': return value && AGE_LABEL_KEY[value] ? t(AGE_LABEL_KEY[value]) : t('seriescope.value_any_age')

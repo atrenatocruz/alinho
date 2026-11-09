@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  gamesPerPerson, splitIntoPools, seedKnockoutFromPools,
+  gamesPerPerson, totalRounds, mixPlan, splitIntoPools, seedKnockoutFromPools,
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
@@ -1016,5 +1016,35 @@ describe('gamesPerPerson (#767)', () => {
     expect(gamesPerPerson({ court_time_minutes: 90, game_time_minutes: 20, format: 'todos_contra_todos' }).upTo).toBe(true)
     expect(gamesPerPerson({ court_time_minutes: 90, game_time_minutes: 20, format: 'grupos_eliminatorias' }).upTo).toBe(true)
     expect(gamesPerPerson({ court_time_minutes: 60, game_time_minutes: 45, format: 'todos_contra_todos' })).toEqual({ count: 1, upTo: false, left: 15 })
+  })
+})
+
+describe('aquecimento e troca (#768)', () => {
+  const base = { court_time_minutes: 90, game_time_minutes: 20, date: '2026-11-12T20:00:00' }
+  it('sem os dois, a conta de sempre', () => {
+    expect(totalRounds(base)).toBe(4)
+    expect(totalRounds({ ...base, warmup_minutes: null, changeover_minutes: null })).toBe(4)
+    expect(mixPlan(base).extra).toBe(false)
+  })
+  it('Grupos + Eliminatórias não tem fases: não contam (QA 7 nov)', () => {
+    const g = { ...base, format: 'grupos_eliminatorias', warmup_minutes: 10, changeover_minutes: 3 }
+    expect(totalRounds(g)).toBe(4)
+    expect(mixPlan(g).extra).toBe(false)
+  })
+  it('o exemplo da SPEC: 10 min de aquecimento e trocas de 2 min dão 3 rondas, acaba às 21:15', () => {
+    const p = mixPlan({ ...base, warmup_minutes: 10, changeover_minutes: 2 })
+    expect(p).toMatchObject({ rounds: 3, warmup: 10, changeover: 2, changes: 2, minutes: 74, extra: true })
+    expect(p.endsAt.getHours()).toBe(21)
+    expect(p.endsAt.getMinutes()).toBe(15)
+  })
+  it('as rondas cabem à justa no tempo de campo', () => {
+    // 2h, jogos de 15 e trocas de 5: 6×15 + 5×5 = 115 ≤ 120 (7 já dava 135)
+    expect(totalRounds({ court_time_minutes: 120, game_time_minutes: 15, changeover_minutes: 5 })).toBe(6)
+    expect(totalRounds({ court_time_minutes: 90, game_time_minutes: 20, warmup_minutes: 10 })).toBe(4)
+    expect(totalRounds({ court_time_minutes: 90, game_time_minutes: 20, warmup_minutes: 10, changeover_minutes: 5 })).toBe(3)
+  })
+  it('com um jogo só não há trocas, e nunca menos de 1 ronda', () => {
+    expect(mixPlan({ court_time_minutes: 45, game_time_minutes: 45, changeover_minutes: 5 })).toMatchObject({ rounds: 1, changes: 0, extra: false })
+    expect(totalRounds({ court_time_minutes: 45, game_time_minutes: 45, warmup_minutes: 10 })).toBe(1)
   })
 })
