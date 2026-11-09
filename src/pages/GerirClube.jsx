@@ -23,7 +23,7 @@ import { totalRounds, mixHasPhases, reverseClimbWarning, uiFormatOf, formatField
 import { scoringHasDeuce } from '../lib/deuceMode'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
-import PlayerSearch from '../components/PlayerSearch'
+import MemberOrInviteSearch from '../components/people/MemberOrInviteSearch'
 import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
 import RobotMessagesSwitch from '../components/RobotMessagesSwitch'
 import { searchPlayers } from '../lib/privateMatches'
@@ -4330,26 +4330,35 @@ export default function GerirClube() {
                 </>
               )}
 
-              <p className={SECTION_KICKER}>{t('gerirclube.invite_player_heading')}</p>
+              <p className={SECTION_KICKER}>{t('gerirclube.search_or_invite_heading')}</p>
               <div className={`${CARD_BOX} space-y-3 p-4`}>
-                {/* Escolha num formulário = pastilhas soltas (regra de 24 set). */}
-                <Chips
-                  label={t('gerirclube.invite_player_heading')}
-                  options={[
-                    { value: 'member', label: t('gerirclube.invite_as_member') },
-                    { value: 'admin', label: t('gerirclube.invite_as_admin') },
-                  ]}
-                  value={inviteAsAdmin ? 'admin' : 'member'}
-                  onChange={(value) => setInviteAsAdmin(value === 'admin')}
-                />
-                {inviteAsAdmin && <p className="text-[11px] text-muted">{t('gerirclube.invite_as_admin_hint')}</p>}
-                <PlayerSearch
+                {/* Um só campo (#776, SPEC de 9 nov): encontra quem já é membro e quem se pode convidar. */}
+                <MemberOrInviteSearch
                   label={t('gerirclube.search_by_name_placeholder')}
+                  members={members}
+                  ownerId={ownerId}
                   searchFn={searchPlayers}
-                  disabledIds={members.map((m) => m.id)}
-                  disabledLabel={t('comunidade.member_label')}
-                  onSelect={handleInvitePlayer}
+                  onOpenMember={setMemberSheet}
+                  onInvite={handleInvitePlayer}
                 />
+                {/* Um erro numa pessoa que a lista ainda não mostra aparece aqui. */}
+                {memberError && !showAllMembers && members.findIndex((m) => m.id === memberError.id) >= MEMBERS_PREVIEW && (
+                  <p role="alert" className="text-sm font-extrabold text-danger">{memberError.text}</p>
+                )}
+                <div className="space-y-2">
+                  <p className="text-xs text-muted">{t('gerirclube.search_invite_enters_as')}</p>
+                  {/* Escolha num formulário = pastilhas soltas (regra de 24 set). */}
+                  <Chips
+                    label={t('gerirclube.search_invite_enters_as')}
+                    options={[
+                      { value: 'member', label: t('gerirclube.invite_as_member') },
+                      { value: 'admin', label: t('gerirclube.invite_as_admin') },
+                    ]}
+                    value={inviteAsAdmin ? 'admin' : 'member'}
+                    onChange={(value) => setInviteAsAdmin(value === 'admin')}
+                  />
+                </div>
+                {inviteAsAdmin && <p className="text-[11px] text-muted">{t('gerirclube.invite_as_admin_hint')}</p>}
                 {inviteError && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{inviteError}</p>}
                 <button type="button" onClick={handleCopyInviteLink}
                   className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-sm font-extrabold text-ink-900">
