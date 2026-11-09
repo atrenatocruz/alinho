@@ -345,10 +345,10 @@ test('#554 mix sem «Inscrição em dupla»: recusa', async () => {
   assert.equal(solo().partner_id, null)
 })
 
-test('#554 parceiro que não está na app: «Sim» junta-o como convidado sem conta', async () => {
+test('#554 parceiro que não está na app: «In com X» junta-o logo como convidado sem conta', async () => {
   soloIn()
-  assert.match(await say('in com rui costa'), /Queres inscrever a dupla/)
-  const out = await say('sim')
+  const out = await say('in com rui costa')
+  assert.doesNotMatch(out, /Sim/)
   assert.match(out, /convidado deste mix, sem conta/)
   assert.equal(db.participants.length, 1)
   assert.ok(solo().partner_guest_id, 'o parceiro-convidado fica na linha que já existia')
@@ -487,8 +487,179 @@ test('«In <só o meu nome>» entra sozinho', async () => {
   assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id ?? null]), [['a', null]])
 })
 
-test('«In <parceiro sem conta>» sem «com» pergunta se inscreve a dupla', async () => {
-  assert.match(await sayAs('In Marco Silva', { pn: '351922222222' }), /Não encontrei o \*Marco Silva\*.*Queres inscrever a dupla/s)
+// #760 (Francisco, 3 nov): «In com X» com quem não está no clube inscreve logo.
+test('«In com X» não encontrado: dupla inscrita logo, com X como convidado só com o nome', async () => {
+  const out = await sayAs('in com Rodrigo Silva')
+  assert.match(out, /\*Rodrigo Silva\*/)
+  assert.match(out, /fala com quem organiza/)
+  assert.doesNotMatch(out, /—/)
+  assert.equal(db.game_guests.length, 1)
+  assert.equal(db.game_guests[0].name, 'Rodrigo Silva')
+  assert.equal(db.game_guests[0].phone_hash ?? null, null)
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_guest_id]), [['a', db.game_guests[0].id]])
+  // Não fica nenhuma pergunta à espera: outro «sim» não faz nada.
+  await sayAs('sim')
+  assert.equal(db.game_guests.length, 1)
+  assert.equal(db.participants.length, 1)
+})
+
+test('«In com o João»: o artigo não conta, encontra o membro e não cria convidado', async () => {
+  await sayAs('in com o Afonso Dias')
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'b']])
+})
+
+test('«In com a Rita Lopes» não encontrada: o convidado fica sem o artigo', async () => {
+  await sayAs('in com a Rita Lopes')
+  assert.equal(db.game_guests[0].name, 'Rita Lopes')
+})
+
+test('«In com» o próprio nome: não cria convidado', async () => {
+  assert.match(await sayAs('in com Bernardo Ramos'), /teu próprio parceiro/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In com 5 min de atraso»: não é um nome, não inscreve', async () => {
+  assert.match(await sayAs('in com 5 min de atraso'), /Não encontrei ninguém/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In com Rui Costa e Rita Lopes»: um parceiro de cada vez, não cria convidado', async () => {
+  assert.match(await sayAs('in com Rui Costa e Rita Lopes'), /um parceiro/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In com X» com dois convidados do mix com esse nome: pergunta qual', async () => {
+  db.game_guests = [{ id: 'g1', game_id: 'm', name: 'Rui Costa', phone_hash: null }, { id: 'g2', game_id: 'm', name: 'Rui Pires', phone_hash: null }]
+  db.participants.push(
+    { id: 'r1', game_id: 'm', user_id: null, guest_id: 'g1', status: 'confirmed', joined_alone: true, created_at: '2026-09-30T16:16:00Z' },
+    { id: 'r2', game_id: 'm', user_id: null, guest_id: 'g2', status: 'confirmed', joined_alone: true, created_at: '2026-09-30T16:17:00Z' },
+  )
+  const out = await sayAs('in com rui')
+  assert.match(out, /Rui Costa/)
+  assert.match(out, /Rui Pires/)
+  assert.equal(db.game_guests.length, 2)
+  assert.equal(db.participants.length, 2)
+})
+
+test('«In <nome que não está no clube>» sem «com»: diz como se escreve, sem pergunta nem inscrição', async () => {
+  const out = await sayAs('In Marco Silva', { pn: '351922222222' })
+  assert.match(out, /Não encontrei «Marco Silva» no clube/)
+  // Diz como se faz, sem repetir o texto (Copywriter, 8 nov: pode não ser um nome).
+  assert.match(out, /escreve \*In com\* e o nome dessa pessoa/)
+  assert.doesNotMatch(out, /Sim|Não\*/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.equal(db.participants.length, 0)
+})
+
+for (const text of ['In com o Afonso mas chego tarde', 'In com o Afonso hoje', 'in com o afonso, chego às 10', 'in com o Afonso, obg', 'In Afonso se houver vaga']) {
+  test(`«${text}»: o início é um membro, pergunta em vez de criar convidado`, async () => {
+    const out = await sayAs(text)
+    assert.match(out, /Querias dizer:\n• Afonso Dias/)
+    assert.match(out, /\*In com Afonso Dias\*/)
+    assert.equal(db.game_guests?.length ?? 0, 0)
+    assert.equal(db.participants.length, 0)
+  })
+}
+
+for (const text of ['In com o Afonso.', 'In com o Afonso!', 'In com o Afonso?', 'In com o Afonso 👍', 'in com Afonso Dias (M4)', 'In com o Afonso Dias 👍🏽']) {
+  test(`«${text}»: a pontuação e o emoji no fim não contam, encontra o membro`, async () => {
+    await sayAs(text)
+    assert.equal(db.game_guests?.length ?? 0, 0)
+    assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'b']])
+  })
+}
+
+test('«In com Afonso Pereira», com o Afonso Dias no clube: é outra pessoa, entra como convidado', async () => {
+  const out = await sayAs('In com Afonso Pereira')
+  assert.doesNotMatch(out, /Querias dizer/)
+  assert.equal(db.game_guests[0].name, 'Afonso Pereira')
+  assert.equal(db.participants.length, 1)
+})
+
+test('«In com Rodrigo.»: o convidado fica sem o ponto', async () => {
+  await sayAs('In com Rodrigo.')
+  assert.equal(db.game_guests[0].name, 'Rodrigo')
+})
+
+for (const text of ['In com Afonso e', 'In com o Afonso :)', 'In com o Afonso ;-P', 'In com o Afonso <3']) {
+  test(`«${text}»: o resto da frase e o smiley não contam, encontra o membro`, async () => {
+    await sayAs(text)
+    assert.equal(db.game_guests?.length ?? 0, 0)
+    assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'b']])
+  })
+}
+
+for (const [text, guest] of [['in com o Rodrigo, obg', 'Rodrigo'], ['In com o Rodrigo tb', 'Rodrigo'], ['In com Rodrigo Silva hoje', 'Rodrigo Silva']]) {
+  test(`«${text}», sem ninguém com esse nome: o convidado fica «${guest}»`, async () => {
+    const out = await sayAs(text)
+    assert.doesNotMatch(out, /Só dá para inscrever um parceiro/)
+    assert.equal(db.game_guests[0].name, guest)
+  })
+}
+
+for (const [text, guest] of [['In com Rui Sé', 'Rui Sé'], ['In com Rita Sé', 'Rita Sé']]) {
+  test(`«${text}»: o «Sé» com acento é apelido, o convidado fica «${guest}»`, async () => {
+    await sayAs(text)
+    assert.equal(db.game_guests[0].name, guest)
+  })
+}
+
+test('«In com Afonso e Rui», com o Afonso no clube: dois nomes, um parceiro de cada vez', async () => {
+  const out = await sayAs('In com Afonso e Rui')
+  assert.doesNotMatch(out, /Querias dizer/)
+  assert.match(out, /Só dá para inscrever um parceiro/)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In com o Afonso, já chego»: o «já» com acento continua a ser conversa', async () => {
+  assert.match(await sayAs('In com o Afonso, já chego'), /Querias dizer:\n• Afonso Dias/)
+})
+
+test('«In com Rodrigo ou o Rui»: o «ou» não escolhe o Rodrigo', async () => {
+  await sayAs('In com Rodrigo ou o Rui')
+  assert.notEqual(db.game_guests?.[0]?.name, 'Rodrigo')
+})
+
+test('«In com Bernardo Ramos hoje», dito pelo Bernardo: não é parceiro de si próprio', async () => {
+  assert.match(await sayAs('In com Bernardo Ramos hoje'), /Não podes ser o teu próprio parceiro/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In com 🙂»: não pede «In com Com» nem cria convidado', async () => {
+  assert.doesNotMatch(await sayAs('In com 🙂'), /In com Com|Não encontrei Com/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+})
+
+test('o «Querias dizer» mostra o texto como foi escrito', async () => {
+  const out = await sayAs('in com o afonso, chego às 10')
+  assert.match(out, /Não encontrei «afonso, chego às 10» no clube/)
+})
+
+// Francisco, 8 nov: «In com quem calhar», «In com um amigo» inscrevem com um
+// convidado com o que a pessoa escreveu. Não se pede o nome.
+for (const [text, guest] of [['In com quem calhar', 'Quem Calhar'], ['In com um amigo', 'Um Amigo']]) {
+  test(`«${text}»: inscreve com o convidado «${guest}», sem pedir o nome`, async () => {
+    const out = await sayAs(text)
+    assert.doesNotMatch(out, /Querias dizer|Não encontrei|Só dá para inscrever um parceiro/)
+    assert.equal(db.game_guests[0].name, guest)
+    assert.equal(db.participants.length, 1)
+  })
+}
+
+test('«In com» sozinho não pede «In com Com» nem cria convidado', async () => {
+  assert.doesNotMatch(await sayAs('In com'), /In com Com|Não encontrei Com/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+})
+
+test('«In mas chego tarde»: uma frase não vira parceiro', async () => {
+  assert.doesNotMatch(await sayAs('In mas chego tarde'), /convidado/)
+  assert.equal(db.game_guests?.length ?? 0, 0)
+  assert.equal(db.participants.length, 0)
 })
 
 test('«In @X» usa o nome do WhatsApp do X se ele já escreveu no grupo', async () => {
@@ -507,19 +678,6 @@ test('«In @X» sem nome conhecido fica «Parceiro de …» e muda quando o X es
   assert.equal(db.game_guests.find((g) => g.id === guestId)?.name, 'Parceiro de Bernardo Ramos')
   await sayAs('boas', { pn: '351955555555', pushName: 'Gonçalo' })
   assert.equal(db.game_guests.find((g) => g.id === guestId)?.name, 'Gonçalo')
-})
-
-test('«Sim» a parceiro sem conta, mas entretanto entrou alguém com esse nome → dupla com ele, sem criar outro', async () => {
-  db.profiles.push({ id: 'k', name: 'Miguel Almeida', phone_hash: hash('977777777'), language: 'pt' })
-  db.memberships.push({ user_id: 'k', organization_id: 'o' })
-  assert.match(await sayAs('in com paulo duarte', { pn: '351977777777', pushName: 'Mike' }), /Queres inscrever a dupla/)
-  db.profiles.push({ id: 'p', name: 'Paulo Duarte#12', phone_hash: hash('966666666'), language: 'pt' })
-  db.memberships.push({ user_id: 'p', organization_id: 'o', is_guest: true })
-  db.participants.push({ id: 'prow', game_id: 'm', user_id: 'p', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-30T16:16:00Z' })
-  const out = await sayAs('sim', { pn: '351977777777', pushName: 'Mike' })
-  assert.doesNotMatch(out, /convite\//)
-  assert.equal(db.participants.find((p) => p.id === 'prow').partner_id, 'k')
-  assert.equal(db.partner_invites.length, 0)
 })
 
 test('responder ao cartão com «In <eu> e <parceiro>» inscreve a dupla (antes: entrava sozinho)', async () => {
@@ -596,10 +754,9 @@ test('convidado sem conta + parceiro que já está sozinho → entra na inscriç
     [['b', null, guest.id]])
 })
 
-test('convidado sem conta + parceiro que não está na app → «Sim» inscreve os dois como convidados', async () => {
-  const ask = await say('in com Zé Ninguém', '351955555555')
-  assert.match(ask, /Zé Ninguém/)
-  await say('sim', '351955555555')
+test('convidado sem conta + parceiro que não está na app → «In com X» inscreve logo os dois como convidados', async () => {
+  const out = await say('in com Zé Ninguém', '351955555555')
+  assert.match(out, /Zé Ninguém/)
   const me = db.game_guests.find((g) => g.phone_hash === hash('955555555'))
   const partner = db.game_guests.find((g) => g.name === 'Zé Ninguém')
   assert.ok(me && partner)

@@ -62,6 +62,63 @@ export function partnerFromTypedNames(typed, senderNames) {
   return text
 }
 
+// O que fica no fim de um nome e não é dele: pontuação, emojis, «(M4)»,
+// smileys de texto («:)», «;-P», «<3») e um «e» de frase cortada («Afonso e»).
+const TRAILING = /(?:\s*\([^()]*\)|[\s.,;:!?…]+|[\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0f\u20e3]+|\s*[:;=][-'^]?[()[\]DdPpOo3/\\|*]+|\s*<3+|\s+(?:e|com|and|with))$/u
+
+/** «Afonso.», «Afonso!», «Afonso 👍», «Afonso Dias (M4)» → o nome sozinho (QA, 6 nov). */
+export function trimPartnerText(text) {
+  let s = String(text || '').trim()
+  for (let prev = null; prev !== s;) { prev = s; s = s.replace(TRAILING, '') }
+  return s.trim()
+}
+
+// Palavras que, logo a seguir a um nome, já não são do nome: «Afonso mas chego
+// tarde», «Afonso hoje», «Afonso obg» (QA, 6 nov). Sem acentos.
+const NOT_NAME_WORDS = new Set(['mas', 'hoje', 'amanha', 'logo', 'ja', 'depois', 'se', 'que', 'porque', 'pq', 'ou',
+  'chego', 'vou', 'as', 'obrigado', 'obrigada', 'obg', 'obgd', 'tb', 'tbm', 'tambem', 'pf', 'pfv', 'por', 'sff',
+  'talvez', 'but', 'today', 'tomorrow', 'if', 'thanks', 'thx', 'pls', 'please', 'late'])
+
+// Destas, as que se escrevem com acento («amanhã», «já», «às», «também»). As
+// outras, com acento, são nomes: «Rui Sé» não é o «se» de «se houver vaga» (QA, 6 nov).
+const ACCENTED_WORDS = new Set(['amanha', 'ja', 'as', 'tambem'])
+const hasAccent = (word) => /[\u0300-\u036f]/.test(String(word || '').normalize('NFD'))
+
+/** Esta palavra, depois de um nome, já não é do nome? */
+export function isNotNameWord(word) {
+  const w = normName(word)
+  return NOT_NAME_WORDS.has(w) && (ACCENTED_WORDS.has(w) || !hasAccent(word))
+}
+
+/**
+ * O texto até à conversa: «Afonso, chego às 10» → «Afonso». Um segundo nome
+ * fica («Afonso e Rui»): são dois nomes, não um nome e conversa (QA, 6 nov).
+ */
+export function beforeChat(text) {
+  const s = String(text || '').replace(/\s+/g, ' ').trim()
+  const parts = s.split(SEPARATORS)
+  const next = (parts[1] || '').trim().split(' ')[0]
+  return parts.length > 1 && next && isNotNameWord(next) ? parts[0].trim() : s
+}
+
+/**
+ * O nome sem o que vem depois dele: «Rodrigo tb», «Rodrigo, obg», «Bernardo
+ * Ramos hoje» → «Rodrigo», «Bernardo Ramos» (QA, 6 nov). O «ou» fica: «Rodrigo
+ * ou o Rui» não é o Rodrigo.
+ */
+export function withoutExtraWords(text) {
+  const first = beforeChat(text)
+  const words = first.split(' ')
+  const cut = words.findIndex((w, i) => i > 0 && normName(w) !== 'ou' && isNotNameWord(w))
+  return cut > 0 ? words.slice(0, cut).join(' ') : first
+}
+
+/** Só letras, espaços, apóstrofo, ponto e hífen («5 min de atraso» não é um nome). */
+export const isPlainName = (text) => NAME_TEXT.test(String(text || ''))
+
+/** Mais do que um nome («João e Maria», «João, Maria»). */
+export const hasSeveralNames = (text) => String(text || '').split(SEPARATORS).filter((p) => p.trim()).length > 1
+
 /** O texto é só o nome de quem escreveu? («In Miguel Oliveira com Marco Silva» → «Miguel Oliveira»). */
 export function isOnlySenderName(typed, senderNames) {
   return partnerFromTypedNames(typed, senderNames) === null
