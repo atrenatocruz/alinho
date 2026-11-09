@@ -111,9 +111,41 @@ export function reverseClimbWarning({ numCourts, rounds }) {
   return null
 }
 
-/** Rondas disponíveis no court. */
-export const totalRounds = (game) =>
-  Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))
+/** Aquecimento e troca entre rondas (#768, SPEC design-handoff/2026-10-26-
+ *  mix-aquecimento-e-troca). Os valores que a base aceita; null = «Sem». */
+export const WARMUP_OPTIONS = [5, 10]
+export const CHANGEOVER_OPTIONS = [2, 3, 5]
+const minutesOr0 = (v) => (Number(v) > 0 ? Number(v) : 0)
+/** Grupos + Eliminatórias não tem aquecimento nem troca (#768, QA 7 nov):
+ *  as escolhas não aparecem no Criar e não contam. */
+export const mixHasPhases = (game) => game?.format !== 'grupos_eliminatorias'
+const phaseMinutes = (game, key) => (mixHasPhases(game) ? minutesOr0(game[key]) : 0)
+
+/** Rondas disponíveis no court. Com aquecimento e troca, cabem as rondas em
+ *  que aquecimento + rondas × jogo + (rondas − 1) × troca ≤ tempo de campo
+ *  (#768). Sem os dois, a conta de sempre. */
+export const totalRounds = (game) => {
+  const court = game.court_time_minutes || 90
+  const each = game.game_time_minutes || 20
+  const warmup = phaseMinutes(game, 'warmup_minutes')
+  const changeover = phaseMinutes(game, 'changeover_minutes')
+  return Math.max(1, Math.floor((court - warmup + changeover) / (each + changeover)))
+}
+
+/** O plano do mix com aquecimento e troca (#768): quantos jogos, quantas
+ *  trocas, e a que horas acaba (arredondado a 5 min). `endsAt` só com data. */
+export function mixPlan(game) {
+  const rounds = totalRounds(game)
+  const each = game.game_time_minutes || 20
+  const warmup = phaseMinutes(game, 'warmup_minutes')
+  const changeover = rounds > 1 ? phaseMinutes(game, 'changeover_minutes') : 0
+  const changes = changeover ? rounds - 1 : 0
+  const minutes = warmup + rounds * each + changes * changeover
+  const start = game.date ? new Date(game.date).getTime() : NaN
+  const step = 5 * 60000
+  const endsAt = Number.isFinite(start) ? new Date(Math.round((start + minutes * 60000) / step) * step) : null
+  return { rounds, each, warmup, changeover, changes, minutes, endsAt, extra: warmup > 0 || changes > 0 }
+}
 
 /** «Cada jogo» no Criar e Editar do mix (#767, SPEC design-handoff/2026-11-05-
  *  mix-cada-jogo): quantos jogos dá por pessoa e quanto sobra para aquecer. A

@@ -9,7 +9,8 @@ import EventHero from '../components/event/EventHero'
 import { GlassPinned } from '../components/GlassBar'
 import EventFacts from '../components/event/EventFacts'
 import OrganizerBox from '../components/event/OrganizerBox'
-import { isMixLive } from '../lib/mixLive'
+import { isMixLive, mixClock, clearPhase, hasPhaseColumns } from '../lib/mixLive'
+import MixPhaseClock from '../components/mix/MixPhaseClock'
 import EventCoverSkeleton from '../components/event/EventCoverSkeleton'
 import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2 } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
@@ -26,7 +27,7 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, mixPlan, mixHasPhases, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -223,6 +224,16 @@ export default function GameDetails() {
   // 4 mixes — a tira amarela, só para quem organiza (é quem sorteia a ronda).
   const [roundRepeatNotice, setRoundRepeatNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  // «Todos os campos acabaram» (#768): a ronda a que se disse «Esperar».
+  // Fica guardado neste telemóvel: ao recarregar, a pergunta não volta (QA 7 nov).
+  const earlyDoneStore = `alinho.mix_early_done_skip.${id}`
+  const [earlyDoneSkip, setEarlyDoneSkipState] = useState(() => {
+    try { return localStorage.getItem(earlyDoneStore) } catch { return null }
+  })
+  const setEarlyDoneSkip = (key) => {
+    setEarlyDoneSkipState(key)
+    try { localStorage.setItem(earlyDoneStore, key) } catch { /* sem armazenamento: fica só nesta visita */ }
+  }
   const [scores, setScores] = useState({}) // matchId -> {a, b}
   // 👍 da noite (kudos) — pódio do mix + o meu voto, lidos por RPC.
   const [kudos, setKudos] = useState([])
@@ -2080,7 +2091,8 @@ export default function GameDetails() {
     try {
       const { error } = await supabase
         .from('games')
-        .update({ round_started_at: new Date().toISOString(), round_duration_minutes: game.game_time_minutes })
+        // Começar já (também a meio do aquecimento ou da troca) limpa a fase.
+        .update({ round_started_at: new Date().toISOString(), round_duration_minutes: game.game_time_minutes, ...clearPhase(game) })
         .eq('id', id)
       if (error) throw error
       loadGameDetails()
@@ -2371,10 +2383,15 @@ export default function GameDetails() {
     if (lastScored && new Date(lastScored) > new Date(game.round_started_at)) currentRound = firstOpenRound - 1
   }
   const currentRoundMatches = matches.filter(m => m.round_number === currentRound)
+  // Aquecimento e troca (#768): a ronda começa sozinha no fim da fase, à
+  // hora certa, mesmo antes de quem organiza a gravar (mixClock). A página
+  // refaz a conta no instante em que a fase muda.
+  const [clockNow, setClockNow] = useState(() => Date.now())
+  const roundStartedAt = mixClock(game, { now: clockNow }).roundStartedAt
   // A ronda atual está sorteada mas o relógio não arrancou (ponto 11) — no
   // Americano também, ronda a ronda, como nos outros formatos.
   const roundPending = game?.status === 'in_progress' && matches.length > 0
-    && !game?.round_started_at && !currentRoundMatches.some(hasResult)
+    && !roundStartedAt && !currentRoundMatches.some(hasResult)
   // A Ronda 1 sorteada e por começar ainda é «antes da Ronda 1»: as duplas
   // mexem-se (e a ronda volta a sortear-se).
   const round1Pending = roundPending && maxRound === 1
@@ -2447,6 +2464,14 @@ export default function GameDetails() {
   // before that point, this file's existing round/elim rendering owns
   // everything after.
   const inPoolStage = isGruposEliminatorias && existingElim.length === 0
+  // O relógio com o aquecimento e a troca (#768). Depois da última ronda não
+  // há troca; na fase de grupos do Grupos + Eliminatórias fica como hoje.
+  const lastRoundNow = inPoolStage || (isAmericano ? currentRound >= maxRound : (!inGroupPhase && !nextPhase))
+  const clock = mixClock(game, { now: clockNow, lastRound: lastRoundNow })
+  // Quem organiza, antes do aquecimento: a ronda 1 sorteada e por começar.
+  const changeoverMinutes = mixHasPhases(game) ? Number(game?.changeover_minutes) || 0 : 0
+  const warmupReady = !inPoolStage && mixHasPhases(game) && roundPending && currentRound === 1 && !clock.phase
+    && Number(game?.warmup_minutes) > 0 && hasPhaseColumns(game)
 
   // Current leader — used both when the mix ends naturally (all rounds
   // played) and when the admin cuts it short early with "Terminar Mix".
@@ -2460,13 +2485,34 @@ export default function GameDetails() {
   // carregar e dar erro. No Americano a regra não existe.
   const missingResults = isAmericano ? 0 : matches.filter(m => !hasResult(m)).length
 
-  const handleAdvance = async () => {
+  // O relógio depois de fechar a ronda (#768). `startAt` (ms): a ronda
+  // seguinte começa já a essa hora (o fim da troca, ou «Começar já» quando
+  // todos os campos acabaram). Sem ele, com troca, a troca conta (começa já
+  // se a ronda ainda corria) e a ronda seguinte começa sozinha no fim; sem
+  // troca, ou com a troca já acabada, fica «por começar», como hoje.
+  const nextRoundTimer = (startAt) => {
+    if (startAt) return { round_started_at: new Date(startAt).toISOString(), round_duration_minutes: game.game_time_minutes, ...clearPhase(game) }
+    const now = Date.now()
+    const c = mixClock(game, { now })
+    const changeover = changeoverMinutes
+    const phaseStart = c.phase === 'troca' ? c.phaseStartedAt
+      : changeover && hasPhaseColumns(game) && !c.phase && !c.advanceAt && game.round_started_at ? now : null
+    if (phaseStart) {
+      const minutes = c.phase === 'troca' ? Math.round((c.phaseEndsAt - c.phaseStartedAt) / 60000) : changeover
+      return { round_started_at: null, round_duration_minutes: game.game_time_minutes, round_phase: 'troca', phase_started_at: new Date(phaseStart).toISOString(), phase_minutes: minutes }
+    }
+    return { round_started_at: null, round_duration_minutes: game.game_time_minutes, ...clearPhase(game) }
+  }
+
+  // `opts.startAt`: ver nextRoundTimer. Do botão chega o clique: ignora-se.
+  const handleAdvance = async (opts) => {
+    const startAt = typeof opts?.startAt === 'number' ? opts.startAt : null
     if (isAmericano) {
       // A ronda seguinte já existe: fica «por começar», como nos outros.
       setBusy(true)
       setMixError('')
       try {
-        const { error } = await supabase.from('games').update({ round_started_at: null }).eq('id', id)
+        const { error } = await supabase.from('games').update(nextRoundTimer(startAt)).eq('id', id)
         if (error) throw error
         await loadGameDetails()
       } catch (error) {
@@ -2577,10 +2623,11 @@ export default function GameDetails() {
       if (error) throw error
 
       // A ronda seguinte fica «por começar»: sem contar o tempo até
-      // «Começar Ronda N+1» (ponto 11).
+      // «Começar Ronda N+1» (ponto 11). Com troca, começa sozinha no fim
+      // dela (#768).
       const { error: timerError } = await supabase
         .from('games')
-        .update({ round_started_at: null, round_duration_minutes: game.game_time_minutes })
+        .update(nextRoundTimer(startAt))
         .eq('id', id)
       if (timerError) throw timerError
 
@@ -2595,6 +2642,46 @@ export default function GameDetails() {
       setBusy(false)
     }
   }
+
+  // ── O relógio do aquecimento e da troca (#768) ──
+  // A página refaz a conta quando a fase muda, e sempre que o mix recarrega.
+  useEffect(() => { setClockNow(Date.now()) }, [game])
+  useEffect(() => {
+    if (!clock.nextAt) return undefined
+    const timer = setTimeout(() => setClockNow(Date.now()), Math.max(0, clock.nextAt - Date.now()) + 300)
+    return () => clearTimeout(timer)
+  }, [clock.nextAt])
+  // Quem organiza grava a passagem (os outros já a veem pela conta). Só
+  // grava se o mix ainda estiver como estava: dois telemóveis de quem
+  // organiza não gravam duas vezes.
+  const clockPatchKey = isAdmin && clock.patch ? JSON.stringify(clock.patch) : null
+  const clockPatchDone = useRef(null)
+  useEffect(() => {
+    if (!clockPatchKey || clockPatchDone.current === clockPatchKey) return
+    clockPatchDone.current = clockPatchKey
+    let q = supabase.from('games').update(clock.patch).eq('id', id)
+    q = game.round_phase ? q.eq('round_phase', game.round_phase).eq('phase_started_at', game.phase_started_at) : q.is('round_phase', null)
+    q.then(({ error }) => {
+      if (error) console.error('Error saving the mix clock:', error)
+      loadGameDetails()
+    })
+  }, [clockPatchKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  // No fim da troca, com os resultados todos, a ronda seguinte sorteia-se e
+  // começa sozinha. Se faltar algum (ou houver um empate), espera por quem
+  // organiza, como hoje.
+  const advancedFor = useRef(null)
+  useEffect(() => {
+    if (!isAdmin || !clock.advanceAt || !canAdvance || busy || advancedFor.current === clock.advanceAt) return
+    if (Date.now() - clock.advanceAt > 30 * 60000) return
+    advancedFor.current = clock.advanceAt
+    // Só começa à hora do fim da troca se os resultados já lá estavam nessa
+    // hora. Um resultado que chega depois não come tempo à ronda seguinte:
+    // ela fica sorteada e por começar, com «Começar Ronda N» (QA 7 nov, SPEC
+    // ponto 5). Sem hora do resultado, só conta se for logo no fim da troca.
+    const lastScored = Math.max(0, ...matches.filter((m) => m.round_number === currentRound).map((m) => Date.parse(m.scored_at) || 0))
+    const onTime = lastScored ? lastScored <= clock.advanceAt + 5000 : Date.now() - clock.advanceAt < 15000
+    handleAdvance(onTime ? { startAt: clock.advanceAt } : undefined)
+  }, [isAdmin, clock.advanceAt, canAdvance, busy]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDrawPoolRound = async (rows) => {
     setBusy(true)
@@ -2652,6 +2739,42 @@ export default function GameDetails() {
       loadGameDetails()
     } finally {
       setBusy(false)
+    }
+  }
+
+  // «Começar o aquecimento» (#768): no fim, a ronda 1 começa sozinha.
+  const handleStartWarmup = async () => {
+    setBusy(true)
+    setMixError('')
+    try {
+      const { error } = await supabase.from('games')
+        .update({ round_phase: 'aquecimento', phase_started_at: new Date().toISOString(), phase_minutes: Number(game.warmup_minutes) })
+        .eq('id', id)
+      if (error) throw error
+      loadGameDetails()
+      await settleLoads()
+    } catch (error) {
+      console.error('Error starting the warm-up:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // O ± do aquecimento e da troca: um minuto de cada vez (entre 1 e 30, a
+  // regra da base).
+  const handleAdjustPhase = async (deltaMinutes) => {
+    if (!game.round_phase) return
+    const base = Number(game.phase_minutes) || 1
+    const next = Math.min(30, Math.max(1, base + deltaMinutes))
+    if (next === base) return
+    try {
+      const { error } = await supabase.from('games').update({ phase_minutes: next }).eq('id', id).eq('round_phase', game.round_phase)
+      if (error) throw error
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error adjusting the phase time:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_adjust_round_time'))
     }
   }
 
@@ -3081,7 +3204,21 @@ export default function GameDetails() {
     } else if (roundPending) {
       barPrimary = openSlotHint && currentRound === 1
         ? { label: t('gamedetails.start_round_n', { number: 1 }), onClick: () => {}, disabled: true, hint: openSlotHint }
-        : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: currentRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
+        // Com aquecimento (#768): «Começar o aquecimento» e, por baixo, o
+        // link «Saltar o aquecimento», que começa já a ronda 1.
+        : warmupReady
+          ? {
+            label: busy ? t('gamedetails.processing') : t('mixclock.start_warmup'),
+            onClick: handleStartWarmup,
+            disabled: busy || unpaired.length > 0,
+            hint: (
+              <button type="button" onClick={handleStartRound} disabled={busy || unpaired.length > 0}
+                className="block w-full min-h-[44px] text-center text-sm font-extrabold text-ink-900 underline underline-offset-2 disabled:opacity-50">
+                {t('mixclock.skip_warmup')}
+              </button>
+            ),
+          }
+          : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: currentRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
     } else if (roundsStarted && canAdvance) {
       barPrimary = {
         label: busy ? t('gamedetails.processing')
@@ -3178,6 +3315,29 @@ export default function GameDetails() {
     </div>
   ) : null
   const myMatch = currentRoundMatches.find((m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) || null
+  // No aquecimento e na troca, a ronda seguinte de quem joga (#768): a
+  // atual, se ainda não começou; no Americano, a que já está sorteada.
+  const nextUpLine = (() => {
+    if (!clock.phase) return null
+    const next = clock.phase === 'aquecimento' || !game?.round_started_at ? currentRound
+      : matches.some((m) => m.round_number === currentRound + 1) ? currentRound + 1 : null
+    const m = next && matches.find((x) => x.round_number === next && (myTeamIds.has(x.team_a_id) || myTeamIds.has(x.team_b_id)))
+    if (!m) return null
+    const team = teamById[myTeamIds.has(m.team_a_id) ? m.team_a_id : m.team_b_id]
+    const partner = team?.player1_id === user?.id ? (team?.player2 || team?.guest2) : (team?.player1 || team?.guest1)
+    // «Diogo A.» não parte: a inicial nunca fica sozinha na linha de baixo.
+    const name = partner?.name ? shortPersonName(partner.name).replace(/ (\p{L}\.)/u, ' $1') : null
+    const gender = ratingInfoById[partner?.id]?.gender
+    const key = !name ? 'mixclock.next_up_no_partner'
+      : gender === 'feminino' ? 'mixclock.next_up_f' : gender === 'masculino' ? 'mixclock.next_up_m' : 'mixclock.next_up'
+    // «Ana L.» já acaba em ponto: a frase não leva outro.
+    return t(key, { round: next, court: m.court_number, name }).replace(/\.\.$/, '.')
+  })()
+  // «Todos os campos acabaram» (#768, SPEC ponto 6): só quem organiza, com a
+  // ronda ainda a correr. Pergunta uma vez por ronda; nunca passa sozinha.
+  const roundEndsAt = roundStartedAt ? new Date(roundStartedAt).getTime() + (clock.roundDuration || game?.game_time_minutes || 20) * 60000 : null
+  const earlyDoneKey = isAdmin && !clock.phase && !inPoolStage && roundEndsAt && roundEndsAt > Date.now() + 30000
+    && currentRoundDone && canAdvance ? `${currentRound}:${roundStartedAt}` : null
   const orgSlug = gameOrg?.slug
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
@@ -3683,6 +3843,17 @@ export default function GameDetails() {
             ] : [
               { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
               { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
+              // Aquecimento, troca entre rondas e a hora a que acaba (#768). Sem
+              // aquecimento ou sem troca, o quadrado não aparece.
+              ...(() => {
+                const plan = mixPlan(game)
+                if (!plan.extra) return []
+                return [
+                  { key: 'warmup', label: t('gamedetails.fact_warmup'), value: plan.warmup ? t('mixwizard.phase_minutes', { minutes: plan.warmup }) : null },
+                  { key: 'changeover', label: t('gamedetails.fact_changeover'), value: plan.changes ? t('mixwizard.phase_minutes', { minutes: plan.changeover }) : null },
+                  { key: 'ends', label: t('gamedetails.fact_ends'), value: plan.endsAt ? t('gamedetails.ends_around', { time: hhmm(plan.endsAt, i18n.language) }) : null },
+                ]
+              })(),
               // A pontuação («Set sem fim», «Pontos corridos», SPEC 26 out) e,
               // quando há 15-30-40, o modo dos 40-40 com o «?» (22 out).
               { key: 'scoring', label: t('homecard.fact_scoring'),
@@ -4423,13 +4594,13 @@ export default function GameDetails() {
                 <div className="flex items-center justify-between mb-3">
                   {title}
                   {/* Sorteada e à espera de «Começar Ronda N» (ponto 11). */}
-                  {roundPending && (
+                  {roundPending && !clock.phase && !warmupReady && (
                     <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-extrabold text-ink-700">{t('gamedetails.round_pending_min', { minutes: game.game_time_minutes || 20 })}</span>
                   )}
-                  {isCurrent && (
+                  {isCurrent && !clock.phase && (
                     <RoundTimer
-                      startedAt={game.round_started_at}
-                      durationMinutes={game.round_duration_minutes}
+                      startedAt={roundStartedAt}
+                      durationMinutes={clock.roundDuration}
                       isAdmin={isAdmin}
                       onAdjust={isAdmin ? handleAdjustRoundDuration : undefined}
                     />
@@ -4437,15 +4608,42 @@ export default function GameDetails() {
                 </div>
                 )}
 
+                {/* Aquecimento e troca entre rondas (#768): o cronómetro da
+                    fase, com o que vem a seguir; o ± só a quem organiza. */}
+                {isCurrent && (clock.phase || (isAdmin && warmupReady)) && (
+                  <div className="mb-3">
+                    <MixPhaseClock
+                      phase={clock.phase || 'pronto'}
+                      endsAt={clock.phaseEndsAt}
+                      minutes={Number(game.warmup_minutes)}
+                      nextLine={nextUpLine}
+                      onAdjust={isAdmin && game.round_phase ? handleAdjustPhase : undefined}
+                    />
+                  </div>
+                )}
+
                 {/* O alarme das rondas (27 set): no mix vem ligado; cada um
                     desliga no seu telemóvel. Com os resultados todos a ronda
                     acabou (SPEC, ponto 7): cala-se e fica à espera da
                     seguinte, sem a tira âmbar (designer, 27 set). */}
-                {isCurrent && game.round_started_at && game.round_duration_minutes > 0 && (
+                {/* O alarme toca também no fim do aquecimento e da troca (#768). */}
+                {isCurrent && clock.phase && (
                   <div className="mb-3">
                     <RoundAlarm
-                      roundKey={ms.length > 0 && ms.every(hasResult) ? null : `${id}:${game.round_started_at}`}
-                      endsAt={new Date(game.round_started_at).getTime() + game.round_duration_minutes * 60000}
+                      roundKey={`${id}:${clock.phase}:${clock.phaseStartedAt}`}
+                      endsAt={clock.phaseEndsAt}
+                      roundNumber={clock.phase === 'aquecimento' ? 0 : r}
+                      eventName={game.title}
+                      defaultOn
+                      phase={clock.phase}
+                    />
+                  </div>
+                )}
+                {isCurrent && !clock.phase && roundStartedAt && clock.roundDuration > 0 && (
+                  <div className="mb-3">
+                    <RoundAlarm
+                      roundKey={ms.length > 0 && ms.every(hasResult) ? null : `${id}:${roundStartedAt}`}
+                      endsAt={new Date(roundStartedAt).getTime() + clock.roundDuration * 60000}
                       roundNumber={r}
                       eventName={game.title}
                       defaultOn
@@ -4756,6 +4954,17 @@ export default function GameDetails() {
                       começar ronda não pode estar só em cima… Como estava»),
                       «Terminar Ronda N» ou, na última, «Terminar e dar os pontos». */}
                   {stepSlot === 'rounds' && renderStepButton()}
+                  <ConfirmSheet
+                    open={!!earlyDoneKey && earlyDoneSkip !== earlyDoneKey}
+                    title={t('mixclock.all_done_title')}
+                    message={changeoverMinutes > 0
+                      ? t('mixclock.all_done_body', { count: Math.max(1, Math.round(((roundEndsAt || 0) - Date.now()) / 60000)), changeover: changeoverMinutes })
+                      : t('mixclock.all_done_body_no_changeover', { number: currentRound + 1 })}
+                    confirmLabel={changeoverMinutes > 0 ? t('mixclock.go_to_changeover') : t('gamedetails.start_round_n', { number: currentRound + 1 })}
+                    cancelLabel={t('mixclock.wait_for_time')}
+                    onConfirm={() => handleAdvance(changeoverMinutes > 0 ? undefined : { startAt: Date.now() })}
+                    onClose={() => setEarlyDoneSkip(earlyDoneKey)}
+                  />
                 </>
             </div>
           )}
