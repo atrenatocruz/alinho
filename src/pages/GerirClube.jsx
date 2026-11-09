@@ -282,8 +282,8 @@ function Segmented({ options, value, onChange }) {
 function RequestPerson({ req, fallbackName }) {
   return (
     <Link to={`/jogador/${req.user_id}`} className="flex flex-1 min-w-0 items-center gap-3">
-      {/* Abaixo de 340 px sem a foto: com ela, o nome ficava com 64 px. */}
-      <span className="shrink-0 max-[339px]:hidden"><Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" /></span>
+      {/* Abaixo de 400 px sem a foto: com ela, um nome de três palavras saía em 3 linhas e cortado (#776, UX 8 nov). */}
+      <span className="shrink-0 max-[399px]:hidden"><Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" /></span>
       {/* Até 2 linhas, do tamanho dos nomes dos membros: a 360 px saía «Xico te…» (#776, UX 7 nov).
           O «›» fica colado à última palavra, nunca sozinho na 2.ª linha. */}
       <span className="min-w-0 line-clamp-2 text-sm font-extrabold text-ink-900">{req.name || fallbackName}{'\u00a0'}›</span>
