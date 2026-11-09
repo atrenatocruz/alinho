@@ -22,410 +22,54 @@ import WhereToUse from './vouchers/WhereToUse'
 import GlassBar, { GLASS_ROUND, SAFE_TOP, useUnderBar } from './GlassBar'
 import TimeInput from './TimeInput'
 import { SkeletonGate, SkCircle, SkLine } from './Skeleton'
+import { BirthdayWheelField, EventDayWheelField, eventDayLong } from './DateWheels'
+import { WheelColumn, WheelSheet } from './WheelPicker'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
-   Native <input type=date/datetime-local> pickers open reliably on iOS
-   Safari (any tap opens the full OS picker) but not on desktop Chrome/
-   Edge/Firefox, where only a click on the browser's own tiny built-in
-   calendar icon opens anything. Both fields below are fully custom instead
-   — a styled trigger box (unchanged look) opens our own portal'd bottom
-   sheet with a month-grid calendar, so behavior is identical everywhere. */
+   Os campos de data e hora abrem a nossa roda numa folha branca (design-
+   handoff/2026-10-18-roda-datas-horas, 19 out), igual no iPhone, no Android
+   e no computador — nunca o seletor do browser. */
 
-// Single-letter weekday headers for the calendar grid. Locale-specific
-// lookup rather than Intl.DateTimeFormat('narrow') because pt-PT's narrow
-// weekdays don't match the single-letter convention players expect here
-// (e.g. distinct Tue/Thu letters aren't needed — repeats are fine, same as
-// most calendar UIs), so an explicit table per language is clearer than
-// coaxing it out of Intl.
-const WEEKDAY_LABELS = {
-  pt: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'],
-  en: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-}
-
-// Month names for the quick month-jump Select, capitalized the same way as
-// the header label (JS, not CSS — see the note below). Built per-render
-// (not module scope) so it can pick up the active language.
-function monthOptionsFor(lang) {
-  return Array.from({ length: 12 }, (_, i) => {
-    const label = formatDate(new Date(2000, i, 1), lang, { month: 'long' })
-    return { value: i, label: label.charAt(0).toUpperCase() + label.slice(1) }
-  })
-}
-
-// Bounds the year-jump Select's option list. With both min and max (games
-// have neither, birthdays only have max) the range is exact; with only a
-// max (birthdays) it opens up 120 years back — enough for anyone filling
-// in their own birth year without endless scrolling; with neither
-// (unconstrained dates) it's just a handful of years around today.
-function yearOptionsFor(min, max) {
-  const thisYear = new Date().getFullYear()
-  let startYear, endYear
-  if (min && max) {
-    startYear = min.getFullYear()
-    endYear = max.getFullYear()
-  } else if (max) {
-    endYear = max.getFullYear()
-    startYear = endYear - 120
-  } else {
-    startYear = thisYear - 1
-    endYear = thisYear + 5
-  }
-  const years = []
-  for (let y = endYear; y >= startYear; y--) years.push({ value: y, label: String(y) })
-  return years
-}
-
-function toIsoDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-/* Month grid used by both DateField and DateTimeField's picker sheet.
-   `selected`/`min`/`max` are Date objects or null; `viewDate` is the 1st
-   of the month currently on screen (navigation doesn't move `selected`
-   until a day is actually tapped). Month/year are also directly jumpable
-   (not just +/-1 arrows) — stepping one month at a time from today back to
-   a decades-old birth year is a real, reported usability problem. */
-function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max, showToday = true, onToday, yearSelect = {} }) {
-  const { t, i18n } = useTranslation()
-  const weekdayLabels = WEEKDAY_LABELS[i18n.language] || WEEKDAY_LABELS.pt
-  const year = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-  const firstWeekday = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  const cells = []
-  for (let i = 0; i < firstWeekday; i++) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-
-  const hoje = new Date()
-  // "Hoje" não aparece onde não faz sentido (data de nascimento) nem quando
-  // o dia de hoje está fora dos limites permitidos.
-  const hojeForaDosLimites = (min && hoje < min) || (max && hoje > max)
-
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => onNavigate(-1)}
-          aria-label={t('ui.previous_month')}
-          className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 transition-colors duration-fast"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <Select
-            value={month}
-            onChange={(m) => onJumpTo(year, Number(m))}
-            options={monthOptionsFor(i18n.language)}
-            className="flex-1 min-w-0 py-2"
-          />
-          <Select
-            value={year}
-            onChange={(y) => onJumpTo(Number(y), month)}
-            options={yearOptionsFor(min, max)}
-            // Largura para «2026» inteiro com a seta (aparecia «20…» — UX, 16 out).
-            className="w-[7.25rem] shrink-0 py-2"
-            {...yearSelect}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => onNavigate(1)}
-          aria-label={t('ui.next_month')}
-          className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 transition-colors duration-fast"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {weekdayLabels.map((w, i) => (
-          <div key={i} className="text-center text-[11px] font-extrabold uppercase text-muted py-1">{w}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((d, i) => {
-          if (d === null) return <div key={`e${i}`} />
-          const cellDate = new Date(year, month, d)
-          const isSelected = !!selected
-            && selected.getFullYear() === year && selected.getMonth() === month && selected.getDate() === d
-          // O dia de hoje fica sempre marcado, com o mesmo aro do calendário
-          // da Home (AgendaControls/MonthSheet) — sem isto não havia
-          // referência nenhuma ao dia em que estamos (Trello #357).
-          const isToday = cellDate.getFullYear() === hoje.getFullYear()
-            && cellDate.getMonth() === hoje.getMonth() && cellDate.getDate() === hoje.getDate()
-          const disabled = (min && cellDate < min) || (max && cellDate > max)
-          return (
-            <button
-              key={d}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSelectDay(d)}
-              className={`h-10 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
-                isSelected ? 'bg-lime-400 text-ink-900'
-                : disabled ? 'text-muted/40 cursor-not-allowed'
-                : isToday ? 'text-ink-900 ring-1 ring-ink-900/20 hover:bg-ink-50'
-                : 'text-ink-900 hover:bg-ink-50'
-              }`}
-            >
-              {d}
-            </button>
-          )
-        })}
-      </div>
-
-      {showToday && !hojeForaDosLimites && (
-        <button
-          type="button"
-          onClick={() => onToday(hoje)}
-          className="w-full mt-4 py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
-        >
-          {t('ui.today')}
-        </button>
-      )}
-    </div>
-  )
-}
+// O calendário antigo saiu a 19 out: as datas usam a roda (DateWheels.jsx).
 
 // display (opcional): como mostrar a data escolhida, quando o campo é
 // estreito (ex.: «30 set» na promoção da turma, #342).
-// `birthday`: data de nascimento — o seletor do ano chama-se «Ano de
-// nascimento» e, sem data, abre em 1995 sem nenhum ano marcado (o 2013 do
-// limite dos 13 anos parecia a resposta; Francisco/UX, 18 out).
-export function DateField({ value, onChange, max, min, placeholder, hideToday = false, display = null, birthday = false }) {
+// `birthday`: data de nascimento — a roda com o dia, o mês e o ano, que abre
+// em 1 de janeiro de 1995 (Francisco/UX, 18–19 out).
+export function DateField(props) {
+  // Data de nascimento: a roda (dia, mês, ano), como o Francisco pediu a 19 out.
+  // O resto são dias de eventos: uma coluna a começar em «Hoje» (19 out).
+  return props.birthday ? <BirthdayWheelField {...props} /> : <EventDayWheelField {...props} />
+}
+
+export function DateTimeField({ value, onChange, min = null }) {
+  // Dia e hora em dois campos, cada um com a sua roda (19 out): o dia numa
+  // coluna a começar em «Hoje», a hora em 24 h. O valor continua
+  // 'YYYY-MM-DDTHH:MM' e só sai quando há os dois.
   const { t, i18n } = useTranslation()
-  const resolvedPlaceholder = placeholder ?? t('ui.select_date_placeholder')
-  const [open, setOpen] = useState(false)
-  const selectedDate = value ? new Date(value + 'T00:00:00') : null
-  const minDate = min ? new Date(min + 'T00:00:00') : null
-  const maxDate = max ? new Date(max + 'T00:00:00') : null
-  const [viewDate, setViewDate] = useState(selectedDate || new Date())
-
-  const shown = value
-    ? (display ? display(value) : formatDate(value + 'T00:00:00', i18n.language, { day: '2-digit', month: 'long', year: 'numeric' }))
-    : resolvedPlaceholder
-
-  const openPicker = () => {
-    // Sem data escolhida, abre no mês mais recente SELECIONÁVEL — num
-    // nascimento com max de há 13 anos, abrir em 2026 mostrava um mês
-    // inteiro desativado e obrigava a recuar 13 anos à mão.
-    const hoje = new Date()
-    // Data de nascimento sem data: abre em janeiro de 1995, o mesmo ano da
-    // lista dos anos — abrir no limite (2013) parecia a resposta (UX, 18 out).
-    setViewDate(selectedDate || (birthday ? new Date(1995, 0, 1) : (maxDate && maxDate < hoje ? maxDate : hoje)))
-    setOpen(true)
-  }
-
-  const navigate = (delta) => {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1))
-  }
-
-  const jumpTo = (year, month) => {
-    setViewDate(new Date(year, month, 1))
-  }
-
-  const selectDay = (day) => {
-    onChange(toIsoDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), day)))
-    setOpen(false)
-  }
-
-  // "Hoje" escolhe o dia de hoje e fecha, como se lhe tivessem tocado na
-  // grelha (Trello #357).
-  const selectToday = (hoje) => {
-    setViewDate(hoje)
-    onChange(toIsoDate(hoje))
-    setOpen(false)
-  }
-
+  const [d0 = '', t0 = ''] = value ? String(value).split('T') : []
+  const [day, setDay] = useState(d0)
+  const [time, setTime] = useState(t0.slice(0, 5))
+  useEffect(() => { setDay(d0); setTime(t0.slice(0, 5)) }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+  const minIso = min instanceof Date
+    ? `${min.getFullYear()}-${String(min.getMonth() + 1).padStart(2, '0')}-${String(min.getDate()).padStart(2, '0')}`
+    : (min ? String(min).slice(0, 10) : null)
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={openPicker}
-        className={`input-field flex items-center justify-between text-left ${value ? 'text-ink-900' : 'text-muted'}`}
-      >
-        <span className="truncate">{shown}</span>
-        <Calendar size={20} className="text-ink-700 shrink-0 ml-2" />
-      </button>
-
-      {open && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-5 animate-pop"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label={t('ui.close')}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <MonthCalendar
-              selected={selectedDate}
-              viewDate={viewDate}
-              onNavigate={navigate}
-              onJumpTo={jumpTo}
-              onSelectDay={selectDay}
-              min={minDate}
-              max={maxDate}
-              showToday={!hideToday}
-              onToday={selectToday}
-              yearSelect={birthday ? { title: t('ui.birth_year_title'), ...(selectedDate ? {} : { highlight: false, startAt: 1995 }) } : undefined}
-            />
-          </div>
-        </div>,
-        document.body
-      )}
+    <div className="space-y-3">
+      <div>
+        <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('ui.wheel_day')}</p>
+        <EventDayWheelField value={day} min={minIso} placeholder={t('ui.select_day_placeholder')}
+          onChange={(d) => { setDay(d); if (time) onChange(`${d}T${time}`) }} />
+      </div>
+      <div>
+        <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('ui.hour_label')}</p>
+        <TimeInput value={time} aria-label={t('ui.hour_label')} className="input-field w-full min-w-0"
+          subtitle={day ? eventDayLong(day, i18n.language) : null} day={day || null}
+          onChange={(e) => { const v = e.target.value; setTime(v); if (day) onChange(`${day}T${v}`) }} />
+      </div>
     </div>
   )
 }
-
-// min: Date (ou string) — dias anteriores ficam desligados no calendário;
-// a hora do próprio dia fica a cargo de quem valida o formulário.
-export function DateTimeField({ value, onChange, placeholder, min = null }) {
-  const { t, i18n } = useTranslation()
-  const resolvedPlaceholder = placeholder ?? t('ui.select_datetime_placeholder')
-  const [open, setOpen] = useState(false)
-  // Pending date (from the calendar) and time (from the native time input)
-  // are held separately while the sheet is open, and only combined into
-  // one value when "Confirmar" is tapped — picking a day shouldn't close
-  // this sheet the way it does for DateField, since there's still a time
-  // to set.
-  const initialDate = value ? new Date(value) : null
-  const [pendingDate, setPendingDate] = useState(initialDate)
-  const [pendingTime, setPendingTime] = useState(
-    initialDate
-      ? `${String(initialDate.getHours()).padStart(2, '0')}:${String(initialDate.getMinutes()).padStart(2, '0')}`
-      : '10:00'
-  )
-  const [viewDate, setViewDate] = useState(initialDate || new Date())
-
-  const display = value
-    ? formatDate(value, i18n.language, { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : resolvedPlaceholder
-
-  const openPicker = () => {
-    const current = value ? new Date(value) : null
-    setPendingDate(current)
-    setPendingTime(
-      current
-        ? `${String(current.getHours()).padStart(2, '0')}:${String(current.getMinutes()).padStart(2, '0')}`
-        : '10:00'
-    )
-    setViewDate(current || new Date())
-    setOpen(true)
-  }
-
-  const navigate = (delta) => {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1))
-  }
-
-  const jumpTo = (year, month) => {
-    setViewDate(new Date(year, month, 1))
-  }
-
-  const selectDay = (day) => {
-    setPendingDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), day))
-  }
-
-  // Aqui "Hoje" escolhe o dia mas não fecha: ainda falta a hora.
-  const selectToday = (hoje) => {
-    setViewDate(hoje)
-    setPendingDate(hoje)
-  }
-
-  const confirm = () => {
-    if (!pendingDate) return
-    const [hours, minutes] = pendingTime.split(':').map(Number)
-    const combined = new Date(pendingDate.getFullYear(), pendingDate.getMonth(), pendingDate.getDate(), hours, minutes)
-    const iso = `${combined.getFullYear()}-${String(combined.getMonth() + 1).padStart(2, '0')}-${String(combined.getDate()).padStart(2, '0')}T${String(combined.getHours()).padStart(2, '0')}:${String(combined.getMinutes()).padStart(2, '0')}`
-    onChange(iso)
-    setOpen(false)
-  }
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={openPicker}
-        className={`input-field flex items-center justify-between text-left ${value ? 'text-ink-900' : 'text-muted'}`}
-      >
-        <span className="truncate">{display}</span>
-        <Calendar size={20} className="text-ink-700 shrink-0 ml-2" />
-      </button>
-
-      {open && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="bg-white rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden p-5 animate-pop"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label={t('ui.close')}
-                className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <MonthCalendar
-              selected={pendingDate}
-              viewDate={viewDate}
-              onNavigate={navigate}
-              onJumpTo={jumpTo}
-              onSelectDay={selectDay}
-              min={min ? new Date(new Date(min).setHours(0, 0, 0, 0)) : null}
-              max={null}
-              showToday
-              onToday={selectToday}
-            />
-            <div className="mt-4 min-w-0">
-              <label className="block text-sm font-extrabold text-ink-900 mb-2">{t('ui.hour_label')}</label>
-              {/* iOS Safari's native time-picker control can ignore `width:
-                  100%` and render at its own internal width instead,
-                  pushing past the card's right edge — `min-w-0` overrides
-                  the implicit "don't shrink below content size" default
-                  that causes it. */}
-              <TimeInput
-                value={pendingTime}
-                onChange={(e) => setPendingTime(e.target.value)}
-                className="input-field w-full min-w-0 box-border"
-                aria-label={t('ui.hour_label')}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={confirm}
-              disabled={!pendingDate}
-              className="btn-primary w-full mt-4 disabled:opacity-40 disabled:pointer-events-none"
-            >
-              {t('ui.confirm')}
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  )
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   UI kit — alinho
-   Reusable components: PrimaryButton, RatingBadge, PlayerAvatarRow,
-   EmptyState, MixCard. Design tokens live in src/index.css.
-   ════════════════════════════════════════════════════════════════════════ */
 
 /* ─── BadgePill ──────────────────────────────────────────────────────────
    Pill partilhado por RatingBadge, GroupLevelBadge e o LevelPill das aulas —
@@ -473,142 +117,58 @@ export function GroupLevelBadge({ rating, genders = null, size = 'sm' }) {
 }
 
 /* ─── TimeField ───────────────────────────────────────────────────────────
-   A hora, sem o relógio nativo do browser (no computador era mau — Renato,
-   29 set). Uma lista simples, uma hora por linha, de 30 em 30 min, que abre
-   já na escolhida (à Google Calendar — a grelha de 34 botões ficava
-   amontoada, Renato, 29 set):
-     · computador: menu logo por baixo do campo (por cima, se não couber);
-     · telemóvel: folha em baixo, linhas grandes para o dedo.
-   `min` (HH:MM) é o «Fim» a seguir ao «Início»: só se mostram as horas
-   depois dela, cada uma com a duração («19:30 · 1h30»).
-   `value` e `onChange` em «HH:MM». */
+   A hora dos jogos em aberto («Início» e «Fim»), na roda da hora (19 out,
+   design-handoff/2026-10-18-roda-datas-horas): horas e minutos, de `step` em
+   `step` minutos, entre `from` e `to`. `min` (HH:MM) é o «Fim» a seguir ao
+   «Início»: só as horas depois dela, e a roda abre no «Início» + 1h30; por
+   cima, a cinzento, a duração («1h30»). Sem nada, o «Início» abre às 19:00.
+   O campo só muda com «Feito». `value` e `onChange` em «HH:MM». */
 const durationLabel = (mins) => {
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return h ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`
 }
 
-export function TimeField({ value, onChange, hint, min = null, from = '07:00', to = '23:30', step = 30, disabled = false, suggest = '18:00' }) {
+export function TimeField({ value, onChange, hint, min = null, from = '07:00', to = '23:30', step = 30, disabled = false, suggest = '19:00' }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [anchor, setAnchor] = useState(null) // posição do menu no computador
-  const triggerRef = useRef(null)
-  const listRef = useRef(null)
   const title = hint || t('ui.hour_label')
   const minM = toMin(min)
-  const options = timeOptions({ from, to, step, include: value })
-    .filter((o) => minM == null || toMin(o) > minM)
-
-  const openPicker = () => {
-    const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)').matches
-    if (wide && triggerRef.current) {
-      const r = triggerRef.current.getBoundingClientRect()
-      const height = 264
-      const below = window.innerHeight - r.bottom - 8
-      setAnchor({ left: r.left, width: Math.max(r.width, 160), top: below >= height || below >= r.top ? r.bottom + 6 : r.top - 6 - Math.min(height, r.top - 8), maxHeight: Math.min(height, Math.max(below, r.top - 8)) })
-    } else {
-      setAnchor(null)
-    }
+  const all = timeOptions({ from, to, step, include: value }).filter((o) => minM == null || toMin(o) > minM)
+  const [pick, setPick] = useState(null)
+  const hoursOf = [...new Set(all.map((o) => o.slice(0, 2)))]
+  const minutesFor = (h) => all.filter((o) => o.startsWith(`${h}:`)).map((o) => o.slice(3))
+  const openSheet = () => {
+    if (disabled || all.length === 0) return
+    const want = value && all.includes(value) ? value
+      : minM != null ? (all.find((o) => toMin(o) >= minM + 90) || all[0])
+        : (all.find((o) => o === suggest) || all.find((o) => toMin(o) >= toMin(suggest)) || all[0])
+    setPick(want)
     setOpen(true)
   }
-
-  // Abre já na escolhida (ou na primeira), a meio da lista.
-  useEffect(() => {
-    if (!open) return undefined
-    // Sem hora escolhida: o «Início» abre por volta de `suggest` (o padel é
-    // ao fim do dia); o «Fim» abre no princípio, logo a seguir ao início.
-    const target = listRef.current?.querySelector('[data-selected="true"]')
-      || (minM == null && listRef.current?.querySelector(`[data-time="${suggest}"]`))
-      || listRef.current?.querySelector('button')
-    target?.scrollIntoView({ block: 'center' })
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
-
-  const pick = (o) => { onChange(o); setOpen(false) }
-  const items = (big) => options.map((o) => {
-    const selected = o === value
-    return (
-      <button
-        key={o}
-        type="button"
-        role="option"
-        aria-selected={selected}
-        data-selected={selected || undefined}
-        data-time={o}
-        onClick={() => pick(o)}
-        className={`flex w-full items-center justify-between rounded-ctrl px-3 text-left tabular-nums transition-colors duration-fast ${
-          big ? 'min-h-[48px] text-base' : 'min-h-[40px] text-[15px]'
-        } ${selected ? 'bg-ink-900 font-extrabold text-white' : 'font-bold text-ink-900 hover:bg-ink-50'}`}
-      >
-        <span>{o}</span>
-        {minM != null && (
-          <span className={`text-xs font-medium ${selected ? 'text-white/70' : 'text-muted'}`}>{durationLabel(toMin(o) - minM)}</span>
-        )}
-      </button>
-    )
-  })
-
+  const setPart = (h, m) => {
+    const ms = minutesFor(h)
+    setPick(`${h}:${ms.includes(m) ? m : ms[0]}`)
+  }
+  const ph = pick ? pick.slice(0, 2) : null
+  const pm = pick ? pick.slice(3) : null
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        onClick={openPicker}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+      <button type="button" disabled={disabled} onClick={openSheet} aria-haspopup="dialog"
         aria-label={value ? `${title}: ${value}` : title}
-        className={`input-field flex w-full min-w-0 items-center justify-between text-left disabled:opacity-50 ${value ? 'text-ink-900' : 'text-muted'}`}
-      >
+        className={`input-field flex w-full min-w-0 items-center justify-between text-left disabled:opacity-50 ${value ? 'text-ink-900' : 'text-muted'}`}>
         <span className="truncate tabular-nums">{value || title}</span>
         <Clock size={18} className="ml-2 shrink-0 text-ink-700" />
       </button>
-
-      {open && createPortal(
-        anchor ? (
-          // Computador: menu por baixo do campo.
-          <div className="fixed inset-0 z-50" onClick={() => setOpen(false)}>
-            <div
-              ref={listRef}
-              role="listbox"
-              aria-label={title}
-              className="fixed overflow-y-auto overscroll-contain rounded-ctrl border border-line bg-white p-1 shadow-lift animate-pop"
-              style={{ left: anchor.left, top: anchor.top, width: anchor.width, maxHeight: anchor.maxHeight }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {items(false)}
-            </div>
-          </div>
-        ) : (
-          // Telemóvel: folha em baixo.
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50 animate-fade-in" onClick={() => setOpen(false)}>
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={title}
-              className="flex max-h-[60vh] w-full flex-col overflow-hidden rounded-t-card bg-white shadow-lift animate-pop"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-5">
-                <h3 className="text-lg text-ink-900">{title}</h3>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label={t('ui.close')}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-ink-50 hover:text-ink-900"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <div ref={listRef} role="listbox" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)+16px)]">
-                {items(true)}
-              </div>
-            </div>
-          </div>
-        ),
-        document.body
+      {open && pick && (
+        <WheelSheet title={title} subtitle={minM != null ? durationLabel(toMin(pick) - minM) : null}
+          onClose={() => setOpen(false)} onDone={() => { onChange(pick); setOpen(false) }}>
+          <WheelColumn label={t('ui.wheel_hours')} className="flex-1" align="end"
+            options={hoursOf.map((h) => ({ value: h, label: h }))} value={ph} onChange={(h) => setPart(h, pm)} />
+          <span aria-hidden className="relative z-[1] flex w-8 items-center justify-center text-[22px] font-semibold text-[#040404]">:</span>
+          <WheelColumn label={t('ui.wheel_minutes')} className="flex-1" align="start"
+            options={minutesFor(ph).map((m) => ({ value: m, label: m }))} value={pm} onChange={(m) => setPart(ph, m)} />
+        </WheelSheet>
       )}
     </>
   )

@@ -19,7 +19,7 @@ import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar, TOP_EDGE, EmptyState, RatingBadge, SWITCH_TRACK } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
-import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, scoringForFormat } from '../lib/mixLogic'
+import { totalRounds, mixHasPhases, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, scoringForFormat } from '../lib/mixLogic'
 import { scoringHasDeuce } from '../lib/deuceMode'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -205,6 +205,10 @@ const EMPTY_GAME_FORM = {
   num_courts: 1,
   court_time_minutes: 90,
   game_time_minutes: 20,
+  // Aquecimento e troca entre rondas (#768): null = «Sem». Só vão à base de
+  // dados quando há um (antes da migração as colunas não existem).
+  warmup_minutes: null,
+  changeover_minutes: null,
   format: 'sobe_desce',
   pool_size: 4,
   scoring_format: 'pontos_simples',
@@ -1346,6 +1350,12 @@ export default function GerirClube() {
       tiebreak_8_8: game.tiebreak_8_8 ?? null,
     } : {}),
     ...(typeof game.deuce_mode === 'string' ? { deuce_mode: game.deuce_mode } : {}),
+    // Aquecimento e troca (#768): a série guarda-os e cada data nova copia-os
+    // (recurrence_insert_pending). Só com as colunas; também null, para tirar.
+    ...('warmup_minutes' in game ? {
+      warmup_minutes: (mixHasPhases(game) && game.warmup_minutes) || null,
+      changeover_minutes: (mixHasPhases(game) && game.changeover_minutes) || null,
+    } : {}),
   })
 
   // advanceByFrequency vive em src/lib/mixDraft.js: publicar um rascunho de
@@ -1552,7 +1562,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, warmup_minutes: warmup, changeover_minutes: changeover, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1630,6 +1640,9 @@ export default function GerirClube() {
             ...(gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
             // «Aos 40-40»: só vai quando não é o ponto de ouro (antes da migração do Dev 3 a coluna não existe).
             ...(gameForm.deuce_mode && gameForm.deuce_mode !== 'ponto_de_ouro' && scoringHasDeuce(scoringFormatOf(gameForm)) ? { deuce_mode: gameForm.deuce_mode } : {}),
+            // Aquecimento e troca (#768): só vão quando há um.
+            ...(warmup && mixHasPhases(gameForm) ? { warmup_minutes: warmup } : {}),
+            ...(changeover && mixHasPhases(gameForm) ? { changeover_minutes: changeover } : {}),
             status: asDraft ? 'draft' : launchAt ? 'pending' : 'open',
             ...(launchAt ? { launch_at: launchAt.toISOString() } : {}),
             // A imagem só vai quando há uma (antes da migração a coluna não existe).
@@ -1824,7 +1837,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, warmup_minutes: warmup, changeover_minutes: changeover, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1893,6 +1906,9 @@ export default function GerirClube() {
             ? { deuce_mode: scoringHasDeuce(scoringFormatOf(gameForm)) && gameForm.deuce_mode ? gameForm.deuce_mode : 'ponto_de_ouro' } : {}),
           // A imagem: vai quando há uma ou quando se tirou a que havia.
           ...((imageUrl || editingGame.image_url) ? { image_url: imageUrl || null } : {}),
+          // Aquecimento e troca (#768): vão quando há um ou quando havia.
+          ...((warmup || editingGame.warmup_minutes) ? { warmup_minutes: (mixHasPhases(gameForm) && warmup) || null } : {}),
+          ...((changeover || editingGame.changeover_minutes) ? { changeover_minutes: (mixHasPhases(gameForm) && changeover) || null } : {}),
           ...pendingLaunchUpdate,
           ...singleLaunchUpdate,
       }
@@ -2665,6 +2681,8 @@ export default function GerirClube() {
       num_courts: game.num_courts || 1,
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
+      warmup_minutes: game.warmup_minutes ?? null,
+      changeover_minutes: game.changeover_minutes ?? null,
       format: game.format || 'sobe_desce',
       pool_size: game.pool_size || 4,
       scoring_format: game.scoring_format || 'pontos_simples',
@@ -3305,9 +3323,6 @@ export default function GerirClube() {
                       organizationId={editingGame?.organization_id || mixScopeId || currentOrganizationId} />
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.date_time_label')}
-                      </label>
                       <DateTimeField
                         value={gameForm.date}
                         onChange={(v) => setGameForm({ ...gameForm, date: v })}

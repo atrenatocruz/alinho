@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BackBar, Tabs, Chips, PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState } from '../components/ui'
+import { BackBar, Tabs, Chips, PrimaryButton, ConfirmSheet, EmptyState, LoadErrorState, DateField } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import { getLeaguePage, decideApplication, publishLeague, saveSchedule, finishCategory, addOrganizer, removeOrganizer, leagueErrorMessage } from '../lib/leagueApi'
 import { roundRobin } from '../lib/leagueSchedule'
@@ -118,9 +118,11 @@ export default function LeagueManagePage() {
         <div className="space-y-3">
           {cat?.status === 'inscricoes' && (
             <div className={card}>
-              <label className="block text-sm font-bold">{t('league.first_round_starts')}
-                <input type="date" value={firstStart} onChange={(e) => setFirstStart(e.target.value)} className="mt-1.5 min-h-[48px] w-full rounded-ctrl border border-line bg-white px-3 text-base" />
-              </label>
+              {/* Só o dia, na roda (SPEC da roda, 19 out): três colunas, sem dias passados. */}
+              <div>
+                <p className="mb-1.5 text-sm font-bold">{t('league.first_round_starts')}</p>
+                <DateField value={firstStart} onChange={setFirstStart} min={toDayKey(new Date())} title={t('league.first_round_starts')} />
+              </div>
               <Chips label={t('league.days_per_round')} value={days} onChange={setDays} options={[7, 14, 21].map((n) => ({ value: n, label: t('league.days_n', { n }) }))} />
               <PrimaryButton variant="ink" className="w-full" disabled={approved.length < 2} onClick={onMakeSchedule}>{t('league.make_schedule')}</PrimaryButton>
             </div>

@@ -7,7 +7,7 @@ import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { startTimer } from './timing.js'
-import { partnerFromTypedNames, isOnlySenderName } from './partnerNames.js'
+import { partnerFromTypedNames, isOnlySenderName, isPlainName, hasSeveralNames, trimPartnerText, beforeChat, isNotNameWord, withoutExtraWords } from './partnerNames.js'
 import { rememberName, seenName, usablePushName, notePlaceholder, renameDefaultPartner, renamePlaceholderFor } from './seenNames.js'
 import { repostHooks, noteCardSent, cardUnchangedRecently } from './sync.js'
 
@@ -138,13 +138,18 @@ function splitPartner(rest) {
   let partnerName = null
   const m = r.match(/(?:^|\s)com\s+(.+)$/)
   if (m) {
-    partnerName = m[1].replace(/\s+/g, ' ').trim() || null
+    partnerName = trimPartnerText(stripPartnerArticle(m[1].replace(/\s+/g, ' ').trim())) || null
     r = r.slice(0, m.index)
   } else {
     r = r.replace(/(?:^|\s)com\s*$/, ' ')
   }
   r = r.replace(/\s+/g, ' ').trim()
   return { rest: r || null, partnerName }
+}
+
+/** «In com o João»: o artigo não é do nome (com ele, não se encontrava o João). */
+function stripPartnerArticle(name) {
+  return name.replace(/^[oa]\s+/i, '')
 }
 
 /** «joao silva» → «Joao Silva»: o texto chega em minúsculas (parseCommand normaliza). */
@@ -435,8 +440,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   }
   if (copied) parsed = { action: 'in', rest: null, glued: false }
   if (!pending && !parsed) return
-  // Declarado já aqui: o «Sim» a um parceiro sem conta (lá em baixo, no
-  // pending) pode voltar ao caminho do «In com …» (confirmPairWithUnregistered).
   let partnerRequest = null
   ctx.action = copied ? 'copied_list' : (parsed?.action ?? 'pending')
 
@@ -598,17 +601,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       pendingSuplenteConfirmations.delete(key)
     }
 
-    if (normalized === 'sim' && pending.kind === 'pair_unregistered') {
-      pendingSuplenteConfirmations.delete(key)
-      await confirmPairWithUnregistered(pending)
-      return
-    }
-    if (normalized === 'nao' && pending.kind === 'pair_unregistered') {
-      pendingSuplenteConfirmations.delete(key)
-      await reply('partner_offer_declined')
-      return
-    }
-
     if (!pending.reprompted) {
       pending.reprompted = true
       await reply('did_not_understand_yes_no')
@@ -641,7 +633,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     if (split.partnerName || mentionedJids.length > 0) {
       // O nome como a pessoa o escreveu (com acentos e maiúsculas) — para as
       // respostas e para o perfil de convidado; a procura usa o normalizado.
-      const typed = text.replace(/@\S+/g, ' ').match(/(?:^|\s)com\s+(.+)$/i)?.[1]?.replace(/\s+/g, ' ').trim()
+      const typedWithArticle = text.replace(/@\S+/g, ' ').match(/(?:^|\s)com\s+(.+)$/i)?.[1]?.replace(/\s+/g, ' ').trim()
+      const typed = typedWithArticle && trimPartnerText(stripPartnerArticle(typedWithArticle))
       partnerRequest = { name: split.partnerName, typedName: typed || null, mentionedPns }
       rest = split.rest
     }
@@ -690,10 +683,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       } else {
         // O texto como foi escrito (acentos, maiúsculas): as últimas palavras.
         const typed = typedRest ?? text.trim().replace(/\s+/g, ' ').split(' ').slice(-rest.split(' ').length).join(' ')
-        const partner = partnerFromTypedNames(typed, senderNames)
+        // «In com» sozinho, ou com um smiley («In com 🙂»): o «com» não é um nome (QA, 6 nov).
+        const typedName = trimPartnerText(typed)
+        const partner = /^com$/i.test(typedName) ? null : partnerFromTypedNames(typedName, senderNames)
         if (partner !== undefined) {
           rest = null
-          if (partner) partnerRequest = { name: stripAccents(partner.toLowerCase()), typedName: partner, mentionedPns: [] }
+          if (partner) partnerRequest = { name: stripAccents(partner.toLowerCase()), typedName: partner, mentionedPns: [], withoutCom: true }
         } else {
           // Nomes que não são quem escreveu + um parceiro («In Bruno Ribeiro
           // e Nuno Miguel», dito pelo Miguel Miranda — A2N, 28 out): antes
@@ -750,23 +745,56 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
    */
   const shownName = () => titleCase(partnerRequest.typedName || partnerRequest.name)
 
-  /** Os membros do clube com este nome (tirando quem escreveu): o igual, se só houver um, senão os parecidos. */
-  async function membersNamed(profile, name) {
+  /** Os membros do clube (tirando quem escreveu). */
+  async function clubPeople(profile) {
     const { data: rows, error } = await supabase
       .from('memberships')
       .select('user_id, profile:profiles!inner(id, name, email, claim_pending)')
       .eq('organization_id', organizationId)
     if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
-    const query = stripAccents(name.toLowerCase()).replace(/\s+/g, ' ').trim()
-    const people = rows
+    return rows
       .filter((r) => !isLegacyGuestProfile(r.profile))
       .map((r) => ({ id: r.user_id, name: r.profile.name }))
       .filter((x) => !isMine(profile, x.id))
+  }
+
+  /** Destas pessoas, as com este nome: o igual, se só houver um, senão os parecidos. */
+  function peopleNamed(people, name) {
+    const query = stripAccents(name.toLowerCase()).replace(/\s+/g, ' ').trim()
     const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
     return exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
   }
 
-  async function resolvePartner(profile, game = null, { addToRowId = null, rows = [] } = {}) {
+  /** Os membros do clube com este nome (tirando quem escreveu). */
+  async function membersNamed(profile, name) {
+    return peopleNamed(await clubPeople(profile), name)
+  }
+
+  /**
+   * «In com o Afonso mas chego tarde», «In com o Afonso, chego às 10» (QA, 6
+   * nov): o nome todo não bate em ninguém, mas o início bate num membro. Os
+   * membros do início mais comprido que bate, ou nenhum. Só quando o que vem
+   * depois não é um nome (vírgula, «mas», «hoje»…): «In com Afonso Pereira»,
+   * com o Afonso Dias no clube, é outra pessoa e entra como convidado.
+   */
+  async function membersNamedByStart(profile, name) {
+    const head = beforeChat(name)
+    // Dois nomes («Afonso e Rui»): «Só dá para inscrever um parceiro», mais abaixo.
+    if (hasSeveralNames(head)) return []
+    const words = head.split(' ').filter(Boolean)
+    const full = name.replace(/\s+/g, ' ').trim()
+    const people = await clubPeople(profile)
+    for (let k = words.length; k >= 1; k -= 1) {
+      const start = words.slice(0, k).join(' ')
+      if (start === full || start.length < 2) continue
+      if (k < words.length && !isNotNameWord(words[k])) continue
+      const found = peopleNamed(people, start)
+      if (found.length > 0) return found
+    }
+    return []
+  }
+
+  async function resolvePartner(profile, { rows = [] } = {}) {
     if ((partnerRequest.mentionedPns || []).length > 1) {
       await reply('partner_one_mention')
       return null
@@ -808,25 +836,48 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       // não se cria outro com o mesmo nome.
       const inGame = guestsNamed(rows, partnerRequest.name).filter((g) => g.phoneHash == null || g.phoneHash !== myHash)
       if (inGame.length === 1) return { partner: inGame[0], isNewGuest: false }
-      // Pode ser alguém que não está na app nem no grupo (não dá para o
-      // mencionar). Em vez de parar aqui, pergunta-se — «Sim» faz o mesmo
-      // que o «Não está na app?» da app (partnerInvite.js). A pergunta
-      // evita criar uma pessoa nova por um nome mal escrito.
-      const name = shownName()
-      if (game && name.length >= 2 && name.length <= 60) {
-        pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
-          kind: 'pair_unregistered',
-          gameId: game.id,
-          addToRowId,
-          name,
-          expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
-          reprompted: false,
-        })
-        await reply('partner_offer_unregistered', { name })
+      if (inGame.length > 1) {
+        await reply('partner_ambiguous', { name: shownName(), list: inGame.slice(0, 6).map((x) => `• ${x.name}`).join('\n'), example: inGame[0].name })
         return null
       }
-      await reply('partner_not_found', { name })
-      return null
+      const name = shownName()
+      // O início é um membro: não se ocupa o lugar com a frase toda como
+      // convidado, pergunta-se (antes era «Sim» ou «Não»; QA, 6 nov).
+      // O texto escrito, com acentos: «Rui Sé» não é «Rui se…».
+      const near = await membersNamedByStart(profile, partnerRequest.typedName || partnerRequest.name)
+      if (near.length > 0) {
+        // O texto como foi escrito («Afonso, chego às 10»), sem maiúsculas a mais.
+        const typed = partnerRequest.typedName || partnerRequest.name
+        await reply('partner_did_you_mean', { name: typed, list: near.slice(0, 6).map((x) => `• ${x.name}`).join('\n'), example: near[0].name })
+        return null
+      }
+      // Sem o «com», o texto pode não ser um nome («In mas chego tarde»): não
+      // se cria ninguém, diz-se como se escreve (Francisco, 3 nov).
+      if (partnerRequest.withoutCom) {
+        await reply('partner_use_com', { name })
+        return null
+      }
+      // Palavras a mais depois do nome («Rodrigo tb», «Rodrigo, obg»): o
+      // convidado fica só com o nome (QA, 6 nov).
+      const guestName = titleCase(withoutExtraWords(partnerRequest.typedName || partnerRequest.name))
+      if (hasSeveralNames(guestName)) {
+        await reply('partner_one_at_a_time')
+        return null
+      }
+      if (!isPlainName(guestName) || guestName.length < 2 || guestName.length > 60) {
+        await reply('partner_not_found', { name })
+        return null
+      }
+      const plain = (s) => stripAccents(String(s || '').toLowerCase()).replace(/\s+/g, ' ').trim()
+      if ([profile?.name, message?.pushName].some((own) => plain(own) === plain(guestName))) {
+        await reply('partner_is_you')
+        return null
+      }
+      // «In com X» com quem não está no clube inscreve logo a dupla, com X
+      // como convidado deste mix só com o nome, sem Sim nem Não (Francisco,
+      // 3 nov; M3 A2N). Nome errado ou conta noutro clube: o organizador
+      // troca na app. Sem número, o upsert nunca colide (NULLs distintos).
+      return { partner: { guest: true, id: null, name: guestName, phoneHash: null }, isNewGuest: true }
     }
     const list = matches.slice(0, 6).map((x) => `• ${x.name}`).join('\n')
     await reply('partner_ambiguous', { name: shownName(), list, example: matches[0].name })
@@ -859,92 +910,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     return null
   }
 
-  // «Sim» à pergunta «inscrever a dupla com quem não está na app?». Entre a
-  // pergunta e a resposta passaram até 10 minutos: volta-se a verificar o mix
-  // e as vagas antes de criar a conta por reclamar e o convite.
-  async function confirmPairWithUnregistered(pending) {
-    const { game, people, capacity, rows } = await loadGame(pending.gameId)
-    if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now()) {
-      await reply('mix_no_longer_available')
-      return
-    }
-    if (game.rotate_partners) {
-      await reply('partner_not_fixed_pairs')
-      return
-    }
-    if (!game.allow_pair_signup) {
-      await reply('pair_signup_off')
-      return
-    }
-    const adding = Boolean(pending.addToRowId)
-    const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
-    if (!profile) return
-    const own = adding ? rows.find((row) => row.id === pending.addToRowId) : null
-    if (adding) {
-      // A inscrição sozinha tem de continuar lá, ser desta pessoa (por
-      // conta OU pelo hash — pode ser a linha-convidado de antes da conta)
-      // e sem parceiro.
-      if (!own || own.status !== 'confirmed' || own.partner_id || own.partner_guest_id || !rowOwnerIsMine(profile, myHash, own)) {
-        await reply('mix_no_longer_available')
-        return
-      }
-    } else if (rows.some((row) => rowIsMine(profile, myHash, row))) {
-      await reply('already_joined')
-      return
-    }
-    // Entre a pergunta e o «Sim» a pessoa pode ter entrado no clube (30 set:
-    // o Paulo deu «In» enquanto o Mike respondia, e ficaram dois «Paulo
-    // Duarte»). Se agora há um membro com esse nome, segue o «In com …» normal.
-    if ((await membersNamed(profile, pending.name)).length === 1) {
-      partnerRequest = { name: stripAccents(pending.name.toLowerCase()), typedName: pending.name, mentionedPns: [] }
-      if (adding) await addPartnerToRow({ game, people, capacity, profile, row: own, existingRows: rows })
-      else await joinAsPair({ game, people, capacity, profile, isNewGuest, existingRows: rows })
-      return
-    }
-    const needed = adding ? 1 : 2
-    if (capacity - people.length < needed) {
-      await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
-      return
-    }
-    // Convidado sem conta, só com o nome — substitui o convite por link
-    // (partner_invites/#339) no bot: sem conta por reclamar, sem token
-    // (decisão Ruben, 30 set). Se a pessoa criar conta e confirmar o número
-    // não há adoção automática (não temos o número dela) — o admin troca na
-    // app se for preciso.
-    let guestId
-    let owner = {}
-    try {
-      guestId = await createNamedGameGuest(game.id, pending.name)
-    } catch (err) {
-      console.error('Failed to create named guest partner:', err)
-      await reply('partner_not_found_app', { appUrl: config.appUrl })
-      return
-    }
-    const { error: pairError } = adding
-      ? await supabase
-          .from('participants')
-          .update({ partner_guest_id: guestId, joined_alone: false })
-          .eq('id', pending.addToRowId)
-      : await supabase
-          .from('participants')
-          .insert([{ game_id: game.id, ...(owner = await ownerFields(game.id, profile)), partner_guest_id: guestId, status: 'confirmed', joined_alone: false }])
-    if (pairError) {
-      await supabase.from('game_guests').delete().eq('id', guestId)
-      await cleanupMyGuest(owner)
-      if (isGameFull(pairError)) {
-        await reply(adding ? 'mix_full_add_partner' : 'mix_full_pair')
-        return
-      }
-      if (pairError.code === '23505') {
-        await reply('already_joined')
-        return
-      }
-      throw new Error(`Failed to join with named guest partner: ${pairError.message}`)
-    }
-    repostHooks.requestRepostForGame(organizationId, game.id)
-    await reply('pair_partner_guest_created', { partner: pending.name, appUrl: config.appUrl })
-  }
-
   /**
    * #554 — quem já deu «In» sozinho junta o parceiro depois, sem sair: a
    * inscrição que já existe ganha o partner_id, e mantém o lugar na lista.
@@ -966,7 +931,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       await reply('mix_full_add_partner')
       return
     }
-    const resolved = await resolvePartner(profile, game, { addToRowId: row.id, rows: existingRows })
+    const resolved = await resolvePartner(profile, { rows: existingRows })
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
     if (isMine(profile, partner.id) || (partner.guest && partner.phoneHash === myHash)) {
@@ -1092,7 +1057,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       await reply('mix_full_pair')
       return
     }
-    const resolved = await resolvePartner(profile, game, { rows: existingRows })
+    const resolved = await resolvePartner(profile, { rows: existingRows })
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
     if (isMine(profile, partner.id) || (partner.guest && partner.phoneHash === myHash)) {

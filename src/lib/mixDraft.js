@@ -77,6 +77,9 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     ...(game.format === 'grupos_eliminatorias' && game.pool_size ? { pool_size: game.pool_size } : {}),
     ...(game.tiebreak_8_8 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
     ...(game.deuce_mode && game.deuce_mode !== 'ponto_de_ouro' ? { deuce_mode: game.deuce_mode } : {}),
+    // Aquecimento e troca (#768), só quando há.
+    ...(game.warmup_minutes && game.format !== 'grupos_eliminatorias' ? { warmup_minutes: game.warmup_minutes } : {}),
+    ...(game.changeover_minutes && game.format !== 'grupos_eliminatorias' ? { changeover_minutes: game.changeover_minutes } : {}),
     status: 'pending',
     created_by: userId,
     recurrence_id: recurrenceId,

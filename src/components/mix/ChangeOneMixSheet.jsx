@@ -90,7 +90,7 @@ export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved,
         <p id="change-one-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{title}</p>
         <p className="mt-1 text-[15px] leading-snug text-ink-500">{t('eventactions.change_one_hint')}</p>
 
-        <p className="mt-4 mb-1.5 text-sm font-extrabold text-ink-900">{t('eventactions.change_one_when')}</p>
+        <div className="mt-4" />
         <DateTimeField value={date} onChange={setDate} />
         <label htmlFor="change-one-place" className="mt-4 mb-1.5 block text-sm font-extrabold text-ink-900">{t('eventactions.change_one_where')}</label>
         <input
