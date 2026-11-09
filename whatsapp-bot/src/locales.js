@@ -23,9 +23,9 @@ Para entrares num mix:
 • *Alinho* / *In* / *Dentro* / *Estou dentro*
 
 Para entrares já em dupla (nos mixes com «👥 Inscrição individual ou em dupla»):
-• *In com João Silva* — o nome como está na app
-• ou *In @João* — menciona o teu parceiro
-Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convidado; pelo nome, o bot pergunta se queres inscrever a dupla na mesma e dá-te um link para lhe enviares.
+• *In com João Silva*: o nome como está na app
+• ou *In @João*: menciona o teu parceiro
+Se ele ainda não estiver na app, o bot inscreve-o como convidado deste mix, pelo nome ou pela menção @.
 Já entraste sozinho? *In com* e o nome (ou *In @parceiro*) junta o parceiro, sem perderes o lugar. A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
 
 Para saíres de um mix:
@@ -108,19 +108,19 @@ Para veres esta lista:
   mix_full_pair: '🤖 O mix está cheio — não há vagas para uma dupla. Podes entrar sozinho como suplente com *In*.',
   mix_one_spot_pair: '🤖 Só há 1 vaga neste mix — não cabe uma dupla. Podes entrar sozinho com *In*.',
   partner_one_mention: '🤖 Menciona só uma pessoa — o teu parceiro 🤝',
+  partner_one_at_a_time: '🤖 Só dá para inscrever um parceiro: escreve *In com* e o nome de uma pessoa.',
+  partner_use_com: '🤖 Não encontrei «{{name}}» no clube. Para entrares em dupla com alguém que não está no clube, escreve *In com* e o nome dessa pessoa.',
   partner_mention_unreadable: '🤖 Não consegui saber quem mencionaste 😅 Escreve *In com* e o nome do teu parceiro como está na app (ex.: *In com João Silva*).',
   partner_not_found: '🤖 Não encontrei ninguém no clube com o nome «{{name}}». Escreve o nome como está na app, ou menciona a pessoa com @.',
-  partner_not_found_app: '🤖 Não consegui inscrever o teu parceiro. Inscreve a dupla pela app: {{appUrl}}',
   partner_ambiguous: '🤖 Há mais do que uma pessoa com «{{name}}»:\n{{list}}\n\nEscreve o nome completo (ex.: *In com {{example}}*) ou menciona a pessoa com @.',
+  partner_did_you_mean: '🤖 Não encontrei «{{name}}» no clube. Querias dizer:\n{{list}}\n\nEscreve *In com {{example}}* ou menciona a pessoa com @. Se for outra pessoa, escreve *In com* e o nome completo.',
   partner_is_you: '🤖 Não podes ser o teu próprio parceiro 😄 Escolhe outra pessoa.',
   partner_already_in: '🤖 {{name}} já está inscrito neste mix.',
   partner_in_pair: '🤖 {{name}} já está em dupla com {{other}}. Escreve *In* para entrares sozinho.',
   partner_in_pair_you_stay: '🤖 {{name}} já está em dupla com {{other}}. Continuas inscrito sozinho.',
   partner_guest_default_name: 'Parceiro de {{name}}',
-  partner_offer_unregistered: '🤖 Não encontrei o *{{name}}* no clube. Queres inscrever a dupla com ele na mesma? Responde *Sim* ou *Não*.\n\n(Se ele já está na app com outro nome, responde *Não* e escreve o nome como aparece lá.)',
-  partner_offer_declined: '🤖 Ok, não inscrevi a dupla. Podes tentar *In com* e o nome como está na app, ou *In @parceiro* se ele estiver no grupo.',
   pair_partner_invite_created: '🤖 🤝 Dupla inscrita com *{{partner}}*! Envia-lhe este link para ele ficar com o lugar e ter o histórico e o ranking:\n{{link}}',
-  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! *{{partner}}* entra como convidado deste mix, sem conta — para ter ranking e histórico, pode registar-se em {{appUrl}}.',
+  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! *{{partner}}* entra como convidado deste mix, sem conta. Para ter ranking e histórico, pode registar-se em {{appUrl}}.\nSe o nome estiver errado ou essa pessoa já estiver na app com outro nome, fala com quem organiza.',
   // Quem não tem conta deu «In com X» (Francisco/UX, 18 out): diz com quem ficou.
   guest_pair_joined: '🤖 🤝 Dupla inscrita com *{{partner}}*! Entraste como *convidado* deste mix — podes jogar assim, mas sem conta não tens ranking nem histórico. Para isso, regista-te em {{appUrl}}.',
   guest_pair_need_account: '🤖 Para te inscreveres em dupla precisas de conta — regista-te em {{appUrl}}. Entretanto podes entrar sozinho com *In*, ou o teu parceiro escreve *In* por ele.',
@@ -134,9 +134,9 @@ To join a mix:
 • *Alinho* / *In* / *Dentro* / *Estou dentro*
 
 To join straight away as a pair (mixes marked «👥 Inscrição individual ou em dupla»):
-• *In com João Silva* — the name as it appears in the app
-• or *In @João* — mention your partner
-If they're not on the app yet: with the @ mention the bot signs them up as a guest; by name, the bot asks whether to sign up the pair anyway and gives you a link to send them.
+• *In com João Silva*: the name as it appears in the app
+• or *In @João*: mention your partner
+If they're not on the app yet, the bot signs them up as a guest of this mix, by name or by @ mention.
 Already in on your own? *In com* and the name (or *In @partner*) adds your partner, keeping your spot. The pair shows up on the list with the same number next to both names, e.g. *(1)*.
 
 To leave a mix:
@@ -216,19 +216,19 @@ To see this list:
   mix_full_pair: "🤖 The mix is full — there's no room for a pair. You can join on your own as a substitute with *In*.",
   mix_one_spot_pair: "🤖 There's only 1 spot left — not enough for a pair. You can join on your own with *In*.",
   partner_one_mention: '🤖 Mention just one person — your partner 🤝',
+  partner_one_at_a_time: '🤖 You can only sign up one partner: type *In com* and one person\'s name.',
+  partner_use_com: "🤖 I couldn't find «{{name}}» in the club. To sign up as a pair with someone who isn't in the club, type *In com* and their name.",
   partner_mention_unreadable: "🤖 I couldn't tell who you mentioned 😅 Type *In com* and your partner's name as it appears in the app (e.g. *In com João Silva*).",
   partner_not_found: "🤖 I couldn't find anyone in the club called «{{name}}». Type the name as it appears in the app, or mention them with @.",
-  partner_not_found_app: "🤖 I couldn't sign up your partner. Sign up the pair through the app: {{appUrl}}",
   partner_ambiguous: '🤖 More than one person matches «{{name}}»:\n{{list}}\n\nType the full name (e.g. *In com {{example}}*) or mention them with @.',
+  partner_did_you_mean: "🤖 I couldn't find «{{name}}» in the club. Did you mean:\n{{list}}\n\nType *In com {{example}}* or mention them with @. If it's someone else, type *In com* and their full name.",
   partner_is_you: "🤖 You can't be your own partner 😄 Pick someone else.",
   partner_already_in: '🤖 {{name}} is already signed up for this mix.',
   partner_in_pair: '🤖 {{name}} is already paired with {{other}}. Write *In* to join on your own.',
   partner_in_pair_you_stay: "🤖 {{name}} is already paired with {{other}}. You're still signed up on your own.",
   partner_guest_default_name: "{{name}}'s partner",
-  partner_offer_unregistered: "🤖 I couldn't find *{{name}}* in the club. Do you want to sign up the pair anyway? Reply *Sim* or *Não*.\n\n(If they're already on the app under another name, reply *Não* and type the name as it appears there.)",
-  partner_offer_declined: "🤖 Ok, I didn't sign up the pair. Try *In com* and the name as it appears in the app, or *In @partner* if they're in the group.",
   pair_partner_invite_created: '🤖 🤝 Pair signed up with *{{partner}}*! Send them this link so they claim the spot and keep their history and ranking:\n{{link}}',
-  pair_partner_guest_created: '🤖 🤝 Pair signed up! *{{partner}}* joins as a guest of this mix, no account — for ranking and history they can sign up at {{appUrl}}.',
+  pair_partner_guest_created: "🤖 🤝 Pair signed up! *{{partner}}* joins as a guest of this mix, without an account. To get a ranking and history, they can sign up at {{appUrl}}.\nIf the name is wrong or they're already on the app under another name, talk to the organiser.",
   guest_pair_joined: "🤖 🤝 Pair signed up with *{{partner}}*! You've joined as a *guest* of this mix — you can play like this, but without an account there's no ranking or history. For that, sign up at {{appUrl}}.",
   guest_pair_need_account: '🤖 To sign up as a pair you need an account — register at {{appUrl}}. Meanwhile you can join solo with *In*, or your partner writes *In* themselves.',
 }
@@ -254,7 +254,6 @@ const ptNew = {
   waitlisted: '🤖 O mix está cheio. Ficaste como suplente. Se alguém sair, entras logo.',
   already_joined: '🤖 Já estás neste mix.',
   disambiguate_in: '🤖 Há {{count}} mixes abertos. Em qual queres entrar?\n{{list}}\n\nResponde {{options}}.',
-  partner_offer_unregistered: '🤖 Não encontrei {{name}} no clube. Inscrevo a dupla na mesma? Responde *Sim*.\nSe estiver na app com outro nome, escreve *In com* e o nome como aparece lá.',
   out_pair_menu: '🤖 Estás em dupla com {{partner}}. Quem sai?\n1. Os dois\n2. Só tu\n3. Só {{partner}}\nResponde *1*, *2* ou *3*.',
   waitlist_left: '🤖 Saíste da lista de suplentes.',
   mix_already_started_out: '🤖 Este mix já começou. Para sair, fala com quem organiza.',
@@ -274,7 +273,6 @@ const enNew = {
   waitlisted: "🤖 The mix is full. You're a substitute now. If someone leaves, you're in straight away.",
   already_joined: "🤖 You're already in this mix.",
   disambiguate_in: '🤖 There are {{count}} open mixes. Which one do you want to join?\n{{list}}\n\nReply {{options}}.',
-  partner_offer_unregistered: "🤖 I couldn't find {{name}} in the club. Sign up the pair anyway? Reply *Sim*.\nIf they're on the app under another name, type *In com* and the name as it appears there.",
   out_pair_menu: "🤖 You're in a pair with {{partner}}. Who's leaving?\n1. Both of you\n2. Just you\n3. Just {{partner}}\nReply *1*, *2* or *3*.",
   waitlist_left: '🤖 You left the substitutes list.',
   mix_already_started_out: '🤖 This mix has already started. To leave, talk to the organiser.',
