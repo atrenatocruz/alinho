@@ -21,7 +21,7 @@ import MixImageField from './MixImageField'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
-import { totalRounds, gamesPerPerson, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople, scoringFormatOf, scoringForFormat, SCORING_FORMAT_HINT_KEY, SCORING_FORMAT_LABEL_KEY, AMERICANO_SCORING_FORMATS } from '../../lib/mixLogic'
+import { totalRounds, gamesPerPerson, mixPlan, WARMUP_OPTIONS, CHANGEOVER_OPTIONS, mixHasPhases, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople, scoringFormatOf, scoringForFormat, SCORING_FORMAT_HINT_KEY, SCORING_FORMAT_LABEL_KEY, AMERICANO_SCORING_FORMATS } from '../../lib/mixLogic'
 import { DeuceModeChips } from '../DeuceMode'
 import { deuceModeOf, scoringHasDeuce } from '../../lib/deuceMode'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
@@ -93,7 +93,8 @@ export default function MixWizard({
   // com a ronda 1 começada ou um resultado (a regra do «a decorrer»), o
   // formato, as duplas, os campos e as regras de jogo ficam à vista mas
   // trancados. O nome, a descrição e a imagem continuam livres. Antes da
-  // ronda 1 fica tudo como antes.
+  // ronda 1 fica tudo como antes. O aquecimento já conta como começado
+  // (#768, Francisco, 8 nov): o isMixLive já o inclui.
   const started = !!editingGame && (isMixLive(editingGame) || editingGame.status === 'finished')
   // O cadeado em linha, a cinzento, o do Editar do torneio (UX, 13 out).
   const startedNote = started ? <LockNote>{t('mixwizard.started_locked')}</LockNote> : null
@@ -105,6 +106,9 @@ export default function MixWizard({
   const levelNum = parseLevel(form.level)?.num
   // O escalão que vale: o de «Quem pode entrar», quando respondido.
   const shownScale = form.gender_restriction && form.gender_restriction !== 'indiferente' ? scaleForGender(form.gender_restriction) : levelScale
+  // O plano com aquecimento e troca (#768) e o «em 1h30» das frases das Regras.
+  const plan = mixPlan(form)
+  const courtTimeLabel = options.courtTimes.find((c) => c.value === form.court_time_minutes)?.label || `${form.court_time_minutes}min`
 
   // O que falta em cada passo para o «Seguinte» andar.
   const missing = (() => {
@@ -562,14 +566,16 @@ export default function MixWizard({
         )}
         {/* Quantos jogos dá por pessoa e o que sobra para aquecer (#767). Sem
             cor de aviso: não sobrar tempo não é um erro. */}
+        {/* Com aquecimento ou troca (#768), a frase passa para a caixa por
+            baixo das duas escolhas, que conta tudo (SPEC de 26 out; com «Sem»
+            nas duas fica esta, SPEC #767). */}
         <Field label={t('mixwizard.game_time_label')} locked={started}
-          hint={(() => {
+          hint={plan.extra ? null : (() => {
             const g = gamesPerPerson(form)
-            const time = options.courtTimes.find((c) => c.value === form.court_time_minutes)?.label || `${form.court_time_minutes}min`
             return (
               <>
                 <Trans i18nKey={g.upTo ? 'mixwizard.games_up_to' : 'mixwizard.games_in'} count={g.count}
-                  values={{ count: g.count, time }} components={{ b: <b className="font-extrabold text-ink-900" /> }} />
+                  values={{ count: g.count, time: courtTimeLabel }} components={{ b: <b className="font-extrabold text-ink-900" /> }} />
                 {' '}{g.left > 0 ? t('mixwizard.warmup_left', { minutes: g.left }) : t('mixwizard.warmup_none')}
               </>
             )
@@ -577,6 +583,39 @@ export default function MixWizard({
           <Chips label={t('mixwizard.game_time_label')} value={form.game_time_minutes}
             onChange={(v) => set({ game_time_minutes: v })} options={options.gameTimes} />
         </Field>
+        {/* Aquecimento e troca entre rondas (#768): «Sem» por omissão, e quem
+            não mexer fica como hoje. */}
+        {mixHasPhases(form) && (<>
+        <Field label={t('mixwizard.warmup_label')} locked={started}>
+          <Chips label={t('mixwizard.warmup_label')} value={form.warmup_minutes ?? null}
+            onChange={(v) => set({ warmup_minutes: v })}
+            options={[{ value: null, label: t('mixwizard.phase_none') }, ...WARMUP_OPTIONS.map((m) => ({ value: m, label: t('mixwizard.phase_minutes', { minutes: m }) }))]} />
+        </Field>
+        <Field label={t('mixwizard.changeover_label')} locked={started}>
+          <Chips label={t('mixwizard.changeover_label')} value={form.changeover_minutes ?? null}
+            onChange={(v) => set({ changeover_minutes: v })}
+            options={[{ value: null, label: t('mixwizard.phase_none') }, ...CHANGEOVER_OPTIONS.map((m) => ({ value: m, label: t('mixwizard.phase_minutes', { minutes: m }) }))]} />
+        </Field>
+        </>)}
+        {plan.extra && (() => {
+          const g = gamesPerPerson(form)
+          const vars = { count: plan.changes, games: plan.rounds, minutes: plan.each, warmup: plan.warmup, changeover: plan.changeover }
+          const detail = plan.warmup && plan.changes ? t('mixwizard.plan_both', vars)
+            : plan.warmup ? t('mixwizard.plan_warmup', { ...vars, count: plan.rounds })
+              : t('mixwizard.plan_changeover', vars)
+          return (
+            <div role="status" className="rounded-[16px] border border-line bg-white p-4">
+              <p className="text-[15px] leading-snug text-ink-900">
+                <Trans i18nKey={g.upTo ? 'mixwizard.games_up_to' : 'mixwizard.games_in'} count={g.count}
+                  values={{ count: g.count, time: courtTimeLabel }} components={{ b: <b className="font-extrabold" /> }} />
+              </p>
+              <p className="mt-1 text-sm leading-snug text-ink-700">
+                {detail}
+                {plan.endsAt && <>{' '}{t('mixwizard.plan_ends', { time: formatTime(plan.endsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) })}</>}
+              </p>
+            </div>
+          )
+        })()}
         {/* «2 sets + super tie-break»: o mesmo nome e a mesma frase do torneio
             (UX, 7 out). O Americano tem só «Pontos corridos» e «Set sem fim»
             (SPEC 2026-10-26). */}

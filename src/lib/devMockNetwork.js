@@ -304,7 +304,7 @@ const RPC_MOCKS = {
     user_id: id, name: p.name, avatar_url: p.avatar_url, rating: p.rating, rating_games: 30, gender: p.gender, mix_wins: 3, mixes_played: 8,
   })).concat(Array.from({ length: 55 }, (_, i) => ({
     user_id: `fake-${i}`, name: MOCK_NAMES[i % MOCK_NAMES.length], rating: 2000 - i * 10, rating_games: i === 2 ? 4 : 30,
-    gender: i % 3 ? 'masculino' : 'feminino', mix_wins: (55 - i) % 7, mixes_played: 10,
+    gender: /^(Ana|Beatriz|Inês) /.test(MOCK_NAMES[i % MOCK_NAMES.length]) ? 'feminino' : 'masculino', mix_wins: (55 - i) % 7, mixes_played: 10,
   // localStorage.mockEventGuests = 'true': os convidados não têm pontos.
   })).filter((r) => !(localStorage.getItem('mockEventGuests') === 'true' && ['fake-2', 'fake-5'].includes(r.user_id)))).concat([{
     user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', rating: 1605, rating_games: 30, gender: 'masculino', mix_wins: 4, mixes_played: 9,
@@ -2159,6 +2159,20 @@ const TABLE_MOCKS = {
       // localStorage.mockProSet = '7' | '10' — o mix em pro set a 9, com o 8-8
       // a tie-break a 7 ou a super tie-break a 10 (#580).
       ...(localStorage.getItem('mockProSet') ? { scoring_format: 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockProSet') === '10' ? 'super_tiebreak' : null } : {}),
+      // localStorage.mockPhase (#768): o mix com 10 min de aquecimento e trocas
+      // de 2 min. 'on' = só as regras; 'aquecimento' = começou há 7 min (com
+      // mockRoundPending = '1'); 'troca' = a ronda acabou há 30 s; 'troca2' =
+      // a troca com a ronda 2 já sorteada (sem mockRoundPending).
+      ...(localStorage.getItem('mockPhase') ? (() => {
+        const ph = localStorage.getItem('mockPhase')
+        const ago = (s) => new Date(Date.now() - s * 1000).toISOString()
+        return {
+          warmup_minutes: 10, changeover_minutes: 2, round_phase: null, phase_started_at: null, phase_minutes: null,
+          ...(ph === 'aquecimento' ? { round_phase: 'aquecimento', phase_started_at: ago(7 * 60 - 12), phase_minutes: 10, round_started_at: null } : {}),
+          ...(ph === 'troca' ? { round_phase: 'troca', phase_started_at: ago(30), phase_minutes: 2, round_started_at: ago(20 * 60 + 30) } : {}),
+          ...(ph === 'troca2' ? { round_phase: 'troca', phase_started_at: ago(30), phase_minutes: 2, round_started_at: null } : {}),
+        }
+      })() : {}),
     } : {}),
     // #586 (13 out): mockEditMix = 'pending' (mix único, abre daqui a uns
     // dias) | 'stopped' (data de uma série parada).

@@ -21,12 +21,17 @@ import {
  * - defaultOn: como vem a quem nunca mexeu no interruptor — ligado nos mixes,
  *   desligado no resto (Francisco, 27 set).
  * - unit: 'round' («Ronda N», o mix) ou 'game' («Jogo N», o jogo entre amigos).
+ * - phase: 'aquecimento' | 'troca' — o alarme toca no fim do aquecimento e da
+ *   troca entre rondas do mix (#768); muda só o que se escreve.
  */
-export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, defaultOn = false, unit = 'round', isLast = false }) {
+export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, defaultOn = false, unit = 'round', isLast = false, phase = null }) {
   const { t: tr } = useTranslation()
   // Os textos com «ronda» têm a versão «_game» ao lado (jogo entre amigos).
   const UNIT_KEYS = ['title', 'waiting', 'started', 'tap_to_ring', 'turn_on_round', 'media_title']
   const t = (key, opts) => tr(unit === 'game' && UNIT_KEYS.includes(key.split('.')[1]) ? `${key}_game` : key, opts)
+  // No aquecimento e na troca (#768), os textos dizem a fase e não a ronda.
+  const phaseKey = phase === 'aquecimento' ? 'warmup' : phase === 'troca' ? 'changeover' : null
+  const pt = (key, opts) => (phaseKey ? tr(`${key}_${phaseKey}`, opts) : t(key, opts))
   const [prefs, setPrefs] = useState(() => loadAlarmPrefs(defaultOn))
   const [now, setNow] = useState(Date.now())
   const [blocked, setBlocked] = useState(false) // o telemóvel pediu um toque
@@ -39,7 +44,7 @@ export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, d
     key: roundKey,
     endsAt,
     warn: prefs.warn,
-    title: t('roundalarm.media_title', { number: roundNumber, name: eventName || '' }),
+    title: pt('roundalarm.media_title', { number: roundNumber, name: eventName || '' }),
     subtitle: t('roundalarm.media_subtitle', { warn: warnLabel }),
   })
 
@@ -153,15 +158,15 @@ export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, d
     return (
       <div className="rounded-ctrl bg-amber-50 border border-amber-200 p-3">
         <p className="text-sm text-amber-900">
-          <span className="font-extrabold">{t('roundalarm.started', { number: roundNumber })}</span>{' '}
-          {t('roundalarm.tap_to_ring')}
+          <span className="font-extrabold">{pt('roundalarm.started', { number: roundNumber })}</span>{' '}
+          {pt('roundalarm.tap_to_ring')}
         </p>
         <button
           type="button"
           onClick={start}
           className="mt-2.5 w-full min-h-[44px] rounded-ctrl bg-ink-900 text-white text-sm font-extrabold"
         >
-          {t('roundalarm.turn_on_round', { number: roundNumber })}
+          {pt('roundalarm.turn_on_round', { number: roundNumber })}
         </button>
       </div>
     )
@@ -188,7 +193,7 @@ export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, d
       )}
       {prefs.on && running && (
         <>
-          <p className="mt-1 text-xs text-muted">{t('roundalarm.on_hint')}</p>
+          <p className="mt-1 text-xs text-muted">{phase === 'aquecimento' ? tr('roundalarm.on_hint_warmup') : t('roundalarm.on_hint')}</p>
           <p className="mt-3 mb-1 text-xs text-ink-700">{t('roundalarm.warn_label')}</p>
           <Chips
             label={t('roundalarm.warn_label')}

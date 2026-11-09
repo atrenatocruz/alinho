@@ -14,6 +14,11 @@ describe('«a decorrer» só a partir da ronda 1 (12 out)', () => {
     expect(isMixLive({ status: 'in_progress', round_started_at: null, scored: [{ id: 'm1' }] })).toBe(true)
     expect(isMixLive({ status: 'in_progress', round_started_at: null }, { scored: true })).toBe(true)
   })
+  it('no aquecimento já está a decorrer (#768, 8 nov)', () => {
+    const g = { status: 'in_progress', round_started_at: null, round_phase: 'aquecimento', scored: [] }
+    expect(isMixLive(g)).toBe(true)
+    expect(isFormedNotStarted(g)).toBe(false)
+  })
   it('aberto ou terminado: não', () => {
     expect(isMixLive({ status: 'open', round_started_at: 'x' })).toBe(false)
     expect(isMixLive({ status: 'finished', round_started_at: 'x' })).toBe(false)

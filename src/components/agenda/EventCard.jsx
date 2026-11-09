@@ -247,7 +247,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   const capacity = mixCapacity(game)
   const isFull = players.length >= capacity
   const isClosed = game.status === 'closed' || (game.status === 'open' && isFull)
-  // Só a decorrer com a ronda 1 começada (mixLive, 12 out).
+  // Só a decorrer com a ronda 1 começada ou no aquecimento (mixLive).
   const isLive = isMixLive(game)
   const friendsIn = friendIds ? players.filter((p) => p.id && friendIds.has(p.id)) : []
   // Jogo em aberto aberto por alguém (SPEC-4, ponto 5): «Abriste este jogo»
