@@ -1,114 +1,42 @@
 // A hora sempre em 24 h («16:00», nunca «04:00 PM»), em todo o lado onde se
-// escolhe hora (Renato/Francisco, 16 out). O <input type="time"> do browser
-// segue a língua do computador ou do telemóvel, e num em inglês aparece em
-// AM/PM, sem forma de o mudar. Aqui são duas partes, horas 00–23 e minutos.
-// Funciona como o input: `value` em 'HH:MM' (ou '') e `onChange(e)`, com
-// `e.target.value` também em 'HH:MM'. `step` em segundos, como no input
-// (1800 = de meia em meia hora); por omissão, de 5 em 5 minutos. Um valor
-// fora do passo continua na lista.
+// escolhe hora (Renato/Francisco, 16 out). Funciona como o input: `value` em
+// 'HH:MM' (ou '') e `onChange(e)`, com `e.target.value` também em 'HH:MM'.
+// `step` em segundos, como no input (1800 = de meia em meia hora); por
+// omissão, de 5 em 5 minutos. Um valor fora do passo continua na roda.
 //
-// Cada parte abre uma lista da app, pequena (6 linhas), junto à caixa, com
-// a escolhida à vista e a preto — no computador e no telemóvel. A lista
-// nativa abria enorme e colada à esquerda no computador, e a roda do sistema
-// no telemóvel «está muito marada para mudar as horas, nem devia ser de
-// sistema» (Francisco, 16 out). Com o dedo, as linhas têm 44 px.
+// A caixa abre a roda (design-handoff/2026-10-18-roda-datas-horas, aprovada
+// pelo Francisco a 19 out): duas colunas, as horas de 00 a 23 e os minutos,
+// com «:» no meio, numa folha branca com «Feito». Substituiu as listas
+// pequenas de 16 out. `subtitle`: a linha cinzenta da folha (o dia escolhido,
+// se já houver). `placeholder`: o texto da caixa vazia, quando cabe. `day`
+// ('YYYY-MM-DD'): se for hoje, as horas que já passaram não aparecem e,
+// depois das 19:00, abre na próxima hora certa (UX, acerto de 19 out).
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Clock } from 'lucide-react'
+import { WheelColumn, WheelSheet } from './WheelPicker'
 
 const pad = (n) => String(n).padStart(2, '0')
-const ROWS = 6
 
-// Com o dedo (sem rato), linhas de 44 px; com rato, de 36.
-const useTouch = () => {
-  const q = '(pointer: coarse)'
-  const [touch, setTouch] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(q).matches)
-  useEffect(() => {
-    const m = window.matchMedia?.(q)
-    if (!m) return undefined
-    const on = () => setTouch(m.matches)
-    m.addEventListener?.('change', on)
-    return () => m.removeEventListener?.('change', on)
-  }, [])
-  return touch
-}
-
-// Uma parte (horas ou minutos): a caixa e a lista junto dela.
-function Part({ value, options, onPick, disabled, label, id }) {
-  const ROW = useTouch() ? 44 : 36
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState(null)
-  const btnRef = useRef(null)
-  const listRef = useRef(null)
-  const place = () => {
-    const r = btnRef.current?.getBoundingClientRect()
-    if (!r) return
-    const h = Math.min(options.length, ROWS) * ROW + 8
-    const below = window.innerHeight - r.bottom - 8
-    const top = below >= h || below >= r.top ? r.bottom + 6 : r.top - 6 - h
-    // Dentro do ecrã, com 8 px de folga (a 375 a lista nunca sai da folha).
-    const left = Math.min(Math.max(8, r.left + r.width / 2 - 36), window.innerWidth - 80)
-    setPos({ left, top: Math.max(8, top), height: h })
-  }
-  useEffect(() => {
-    if (!open) return undefined
-    listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' })
-    const away = (e) => { if (!listRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) setOpen(false) }
-    const key = (e) => { if (e.key === 'Escape') { setOpen(false); btnRef.current?.focus() } }
-    // Só fecha se a largura mudar (rodar o telemóvel); no iPhone a barra do
-    // Safari a aparecer e sumir também dá «resize».
-    const w0 = window.innerWidth
-    const move = () => { if (window.innerWidth !== w0) setOpen(false) }
-    document.addEventListener('mousedown', away, true)
-    window.addEventListener('keydown', key)
-    window.addEventListener('resize', move)
-    return () => { document.removeEventListener('mousedown', away, true); window.removeEventListener('keydown', key); window.removeEventListener('resize', move) }
-  }, [open])
-  return (
-    <>
-      <button ref={btnRef} id={id} type="button" disabled={disabled} aria-label={label}
-        aria-haspopup="listbox" aria-expanded={open}
-        onClick={() => { if (!open) place(); setOpen((o) => !o) }}
-        className="min-h-[44px] min-w-[2.6ch] rounded-[6px] px-1 text-center text-base tabular-nums text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ink-900/30 disabled:cursor-default">
-        {value || '--'}
-      </button>
-      {open && pos && createPortal(
-        <div ref={listRef} role="listbox" aria-label={label}
-          className="fixed z-[80] w-[72px] overflow-y-auto rounded-ctrl bg-white p-1 shadow-lift ring-1 ring-line"
-          style={{ left: pos.left, top: pos.top, maxHeight: pos.height }}>
-          {options.map((o) => {
-            const sel = o === value
-            return (
-              <button key={o} type="button" role="option" aria-selected={sel}
-                onClick={() => { onPick(o); setOpen(false); btnRef.current?.focus() }}
-                className={`block w-full rounded-[8px] pl-3 text-left text-[15px] tabular-nums ${sel ? 'bg-ink-900 font-extrabold text-white' : 'text-ink-900 hover:bg-ink-50'}`}
-                style={{ height: ROW, minHeight: ROW }}>
-                {o}
-              </button>
-            )
-          })}
-        </div>,
-        document.body,
-      )}
-    </>
-  )
-}
-
-export default function TimeInput({ value = '', onChange, step = 300, className = '', disabled = false, id, 'aria-label': ariaLabel }) {
+export default function TimeInput({ value = '', onChange, step = 300, className = '', disabled = false, id, 'aria-label': ariaLabel, subtitle = null, placeholder = null, day = null }) {
   const { t } = useTranslation()
   const [hh = '', mm = ''] = String(value || '').slice(0, 5).split(':')
   const every = Math.max(1, Math.round(Number(step || 300) / 60))
-  const hours = Array.from({ length: 24 }, (_, h) => pad(h))
-  const minutes = []
-  for (let m = 0; m < 60; m += every) minutes.push(pad(m))
-  if (mm && !minutes.includes(mm)) minutes.push(mm)
-  minutes.sort()
-  const emit = (h, m) => onChange?.({ target: { value: h && m ? `${h}:${m}` : '' } })
-  const hLabel = ariaLabel ? t('timeinput.hours_of', { label: ariaLabel }) : t('timeinput.hours')
-  const mLabel = ariaLabel ? t('timeinput.minutes_of', { label: ariaLabel }) : t('timeinput.minutes')
-  // O relógio à direita mostra que é um campo, como o antigo (UX, 16 out);
-  // tocar no espaço livre da caixa ou no relógio abre as horas. Nas caixas
+  const now = new Date()
+  const todayIso = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  // Hoje: só as horas que ainda vêm (a partir da próxima hora certa).
+  // Depois das 23h já não há hora certa à frente: fica só a 23, em vez de
+  // voltar às 00 com as horas que já passaram (QA, 8 nov).
+  const firstHour = day === todayIso ? Math.min(now.getHours() + 1, 23) : 0
+  const hours = Array.from({ length: 24 - firstHour }, (_, i) => ({ value: pad(firstHour + i), label: pad(firstHour + i) }))
+  if (hh && !hours.some((o) => o.value === hh)) hours.unshift({ value: hh, label: hh })
+  const minuteValues = []
+  for (let m = 0; m < 60; m += every) minuteValues.push(pad(m))
+  if (mm && !minuteValues.includes(mm)) minuteValues.push(mm)
+  minuteValues.sort()
+  const minutes = minuteValues.map((m) => ({ value: m, label: m }))
+
+  // O relógio à direita mostra que é um campo (UX, 16 out). Nas caixas
   // estreitas (as horas do torneio, 100 px) não cabe e não aparece.
   const boxRef = useRef(null)
   const [roomy, setRoomy] = useState(true)
@@ -119,17 +47,38 @@ export default function TimeInput({ value = '', onChange, step = 300, className 
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const openHours = (e) => {
-    if (disabled || e.target.closest('button')) return
-    e.currentTarget.querySelector('button')?.click()
+
+  const [open, setOpen] = useState(false)
+  const [pick, setPick] = useState({ h: '19', m: '00' })
+  const openSheet = () => {
+    if (disabled) return
+    const firstMinute = minuteValues[0] || '00'
+    // Sem hora: às 19:00; se hoje já passou das 19:00, na próxima hora certa.
+    const startHour = pad(Math.max(19, firstHour) > 23 ? firstHour : Math.max(19, firstHour))
+    setPick({ h: hh || startHour, m: mm && minuteValues.includes(mm) ? mm : (hh ? firstMinute : '00') })
+    setOpen(true)
   }
+  const done = () => {
+    onChange?.({ target: { value: `${pick.h}:${pick.m}` } })
+    setOpen(false)
+  }
+
+  const emptyText = roomy ? (placeholder ?? t('ui.select_time_placeholder')) : '--:--'
   return (
-    <div ref={boxRef} role="group" aria-label={ariaLabel} onClick={openHours}
-      className={`flex cursor-pointer items-center gap-0.5 ${className} ${disabled ? 'cursor-default opacity-60' : ''}`}>
-      <Part id={id} value={hh} options={hours} label={hLabel} disabled={disabled} onPick={(h) => emit(h, mm || '00')} />
-      <span aria-hidden="true" className="text-ink-500">:</span>
-      <Part value={mm} options={minutes} label={mLabel} disabled={disabled} onPick={(m) => emit(hh || '00', m)} />
-      {roomy && <Clock size={18} aria-hidden="true" className="ml-auto shrink-0 text-ink-500" />}
-    </div>
+    <>
+      <button ref={boxRef} id={id} type="button" disabled={disabled} onClick={openSheet}
+        aria-label={ariaLabel} aria-haspopup="dialog"
+        className={`flex items-center gap-1 text-left tabular-nums ${value ? 'text-ink-900' : 'text-muted'} ${className} ${disabled ? 'cursor-default opacity-60' : 'cursor-pointer'}`}>
+        <span className="min-w-0 truncate">{value ? `${hh}:${mm}` : emptyText}</span>
+        {roomy && <Clock size={18} aria-hidden="true" className="ml-auto shrink-0 text-ink-500" />}
+      </button>
+      {open && (
+        <WheelSheet title={ariaLabel || t('ui.wheel_hours')} subtitle={subtitle} onClose={() => setOpen(false)} onDone={done}>
+          <WheelColumn label={t('ui.wheel_hours')} className="flex-1" align="end" options={hours} value={pick.h} onChange={(h) => setPick((p) => ({ ...p, h }))} />
+          <span aria-hidden className="relative z-[1] flex w-8 items-center justify-center text-[22px] font-semibold text-[#040404]">:</span>
+          <WheelColumn label={t('ui.wheel_minutes')} className="flex-1" align="start" options={minutes} value={pick.m} onChange={(m) => setPick((p) => ({ ...p, m }))} />
+        </WheelSheet>
+      )}
+    </>
   )
 }
