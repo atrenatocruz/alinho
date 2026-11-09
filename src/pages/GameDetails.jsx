@@ -2240,7 +2240,8 @@ export default function GameDetails() {
     }
 
     const ok = await askConfirm({
-      title: t('gamedetails.correct_ask_title', { team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b }),
+      // O «6-3» nunca se parte entre linhas: as junções invisíveis prendem o traço aos números (#785).
+      title: t('gamedetails.correct_ask_title', { team: teamName(match.team_a_id), a: `${a}\u2060`, other: teamName(match.team_b_id), b: `\u2060${b}` }),
       message: t('gamedetails.correct_ask_text'),
       confirmLabel: t('gamedetails.correct_ask_confirm'),
       cancelLabel: t('gamedetails.ask_not_yet'),
