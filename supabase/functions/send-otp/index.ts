@@ -180,6 +180,11 @@ Deno.serve(async (req) => {
     // Ex.: o limite de 5/h — a mensagem do RPC é legível e vai para a app.
     return jsonResponse({ error: message }, 429)
   }
+  // Número de outra conta: a função devolve uma linha sem código (10 nov), e
+  // o ecrã recebe a mesma resposta que recebia com o erro acima.
+  if (ver?.[0] && ver[0].code === null) {
+    return jsonResponse({ error: 'phone_taken' }, 409)
+  }
   const code = ver?.[0]?.code
   const expiresAt = ver?.[0]?.expires_at ?? null
   if (!code) {
