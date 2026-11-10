@@ -24,6 +24,7 @@ export function WheelColumn({ options, value, onChange, label, className = '', a
   const ref = useRef(null)
   const [pos, setPos] = useState(0) // scrollTop, para inclinar as linhas
   const settle = useRef(null)
+  const moving = useRef(false) // o dedo (ou o impulso) ainda a mexer a roda
   const index = Math.max(0, options.findIndex((o) => o.value === value))
 
   // Abre já na linha certa, sem animação.
@@ -38,7 +39,8 @@ export function WheelColumn({ options, value, onChange, label, className = '', a
   // a roda acompanha.
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    // Com a roda a mexer, não a puxar: lutava com o dedo e tremia no iPhone.
+    if (!el || moving.current) return
     if (Math.round(el.scrollTop / ROW) !== index) el.scrollTo({ top: index * ROW, behavior: 'smooth' })
   }, [index])
 
@@ -46,8 +48,10 @@ export function WheelColumn({ options, value, onChange, label, className = '', a
     const el = ref.current
     if (!el) return
     setPos(el.scrollTop)
+    moving.current = true
     clearTimeout(settle.current)
     settle.current = setTimeout(() => {
+      moving.current = false
       const i = Math.min(options.length - 1, Math.max(0, Math.round(el.scrollTop / ROW)))
       if (options[i] && options[i].value !== value) onChange(options[i].value)
     }, 90)
@@ -76,7 +80,7 @@ export function WheelColumn({ options, value, onChange, label, className = '', a
       tabIndex={0}
       onScroll={onScroll}
       onKeyDown={onKey}
-      className={`no-scrollbar relative z-[1] overflow-y-auto overscroll-contain outline-none [scroll-snap-type:y_mandatory] focus-visible:ring-2 focus-visible:ring-ink-900/20 rounded-[14px] ${className}`}
+      className={`no-scrollbar relative z-[1] overflow-y-auto overflow-x-hidden touch-pan-y overscroll-contain outline-none [scroll-snap-type:y_mandatory] focus-visible:ring-2 focus-visible:ring-ink-900/20 rounded-[14px] ${className}`}
       style={{
         height: VISIBLE * ROW,
         paddingTop: PAD,
@@ -98,11 +102,12 @@ export function WheelColumn({ options, value, onChange, label, className = '', a
             aria-selected={i === index}
             onClick={() => goTo(i)}
             className={`flex cursor-pointer select-none items-center whitespace-nowrap tabular-nums [scroll-snap-align:center] ${align === 'start' ? 'justify-start pl-3' : align === 'end' ? 'justify-end pr-3' : 'justify-center'} ${center ? 'font-semibold text-[#040404]' : 'text-[#9CA3AF]'}`}
+            // Tamanho fixo e encolher com scale: mudar o font-size a cada
+            // passo da roda refazia o layout e as linhas tremiam (iPhone, 10 nov).
             style={{
               height: ROW,
-              fontSize: center ? 22 : 19 - far * 1.5,
-              transform: `perspective(400px) rotateX(${Math.max(-60, Math.min(60, -d * 22))}deg)`,
-              transition: 'font-size 120ms',
+              fontSize: 22,
+              transform: `perspective(400px) rotateX(${Math.max(-60, Math.min(60, -d * 22))}deg) scale(${center ? 1 : (19 - far * 1.5) / 22})`,
             }}
           >
             {o.label}
