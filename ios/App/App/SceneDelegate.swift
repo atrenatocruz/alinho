@@ -8,7 +8,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        // O nosso (WatchGamesPlugin.swift): regista o plugin WatchGames. Com o
+        // CAPBridgeViewController simples o plugin não existia («not implemented»).
+        window?.rootViewController = AlinhoBridgeViewController()
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
