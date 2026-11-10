@@ -696,7 +696,7 @@ const RPC_MOCKS = {
   tournament_respond_invite: () => 'por_validar',
   tournament_withdraw_entry: () => null,
   tournament_change_partner: () => ({ entry_id: 'ent-me', invite_token: null }),
-  tournament_claim_entry: () => 'tour-smash-open',
+  tournament_claim_entry: () => (localStorage.getItem('mockClaimError') ? { __error: localStorage.getItem('mockClaimError') } : 'tour-smash-open'),
   tournament_validate_entry: () => 'validada',
   tournament_remove_entry: () => null,
   // Devolve o código do convite quando a dupla tem alguém sem conta, como a

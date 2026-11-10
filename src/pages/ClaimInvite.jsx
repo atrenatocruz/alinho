@@ -44,6 +44,7 @@ export default function ClaimInvite() {
   // que não existe dizia «Guardaram-te um lugar» e «Criar conta» (PO, 13 out).
   const [state, setState] = useState(user ? 'claiming' : 'peeking')
   const [error, setError] = useState('')
+  const [claimCode, setClaimCode] = useState(null) // porque é que o link foi recusado
   const [invalid, setInvalid] = useState(null) // 'not_found' | 'claimed' | 'expired'
   useEffect(() => {
     if (user || !token) return undefined
@@ -108,6 +109,7 @@ export default function ClaimInvite() {
         // O código vem no fim da mensagem, mesmo quando o servidor lhe junta
         // texto à frente (os avisos das regras novas, b417e61) — #497.
         const code = errorCode(err)
+        setClaimCode(code)
         if (isTournament && code === 'player_gender_required') { setState('gender'); return }
         const ns = isTournament ? 'tsignup' : 'partner'
         const keys = [`${ns}.claim_error_${code}`]
@@ -121,6 +123,13 @@ export default function ClaimInvite() {
     return () => { cancelled = true }
   }, [user, token, navigate, t, isTournament, isFriends, isMix, confirmed, claimTry])
 
+  /* Alino triste e frase a vermelho só quando a pessoa foi mesmo recusada.
+     invite_not_found também é quem já aceitou e volta a tocar no link (ao
+     aceitar, o código desaparece); invite_is_your_own é quem abriu o próprio. */
+  const notRefused = isTournament && ['invite_not_found', 'invite_is_your_own'].includes(claimCode)
+  const tournamentTitle = state !== 'error' ? 'tsignup.claim_title'
+    : claimCode === 'invite_not_found' ? 'shortlink.invalid_title'
+      : claimCode === 'invite_is_your_own' ? 'tsignup.claim_own_title' : 'tsignup.claim_refused_title'
   if (state === 'peeking') return null
   // Link que já não vale, sem sessão: como o /m/ com um código errado —
   // o Alino, «Este link já não é válido», «Ir para o início» e «Entrar».
@@ -146,8 +155,8 @@ export default function ClaimInvite() {
       <div className="card space-y-3 text-center">
         {/* A bola da alinho, não um emoji (o 🎾 aparecia como raqueta de
             badminton nalguns telemóveis — revisão do site, 13 out). */}
-        <div className="flex justify-center"><Alino pose="ola" size={88} /></div>
-        <h1 className="text-xl text-ink-900">{t(isTournament ? 'tsignup.claim_title' : isFriends ? 'friends.claim_title' : 'partner.claim_title')}</h1>
+        <div className="flex justify-center"><Alino pose={isTournament && state === 'error' && !notRefused ? 'triste' : 'ola'} size={88} /></div>
+        <h1 className="text-xl text-ink-900">{t(isTournament ? tournamentTitle : isFriends ? 'friends.claim_title' : 'partner.claim_title')}</h1>
 
         {state === 'signed_out' && (
           <>
@@ -190,7 +199,7 @@ export default function ClaimInvite() {
 
         {state === 'error' && (
           <>
-            <p className="text-sm text-red-600 font-extrabold">{error}</p>
+            <p className={notRefused ? 'text-sm text-muted' : 'text-sm text-red-600 font-extrabold'}>{error}</p>
             <Link to="/" className="text-sm font-extrabold text-ink-900 underline">{t('partner.claim_go_home')}</Link>
           </>
         )}
