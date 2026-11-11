@@ -241,12 +241,78 @@ final class MixModel: ObservableObject {
         sendStatus = await outbox.status(link.mixMatchID)
     }
 
-    /// Chamado a cada 2 s: de 30 em 30 s tenta outra vez a fila. Com a fila
-    /// vazia não há pedido nenhum, por isso não é preciso saber se há `pending`.
+    /// Chamado a cada 2 s: de 30 em 30 s tenta outra vez a fila (e o último
+    /// placar ao vivo que não seguiu). Com a fila vazia não há pedido nenhum,
+    /// por isso não é preciso saber se há `pending`.
     func tick(now: Date = Date()) {
         guard live, now.timeIntervalSince(lastFlush) >= 30 else { return }
         lastFlush = now
         Task { await flush() }
+        sendLive()
+    }
+
+    // MARK: - Ao vivo (Fase B)
+
+    /// O último placar por enviar. Não há fila: um novo substitui o anterior.
+    private var livePending: (matchID: UUID, state: MixLiveState)?
+    /// O último que o servidor aceitou, para não mandar o mesmo duas vezes.
+    private var liveSent: (matchID: UUID, state: MixLiveState)?
+    private var liveSending = false
+    private var liveSeq: Int64 = 0
+    /// Jogos em que o servidor disse que não (já tem resultado, já não é meu,
+    /// o mix fechou, RPC por correr): deixam de mandar o ao vivo. A contagem
+    /// no relógio não muda.
+    private var liveStopped: Set<UUID> = []
+
+    /// Manda o placar de `state` para a app, se for o jogo do mix ligado. Chama-se
+    /// depois de cada mudança gravada (ponto, desfazer, pausa, acertar, quem serve).
+    func pushLive(_ state: MatchState?) {
+        guard live, let state, let link = mixLink(for: state.id),
+              !liveStopped.contains(link.mixMatchID) else { return }
+        let s = MixLiveState(state, side: link.side)
+        if livePending == nil, let sent = liveSent, sent.matchID == link.mixMatchID, sent.state == s { return }
+        livePending = (link.mixMatchID, s)
+        sendLive()
+    }
+
+    /// Um pedido de cada vez. Se falhar pela rede, o placar fica à espera do
+    /// próximo ponto (ou do `tick`); se correr bem e entretanto houver outro, segue.
+    private func sendLive() {
+        guard live, !liveSending, let next = livePending else { return }
+        guard !liveStopped.contains(next.matchID) else { livePending = nil; return }
+        liveSending = true
+        livePending = nil
+        // Milissegundos: continua a subir depois de a app reiniciar a meio do jogo.
+        liveSeq = max(liveSeq + 1, Int64(Date().timeIntervalSince1970 * 1000))
+        let seq = liveSeq
+        Task {
+            var again = false
+            do {
+                let state = try JSONSerialization.jsonObject(with: JSONEncoder().encode(next.state))
+                let _: [String: Bool] = try await client.rpc("push_mix_live_score", [
+                    "p_match_id": next.matchID.uuidString.lowercased(),
+                    "p_seq": seq,
+                    "p_state": state,
+                ])
+                liveSent = next
+                again = true
+            } catch let error as SyncError {
+                switch error {
+                case .server, .unavailable:
+                    liveStopped.insert(next.matchID)
+                case .signedOut:
+                    if livePending == nil { livePending = next }
+                    signedOut()
+                case .network:
+                    if livePending == nil { livePending = next }
+                }
+            } catch {
+                // Uma resposta que não se lê: como a rede, fica para a próxima.
+                if livePending == nil { livePending = next }
+            }
+            liveSending = false
+            if again { sendLive() }
+        }
     }
 }
 

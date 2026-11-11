@@ -8,7 +8,9 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Avatar } from '../ui'
 import { kindColorsOf } from '../agenda/HomeCard'
+import { Watch } from 'lucide-react'
 import { shortPersonName } from '../../lib/mixLogic'
+import { liveScoreText } from '../../lib/mixLiveScore'
 
 const kindOf = (row) => (row.kind === 'friends' && row.org_kind && row.org_kind !== 'group' ? 'open' : row.kind)
 
@@ -29,6 +31,19 @@ function Team({ team, score, lead, hidden = false }) {
       <b className={`ml-2 min-w-0 flex-1 truncate font-display text-[14.5px] font-bold leading-[1.2] ${lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{names.join(' / ')}</b>
       <em className={`min-w-[40px] text-right font-display text-[30px] font-black not-italic leading-none tracking-[-.02em] tabular-nums ${lead ? 'text-lime-400' : lead === false ? 'text-[#7B8494]' : 'text-white'}`}>{score ?? '-'}</em>
     </div>
+  )
+}
+
+/** O placar do relógio (Fase B): `court.live` só vem fresco e sem resultado. */
+function LiveWatch({ live, className = '' }) {
+  const { t } = useTranslation()
+  const text = liveScoreText(live, t)
+  if (!text) return null
+  return (
+    <span className={`inline-flex items-center gap-1 tabular-nums ${className}`}>
+      <Watch size={12} className="shrink-0 text-lime-400" aria-label={t('live.watch_label')} />
+      {text}
+    </span>
   )
 }
 
@@ -76,6 +91,7 @@ export default function LiveBoard({ row, card, onOpen }) {
           <>
             <Team team={first.a} score={first.score_a} lead={aLeads} hidden={first.a_hidden} />
             <Team team={first.b} score={first.score_b} lead={aLeads == null ? null : !aLeads} hidden={first.b_hidden} />
+            <LiveWatch live={first.live} className="mt-2.5 font-display text-[13px] font-bold text-white" />
           </>
         ) : card.lead ? (
           <p className="mt-2.5 truncate font-display text-[14.5px] text-[#C9CED6]">
@@ -87,7 +103,9 @@ export default function LiveBoard({ row, card, onOpen }) {
           <div className="mt-3 flex flex-wrap gap-1.5">
             {courts.slice(1).map((c) => (
               <span key={c.court} className="rounded-full bg-[#1C212B] px-2.5 py-1.5 font-display text-[12px] font-semibold leading-none text-[#C9CED6]">
-                {t('homecard.live_court_pill', { n: c.court })} · <b className="text-white">{c.score_a ?? '-'}-{c.score_b ?? '-'}</b>
+                {t('homecard.live_court_pill', { n: c.court })} · {liveScoreText(c.live, t)
+                  ? <LiveWatch live={c.live} className="font-bold text-white" />
+                  : <b className="text-white">{c.score_a ?? '-'}-{c.score_b ?? '-'}</b>}
               </span>
             ))}
           </div>
