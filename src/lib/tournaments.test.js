@@ -30,6 +30,9 @@ describe('categorias', () => {
     expect(categoryCode('masculino', 5)).toBe('M5')
     expect(categoryCode('feminino', 3)).toBe('F3')
     expect(categoryCode('misto', 4)).toBe('MX4')
+    // «Para todos» (#802): na base é null, no formulário 'todos'.
+    expect(categoryCode(null, 3)).toBe('T3')
+    expect(categoryCode('todos', 3)).toBe('T3')
   })
   it('soma as vagas de todas as categorias', () => {
     expect(totalSlots([{ slots: 16 }, { slots: 24 }, { slots: '12' }])).toBe(52)
