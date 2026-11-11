@@ -61,7 +61,8 @@ function ScoringChips({ value, onChange, label, locked, t }) {
     </div>
   )
 }
-const GENDERS = ['masculino', 'feminino', 'misto']
+// 'todos' = «Para todos» (#802): grava-se como gender null, qualquer dupla.
+const GENDERS = ['masculino', 'feminino', 'misto', 'todos']
 
 const pad = (n) => String(n).padStart(2, '0')
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -334,7 +335,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       // update_tournament — gravam-se à parte, depois (outgoing).
       // status: com inscritos, a hora só muda até ao sorteio da categoria.
       id: c.id, special: null, had_special: false, status: c.status || null,
-      code: c.code, name: c.name, gender: c.gender, level: c.level,
+      code: c.code, name: c.name, gender: c.gender || 'todos', level: c.level,
       day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
       slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
       prize_first: c.prize_first || '', prize_second: c.prize_second || '',
@@ -532,7 +533,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     // Com inscritos, o dia vai como day_date: é o nome que o update_tournament
     // lê para mudar a hora de uma categoria (Dev 3, 13 out). Mandar a mesma
     // hora não é mudança.
-    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, status: _status, ...c }) => (locked ? { ...c, day_date: c.day || null } : c)),
+    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, status: _status, ...raw }) => {
+      // «Para todos» vai para a base como gender null (#802).
+      const c = { ...raw, gender: raw.gender === 'todos' ? null : raw.gender }
+      return locked ? { ...c, day_date: c.day || null } : c
+    }),
     special_prices: d.categories.filter((c) => c.special || c.had_special).map((c) => ({ code: c.code, value: Number(c.price) > 0 ? (c.special || null) : null })),
     courts: courtNames(d.courts, d.days, courtBase),
     entries_close_at: localInputToIso(d.entries_close_at),
@@ -1142,9 +1147,10 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave, c
         <button type="button" onClick={onCancel} aria-label={t('tournament.create.cancel')} className="text-ink-300 hover:text-ink-700"><X size={16} /></button>
       </div>
       <Field className="mt-3" label={t('tournament.create.gender')}>
-        <Chips value={cat.gender} onChange={(g) => set({ gender: g, name: '' })}
+        <Chips className="!flex-wrap !overflow-visible" value={cat.gender} onChange={(g) => set({ gender: g, name: '' })}
           label={t('tournament.create.gender')}
           options={GENDERS.map((g) => ({ value: g, label: t(`tournament.create.gender_${g}`) }))} />
+        {cat.gender === 'todos' && <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.gender_todos_hint')}</p>}
       </Field>
       <Field className="mt-3" label={t('tournament.create.level')}>
         <Chips value={cat.level} onChange={(n) => set({ level: n, name: '' })}
