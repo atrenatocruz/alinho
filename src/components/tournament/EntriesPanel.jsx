@@ -16,6 +16,7 @@ import { replaceTournamentPlayer, entryHasPlayedMatches } from '../../lib/tourna
 import { categoryGenderQuestion } from './genderCheck'
 import { usePriceRoster, PriceRosterSummary, PriceRosterTag } from '../SpecialPriceRoster'
 import { TshirtSummaryCard, PairShirts } from './TshirtAdmin'
+import { MealSummaryCard } from './MealAdmin'
 import { tshirtOn, shirtRulesOf } from './tshirt'
 import { useNavigate } from 'react-router-dom'
 import { listTournamentClashes } from '../../lib/tournamentApi'
@@ -535,6 +536,8 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
           )}
           {/* As t-shirts do torneio todo (SPEC t-shirts, ponto 4). */}
           <TshirtSummaryCard tournament={tournament} />
+          {/* As refeições do torneio todo, por baixo das t-shirts (#799, SPEC ponto 4). */}
+          <MealSummaryCard tournament={tournament} />
           {clashPeople > 0 && (
             <ClashBanner onResolve={() => setClashList(true)}>
               <b>{t('tclash.entries_title', { count: clashPeople })}</b> {t('tclash.entries_body')}

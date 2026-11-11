@@ -122,6 +122,8 @@ const TOURNAMENT = () => {
       // mockTDeuce = 'star_point' | 'vantagens': «Aos 40-40» (27 out). Sem ele, o torneio não traz o modo (ponto de ouro).
       ...(localStorage.getItem('mockTDeuce') ? { deuce: localStorage.getItem('mockTDeuce') } : {}),
       ...(localStorage.getItem('mockTShirt') ? { tshirt: { mode: localStorage.getItem('mockTShirt'), price_cents: 1200, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] } } : {}),
+      // mockTMeal = 'sale' | 'gift': a refeição do torneio (#799), 10 € à parte ou incluída.
+      ...(localStorage.getItem('mockTMeal') ? { meal: { mode: localStorage.getItem('mockTMeal'), price_cents: 1000, description: 'Jantar no clube, às 20:30' } } : {}),
       // mockTMax = '1' | '2' | '99': o máximo de categorias por pessoa (99 = «Todas», 8 nov).
       ...(localStorage.getItem('mockTMax') ? { max_categories: Number(localStorage.getItem('mockTMax')) } : {}),
       // mockTEntry = 'dupla' | 'as_duas': «Inscrição» do torneio (#790).
@@ -352,7 +354,7 @@ export const TOURNAMENT_RPC_MOCKS = {
       ...(myGamesReal()
         // mockTMyState = 'por_validar' …: o estado da minha inscrição.
         ? { my: { category_id: 'cat-m4', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1' },
-            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1', tshirt: localStorage.getItem('mockTShirt') ? 'L' : null, ...(localStorage.getItem('mockTShirtGuest') ? { guest_name: 'João Ferreira', guest_tshirt: 'M' } : {}) }],
+            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1', tshirt: localStorage.getItem('mockTShirt') ? 'L' : null, ...(localStorage.getItem('mockTMeal') ? { meal: localStorage.getItem('mockTMealMine') === 'no' ? false : localStorage.getItem('mockTMealMine') === 'yes' ? true : null } : {}), ...(localStorage.getItem('mockTShirtGuest') ? { guest_name: 'João Ferreira', guest_tshirt: 'M' } : {}) }],
             my_matches: [] }
         // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
         // inscrito — sem «Os meus jogos» (separadores, 28 set).
@@ -747,6 +749,7 @@ const promotedRead = new Set()
 // localStorage.mockTShirt = 'sale' | 'gift' — as t-shirts (SPEC t-shirts, 8
 // out): tamanhos na lista de quem organiza, a contagem e a lista por pessoa.
 const shirtOn = () => !!localStorage.getItem('mockTShirt')
+const mealOn = () => !!localStorage.getItem('mockTMeal')
 const SHIRT_SIZES = ['L', 'M', 'S', null, 'XL', 'none', 'M', 'L', 'XS', 'M', 'L', 'XXL', null, 'S', 'M', 'L']
 // Uma linha por pessoa, com as categorias juntas (uma t-shirt por pessoa,
 // 11 out; Dev 3: category_codes[], entry_ids[], slots[]).
@@ -768,6 +771,14 @@ export const TOURNAMENT_PROMOTED_RPC_MOCKS = {
   tournament_player_tshirt: () => (shirtOn() && localStorage.getItem('mockTShirtPartner')
     ? { chosen: true, size: localStorage.getItem('mockTShirtPartner') === 'chosen' ? null : localStorage.getItem('mockTShirtPartner') } : shirtOn() ? { chosen: false, size: null } : undefined),
   set_my_tournament_tshirt: () => (shirtOn() ? null : undefined),
+  // localStorage.mockTMeal = 'sale' | 'gift' (#799): a contagem e a lista por
+  // pessoa da refeição. mockTMealPartner = 'yes' | 'no': o parceiro já respondeu.
+  tournament_meal_counts: () => (mealOn() ? { mode: localStorage.getItem('mockTMeal'), price_cents: 1000, description: 'Jantar no clube, às 20:30', yes: 24, no: 9, pending: 7 } : undefined),
+  tournament_meal_people: () => (mealOn() ? SHIRT_PEOPLE().map((p, i) => ({ user_id: p.user_id, name: p.name, category_codes: p.category_codes, entry_ids: p.entry_ids, slots: p.slots, meal: [true, false, true, null, true, true, false, true, null][i] })) : undefined),
+  admin_set_tournament_meal: () => (mealOn() ? true : undefined),
+  set_my_tournament_meal: () => (mealOn() ? true : undefined),
+  tournament_player_meal: () => (mealOn() && localStorage.getItem('mockTMealPartner')
+    ? { chosen: true, meal: null } : mealOn() ? { chosen: false, meal: null } : undefined),
   mark_notifications_read: (params) => {
     if (localStorage.getItem('mockTPromoted') !== 'true') return undefined
     for (const id of params?.p_ids || []) promotedRead.add(id)
