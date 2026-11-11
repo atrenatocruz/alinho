@@ -12,7 +12,7 @@ import OrganizerBox from '../components/event/OrganizerBox'
 import { isMixLive, mixClock, clearPhase, hasPhaseColumns } from '../lib/mixLive'
 import MixPhaseClock from '../components/mix/MixPhaseClock'
 import EventCoverSkeleton from '../components/event/EventCoverSkeleton'
-import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2 } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Share2, Watch } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -71,6 +71,7 @@ import { weekdayShort } from '../lib/launchDay'
 import { adminPairSoloRows, adminSplitPairRow, mixPairErrorMessage } from '../lib/mixPairs'
 import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKeys'
 import { appHref, appOrigin } from '../lib/native'
+import { isLiveFresh, liveScoreText } from '../lib/mixLiveScore'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
@@ -185,6 +186,10 @@ export default function GameDetails() {
   const [requestNotice, setRequestNotice] = useState(null) // { ok, text }
   const [teams, setTeams] = useState([])
   const [matches, setMatches] = useState([])
+  // O placar ao vivo dos jogos contados no relógio (Fase B, 11 nov), por
+  // match_id: { state, updated_at }. `liveNow` volta a contar os 3 min.
+  const [liveScores, setLiveScores] = useState({})
+  const [liveNow, setLiveNow] = useState(() => Date.now())
   const [loading, setLoading] = useState(true)
   const [joining, setJoining] = useState(false)
   const [joinMode, setJoinMode] = useState(null) // null | 'partner'
@@ -527,6 +532,18 @@ export default function GameDetails() {
       .channel(`game_${id}_${table}`)
       .on('postgres_changes', { schema: 'public', table, ...opts }, reloadSoon)
       .subscribe())
+    // O placar do relógio (Fase B): muda a cada ponto, por isso só se põe o
+    // que chegou no sítio, sem ler a página toda outra vez.
+    channels.push(supabase
+      .channel(`game_${id}_mix_live_scores`)
+      .on('postgres_changes', { schema: 'public', table: 'mix_live_scores', event: '*', filter: `game_id=eq.${id}` }, (payload) => {
+        const row = payload.new
+        if (!row?.match_id) return
+        setLiveScores((prev) => ({ ...prev, [row.match_id]: { match_id: row.match_id, state: row.state, updated_at: row.updated_at } }))
+        setLiveNow(Date.now())
+      })
+      .subscribe())
+    const liveTimer = setInterval(() => setLiveNow(Date.now()), 30000)
 
     // O organizador muda de app a meio do mix (telemóvel): ao voltar, a
     // página lê outra vez — o tempo real pode ter falhado entretanto.
@@ -535,6 +552,7 @@ export default function GameDetails() {
 
     return () => {
       clearTimeout(reloadTimer)
+      clearInterval(liveTimer)
       channels.forEach((channel) => supabase.removeChannel(channel))
       document.removeEventListener('visibilitychange', onVisible)
     }
@@ -652,6 +670,13 @@ export default function GameDetails() {
         .order('round_number')
         .order('court_number')
 
+      // Sem a migration_relogio_mix_b.sql (ou numa app que não a conhece) dá
+      // erro: fica sem ao vivo, como antes.
+      const { data: liveRows } = await supabase
+        .from('mix_live_scores')
+        .select('match_id, state, updated_at')
+        .eq('game_id', id)
+
       const { data: scorekeeperRows } = await supabase
         .from('game_scorekeepers')
         .select('user_id')
@@ -725,6 +750,7 @@ export default function GameDetails() {
         player2: personOf(team.player2, team.player2_id) ?? guestAsProfile(team.guest2),
       })))
       setMatches(matchesData || [])
+      setLiveScores(Object.fromEntries((liveRows || []).map((r) => [r.match_id, r])))
 
       // Per-mix leaderboard — only exists once the mix has been finalized
       if (gameData.status === 'finished') {
@@ -4678,6 +4704,13 @@ export default function GameDetails() {
                               <Pencil size={12} />
                               {t('gamedetails.edit_short')}
                             </button>
+                          )}
+                          {/* Ao vivo do relógio (Fase B): só sem resultado e fresco. */}
+                          {!done && isLiveFresh(liveScores[m.id], liveNow) && liveScoreText(liveScores[m.id].state, t) && (
+                            <span className="inline-flex items-center gap-1 text-[12px] font-extrabold text-ink-900 tabular-nums">
+                              <Watch size={12} className="text-ok" aria-label={t('live.watch_label')} />
+                              {liveScoreText(liveScores[m.id].state, t)}
+                            </span>
                           )}
                         </div>
                         <ScoreEntry

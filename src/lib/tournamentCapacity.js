@@ -18,6 +18,7 @@
 import {
   SLACK_DEFAULT, formatOptions, recommendFormat, knockoutRounds,
 } from './tournamentFormat'
+import { endsNextDay } from './tournamentDay'
 
 // ── 1. Quanto tempo de campo ocupa um jogo ───────────────────────────────
 
@@ -53,8 +54,12 @@ const toHhmm = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')
 export function dayMinutes(day) {
   const from = toMinutes(day?.starts_at)
   const to = toMinutes(day?.ends_at)
-  if (from == null || to == null || to <= from) return null
-  return to - from
+  if (from == null || to == null) return null
+  // Um dia que acaba de madrugada (09:00 à 01:00) conta até à 01:00 do dia
+  // seguinte (Trello #797).
+  const end = endsNextDay(day) ? to + 24 * 60 : to
+  if (end <= from) return null
+  return end - from
 }
 
 /** Horas do dia × campos («2 campos · 18h às 23h · 10 h»). */

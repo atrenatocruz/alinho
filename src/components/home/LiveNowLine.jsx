@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { listLiveEvents } from '../../lib/liveEvents'
+import { supabase } from '../../lib/supabase'
 import { cardFields, LiveCard } from '../live/LiveStrip'
 import LiveBoard from './LiveBoard'
 import { Sheet } from '../agenda/AgendaControls'
@@ -39,6 +40,27 @@ export default function LiveNowLine({ filters = null, onCount, show = true }) {
       .catch((err) => console.error('Error loading live events:', err))
     return () => { alive = false }
   }, [])
+  // Com a folha aberta, os pontos do relógio (Fase B, 11 nov): cada placar
+  // novo volta a pedir a lista (vários seguidos dão uma leitura). A RLS só
+  // manda os jogos que a pessoa pode ver. Fechada, fica como antes.
+  useEffect(() => {
+    if (!open) return undefined
+    let timer = null
+    const reload = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        listLiveEvents().then(setAll).catch((err) => console.error('Error loading live events:', err))
+      }, 1000)
+    }
+    const channel = supabase
+      .channel('live_now_mix_live_scores')
+      .on('postgres_changes', { schema: 'public', table: 'mix_live_scores', event: '*' }, reload)
+      .subscribe()
+    return () => {
+      clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
+  }, [open])
   const rows = useMemo(() => filterLive(all, filters), [all, filters])
   useEffect(() => { onCount?.(rows.length) }, [rows.length]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!show || !rows.length) return null

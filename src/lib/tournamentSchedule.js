@@ -36,6 +36,8 @@ export const phaseRank = (match) => {
   return i === -1 ? STAGE_ORDER.length : i
 }
 
+import { endsNextDay, nextDateKey } from './tournamentDay'
+
 const min = (ms) => ms * 60000
 const addMin = (date, m) => new Date(date.getTime() + min(m))
 const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd
@@ -45,7 +47,10 @@ const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd
 export function daySlots(day, durationMaxMin = SCHEDULE_DEFAULTS.durationMaxMin) {
   const slots = []
   const start = new Date(`${day.date}T${day.start}:00`)
-  const end = new Date(`${day.date}T${day.end}:00`)
+  // Com o fim antes do início (09:00 à 01:00) o dia acaba na madrugada
+  // seguinte; essas horas continuam a ser do mesmo `date` e levam `nextDay`
+  // (Trello #797).
+  const end = new Date(`${endsNextDay(day) ? nextDateKey(day.date) : day.date}T${day.end}:00`)
   const [h0, m0] = String(day.start).split(':').map(Number)
   for (const court of day.courts) {
     let t = new Date(start)
@@ -54,8 +59,9 @@ export function daySlots(day, durationMaxMin = SCHEDULE_DEFAULTS.durationMaxMin)
       // `date` e `time` são a hora escrita do dia (a da categoria compara-se
       // com estas), sem passar pelo relógio do aparelho.
       const minutes = h0 * 60 + m0 + n * durationMaxMin
-      const time = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
-      slots.push({ court, startsAt: new Date(t), endsAt: addMin(t, durationMaxMin), date: day.date, time })
+      const clock = minutes % (24 * 60)
+      const time = `${String(Math.floor(clock / 60)).padStart(2, '0')}:${String(clock % 60).padStart(2, '0')}`
+      slots.push({ court, startsAt: new Date(t), endsAt: addMin(t, durationMaxMin), date: day.date, time, nextDay: minutes >= 24 * 60 })
       t = addMin(t, durationMaxMin)
       n++
     }
@@ -113,7 +119,7 @@ export function scheduleMatches(matches, days, options = {}) {
 /** A hora cabe no dia e na hora de início da categoria? */
 const fitsCategoryWindow = (match, slot) =>
   (!match.day || slot.date === match.day)
-  && (!match.notBefore || slot.time >= match.notBefore)
+  && (!match.notBefore || slot.nextDay || slot.time >= match.notBefore)
 
 /** Pode este jogo ficar nesta hora/campo, com os que já estão marcados? */
 export function canPlace(candidate, scheduled, options = {}) {
