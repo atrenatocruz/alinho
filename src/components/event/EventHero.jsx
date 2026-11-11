@@ -20,10 +20,11 @@
 // ao descer (Francisco, 15 out). Quando o topo do título grande chega ao fundo
 // dos botões, o vidro e o nome entram juntos e o título grande sai, numa troca
 // cruzada de 150 ms (UX); ao voltar a subir, o contrário.
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Maximize2, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
+import PosterViewer from '../PosterViewer'
 import { KIND_COLORS } from '../../lib/kindColors'
 import { Avatar } from '../ui'
 import FaceCircles from './FaceCircles'
@@ -76,6 +77,11 @@ export default function EventHero({
   // título) chega aos círculos — nada passa nítido por baixo deles (UX, 15 out).
   const firstUnder = useUnderBar(org ? orgRef : titleRef, rowRef, [!!org])
   const coverGone = useUnderBar(coverRef, rowRef, [], { edge: 'bottom' })
+  // O cartaz em ecrã inteiro (#809): tocar no cartaz ou no «Ver cartaz».
+  // Só com cartaz que carregou; com o Alino por omissão, nada.
+  const [posterFailed, setPosterFailed] = useState(false)
+  const [posterOpen, setPosterOpen] = useState(false)
+  const hasPoster = poster && !!imageUrl && !posterFailed
   return (
     // Sai das margens da página (o <main> tem px-4 e pt-6), como a capa do protótipo.
     // No computador, quando a folha acaba aqui (roundBottom), fica da largura
@@ -87,16 +93,24 @@ export default function EventHero({
         title={barTitle || title} dot={(KIND_COLORS[kind] || KIND_COLORS.mix).strong}
         left={onBack ? <button type="button" onClick={onBack} aria-label={t('common.back')} className={GLASS_ROUND}><ChevronLeft size={22} /></button> : null}
         right={onShare ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={GLASS_ROUND}><Share2 size={18} /></button> : null} />
-      <div ref={coverRef}>
+      <div ref={coverRef} onClick={hasPoster ? () => setPosterOpen(true) : undefined} className={hasPoster ? 'cursor-zoom-in' : undefined}>
       {/* poster: o cartaz do torneio inteiro, sobre ele próprio desfocado (UX, 16 out). */}
-      <KindHero kind={kind} src={imageUrl} poster={poster && !!imageUrl} className="relative h-[210px]" imgClassName={imageUrl ? "" : "object-[center_22%]"}>
+      <KindHero kind={kind} src={imageUrl} poster={poster && !!imageUrl} onError={() => setPosterFailed(true)} className="relative h-[210px]" imgClassName={imageUrl ? "" : "object-[center_22%]"}>
         {chip && (
           <span className="absolute bottom-8 left-4 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs font-extrabold text-white backdrop-blur-sm">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-white" /> {chip}
           </span>
         )}
+        {/* «Ver cartaz»: igual à pastilha do tipo, do outro lado (UX, 11 nov). */}
+        {hasPoster && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); setPosterOpen(true) }}
+            className="absolute bottom-8 right-4 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs font-extrabold text-white backdrop-blur-sm">
+            <Maximize2 size={13} strokeWidth={2.75} aria-hidden="true" /> {t('tournament.view_poster')}
+          </button>
+        )}
       </KindHero>
       </div>
+      {posterOpen && <PosterViewer url={imageUrl} alt={title || ''} onClose={() => setPosterOpen(false)} />}
 
       {/* O cartão branco sobe uns 20 px por cima da capa. `roundBottom`: quando
           a folha acaba aqui, os cantos de baixo a 16 px, como os topos do R12b
