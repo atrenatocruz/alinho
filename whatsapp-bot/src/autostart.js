@@ -2,6 +2,7 @@ import { supabase } from './supabase.js'
 import { getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { gamesLines, loadMixRound, teamNames } from './mixRound.js'
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000
 
@@ -214,7 +215,7 @@ export async function loadRepeatPairKeys(game) {
   return repeatPairsFrom(previousGames, previousTeams)
 }
 
-async function autoStartMix(game, { sendText }) {
+export async function autoStartMix(game, { sendText }) {
   if (!botConsegueComecar(game)) {
     console.log(`Auto-start ignorado (formato que o bot não conduz) para o mix ${game.id}`)
     return
@@ -251,7 +252,6 @@ async function autoStartMix(game, { sendText }) {
   // mix (Ruben, 2 out) e lado 'both' (o default do sideOf).
   const guestIds = new Set((participants || []).flatMap((p) => [p.guest_id, p.partner_guest_id]).filter(Boolean))
 
-  let insertedTeams = drawn
   if (!drawn) {
     const { data: rankings, error: rErr } = await supabase.rpc('get_global_rankings')
     if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
@@ -303,13 +303,13 @@ async function autoStartMix(game, { sendText }) {
       }
     }
 
-    const { data: newTeams, error: teamsError } = await supabase
-      .from('teams')
-      .insert(duplas.map(teamRow))
-      .select('id, player1_id, player2_id, player1_guest_id, player2_guest_id')
+    const { error: teamsError } = await supabase.from('teams').insert(duplas.map(teamRow))
     if (teamsError) throw new Error(`Failed to insert teams for auto-start: ${teamsError.message}`)
-    insertedTeams = newTeams
   }
+
+  // Lê-se antes de pôr o mix a decorrer: se falhar, o ciclo seguinte volta a
+  // tentar com as mesmas duplas, em vez de o mix começar sem anúncio.
+  const round = await loadMixRound(game)
 
   const { error: statusError } = await supabase.from('games').update({ status: 'in_progress' }).eq('id', game.id)
   if (statusError) throw new Error(`Failed to flip game to in_progress for auto-start: ${statusError.message}`)
@@ -322,7 +322,7 @@ async function autoStartMix(game, { sendText }) {
   // call in this bot (see Task 19) — unused below since the pairings
   // announcement is one shared broadcast to the whole group, not a message
   // for any single player, so it stays 'pt' (see locales.js scope note).
-  const profileIds = insertedTeams.flatMap((team) => [team.player1_id, team.player2_id]).filter(Boolean)
+  const profileIds = round.teams.flatMap((team) => [team.player1_id, team.player2_id]).filter(Boolean)
   const { data: profiles } = await supabase.from('profiles').select('id, name, whatsapp_jid, language').in('id', profileIds)
   const profileById = new Map((profiles || []).map((p) => [p.id, p]))
   // Convidados sem conta: nome e JID vêm de game_guests (service-role).
@@ -339,15 +339,16 @@ async function autoStartMix(game, { sendText }) {
   }
 
   const slot = (userId, guestId) => label(userId ? profileById.get(userId) : guestById.get(guestId))
-  const pairs = insertedTeams.map((team) => [slot(team.player1_id, team.player1_guest_id), slot(team.player2_id, team.player2_guest_id)])
-  const lines = pairs.map(([a, b], i) => `${i + 1}. ${a} 🤝 ${b}`)
+  const names = teamNames(round.teams, (team) => [slot(team.player1_id, team.player1_guest_id), slot(team.player2_id, team.player2_guest_id)])
+  // Os jogos da Ronda 1, campo a campo (#791), iguais aos que a app vai criar.
+  const games = gamesLines(round, names)
 
   // Pairings announcement — a shared broadcast to the whole group, stays
   // 'pt' (see locales.js scope note).
   const announceLang = 'pt'
-  const text = t('duplas_formed', announceLang, { title: game.title, lines: lines.join('\n') }) + helpFooter(announceLang)
-  // Mensagens novas (1 out): «A e B», sem o rodapé do /help.
-  const newText = t('duplas_formed', announceLang, { title: game.title, lines: pairs.map(([a, b], i) => `${i + 1}. ${a} e ${b}`).join('\n') }, true)
+  const text = t('duplas_formed', announceLang, { title: game.title, lines: games }) + helpFooter(announceLang)
+  // Mensagens novas (1 out): sem o rodapé do /help.
+  const newText = t('duplas_formed', announceLang, { title: game.title, lines: games }, true)
   for (const group of groups) {
     try {
       await sendText(group.groupJid, group.newMessages ? newText : text, { mentions })

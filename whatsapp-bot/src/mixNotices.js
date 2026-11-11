@@ -2,6 +2,7 @@ import { supabase } from './supabase.js'
 import { getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { gamesLines, loadMixRound, teamNames } from './mixRound.js'
 
 // Avisos de mix (Trello #292, supabase/migration_mix_notices.sql): quando o
 // admin adiciona, tira ou refaz duplas num mix já começado, a app regista
@@ -21,17 +22,13 @@ function mentionToken(jid) {
   return `@${jid.split('@')[0]}`
 }
 
-async function announceUpdatedDuplas(game, changedIds, { sendText }) {
+export async function announceUpdatedDuplas(game, changedIds, { sendText }) {
   const groups = (await getGroupsForOrg(game.organization_id)).filter((g) => mixVisibleToGroup(game, g))
   if (groups.length === 0) return
 
-  const { data: teams, error } = await supabase
-    .from('teams')
-    .select('player1_id, player2_id, player1_guest_id, player2_guest_id, seed_ranking')
-    .eq('game_id', game.id)
-    .order('seed_ranking', { ascending: false })
-  if (error) throw new Error(`Failed to load teams for updated pairings: ${error.message}`)
-  if (!teams?.length) return
+  const round = await loadMixRound(game)
+  const { teams } = round
+  if (!teams.length) return
 
   const ids = teams.flatMap((team) => [team.player1_id, team.player2_id]).filter(Boolean)
   const { data: profiles } = await supabase.from('profiles').select('id, name, whatsapp_jid').in('id', ids)
@@ -52,13 +49,16 @@ async function announceUpdatedDuplas(game, changedIds, { sendText }) {
     return p?.name || 'Jogador'
   }
   const slot = (userId, guestId) => (userId ? label(userId) : guestById.get(guestId)?.name || 'Jogador')
-  const pairs = teams.map((team) => [slot(team.player1_id, team.player1_guest_id), slot(team.player2_id, team.player2_guest_id)])
-  const lines = pairs.map(([a, b], i) => `${i + 1}. ${a} 🤝 ${b}`)
+  const names = teamNames(teams, (team) => [slot(team.player1_id, team.player1_guest_id), slot(team.player2_id, team.player2_guest_id)])
+  // Os jogos campo a campo (#791). Nos modos em que não dá, a lista de sempre.
+  const games = gamesLines(round, names)
+  const bySeed = [...teams].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0))
+  const lines = (joiner) => games ?? bySeed.map((team, i) => `${i + 1}. ${names.get(team.id).join(joiner)}`).join('\n')
 
   // Mensagem para o grupo inteiro — fica em 'pt' (ver nota em locales.js).
-  const text = t('duplas_updated', 'pt', { title: game.title, lines: lines.join('\n') }) + helpFooter('pt')
+  const text = t('duplas_updated', 'pt', { title: game.title, lines: lines(' 🤝 ') }) + helpFooter('pt')
   // Mensagens novas (1 out): «A e B», sem o rodapé do /help.
-  const newText = t('duplas_updated', 'pt', { title: game.title, lines: pairs.map(([a, b], i) => `${i + 1}. ${a} e ${b}`).join('\n') }, true)
+  const newText = t('duplas_updated', 'pt', { title: game.title, lines: lines(' e ') }, true)
   for (const group of groups) {
     try {
       await sendText(group.groupJid, group.newMessages ? newText : text, { mentions })
