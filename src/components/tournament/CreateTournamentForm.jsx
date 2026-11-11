@@ -84,12 +84,12 @@ const inputClass = 'input-field'
 
 // Só para os botões de acrescentar (+ dia, + campo, + categoria). As
 // escolhas usam <Chips>, a pastilha única da app (Trello #528).
-function Chip({ onClick, children }) {
+function Chip({ onClick, children, className = '' }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-[44px] items-center gap-1 whitespace-nowrap rounded-full border border-line px-3.5 py-1.5 text-sm font-extrabold text-ink-700 transition-colors hover:bg-ink-50"
+      className={`inline-flex min-h-[44px] items-center gap-1 whitespace-nowrap rounded-full border border-line px-3.5 py-1.5 text-sm font-extrabold text-ink-700 transition-colors hover:bg-ink-50 ${className}`}
     >
       {children}
     </button>
@@ -166,17 +166,22 @@ function DayCategories({ draft, set, dayLabel }) {
       {semDia.length > 0 && (
         <div className="mt-2 rounded-card border border-warning/30 bg-warning/10 p-4">
           <b className="text-sm text-ink-900">{t('tournament.create.no_day_yet')}</b>
+          <p className="text-xs text-ink-500">{t('tournament.create.no_day_hint')}</p>
           {semDia.map((c) => (
-            <div key={c.code} className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
+            <div key={c.code} className="mt-4">
+              <div className="flex items-center gap-1.5">
+                <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
               {draft.days.map((d) => (
                 // Ao pôr a categoria num dia, a hora passa a ser a de abertura
                 // desse dia — antes ficava a que tinha (QA, 27 set; #453).
-                <Chip key={d.date} onClick={() => patch(c.code, { day: d.date, start_time: d.starts_at })}>
+                <Chip key={d.date} className="bg-white" onClick={() => patch(c.code, { day: d.date, start_time: d.starts_at })}>
                   {dayLabel(d.date)}
                 </Chip>
               ))}
+              </div>
             </div>
           ))}
         </div>
@@ -439,7 +444,28 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     })
     setAddingDay(false)
   }
-  const patchDay = (i, patch) => set({ days: draft.days.map((d, k) => (k === i ? { ...d, ...patch } : d)) })
+  // Uma categoria que começa à hora de abrir acompanha o dia: sem isto, mudar
+  // as 09:00 do dia para as 12:00 deixava-a fora do horário.
+  const patchDay = (i, patch) => setDraft((prev) => {
+    const old = prev.days[i]
+    return {
+      ...prev,
+      days: prev.days.map((d, k) => (k === i ? { ...d, ...patch } : d)),
+      categories: patch.starts_at === undefined ? prev.categories : prev.categories.map((c) => (
+        c.day === old.date && c.start_time === old.starts_at ? { ...c, start_time: patch.starts_at } : c
+      )),
+    }
+  })
+  // As categorias criam-se no passo 1, antes de haver dias. Com um dia só não
+  // há nada a escolher: ficam nesse dia, à hora de abrir (10 nov).
+  const goToNextStep = () => {
+    if (step === 2 && draft.days.length === 1) {
+      const [day] = draft.days
+      set({ categories: draft.categories.map((c) => (c.day ? c : { ...c, day: day.date, start_time: day.starts_at })) })
+    }
+    setTried(false)
+    setStep(step + 1)
+  }
 
   const saveCategory = (cat) => {
     const list = [...draft.categories]
@@ -616,7 +642,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       stepLabel={t(`tournament.create.step${step}`)}
       onBack={step === 1 || locked ? onCancel : () => setStep(step - 1)}
       top={top}
-      onNext={locked || step === 4 ? save : () => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}
+      onNext={locked || step === 4 ? save : () => (problem ? setTried(true) : goToNextStep())}
       nextLabel={locked || step === 4 ? t('tournament.create.save_changes') : t('tournament.create.next')}
       footer={footer}
       error={error}
