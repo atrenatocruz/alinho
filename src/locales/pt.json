@@ -4637,6 +4637,7 @@
   "tournament.create.day_open": "{{courts}} campos · {{from}} às {{to}}",
   "tournament.create.day_no_categories": "Ainda não joga aqui nenhuma categoria.",
   "tournament.create.no_day_yet": "Ainda sem dia",
+  "tournament.create.no_day_hint": "Escolhe o dia de cada categoria.",
   "tournament.create.start_time": "Hora de início",
   "tournament.create.section2": "Quando",
   "tournament.create.section3": "Onde joga",
