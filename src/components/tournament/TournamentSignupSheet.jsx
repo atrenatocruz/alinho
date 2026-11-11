@@ -154,7 +154,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   useEffect(() => {
     if (partnerKnownSex && !partnerFits(chosen, myGender, partnerKnownSex)) { setPartnerId(null); setPartnerKnownSex(null) }
   }, [chosen, myGender, partnerKnownSex])
-  const needsPartnerSex = mode === 'named' || (mode === 'partner' && !!partnerId && !partnerKnownSex)
+  // «Para todos» (#802): qualquer dupla serve, não se pergunta o sexo do parceiro.
+  const needsPartnerSex = !!chosen?.gender && (mode === 'named' || (mode === 'partner' && !!partnerId && !partnerKnownSex))
   const partnerSexWrong = needsPartnerSex && !!partnerSex && !partnerFits(chosen, myGender, partnerSex)
   // Categorias que chocam (9 out): a escolhida começa quase à mesma hora que
   // uma onde já estou. Avisa; não impede.
@@ -318,7 +319,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
               )
             })}
           </div>
-          {mode === 'partner' && !!partnerId && !partnerKnownSex && partnerSexQuestion()}
+          {mode === 'partner' && needsPartnerSex && partnerSexQuestion()}
 
           {/* Sem conta */}
           <div className={`rounded-ctrl border-2 p-3 ${mode === 'named' ? 'border-ok bg-ok/5' : 'border-line'}`}>
@@ -351,7 +352,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
                     por link enquanto o envio de emails nao existir (#479). */}
                 <p className="text-xs text-muted">{t('partner.email_hint')}</p>
                 <p className="text-xs text-muted">{t('tsignup.guest_hint')}</p>
-                {partnerSexQuestion()}
+                {needsPartnerSex && partnerSexQuestion()}
               </div>
             ) : (
               <button onClick={() => { setMode('named'); setPartnerId(null); setPartnerKnownSex(null); setPartnerSex(null) }} className="press w-full text-left">

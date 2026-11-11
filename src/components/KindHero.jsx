@@ -14,8 +14,11 @@ const NIGHT = '#1F2937'
 // `poster`: a imagem é um cartaz (torneio): aparece inteira, centrada, e por
 // trás a mesma imagem a cobrir, desfocada e escurecida — um cartaz com texto
 // cortado a cobrir perdia as bordas (UX, 16 out). Por baixo, a cor do tipo.
-export default function KindHero({ kind, src = null, color = null, alt = '', className = '', imgClassName = '', poster = false, children = null }) {
+// `onError`: avisa quem usa que a imagem não carregou (o topo do torneio tira
+// o «Ver cartaz», #809).
+export default function KindHero({ kind, src = null, color = null, alt = '', className = '', imgClassName = '', poster = false, onError = null, children = null }) {
   const [failed, setFailed] = useState(false)
+  const fail = () => { setFailed(true); onError?.() }
   const url = src || KIND_HERO[kind]
   // O topo do clube e do grupo enquadrado nas caras (≈ 70 % 30 %), para não
   // cortar as cabeças nos cartões largos (SPEC avatares-clube-grupo, 14 out).
@@ -30,12 +33,12 @@ export default function KindHero({ kind, src = null, color = null, alt = '', cla
           {/* O cartaz acaba 48 px acima do fundo da capa: por baixo ficam a
               folha branca (sobe 20 px) e a pastilha do tipo, na faixa
               desfocada — nada tapa o cartaz (UX, 16 out). */}
-          <img src={url} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)}
+          <img src={url} alt={alt} loading="lazy" decoding="async" onError={fail}
             className={`absolute inset-x-0 top-0 h-[calc(100%-3rem)] w-full object-contain ${imgClassName}`} />
         </>
       )}
       {url && !failed && !poster && (
-        <img src={url} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)}
+        <img src={url} alt={alt} loading="lazy" decoding="async" onError={fail}
           className={`absolute inset-0 h-full w-full object-cover ${framed ? 'object-[70%_30%]' : ''} ${imgClassName}`} />
       )}
       {children}

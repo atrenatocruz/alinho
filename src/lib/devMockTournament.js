@@ -54,6 +54,10 @@ const CATEGORIES = [
   { id: 'cat-m5', code: 'M5', name: 'Masculinos 5', gender: 'masculino', level: 5, day_index: 1, start_time: '10:00', slots: 16, entry_count: 16, price_cents: 2500, status: 'sorteada', position: 3 },
   { id: 'cat-f4', code: 'F4', name: 'Femininos 4', gender: 'feminino', level: 4, day_index: 2, start_time: '12:00', slots: 12, entry_count: 12, price_cents: 2500, status: 'inscricoes', position: 4 },
   { id: 'cat-mx4', code: 'MX4', name: 'Mistos 4', gender: 'misto', level: 4, day_index: 1, start_time: '12:00', slots: 16, entry_count: 16, price_cents: 3000, status: 'inscricoes', position: 5 },
+  // mockTOpen = '1': mais uma categoria «Para todos» (#802), gender null.
+  ...(typeof localStorage !== 'undefined' && localStorage.getItem('mockTOpen') === '1'
+    ? [{ id: 'cat-t3', code: 'T3', name: 'Para todos 3', gender: null, level: 3, day_index: 0, start_time: '19:00', slots: 16, entry_count: 6, price_cents: 2500, status: 'inscricoes', position: 6 }]
+    : []),
 ]
 
 // "Os meus jogos" do print 05, 1.º telemóvel: três jogos de grupo ganhos,

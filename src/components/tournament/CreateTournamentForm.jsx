@@ -9,7 +9,7 @@ import { ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
 import { TIEBREAK_RULES } from './tieBreak'
 import { categoryCode, categoryName, categoryOutsideDay, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
-import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
+import { localInputToIso, isoToLocalInput, endsNextDay, nextDateKey } from '../../lib/tournamentDay'
 import { FieldLabel, MonoLabel } from './TournamentBits'
 import { TshirtField } from './tshirt'
 import { MealField } from './meal'
@@ -20,6 +20,12 @@ import StepPage from '../steps/StepPage'
 import WhatsappHoursField from '../WhatsappHoursField'
 import OpensPicker, { openingDays } from './OpensPicker'
 import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
+import { dayMinutes } from '../../lib/tournamentCapacity'
+
+/* Um dia com as duas horas que não dá tempo nenhum: acaba antes de começar
+   e não é madrugada (o fim passa das 06:00). É o dia a corrigir; as
+   categorias dele não se marcam como fora do horário (UX, #797). */
+const dayBackwards = (d) => !!(d?.starts_at && d?.ends_at) && !dayMinutes(d)
 import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
 import { maxCategories, ALL_CATEGORIES, isAllCategories, maxCategoryOptions, shownMaxCategories } from '../../lib/tournamentSignup'
@@ -62,7 +68,8 @@ function ScoringChips({ value, onChange, label, locked, t }) {
     </div>
   )
 }
-const GENDERS = ['masculino', 'feminino', 'misto']
+// 'todos' = «Para todos» (#802): grava-se como gender null, qualquer dupla.
+const GENDERS = ['masculino', 'feminino', 'misto', 'todos']
 
 const pad = (n) => String(n).padStart(2, '0')
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -138,7 +145,7 @@ function DayCategories({ draft, set, dayLabel }) {
             {doDia.length === 0 ? (
               <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.day_no_categories')}</p>
             ) : doDia.map((c) => {
-              const outside = categoryOutsideDay(c, draft.days)
+              const outside = !dayBackwards(d) && categoryOutsideDay(c, draft.days)
               return (
               <div key={c.code} className="mt-1.5">
               <div className="flex items-center gap-2">
@@ -335,7 +342,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       // update_tournament — gravam-se à parte, depois (outgoing).
       // status: com inscritos, a hora só muda até ao sorteio da categoria.
       id: c.id, special: null, had_special: false, status: c.status || null,
-      code: c.code, name: c.name, gender: c.gender, level: c.level,
+      code: c.code, name: c.name, gender: c.gender || 'todos', level: c.level,
       day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
       slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
       prize_first: c.prize_first || '', prize_second: c.prize_second || '',
@@ -388,7 +395,27 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // A guardar sem passos (a editar com inscrições, ou no fim): datas e regras.
   const finalProblem = saveProblem(draft, checkOpts)
   const shown = tried ? ((locked || step === 4) ? (problem || finalProblem) : problem) : null
-  const fieldError = (keys) => (shown && keys.includes(shown) ? t(`tournament.create.problem_${shown}`) : null)
+  // «Há um dia que acaba antes de começar» diz qual é (regra #798, UX 11 nov).
+  const problemText = (p) => {
+    if (p !== 'hours_order') return t(`tournament.create.problem_${p}`)
+    const bad = draft.days.filter(dayBackwards).sort((a, b) => a.date.localeCompare(b.date))
+    if (bad.length !== 1) return t('tournament.create.problem_days_backwards', { count: bad.length })
+    const at = new Date(`${bad[0].date}T12:00`)
+    return t(isMasculineWeekday(at) ? 'tournament.create.problem_day_backwards_m' : 'tournament.create.problem_day_backwards', {
+      // Em inglês o dia leva sempre maiúscula (Copywriter, 11 nov).
+      day: ((w) => (i18n.language?.startsWith('en') ? w.charAt(0).toUpperCase() + w.slice(1) : w))(weekdayLong(at, i18n.language)),
+      // «28 nov», «28 Nov»: o dia antes do mês em todas as línguas, como no título do dia.
+      date: `${at.getDate()} ${at.toLocaleDateString(i18n.language, { month: 'short' }).replace('.', '')}`,
+    })
+  }
+  const fieldError = (keys) => (shown && keys.includes(shown) ? problemText(shown) : null)
+  // Ao tocar com um dia errado, a página vai até ele (regra #798).
+  const showProblem = () => {
+    setTried(true)
+    if (problem !== 'hours_order') return
+    const bad = [...draft.days].sort((a, b) => a.date.localeCompare(b.date)).find(dayBackwards)
+    if (bad) requestAnimationFrame(() => document.getElementById(`tday-${bad.date}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+  }
   const DEADLINE_PROBLEMS = ['deadline', 'deadline_past', 'deadline_after_start']
   const DRAW_PROBLEMS = ['draw_after_start', 'draw_before_deadline']
   // Guarda só sem problemas; com um, mostra-o junto ao campo.
@@ -533,7 +560,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     // Com inscritos, o dia vai como day_date: é o nome que o update_tournament
     // lê para mudar a hora de uma categoria (Dev 3, 13 out). Mandar a mesma
     // hora não é mudança.
-    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, status: _status, ...c }) => (locked ? { ...c, day_date: c.day || null } : c)),
+    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, status: _status, ...raw }) => {
+      // «Para todos» vai para a base como gender null (#802).
+      const c = { ...raw, gender: raw.gender === 'todos' ? null : raw.gender }
+      return locked ? { ...c, day_date: c.day || null } : c
+    }),
     special_prices: d.categories.filter((c) => c.special || c.had_special).map((c) => ({ code: c.code, value: Number(c.price) > 0 ? (c.special || null) : null })),
     courts: courtNames(d.courts, d.days, courtBase),
     entries_close_at: localInputToIso(d.entries_close_at),
@@ -672,7 +703,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       stepLabel={t(`tournament.create.step${step}`)}
       onBack={step === 1 || locked ? onCancel : () => setStep(step - 1)}
       top={top}
-      onNext={locked || step === 4 ? save : () => (problem ? setTried(true) : goToNextStep())}
+      onNext={locked || step === 4 ? save : () => (problem ? showProblem() : goToNextStep())}
       nextLabel={locked || step === 4 ? t('tournament.create.save_changes') : t('tournament.create.next')}
       footer={footer}
       error={error}
@@ -680,7 +711,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       edit={editing_existing ? {
         onSave: save, onCancel, dirty: JSON.stringify(draft) !== initialDraft || openingChanged,
         saving, saveDisabled: !!anyProblem || !!specialProblem || specialLoad !== 'ok',
-        saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`)
+        saveHint: anyProblem ? problemText(anyProblem)
           : specialLoad === 'failed' ? t('tournament.create.special_load_failed')
           : specialLoad === 'loading' ? t('common.loading') : specialProblem,
         // «Voltar a rascunho» e «Cancelar/Eliminar o torneio» saíram do Editar
@@ -955,20 +986,29 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.location')} error={fieldError(['location'])}>
             {locationInput}
           </Field>
-          {draft.days.map((d, i) => (
-            <div key={d.date} className="card">
+          {draft.days.map((d, i) => {
+            const backwards = tried && dayBackwards(d)
+            return (
+            <div key={d.date} id={`tday-${d.date}`} className="card">
               <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
               <div className="mt-2 flex items-center gap-2">
                 <TimeInput className="input-field !w-[100px] !px-2" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
                 <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
-                <TimeInput className="input-field !w-[100px] !px-2" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
+                <TimeInput aria-invalid={backwards || undefined} className={`input-field !w-[100px] !px-2 ${backwards ? '!border !border-danger' : ''}`} value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
               </div>
+              {backwards && <p role="alert" className="mt-1.5 text-xs font-bold text-danger">{t('tournament.create.day_end_before_start')}</p>}
+              {/* Fim antes do início, até às 06:00: o dia acaba na madrugada
+                  seguinte (#797). Diz-se em que dia, para não parecer engano. */}
+              {endsNextDay(d) && (
+                <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.day_ends_next', { day: dayLabel(nextDateKey(d.date)), time: d.ends_at })}</p>
+              )}
               <div className="mt-2 flex items-center gap-2">
                 <input type="number" min="1" max="30" className="input-field !w-[72px] !px-2" value={d.courts} onChange={(e) => patchDay(i, { courts: e.target.value })} />
                 <span className="text-xs text-ink-500">{t('tournament.create.courts_label')}</span>
               </div>
             </div>
-          ))}
+            )
+          })}
           <Field label={t('tournament.create.court_names')} hint={t('tournament.create.court_names_hint')}>
             <div className="flex flex-wrap gap-1.5">
               {courtNames(draft.courts, draft.days, courtBase).map((name, i, shown) => (
@@ -1117,7 +1157,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
 
       {shown && ![...DEADLINE_PROBLEMS, ...DRAW_PROBLEMS, 'duration_order', 'location'].includes(shown) && (
-        <p className="text-xs text-danger">{t(`tournament.create.problem_${shown}`)}</p>
+        <p className="text-xs text-danger">{problemText(shown)}</p>
       )}
     </StepPage>
   )
@@ -1147,9 +1187,10 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave, c
         <button type="button" onClick={onCancel} aria-label={t('tournament.create.cancel')} className="text-ink-300 hover:text-ink-700"><X size={16} /></button>
       </div>
       <Field className="mt-3" label={t('tournament.create.gender')}>
-        <Chips value={cat.gender} onChange={(g) => set({ gender: g, name: '' })}
+        <Chips className="!flex-wrap !overflow-visible" value={cat.gender} onChange={(g) => set({ gender: g, name: '' })}
           label={t('tournament.create.gender')}
           options={GENDERS.map((g) => ({ value: g, label: t(`tournament.create.gender_${g}`) }))} />
+        {cat.gender === 'todos' && <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.gender_todos_hint')}</p>}
       </Field>
       <Field className="mt-3" label={t('tournament.create.level')}>
         <Chips value={cat.level} onChange={(n) => set({ level: n, name: '' })}

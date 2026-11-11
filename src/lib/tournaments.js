@@ -40,14 +40,18 @@ export const totalSlots = (categories = []) => categories.reduce((sum, c) => sum
 
 /** "M5", "F3", "MX4" — o código da categoria a partir do género e do nível,
  *  com as mesmas letras das etiquetas de nível da app (ver ratingBand). */
+/* «Para todos» (#802, 11 nov): qualquer dupla. Na base é gender NULL; no
+   formulário anda como 'todos'. O código é T, igual em todas as línguas. */
+const isOpen = (gender) => !gender || gender === 'todos'
+
 export function categoryCode(gender, level) {
-  const prefix = gender === 'feminino' ? 'F' : gender === 'misto' ? 'MX' : 'M'
+  const prefix = isOpen(gender) ? 'T' : gender === 'feminino' ? 'F' : gender === 'misto' ? 'MX' : 'M'
   return level ? `${prefix}${level}` : prefix
 }
 
 /** O nome por extenso, para quem não sabe o que é "MX4". */
 export function categoryName(t, gender, level) {
-  const key = gender === 'feminino' ? 'female' : gender === 'misto' ? 'mixed' : 'male'
+  const key = isOpen(gender) ? 'open' : gender === 'feminino' ? 'female' : gender === 'misto' ? 'mixed' : 'male'
   return t(`tournament.create.category_name_${key}`, { level: level || '' }).trim()
 }
 
