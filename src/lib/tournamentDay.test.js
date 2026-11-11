@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dayKeyInTz, msUntilNextDay, hhmmInTz, TOURNAMENT_TZ, localInputToIso, isoToLocalInput } from './tournamentDay'
+import { dayKeyInTz, msUntilNextDay, hhmmInTz, TOURNAMENT_TZ, localInputToIso, isoToLocalInput, endsNextDay, nextDateKey, tournamentDayOf } from './tournamentDay'
 
 describe('dayKeyInTz — o dia como o servidor o conta', () => {
   it('00h30 de sabado em Almada e sabado, nao sexta', () => {
@@ -119,5 +119,49 @@ describe('prazo das inscrições com fuso (#487)', () => {
     expect(localInputToIso('amanhã')).toBe(null)
     expect(isoToLocalInput(null)).toBe('')
     expect(isoToLocalInput('não é data')).toBe('')
+  })
+})
+
+describe('dia que acaba de madrugada (#797)', () => {
+  const sab = { date: '2026-11-14', starts_at: '09:00:00', ends_at: '01:00:00' }
+  const dom = { date: '2026-11-15', starts_at: '09:00', ends_at: '20:00' }
+
+  it('09:00 à 01:00 acaba no dia seguinte; até às 06:00 e mais nada', () => {
+    expect(endsNextDay(sab)).toBe(true)
+    expect(endsNextDay({ start: '18:00', end: '00:00' })).toBe(true)
+    expect(endsNextDay({ starts_at: '20:00', ends_at: '06:00' })).toBe(true)
+    expect(endsNextDay({ starts_at: '20:00', ends_at: '06:30' })).toBe(false)
+    expect(endsNextDay(dom)).toBe(false)
+    expect(endsNextDay({ starts_at: '09:00', ends_at: '09:00' })).toBe(false)
+    expect(endsNextDay({})).toBe(false)
+  })
+
+  it('o dia seguinte passa o mês e o ano', () => {
+    expect(nextDateKey('2026-11-30')).toBe('2026-12-01')
+    expect(nextDateKey('2026-12-31')).toBe('2027-01-01')
+    expect(nextDateKey('')).toBeNull()
+  })
+
+  it('o jogo das 00:30 de domingo é de sábado; o das 09:00 é de domingo', () => {
+    // novembro: Lisboa = UTC
+    expect(tournamentDayOf('2026-11-15T00:30:00Z', [sab, dom])).toBe('2026-11-14')
+    expect(tournamentDayOf('2026-11-15T00:59:00Z', [sab, dom])).toBe('2026-11-14')
+    expect(tournamentDayOf('2026-11-15T01:00:00Z', [sab, dom])).toBe('2026-11-15')
+    expect(tournamentDayOf('2026-11-15T09:00:00Z', [sab, dom])).toBe('2026-11-15')
+    expect(tournamentDayOf('2026-11-14T23:30:00Z', [sab, dom])).toBe('2026-11-14')
+  })
+
+  it('sem dia de madrugada na véspera, conta a data do jogo', () => {
+    expect(tournamentDayOf('2026-11-15T00:30:00Z', [dom])).toBe('2026-11-15')
+    expect(tournamentDayOf('2026-11-15T00:30:00Z', [])).toBe('2026-11-15')
+    expect(tournamentDayOf(null, [sab])).toBeNull()
+  })
+
+  it('no verão conta a hora de Portugal, não a UTC', () => {
+    const jul = { date: '2026-07-04', starts_at: '09:00', ends_at: '01:00' }
+    // 23:30 UTC = 00:30 de domingo em Lisboa (UTC+1)
+    expect(tournamentDayOf('2026-07-04T23:30:00Z', [jul])).toBe('2026-07-04')
+    // 00:30 UTC = 01:30 de domingo em Lisboa: já passou do fim
+    expect(tournamentDayOf('2026-07-05T00:30:00Z', [jul])).toBe('2026-07-05')
   })
 })

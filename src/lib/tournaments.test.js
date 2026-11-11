@@ -176,3 +176,22 @@ describe('categoria fora do horário do dia (QA, 27 set; #453)', () => {
   })
 })
 
+describe('dia que acaba de madrugada (#797)', () => {
+  const days = [{ date: '2026-11-14', starts_at: '09:00', ends_at: '01:00', courts: 4 }]
+  it('09:00 à 01:00 são 16 h por campo', () => {
+    expect(courtHours({ ...days[0], courts: 1 })).toBe(16)
+    expect(courtHours(days[0])).toBe(64)
+  })
+  it('fim antes do início depois das 06:00 continua a ser engano', () => {
+    expect(courtHours({ ...days[0], ends_at: '08:00' })).toBe(0)
+  })
+  it('a categoria começa entre a abertura e a meia-noite', () => {
+    expect(categoryOutsideDay({ day: '2026-11-14', start_time: '22:00' }, days)).toBe(false)
+    expect(categoryOutsideDay({ day: '2026-11-14', start_time: '09:00' }, days)).toBe(false)
+    expect(categoryOutsideDay({ day: '2026-11-14', start_time: '08:00' }, days)).toBe(true)
+    expect(categoryOutsideDay({ day: '2026-11-14', start_time: '00:30' }, days)).toBe(true)
+  })
+  it('o passo 2 deixa avançar', () => {
+    expect(stepProblem(3, { days, categories: [] })).not.toBe('hours_order')
+  })
+})

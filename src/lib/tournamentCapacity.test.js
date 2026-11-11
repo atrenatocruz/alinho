@@ -173,3 +173,17 @@ describe('o torneio todo', () => {
     expect(evaluateTournament([], [], rules).status).toBeNull()
   })
 })
+
+describe('dia que acaba de madrugada (#797)', () => {
+  const sat = { date: '2026-11-14', starts_at: '09:00', ends_at: '01:00', courts: 2 }
+  it('09:00 à 01:00 são 16 h, 32 h de campo com 2 campos', () => {
+    expect(dayMinutes(sat)).toBe(16 * 60)
+    expect(dayCourtHours(sat)).toBe(32)
+  })
+  it('até à meia-noite também conta', () => {
+    expect(dayMinutes({ ...sat, starts_at: '18:00', ends_at: '00:00' })).toBe(360)
+  })
+  it('depois das 06:00 continua a ser erro', () => {
+    expect(dayMinutes({ ...sat, ends_at: '07:00' })).toBeNull()
+  })
+})
