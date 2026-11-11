@@ -179,6 +179,8 @@ final class AppModel: ObservableObject {
         start()
         if let id = current?.id {
             mix.setLink(MixLink(localMatchID: id, mixMatchID: m.matchID, side: side, title: m.gameName, userID: mix.userID))
+            // O 0-0: a app passa logo a mostrar que o campo está a ser contado.
+            mix.pushLive(current)
         }
     }
 
@@ -345,6 +347,8 @@ final class AppModel: ObservableObject {
 
     private func save() {
         try? store?.save(session)
+        // Jogo do mix: o placar segue para a app (só se mudou).
+        mix.pushLive(current)
     }
 }
 #endif

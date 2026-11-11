@@ -207,3 +207,26 @@ describe('textos do cartão', () => {
     })
   })
 })
+
+describe('dia que acaba de madrugada (#797)', () => {
+  const sab = dia('2026-11-14', '20:00', '01:00', ['c1'])
+
+  it('as horas vão até à 01:00 de domingo, e continuam a ser de sábado', () => {
+    const slots = daySlots(sab)
+    expect(slots).toHaveLength(5)
+    expect(slots.map((s) => s.time)).toEqual(['20:00', '21:00', '22:00', '23:00', '00:00'])
+    expect(slots.every((s) => s.date === '2026-11-14')).toBe(true)
+    expect(slots.map((s) => Boolean(s.nextDay))).toEqual([false, false, false, false, true])
+    expect(slots[4].startsAt.getTime()).toBe(at('00:00', '2026-11-15').getTime())
+    expect(slots[4].endsAt.getTime()).toBe(at('01:00', '2026-11-15').getTime())
+  })
+
+  it('a madrugada conta como depois da hora da categoria', () => {
+    const jogos = [1, 2, 3, 4, 5].map((n) => jogo(`g${n}`, [`a${n}`, `b${n}`, `c${n}`, `d${n}`],
+      { day: '2026-11-14', notBefore: '21:00' }))
+    const { scheduled, unscheduled } = scheduleMatches(jogos, [sab])
+    expect(scheduled).toHaveLength(4)
+    expect(unscheduled).toHaveLength(1)
+    expect(scheduled.map((m) => hhmm(m.startsAt)).sort()).toEqual(['00:00', '21:00', '22:00', '23:00'])
+  })
+})
