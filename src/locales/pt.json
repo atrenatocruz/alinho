@@ -4742,6 +4742,7 @@
   "tournament.create.save_draft_hint": "Só tu o vês; quem receber o link ainda não consegue abrir.",
   "tournament.create.open_now_question": "Queres abrir as inscrições já?",
   "tournament.create.problem_name": "Falta o nome do torneio.",
+  "tournament.create.problem_location": "Escreve onde se joga.",
   "tournament.create.problem_days": "Escolhe pelo menos um dia.",
   "tournament.create.problem_deadline": "Falta dizer até quando há inscrições.",
   "tournament.create.problem_deadline_past": "Este prazo já passou. Escolhe uma data e hora que ainda estejam para vir.",

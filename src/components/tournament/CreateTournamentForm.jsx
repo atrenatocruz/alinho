@@ -23,6 +23,8 @@ import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
 import { maxCategories } from '../../lib/tournamentSignup'
 import TimeInput from '../TimeInput'
+import PlacesUnavailableHint from '../PlacesUnavailableHint'
+import { usePlaceAutocomplete } from '../../lib/usePlaceAutocomplete'
 import { courtNames } from './courtNames'
 import { DeuceModeChips } from '../DeuceMode'
 import { DEFAULT_DEUCE_MODE } from '../../lib/deuceMode'
@@ -70,8 +72,10 @@ function Field({ label, children, hint, error, className = '' }) {
     <div className={className}>
       <FieldLabel>{label}</FieldLabel>
       {/* Campo em falta ou errado: contorno vermelho no campo E a frase por
-          baixo (regra das janelas, 24 set). */}
-      {error ? <div className="[&_input]:!border [&_input]:!border-danger [&_.input-field]:!border-danger">{children}</div> : children}
+          baixo (regra das janelas, 24 set). O div fica sempre lá: se só
+          aparecesse com erro, o React voltava a montar o campo, que perdia o
+          foco e as sugestões de moradas (QA do #796, 11 nov). */}
+      <div className={error ? '[&_input]:!border [&_input]:!border-danger [&_.input-field]:!border-danger' : undefined}>{children}</div>
       {/* O porquê fica junto ao campo que o causa (Trello #514). */}
       {error && <p role="alert" className="mt-1 text-xs font-bold text-danger">{error}</p>}
       {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
@@ -308,7 +312,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     opens_day: scheduledOpening ? scheduledOpening.slice(0, 10) : 'now',
     opens_time: scheduledOpening ? scheduledOpening.slice(11, 16) : '10:00',
     name: initial?.tournament?.name || '',
-    location: initial?.tournament?.location || club?.location || club?.name || '',
+    // Começa vazio, como no Criar mix (#796): a localidade do clube parecia uma morada já escolhida.
+    location: initial?.tournament?.location || '',
     poster_url: initial?.tournament?.poster_url || null,
     // Vem em UTC: mostra-se na hora local (Trello #487). Cortar o texto, como
     // antes, mostrava a hora UTC como se fosse de Lisboa.
@@ -345,12 +350,22 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   const editing_existing = !!initial
 
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
+  // As sugestões de moradas do Criar mix (#796). O distrito do sítio escolhido
+  // dá a zona do torneio; undefined = o sítio não mexeu, e no Editar não se
+  // toca no que está gravado. Escrever à mão continua a valer, sem distrito.
+  const locationInputRef = useRef(null)
+  const [placeDistrict, setPlaceDistrictValue] = useState(undefined)
+  usePlaceAutocomplete(locationInputRef, locked || step === 3, ({ value, district }) => {
+    set({ location: value })
+    setPlaceDistrictValue(district ?? null)
+  })
   const setRule = (key, value) => setDraft((d) => ({ ...d, rules: { ...d.rules, [key]: value } }))
   const hours = useMemo(() => totalCourtHours(draft.days), [draft.days])
   // O prazo que o torneio já tinha, a editar: se não mudar, não se trava.
   const [initialDeadline] = useState(() => isoToLocalInput(initial?.tournament?.entries_deadline))
   const checkOpts = { now: new Date(), initialDeadline: initial ? initialDeadline : undefined }
-  const problem = stepProblem(step, draft, checkOpts)
+  // O Local já não vem preenchido (#796): um torneio não sai sem sítio.
+  const problem = step === 3 && !draft.location.trim() ? 'location' : stepProblem(step, draft, checkOpts)
   // A guardar sem passos (a editar com inscrições, ou no fim): datas e regras.
   const finalProblem = saveProblem(draft, checkOpts)
   const shown = tried ? ((locked || step === 4) ? (problem || finalProblem) : problem) : null
@@ -474,6 +489,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // chama grava-os depois, já com os ids novos.
   const outgoing = (d) => ({
     ...d,
+    ...(placeDistrict !== undefined ? { place_district: placeDistrict } : {}),
     // Com inscritos, o dia vai como day_date: é o nome que o update_tournament
     // lê para mudar a hora de uma categoria (Dev 3, 13 out). Mandar a mesma
     // hora não é mudança.
@@ -595,6 +611,19 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     </div>
   ) : null
 
+  const locationInput = (
+    <>
+      <input
+        ref={locationInputRef}
+        className={inputClass}
+        value={draft.location}
+        onChange={(e) => { set({ location: e.target.value }); setPlaceDistrictValue(null) }}
+        placeholder={t('gerirclube.location_placeholder')}
+      />
+      <PlacesUnavailableHint />
+    </>
+  )
+
   return (
     <StepPage
       title={editing_existing ? t('tournament.create.edit_title') : t('tournament.create.title')}
@@ -634,8 +663,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           se não existia, se estava noutro sítio, ou se estava trancado. */}
       {locked && (
         <>
-          <Field label={t('tournament.create.location')}>
-            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
+          <Field label={t('tournament.create.location')} error={fieldError(['location'])}>
+            {locationInput}
           </Field>
           <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">
@@ -877,8 +906,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           um dia está sobrecarregado, que é a pergunta de quem monta. */}
       {!locked && step === 3 && (
         <>
-          <Field label={t('tournament.create.location')}>
-            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
+          <Field label={t('tournament.create.location')} error={fieldError(['location'])}>
+            {locationInput}
           </Field>
           {draft.days.map((d, i) => (
             <div key={d.date} className="card">
@@ -1041,7 +1070,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
         </>
       )}
 
-      {shown && ![...DEADLINE_PROBLEMS, ...DRAW_PROBLEMS, 'duration_order'].includes(shown) && (
+      {shown && ![...DEADLINE_PROBLEMS, ...DRAW_PROBLEMS, 'duration_order', 'location'].includes(shown) && (
         <p className="text-xs text-danger">{t(`tournament.create.problem_${shown}`)}</p>
       )}
     </StepPage>

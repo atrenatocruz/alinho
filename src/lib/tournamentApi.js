@@ -11,6 +11,7 @@
 //
 // O torneio é uma ENTIDADE NOVA: nada aqui toca em `games` (o mix).
 import { supabase } from './supabase'
+import { setPlaceDistrict } from './placeDistrictApi'
 import { isMatchDone } from './myTournamentMatches'
 import { normalizeGameOrgHint } from './gameOrgHint'
 import { saveEventSpecialPrice } from './specialPrice'
@@ -70,11 +71,12 @@ export async function listClubTournaments(organizationId) {
  *  pessoa, como se escolhe quem entra) — guardado em jsonb, para não serem
  *  dez colunas que ninguém consulta. */
 export async function createTournament(organizationId, draft) {
-  const { special_prices: _specials, ...rest } = draft
+  const { special_prices: _specials, place_district: district, ...rest } = draft
   const { data, error } = await supabase.rpc('create_tournament', {
     p_organization_id: organizationId, p_draft: rest,
   })
   if (error) throw error
+  if (district) await setPlaceDistrict('tournament', data, district)
   // O preço especial de cada categoria grava-se depois de ela existir: quem
   // cria chama saveCategorySpecialPrices com o que vem em special_prices.
   return data
@@ -126,9 +128,10 @@ export async function getTournamentForEdit(tournamentId) {
  *  organizador, prazo, data do sorteio e se é público) — é o próprio
  *  update_tournament que ignora o resto. */
 export async function updateTournament(tournamentId, draft) {
-  const { special_prices: specials, ...rest } = draft
+  const { special_prices: specials, place_district: district, ...rest } = draft
   const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: rest })
   if (error) throw error
+  if (district !== undefined) await setPlaceDistrict('tournament', tournamentId, district)
   // O torneio já ficou gravado: um erro aqui diz só que o preço especial não.
   try { await saveCategorySpecialPrices(tournamentId, specials) } catch (err) {
     console.error('Error saving special prices:', err)
