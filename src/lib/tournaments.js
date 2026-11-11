@@ -7,7 +7,7 @@
 // `courtHours` daqui desaparece (é a mesma conta, só que ainda não existe
 // no ramo).
 import { ratingBand } from './elo'
-import { localInputToIso } from './tournamentDay'
+import { endsNextDay, localInputToIso } from './tournamentDay'
 
 /** Os estados por onde um torneio passa, pela ordem do desenho (SPEC §3). */
 export const TOURNAMENT_STATUS = ['rascunho', 'inscricoes', 'fechado', 'sorteado', 'a_decorrer', 'terminado']
@@ -21,12 +21,14 @@ export const nextStatus = (status) => {
 }
 export const previousStatus = (status) => (status === 'inscricoes' ? 'rascunho' : status === 'fechado' ? 'inscricoes' : null)
 
-/** Horas de campo de um dia: (fim − início) × campos. Aceita "09:00". */
+/** Horas de campo de um dia: (fim − início) × campos. Aceita "09:00". Um
+ *  dia que acaba de madrugada (09:00 à 01:00) conta até à 01:00 do dia
+ *  seguinte (Trello #797). */
 export function courtHours(day) {
   if (!day?.starts_at || !day?.ends_at) return 0
   const [h1, m1] = day.starts_at.split(':').map(Number)
   const [h2, m2] = day.ends_at.split(':').map(Number)
-  const hours = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60
+  const hours = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60 + (endsNextDay(day) ? 24 : 0)
   return hours > 0 ? hours * (Number(day.courts) || 0) : 0
 }
 
@@ -119,7 +121,9 @@ export function categoryOutsideDay(category, days = []) {
   const day = days.find((d) => d.date === category?.day)
   const at = (category?.start_time || '').slice(0, 5)
   if (!day || !at || !day.starts_at || !day.ends_at) return false
-  return at < day.starts_at.slice(0, 5) || at >= day.ends_at.slice(0, 5)
+  // Num dia que acaba de madrugada, a categoria começa entre a abertura e a
+  // meia-noite: «a partir da 00:30» seria lida como antes de abrir (#797).
+  return at < day.starts_at.slice(0, 5) || (!endsNextDay(day) && at >= day.ends_at.slice(0, 5))
 }
 
 /** Os problemas que se veem ao GUARDAR sem passar pelos passos (a editar um

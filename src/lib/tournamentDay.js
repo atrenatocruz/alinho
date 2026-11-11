@@ -114,3 +114,49 @@ export function isoToLocalInput(iso, tz = TOURNAMENT_TZ) {
   const p = partsInTz(d, tz)
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
 }
+
+/* ── Dias que acabam de madrugada (Trello #797) ──
+   Um dia das 09:00 à 01:00 acaba à 01:00 do dia seguinte: o fim antes do
+   início quer dizer «na madrugada seguinte». Só até às 06:00, a mesma regra
+   da base de dados; depois disso (21:00 a 20:00) continua a ser um engano.
+   Os jogos dessa madrugada contam para o dia do torneio em que começaram. */
+
+/** A hora mais tarde a que um dia pode acabar na madrugada seguinte. */
+export const LATEST_NEXT_DAY_END = '06:00'
+
+const hhmmMinutes = (hhmm) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
+
+/** O dia acaba depois da meia-noite? Aceita { starts_at, ends_at } (como
+ *  vem da base de dados) ou { start, end }, em 'HH:MM'. */
+export function endsNextDay(day) {
+  const from = hhmmMinutes(day?.starts_at ?? day?.start)
+  const to = hhmmMinutes(day?.ends_at ?? day?.end)
+  return from != null && to != null && to < from && to <= hhmmMinutes(LATEST_NEXT_DAY_END)
+}
+
+/** 'AAAA-MM-DD' do dia seguinte, sem passar pelo fuso do aparelho. */
+export function nextDateKey(date) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || '')
+  if (!m) return null
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + 1)).toISOString().slice(0, 10)
+}
+
+/** O dia do torneio a que pertence um jogo ('AAAA-MM-DD'): a data do jogo
+ *  em hora de Portugal, ou a da véspera quando o jogo cai na madrugada de
+ *  um dia que acaba depois da meia-noite (sábado das 09:00 à 01:00: o jogo
+ *  das 00:30 de domingo é de sábado). `days`: [{ date, starts_at, ends_at }].
+ *  É a mesma conta do servidor (tournament_slot_problem). */
+export function tournamentDayOf(when, days = [], tz = TOURNAMENT_TZ) {
+  if (!when) return null
+  const d = when instanceof Date ? when : new Date(when)
+  if (Number.isNaN(d.getTime())) return null
+  const p = partsInTz(d, tz)
+  const key = `${p.year}-${p.month}-${p.day}`
+  const at = Number(p.hour) * 60 + Number(p.minute)
+  const eve = (days || []).find((x) => nextDateKey(x?.date) === key && endsNextDay(x))
+  if (eve && at < hhmmMinutes(eve.ends_at ?? eve.end)) return String(eve.date).slice(0, 10)
+  return key
+}
