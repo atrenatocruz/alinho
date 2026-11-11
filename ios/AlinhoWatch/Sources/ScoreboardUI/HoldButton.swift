@@ -4,7 +4,7 @@ import SwiftUI
 
 enum HoldDuration {
     /// Toque comprido para dar um ponto, desfazer e terminar. Afina-se no jogo de teste.
-    static let seconds = 0.7
+    static let seconds = 0.5
 }
 
 /// Dedo pousado: o véu enche durante `HoldDuration.seconds`; se o dedo sair antes

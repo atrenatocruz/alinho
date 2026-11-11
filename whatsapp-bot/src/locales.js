@@ -58,7 +58,7 @@ Para veres esta lista:
   reminder_group: '🤖 ⏰ *Lembrete!* O mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Não faltes! 🎾',
   // voucherNotices.js — um convidado do WhatsApp ganhou um voucher (27 set, texto do Francisco).
   voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres ter ranking e guardar os próximos prémios? Cria conta em alinho.pt.',
-  duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
+  duplas_updated: '🤖 🔄 *Duplas atualizadas: {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
   digest_text: '🤖 *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
 
@@ -169,7 +169,7 @@ To see this list:
   reminder_group: "🤖 ⏰ *Reminder!* *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Don't miss it! 🎾",
   // mixNotices.js — the admin changed a mix that already started (Trello #292).
   voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want a ranking and to keep future prizes? Sign up at alinho.pt.',
-  duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
+  duplas_updated: '🤖 🔄 *Pairs updated: {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
   digest_text: '🤖 *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
 
