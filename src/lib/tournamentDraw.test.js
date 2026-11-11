@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload, buildKnockoutPayload,
   bracketRounds, byDayAndTime, standingsOf, qualifiersPerGroup, qualifiedFromGroups,
+  secondaryLabels,
 } from './tournamentDraw'
+import { formatOptions } from './tournamentFormat'
 
 const grupos = (n) => Array.from({ length: n }, (_, i) => ({
   number: i + 1, name: `Grupo ${String.fromCharCode(65 + i)}`,
@@ -459,5 +461,124 @@ describe('o 3.º lugar não pode ficar pendurado', () => {
     expect(buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 1, thirdPlace: true }).third_place).toBe(true)
     // E continua a não aparecer quando o organizador não o pediu.
     expect(buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2 }).third_place).toBe(false)
+  })
+})
+
+describe('Quadro B para quem não passa dos grupos (#800)', () => {
+  const comDuplas = (sizes) => sizes.map((n, i) => ({
+    number: i + 1, name: `Grupo ${String.fromCharCode(65 + i)}`,
+    teams: Array.from({ length: n }, (_, k) => `g${i + 1}t${k + 1}`),
+  }))
+
+  it('os lugares do B: todos os 3.os, depois os 4.os, só nos grupos que os têm', () => {
+    expect(secondaryLabels(comDuplas([4, 4, 3]), 2).map((l) => l.label)).toEqual([
+      '3.º do Grupo A', '3.º do Grupo B', '3.º do Grupo C',
+      '4.º do Grupo A', '4.º do Grupo B',
+    ])
+    expect(secondaryLabels(comDuplas([4, 4]), 1).map((l) => l.label)).toEqual([
+      '2.º do Grupo A', '2.º do Grupo B', '3.º do Grupo A', '3.º do Grupo B',
+      '4.º do Grupo A', '4.º do Grupo B',
+    ])
+  })
+
+  it('16 duplas, 4 grupos, passam 2: 7 jogos no A e 7 no B, e o 3.º lugar só no A', () => {
+    const p = buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2, thirdPlace: true, secondary: true })
+    const a = p.bracket.filter((m) => m.stage === 'principal')
+    const b = p.bracket.filter((m) => m.stage === 'secundario')
+    expect(a).toHaveLength(7)
+    expect(b).toHaveLength(7)
+    expect(p.third_place).toBe(true)
+    expect(p.secondary_bracket).toBe(true)
+    // Os quartos do B só têm 3.os e 4.os, e nunca dois do mesmo grupo.
+    const qf = b.filter((m) => m.round === 'QF')
+    expect(qf).toHaveLength(4)
+    for (const m of qf) {
+      expect(m.source_a).toMatch(/^[34]\.º do Grupo [A-D]$/)
+      expect(m.source_b).toMatch(/^[34]\.º do Grupo [A-D]$/)
+      expect(m.source_a.slice(-1)).not.toBe(m.source_b.slice(-1))
+    }
+    // Cada lugar do B aparece uma vez.
+    const lugares = b.flatMap((m) => [m.source_a, m.source_b]).filter((x) => /º do/.test(x))
+    expect(new Set(lugares).size).toBe(8)
+  })
+
+  it('o número de jogos do B é o mesmo que as contas do formato dizem', () => {
+    for (const [n, groupCount, perGroup] of [[16, 4, 2], [11, 3, 2], [12, 3, 1], [10, 2, 2], [9, 3, 1], [6, 2, 2]]) {
+      const p = buildDrawPayload(duplas(n), { groupCount, perGroup, secondary: true })
+      const b = p.bracket.filter((m) => m.stage === 'secundario').length
+      const com = formatOptions(n, { secondaryBracket: true })
+        .find((o) => o.kind === 'grupos' && o.groupCount === groupCount && o.qualifiersPerGroup === perGroup)
+      const sem = formatOptions(n).find((o) => o.key === com.key)
+      expect(b).toBe(com.matches - sem.matches)
+      expect(com.secondary).toBe(b > 0)
+    }
+  })
+
+  it('grupos desiguais: quem sobra a mais fica isento, e o caminho continua certo', () => {
+    // 11 duplas em 3 grupos (4, 4, 3), passam 2: 5 no B, quadro de 8 com 3 isentos.
+    const p = buildDrawPayload(duplas(11), { groupCount: 3, perGroup: 2, secondary: true })
+    const b = p.bracket.filter((m) => m.stage === 'secundario')
+    expect(b).toHaveLength(4)
+    const rondas = b.map((m) => m.round)
+    expect(rondas.filter((r) => r === 'QF')).toHaveLength(1)
+    expect(rondas.filter((r) => r === 'SF')).toHaveLength(2)
+    expect(rondas.filter((r) => r === 'F')).toHaveLength(1)
+    const lugares = b.flatMap((m) => [m.source_a, m.source_b]).filter((x) => /º do/.test(x))
+    expect(lugares.sort()).toEqual(['3.º do Grupo A', '3.º do Grupo B', '3.º do Grupo C', '4.º do Grupo A', '4.º do Grupo B'].sort())
+  })
+
+  it('sem B: grupo único, uma dupla só de fora, ou a caixa desligada', () => {
+    expect(buildDrawPayload(duplas(5), { groupCount: 1, perGroup: 0, secondary: true }).bracket).toEqual([])
+    // 6 duplas, 2 grupos de 3, passam 2: sobra 1 de cada grupo = 2 → há B (1 jogo).
+    expect(buildDrawPayload(duplas(6), { groupCount: 2, perGroup: 2, secondary: true })
+      .bracket.filter((m) => m.stage === 'secundario')).toHaveLength(1)
+    // 5 duplas, 2 grupos (3 e 2), passam 2: sobra 1 → não há B.
+    expect(buildDrawPayload(duplas(5), { groupCount: 2, perGroup: 2, secondary: true })
+      .bracket.filter((m) => m.stage === 'secundario')).toEqual([])
+    const sem = buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2 })
+    expect(sem.bracket.every((m) => m.stage === 'principal')).toBe(true)
+    expect(sem.secondary_bracket).toBe(false)
+  })
+
+  const jogo = (g, x, y, sx, sy) => ({
+    stage: 'grupo', group_id: g, entry_a_id: x, entry_b_id: y, score_a: sx, score_b: sy,
+    status: 'terminado', winner_entry_id: sx > sy ? x : y,
+  })
+
+  it('ao passar ao quadro, quem não passa vai para o B com o lugar dele', () => {
+    const groups = [
+      { id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3'] },
+      { id: 'gB', number: 2, name: 'Grupo B', teams: ['b1', 'b2', 'b3'] },
+    ]
+    const matches = [
+      jogo('gA', 'a1', 'a2', 6, 2), jogo('gA', 'a1', 'a3', 6, 3), jogo('gA', 'a2', 'a3', 6, 4),
+      jogo('gB', 'b3', 'b1', 6, 1), jogo('gB', 'b3', 'b2', 6, 2), jogo('gB', 'b1', 'b2', 6, 5),
+      { stage: 'secundario', round: 'F', source_a: '3.º do Grupo A', source_b: '3.º do Grupo B' },
+    ]
+    const r = qualifiedFromGroups(groups, matches, 2)
+    expect(r.qualified.map((q) => [q.label, q.entry_id, q.stage])).toEqual([
+      ['1.º do Grupo A', 'a1', 'principal'], ['2.º do Grupo A', 'a2', 'principal'], ['3.º do Grupo A', 'a3', 'secundario'],
+      ['1.º do Grupo B', 'b3', 'principal'], ['2.º do Grupo B', 'b1', 'principal'], ['3.º do Grupo B', 'b2', 'secundario'],
+    ])
+    // Os lugares batem com os do sorteio, A e B.
+    const doSorteio = new Set([...qualifierLabels(groups, 2), ...secondaryLabels(groups, 2)].map((l) => l.label))
+    expect(r.qualified.every((q) => doSorteio.has(q.label))).toBe(true)
+    // Sem jogos do B, fica como antes: só quem passa.
+    expect(qualifiedFromGroups(groups, matches.slice(0, 6), 2).qualified).toHaveLength(4)
+  })
+
+  it('com B, um empate entre quem não passa também conta (muda o lugar no B)', () => {
+    const groups = [{ id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3', 'a4', 'a5'] }]
+    const matches = [
+      jogo('gA', 'a1', 'a2', 6, 0), jogo('gA', 'a1', 'a3', 6, 0), jogo('gA', 'a1', 'a4', 6, 0), jogo('gA', 'a1', 'a5', 6, 0),
+      jogo('gA', 'a2', 'a3', 6, 0), jogo('gA', 'a2', 'a4', 6, 0), jogo('gA', 'a2', 'a5', 6, 0),
+      // a3, a4 e a5 em ciclo, com o mesmo resultado: nada os separa.
+      jogo('gA', 'a3', 'a4', 6, 3), jogo('gA', 'a4', 'a5', 6, 3), jogo('gA', 'a5', 'a3', 6, 3),
+    ]
+    expect(qualifiedFromGroups(groups, matches, 2).ties).toEqual([])
+    const comB = qualifiedFromGroups(groups, matches, 2, { secondary: true })
+    expect(comB.qualified).toHaveLength(5)
+    expect(comB.ties).toHaveLength(1)
+    expect(comB.ties[0].positions).toEqual([3, 5])
   })
 })

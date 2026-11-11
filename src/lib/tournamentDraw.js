@@ -141,18 +141,31 @@ const FINISHED = new Set(['terminado', 'falta', 'desistencia'])
  *  mexe no quadro: quem passa (atravessa o corte) ou em que lugar entra
  *  (1.º ou 2.º). Um empate só entre quem já não passa não aparece. Enquanto
  *  houver empates, o ecrã não deve deixar passar ao quadro sem o organizador
- *  escolher a ordem (combinado com o Dev 1, Trello #484). */
-export function qualifiedFromGroups(groups, matches, perGroup) {
+ *  escolher a ordem (combinado com o Dev 1, Trello #484).
+ *
+ *  Quadro B (#800): numa categoria cujo sorteio criou o quadro secundário
+ *  (jogos com `stage: 'secundario'`), quem não passa também entra na lista,
+ *  com o lugar dele («3.º do Grupo A») e `stage: 'secundario'`; quem passa
+ *  leva `stage: 'principal'`. A base de dados pede os lugares dos dois
+ *  quadros de uma vez. E aí todos os empates contam: o 3.º e o 4.º entram
+ *  em sítios diferentes do Quadro B. */
+export function qualifiedFromGroups(groups, matches, perGroup, {
+  secondary = matches.some((m) => m.stage === 'secundario'),
+} = {}) {
   const groupMatches = matches.filter((m) => m.stage === 'grupo')
   const pending = groupMatches.filter((m) => !FINISHED.has(m.status) && !m.winner_entry_id).length
   const qualified = []
   const ties = []
   for (const g of groups) {
     const table = standingsOf(g, matches)
-    for (let position = 1; position <= perGroup; position++) {
+    const last = secondary && perGroup > 0 ? table.length : perGroup
+    for (let position = 1; position <= last; position++) {
       const row = table[position - 1]
       if (!row) continue
-      qualified.push({ label: `${position}.º do ${g.name}`, entry_id: row.id, group: g.number, position })
+      qualified.push({
+        label: `${position}.º do ${g.name}`, entry_id: row.id, group: g.number, position,
+        stage: position <= perGroup ? 'principal' : 'secundario',
+      })
     }
     // Cada empate aparece uma vez, pela primeira dupla dele na tabela.
     const seen = new Set()
@@ -162,7 +175,7 @@ export function qualifiedFromGroups(groups, matches, perGroup) {
       block.forEach((r) => seen.add(r.id))
       const from = block[0].position
       const to = block[block.length - 1].position
-      if (from > perGroup) continue
+      if (from > perGroup && !secondary) continue
       ties.push({ group: g.number, groupName: g.name, entry_ids: block.map((r) => r.id), positions: [from, to] })
     }
   }
@@ -330,6 +343,23 @@ export function qualifierLabels(groups, perGroup) {
   return labels
 }
 
+/** Os lugares do Quadro B (#800): quem não passa de cada grupo, do lugar
+    `perGroup + 1` até ao último desse grupo, pela mesma ordem (todos os 3.os,
+    depois todos os 4.os). Grupos de tamanhos diferentes dão um 4.º só nos
+    grupos que o têm. O tamanho vem de `teams` (o sorteio) ou de `size`. */
+export function secondaryLabels(groups, perGroup) {
+  const sizeOf = (g) => (Array.isArray(g.teams) ? g.teams.length : Number(g.size) || 0)
+  const biggest = Math.max(0, ...groups.map(sizeOf))
+  const labels = []
+  for (let position = perGroup + 1; position <= biggest; position++) {
+    for (const g of groups) {
+      if (position > sizeOf(g)) continue
+      labels.push({ label: `${position}.º do ${g.name}`, group: g.number, position })
+    }
+  }
+  return labels
+}
+
 /** Onde fica cada apurado no quadro (índice = posição na 1.ª ronda, lida
     dois a dois; `null` = lugar vazio, e o adversário fica isento).
 
@@ -347,8 +377,11 @@ export function placeQualifiers(labels, size) {
   const posOfSeed = new Map(order.map((seed, pos) => [seed, pos]))
   const slots = new Array(size).fill(null)
 
-  const firsts = labels.filter((l) => l.position === 1)
-  const others = labels.filter((l) => l.position !== 1)
+  // Os «primeiros» são os do melhor lugar que há: os 1.os no Quadro A, os
+  // 3.os no Quadro B (#800). As mesmas regras valem nos dois.
+  const top = Math.min(...labels.map((l) => l.position))
+  const firsts = labels.filter((l) => l.position === top)
+  const others = labels.filter((l) => l.position !== top)
   firsts.forEach((l, i) => { slots[posOfSeed.get(i + 1)] = l })
 
   const half = (pos) => (pos < size / 2 ? 0 : 1)
@@ -401,9 +434,12 @@ const ROUND_SOURCE = { R32: (n) => `Vencedor dos 16 avos ${n}`, R16: (n) => `Ven
 
     Com lugares a mais (ex.: 6 apurados num quadro de 8), os melhores ficam
     ISENTOS: não têm jogo na 1.ª ronda e o nome deles aparece já na ronda
-    seguinte. */
+    seguinte.
+
+    Com `stage: 'secundario'` é o Quadro B (#800): os mesmos caminhos, com
+    quem não passou (`secondaryLabels`). */
 export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } = {}) {
-  const labels = qualifierLabels(groups, perGroup)
+  const labels = stage === 'secundario' ? secondaryLabels(groups, perGroup) : qualifierLabels(groups, perGroup)
   const q = labels.length
   if (q < 2) return []
 
@@ -456,9 +492,13 @@ export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } =
     escolhido no assistente. O admin já viu isto no ecrã antes de confirmar.
 
     `teams`: [{ id, name, points }] — as duplas selecionadas.
-    `seeds`: as cabeças de série, se o admin as trocou à mão. */
+    `seeds`: as cabeças de série, se o admin as trocou à mão.
+    `secondary`: o Quadro B para quem não passa (#800). Só se cria com dois
+    grupos ou mais, alguém a passar e pelo menos duas duplas de fora, como
+    nas contas do formato (`formatOptions`). `secondary_bracket` volta com o
+    que o admin escolheu, para a categoria o guardar. */
 export function buildDrawPayload(teams, {
-  groupCount, perGroup = 2, seeds = null, seed = 1, thirdPlace = false,
+  groupCount, perGroup = 2, seeds = null, seed = 1, thirdPlace = false, secondary = false,
 } = {}) {
   const sizes = groupSizes(teams.length, groupCount)
   const drawn = drawGroups(teams, sizes, { seeds, seed })
@@ -473,15 +513,19 @@ export function buildDrawPayload(teams, {
     groupRoundRobin(g.teams).map((m) => ({ group: g.number, a: m.a.id, b: m.b.id })))
 
   const bracket = buildBracketSkeleton(groups, perGroup)
+  const bracketB = secondary && groups.length >= 2 && perGroup > 0
+    ? buildBracketSkeleton(groups, perGroup, { stage: 'secundario' })
+    : []
 
   return {
     seeds: (seeds || pickSeeds(teams, groupCount)).map((t) => t.id),
     groups,
     group_matches: groupMatches,
-    bracket: bracket.map((m) => ({
+    bracket: [...bracket, ...bracketB].map((m) => ({
       stage: m.stage, round: m.round, slot: m.slot,
       source_a: m.source_a, source_b: m.source_b,
     })),
+    secondary_bracket: Boolean(secondary),
     // O jogo do 3.º/4.º lugar é «Perdedor meia 1» contra «Perdedor meia
     // 2»: só existe se as DUAS meias-finais existirem. Com 3 apurados (3
     // grupos a passar 1) há 3 duplas num quadro de 4 — o melhor primeiro vai
