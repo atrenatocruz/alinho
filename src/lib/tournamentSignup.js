@@ -79,7 +79,7 @@ export const tournamentInviteLink = (token, origin) => `${origin}/convite-tornei
 
 // ── Chamadas ────────────────────────────────────────────────────────────
 
-export async function signUp({ categoryId, partnerId = null, guestName = null, guestEmail = null, teamName = null, tshirtSize, partnerTshirtSize }) {
+export async function signUp({ categoryId, partnerId = null, guestName = null, guestEmail = null, teamName = null, tshirtSize, partnerTshirtSize, meal, partnerMeal }) {
   const { data, error } = await supabase.rpc('tournament_signup', {
     p_category_id: categoryId,
     p_partner_id: partnerId,
@@ -89,15 +89,18 @@ export async function signUp({ categoryId, partnerId = null, guestName = null, g
     // As t-shirts (Dev 3) só vão quando o torneio as tem: sem elas, a chamada
     // fica igual à de sempre.
     ...(tshirtSize !== undefined ? { p_player1_tshirt: tshirtSize, p_player2_tshirt: partnerTshirtSize ?? null } : {}),
+    // A refeição (#799) também só vai quando o torneio a tem.
+    ...(meal !== undefined ? { p_player1_meal: meal, p_player2_meal: partnerMeal ?? null } : {}),
   })
   if (error) throw error
   return data
 }
 
-export async function respondToInvite(entryId, accept, { tshirtSize } = {}) {
+export async function respondToInvite(entryId, accept, { tshirtSize, meal } = {}) {
   const { data, error } = await supabase.rpc('tournament_respond_invite', {
     p_entry_id: entryId, p_accept: accept,
     ...(accept && tshirtSize !== undefined ? { p_tshirt: tshirtSize } : {}),
+    ...(accept && meal !== undefined ? { p_meal: meal } : {}),
   })
   if (error) throw error
   return data

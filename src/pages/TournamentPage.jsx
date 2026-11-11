@@ -393,6 +393,7 @@ export default function TournamentPage() {
   const heroAside = daysAside(tour.starts_on, tour.ends_on, i18n.language, t)
   const totalSlots = categories.reduce((n, c) => n + (Number(c.slots) || 0), 0)
   const shirt = tour.rules?.tshirt
+  const meal = tour.meal ?? tour.rules?.meal
   const euros = (cents) => (cents / 100).toLocaleString(i18n.language, { maximumFractionDigits: 2 })
   const deuceMode = deuceModeOf({ deuce_mode: tour.rules?.deuce })
   const scorings = phaseScorings(tour.rules)
@@ -418,6 +419,8 @@ export default function TournamentPage() {
       aside: <HelpCircle size={16} aria-label={t(scorings.same ? 'deuce.help_title' : 'tournament.scoring_help_title')} />, onClick: () => setDeuceHelp(true) },
     { key: 'price', label: t('tournament.fact_price'), value: tour.entry_fee_cents ? t('tournament.fact_price_pair', { price: euros(tour.entry_fee_cents) }) : null },
     { key: 'tshirt', label: t('tournament.fact_tshirt'), value: shirt?.mode === 'gift' ? t('tournament.fact_tshirt_gift') : shirt?.mode === 'sale' ? t('tournament.fact_tshirt_sale', { price: euros(shirt.price_cents || 0) }) : null },
+    // A refeição, ao lado da t-shirt (#799, SPEC ponto 6).
+    { key: 'meal', label: t('tournament.fact_meal'), value: meal?.mode === 'gift' ? t('tournament.fact_meal_included') : meal?.mode === 'sale' ? t('tournament.fact_meal_sale', { price: euros(meal.price_cents || 0) }) : null },
     { key: 'deadline', label: t('tournament.fact_entries'), value: shortDay(tour.entries_deadline, i18n.language) ? t('tournament.fact_until', { date: shortDay(tour.entries_deadline, i18n.language) }) : null },
     { key: 'draw', label: t('tournament.fact_draw'), value: shortDay(tour.draw_on, i18n.language) },
   ]

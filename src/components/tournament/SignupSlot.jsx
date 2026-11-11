@@ -19,7 +19,8 @@ import { signUpBackLink } from '../../lib/loginLinks'
 import { errorCode, signupErrorMessage } from '../../lib/tournamentError'
 import { categoryGenderQuestion } from './genderCheck'
 import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
-import { setMyTshirtSize } from '../../lib/tournamentApi'
+import { setMyTshirtSize, setMyMeal as saveMyMeal } from '../../lib/tournamentApi'
+import { MealPicker, mealOf, mealOn, mealRulesOf, mealTitle } from './meal'
 import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 import { appOrigin } from '../../lib/native'
 import { localeOf } from '../../lib/formatDate'
@@ -205,6 +206,30 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // a folha promete «Podes mudar os dois». shirtSheet: 'mine' | 'guest'.
   const [shirtSheet, setShirtSheet] = useState(null)
   const [shirtError, setShirtError] = useState('')
+  // A refeição (#799), o mesmo caminho da t-shirt: no pedido ao parceiro e na
+  // linha «🍽️ A tua refeição: Sim · Mudar». mealSheet: 'mine' | 'guest'.
+  const meals = mealOn(mealRulesOf(tournament))
+  const [inviteMeal, setInviteMeal] = useState({})
+  const [inviteTried, setInviteTried] = useState(null) // entry_id do «Aceitar» tocado com falta
+  const [mealSheet, setMealSheet] = useState(null)
+  const [mealError, setMealError] = useState('')
+  const changeMeal = async (meal) => {
+    setBusy(true); setMealError('')
+    try {
+      await saveMyMeal(my.entry_id, meal, { forGuest: mealSheet === 'guest' })
+      setMealSheet(null)
+      window.dispatchEvent(new CustomEvent('tournament:reload'))
+    } catch (err) { console.error('Error changing meal:', err); setMealError(signupErrorMessage(t, err)) }
+    finally { setBusy(false) }
+  }
+  // O que falta responder antes de aceitar um pedido (regra #798): o
+  // «Aceitar» fica ativo e, ao tocar, diz o quê.
+  const inviteMissing = (inv) => {
+    const shirtMissing = shirts && !inv.my_tshirt && !inviteShirt[inv.entry_id]
+    const answered = (v) => v === true || v === false
+    const mealMissing = meals && !answered(inv.my_meal) && !answered(inviteMeal[inv.entry_id])
+    return { shirtMissing, mealMissing, text: shirtMissing && mealMissing ? t('meal.missing_both') : shirtMissing ? t('meal.missing_shirt') : mealMissing ? t('meal.missing_meal') : null }
+  }
   const changeShirt = async (size) => {
     setBusy(true); setShirtError('')
     try {
@@ -228,7 +253,11 @@ export default function SignupSlot({ tournament, categories, category, my: first
       // Já com t-shirt neste torneio (uma por pessoa, 11 out): não se pergunta;
       // a base de dados dá-lhe a que já tem.
       const inv = invites.find((x) => x.entry_id === entryId)
-      await respondToInvite(entryId, accept, shirts && !inv?.my_tshirt ? { tshirtSize: inviteShirt[entryId] } : {})
+      const mealAnswered = inv?.my_meal === true || inv?.my_meal === false
+      await respondToInvite(entryId, accept, {
+        ...(shirts && !inv?.my_tshirt ? { tshirtSize: inviteShirt[entryId] } : {}),
+        ...(meals && !mealAnswered ? { meal: inviteMeal[entryId] } : {}),
+      })
       reloadInvites()
       window.dispatchEvent(new CustomEvent('tournament:reload'))
     } catch (err) {
@@ -280,8 +309,24 @@ export default function SignupSlot({ tournament, categories, category, my: first
           ) : shirts && (
             <div>
               <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</p>
-              <TshirtPicker rules={shirtRulesOf(tournament)} value={inviteShirt[inv.entry_id] || null}
-                onChange={(v) => setInviteShirt((m) => ({ ...m, [inv.entry_id]: v }))} label={t('tshirt.mine_label', { price: '' })} />
+              {/* A vermelho quando falta, como a refeição (regra #798). */}
+              <div className={inviteTried === inv.entry_id && inviteMissing(inv).shirtMissing ? 'rounded-2xl outline outline-2 outline-offset-2 outline-danger' : ''}>
+                <TshirtPicker rules={shirtRulesOf(tournament)} value={inviteShirt[inv.entry_id] || null}
+                  onChange={(v) => setInviteShirt((m) => ({ ...m, [inv.entry_id]: v }))} label={t('tshirt.mine_label', { price: '' })} />
+              </div>
+            </div>
+          )}
+          {/* A refeição, por baixo da t-shirt (#799). Já respondida noutra
+              categoria: não pergunta. */}
+          {meals && (inv.my_meal === true || inv.my_meal === false) ? (
+            <p className="text-sm text-ink-900">🍽️ {t('meal.my_line')} <b>{inv.my_meal ? t('meal.yes') : t('meal.no')}</b> · {t('meal.already_chosen')}</p>
+          ) : meals && (
+            <div>
+              <p className="mb-1.5 text-sm font-extrabold text-ink-900">{mealTitle(mealRulesOf(tournament), t, i18n.language)}</p>
+              {mealOf(mealRulesOf(tournament)).description && <p className="-mt-1 mb-2 text-xs text-ink-500">{mealOf(mealRulesOf(tournament)).description}</p>}
+              <MealPicker value={inviteMeal[inv.entry_id] ?? null} label={t('meal.title')}
+                missing={inviteTried === inv.entry_id && inviteMissing(inv).mealMissing}
+                onChange={(v) => setInviteMeal((m) => ({ ...m, [inv.entry_id]: v }))} />
             </div>
           )}
           {inviteError?.entryId === inv.entry_id && (
@@ -300,7 +345,14 @@ export default function SignupSlot({ tournament, categories, category, my: first
           )}
           {/* Empilhados, a ação em cima (regra de 6 out): nunca lado a lado. */}
           <div className="space-y-2">
-            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy || (shirts && !inv.my_tshirt && !inviteShirt[inv.entry_id])} className="w-full">
+            {/* A razão colada por cima do botão (regra #798). */}
+            {inviteTried === inv.entry_id && inviteMissing(inv).text && (
+              <p role="alert" className="text-sm font-extrabold text-danger">{inviteMissing(inv).text}</p>
+            )}
+            <PrimaryButton onClick={() => {
+              if (inviteMissing(inv).text) { setInviteTried(inv.entry_id); return }
+              answer(inv.entry_id, true)
+            }} disabled={busy} className="w-full">
               {t('tsignup.invite_accept')}
             </PrimaryButton>
             <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="w-full">
@@ -334,6 +386,41 @@ export default function SignupSlot({ tournament, categories, category, my: first
             </div>
           ))}
         </div>
+      )}
+      {/* A minha refeição, por baixo da t-shirt (#799, SPEC ponto 6). */}
+      {meals && my && (
+        <div className="card space-y-2">
+          {[
+            { key: 'mine', label: t('meal.my_line'), meal: my.meal },
+            ...(my.guest_name ? [{ key: 'guest', label: `${t('meal.guest_label', { name: String(my.guest_name).split(/\s+/)[0] })}:`, meal: my.guest_meal }] : []),
+          ].map((row) => (
+            <div key={row.key} className="flex items-start gap-3">
+              <span aria-hidden="true" className="text-lg leading-6">🍽️</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-ink-900">
+                  {row.label} <b>{row.meal === true ? t('meal.yes') : row.meal === false ? t('meal.no') : t('ui.empty_tshirt_pending')}</b>
+                </p>
+                <p className="text-xs text-muted">{open ? t('tshirt.change_until_short', { date: deadlineDay }) : t('tshirt.closed_line', { date: deadlineDay })}</p>
+              </div>
+              {open && (
+                <button type="button" onClick={() => setMealSheet(row.key)} className="-my-2 inline-flex min-h-[44px] shrink-0 items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                  {t('tshirt.change')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {mealSheet && my && (
+        <Sheet title={mealSheet === 'guest'
+          ? t('meal.guest_label', { name: String(my.guest_name || '').split(/\s+/)[0] })
+          : mealTitle(mealRulesOf(tournament), t, i18n.language)} onClose={() => setMealSheet(null)}>
+          <div className="space-y-3">
+            <MealPicker value={(mealSheet === 'guest' ? my.guest_meal : my.meal) ?? null} onChange={changeMeal} disabled={busy} label={t('meal.title')} />
+            <p className="text-xs text-muted">{t('tshirt.change_until', { date: deadlineDay })}</p>
+            {mealError && <p className="text-sm font-extrabold text-danger">{mealError}</p>}
+          </div>
+        </Sheet>
       )}
       {shirtSheet && my && (
         <Sheet title={shirtSheet === 'guest'
@@ -480,6 +567,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
           takenIds={myEntries.map((e) => e.category_id)}
           // A t-shirt que já tenho neste torneio (uma por pessoa, 11 out).
           myExistingShirt={myEntries.find((e) => e.state !== 'desistiu' && e.tshirt)?.tshirt || null}
+          // A refeição já respondida neste torneio (uma por pessoa, #799).
+          myExistingMeal={myEntries.find((e) => e.state !== 'desistiu' && (e.meal === true || e.meal === false))?.meal ?? null}
           busy={busy}
           error={error}
           onConfirm={trySignUp}

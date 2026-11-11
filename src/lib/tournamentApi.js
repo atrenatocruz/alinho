@@ -517,6 +517,47 @@ export async function getPlayerTshirt(tournamentId, userId) {
   return row?.chosen ? { chosen: true, size: row.size || null } : null
 }
 
+// Refeição do torneio (#799, SPEC 2026-11-11-torneio-refeicao; dados do
+// Dev 3). A resposta é true (sim), false (não) ou null (por responder).
+// rules.meal = { mode: 'none'|'gift'|'sale', price_cents, description }.
+
+/** O próprio responde, até as inscrições fecharem. Com `forGuest`, quem
+ *  inscreveu responde pelo parceiro sem conta. */
+export async function setMyMeal(entryId, meal, { forGuest = false } = {}) {
+  const { error } = await supabase.rpc('set_my_tournament_meal', { p_entry_id: entryId, p_meal: meal, ...(forGuest ? { p_for_guest: true } : {}) })
+  if (error) throw error
+}
+
+/** Quem organiza muda a resposta de qualquer jogador, mesmo depois do prazo. */
+export async function adminSetMeal(entryId, slot, meal) {
+  const { error } = await supabase.rpc('admin_set_tournament_meal', { p_entry_id: entryId, p_slot: slot, p_meal: meal })
+  if (error) throw error
+}
+
+/** { mode, price_cents, description, yes, no, pending }, só para quem
+ *  organiza. null sem a função (migração por correr). */
+export async function getMealCounts(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_meal_counts', { p_tournament_id: tournamentId })
+  if (error) { if (error.code === 'PGRST202') return null; throw error }
+  return Array.isArray(data) ? data[0] || null : data || null
+}
+
+/** Uma linha por pessoa: [{ user_id, name, category_codes, entry_ids, slots, meal }]. */
+export async function getMealPeople(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_meal_people', { p_tournament_id: tournamentId })
+  if (error) { if (error.code === 'PGRST202') return []; throw error }
+  return data || []
+}
+
+/** Se a pessoa já respondeu neste torneio: { chosen, meal } (a resposta só
+ *  para o próprio e quem organiza). null sem resposta ou sem a função. */
+export async function getPlayerMeal(tournamentId, userId) {
+  const { data, error } = await supabase.rpc('tournament_player_meal', { p_tournament_id: tournamentId, p_user_id: userId })
+  if (error) { if (error.code === 'PGRST202') return null; throw error }
+  const row = Array.isArray(data) ? data[0] : data
+  return row?.chosen ? { chosen: true, meal: row.meal ?? null } : null
+}
+
 // ── Categorias que chocam (design-handoff/2026-10-09-torneio-categorias-
 // chocam; base de dados do Dev 3) ───────────────────────────────────────
 // Um choque: { user_id?, name?, category_a, category_b, code_a, code_b,

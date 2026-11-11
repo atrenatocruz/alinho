@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { pricePerPlayer } from '../../lib/tournaments'
 import { Search, UserPlus, Euro } from 'lucide-react'
@@ -32,11 +32,12 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
    conta entra pelo nome e recebe um link. Quem grava é a página
    (onConfirm). */
 
-import { NO_TSHIRT, TshirtPicker, tshirtOn, tshirtPriceLabel, pairTotalLine, shirtRulesOf } from './tshirt'
-import { getPlayerTshirt } from '../../lib/tournamentApi'
+import { NO_TSHIRT, TshirtPicker, tshirtOn, tshirtPriceLabel, shirtRulesOf } from './tshirt'
+import { getPlayerTshirt, getPlayerMeal } from '../../lib/tournamentApi'
+import { MealPicker, mealOn, mealRulesOf, mealOf, mealTitle, pairTotalWithMeal } from './meal'
 import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 
-export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], myExistingShirt = null, initialMode = 'partner', busy, error, onConfirm, onClose }) {
+export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], myExistingShirt = null, myExistingMeal = null, initialMode = 'partner', busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
   const { user, profile } = useAuth()
   // As que servem à pessoa primeiro — o género dela (ou misto) e o nível
@@ -77,6 +78,14 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   // O parceiro com conta que já tem t-shirt noutra categoria.
   const [partnerShirt, setPartnerShirt] = useState(null)
   const [guestShirt, setGuestShirt] = useState(null)
+  // A refeição (#799): Não ou Sim, nenhuma vem escolhida. Uma por pessoa no
+  // torneio, como a t-shirt: numa 2.ª categoria já vem respondida.
+  const [myMeal, setMyMeal] = useState(myExistingMeal)
+  const [changingMyMeal, setChangingMyMeal] = useState(false)
+  const [partnerMeal, setPartnerMeal] = useState(null)
+  const [guestMeal, setGuestMeal] = useState(null)
+  const shirtRef = useRef(null)
+  const mealRef = useRef(null)
 
   useEffect(() => {
     if (!tournament?.organization_id) return
@@ -130,6 +139,29 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   const emailError = partnerEmailError(email)
   const shirts = tshirtOn(shirtRulesOf(tournament))
   const shirtsReady = !shirts || (!!myShirt && (mode !== 'named' || !!guestShirt))
+  const meals = mealOn(mealRulesOf(tournament))
+  const myMealMissing = meals && myMeal !== true && myMeal !== false
+  const guestMealMissing = meals && mode === 'named' && guestMeal !== true && guestMeal !== false
+  const mealsReady = !myMealMissing && !guestMealMissing
+  const guestFirst = name.trim().split(/\s+/)[0]
+  // Regra #798: o «Inscrever» nunca fica cinzento por falta de t-shirt ou de
+  // refeição. Ao tocar, a razão fica colada por cima do botão, a folha
+  // desliza até à primeira pergunta em falta e ela fica marcada.
+  // Só falta o do convidado (t-shirt e refeição dele): a frase diz o nome
+  // dele, não «queres» (QA, 11 nov).
+  const onlyGuestBoth = shirts && meals && mode === 'named' && !!myShirt && !myMealMissing && !guestShirt && guestMealMissing
+  const missingText = onlyGuestBoth ? t('meal.missing_guest_both', { name: guestFirst })
+    : !shirtsReady && !mealsReady ? t('meal.missing_both')
+    : !shirtsReady ? t('meal.missing_shirt')
+      : myMealMissing ? t('meal.missing_meal')
+        : guestMealMissing ? t('meal.missing_guest_meal', { name: guestFirst }) : null
+  useEffect(() => {
+    setPartnerMeal(null)
+    if (!meals || mode !== 'partner' || !partnerId) return undefined
+    let cancelled = false
+    getPlayerMeal(tournament.id, partnerId).then((m) => { if (!cancelled) setPartnerMeal(m) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [meals, mode, partnerId, tournament.id])
   useEffect(() => {
     setPartnerShirt(null)
     if (!shirts || mode !== 'partner' || !partnerId) return undefined
@@ -139,13 +171,19 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   }, [shirts, mode, partnerId, tournament.id])
   // O que se paga agora: a minha só se ainda não a tinha.
   const payingShirts = [myExistingShirt ? null : myShirt, mode === 'named' ? guestShirt : null]
-  const ready = categoryId && shirtsReady && (
+  const payingMeals = [myExistingMeal === true || myExistingMeal === false ? null : myMeal, mode === 'named' ? guestMeal : null]
+  const ready = categoryId && (
     mode === 'alone' ? true : mode === 'partner' ? !!partnerId : !nameError && !emailError
   )
 
   const confirm = () => {
     setTouched(true)
     if (!ready || busy) return
+    if (missingText) {
+      const el = (!shirtsReady ? shirtRef : mealRef).current
+      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      return
+    }
     onConfirm({
       categoryId,
       partnerId: mode === 'partner' ? partnerId : null,
@@ -157,10 +195,12 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
       guestEmail: mode === 'named' ? email.trim() : null,
       teamName: teamName.trim() || null,
       ...(shirts ? { tshirtSize: myShirt, partnerTshirtSize: mode === 'named' ? guestShirt : null } : {}),
+      ...(meals ? { meal: myMeal, partnerMeal: mode === 'named' ? guestMeal : null } : {}),
     })
   }
 
   const price = (chosen?.price_cents ?? tournament?.entry_fee_cents)
+  const rulesForTotal = { ...shirtRulesOf(tournament), ...mealRulesOf(tournament) }
 
   return (
     <Sheet onClose={onClose} title={t('tsignup.sheet_title', { name: tournament.name })}>
@@ -297,7 +337,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
 
         {/* A t-shirt do torneio (SPEC t-shirts, ponto 2). */}
         {shirts && (
-          <div className="space-y-3">
+          <div ref={shirtRef} className="space-y-3">
             {myExistingShirt && !changingMine ? (
               <p className="flex items-center justify-between gap-2 text-sm text-ink-900">
                 <span>👕 {t('tshirt.my_line')} <b>{myShirt === NO_TSHIRT ? t('tshirt.no_thanks') : myShirt}</b> · {t('tshirt.already_chosen')}</span>
@@ -306,13 +346,17 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
             ) : (
               <div>
                 <FieldLabel>{t('tshirt.mine_label', { price: myExistingShirt ? '' : tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
-                <TshirtPicker rules={shirtRulesOf(tournament)} value={myShirt} onChange={setMyShirt} label={t('tshirt.mine_label', { price: '' })} />
+                <div className={touched && !myShirt ? 'rounded-2xl outline outline-2 outline-offset-2 outline-danger' : ''}>
+                  <TshirtPicker rules={shirtRulesOf(tournament)} value={myShirt} onChange={setMyShirt} label={t('tshirt.mine_label', { price: '' })} />
+                </div>
               </div>
             )}
             {mode === 'named' && name.trim() && (
               <div>
                 <FieldLabel>{t('tshirt.guest_label', { name: name.trim().split(/\s+/)[0], price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
-                <TshirtPicker rules={shirtRulesOf(tournament)} value={guestShirt} onChange={setGuestShirt} label={t('tshirt.guest_label', { name: name.trim(), price: '' })} />
+                <div className={touched && !guestShirt ? 'rounded-2xl outline outline-2 outline-offset-2 outline-danger' : ''}>
+                  <TshirtPicker rules={shirtRulesOf(tournament)} value={guestShirt} onChange={setGuestShirt} label={t('tshirt.guest_label', { name: name.trim(), price: '' })} />
+                </div>
               </div>
             )}
             <div className="text-xs text-ink-500">
@@ -321,11 +365,42 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
               ) : (
                 <p>{t('tshirt.partner_chooses', { name: (members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name?.split(/\s+/)[0] || '' })}</p>
               ))}
-              {tournament.entries_deadline && (
+              {tournament.entries_deadline && !meals && (
                 <p>{t(mode === 'named' ? 'tshirt.change_until_both' : 'tshirt.change_until', { date: new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ') })}</p>
               )}
             </div>
-            {touched && !shirtsReady && <p className="text-sm text-danger font-extrabold">{t('tshirt.choose_error')}</p>}
+          </div>
+        )}
+
+        {/* A refeição do torneio, logo a seguir às t-shirts (#799, SPEC ponto 2). */}
+        {meals && (
+          <div ref={mealRef} className="space-y-3">
+            {(myExistingMeal === true || myExistingMeal === false) && !changingMyMeal ? (
+              <p className="flex items-center justify-between gap-2 text-sm text-ink-900">
+                <span>🍽️ {t('meal.my_line')} <b>{myMeal ? t('meal.yes') : t('meal.no')}</b> · {t('meal.already_chosen')}</span>
+                <button type="button" onClick={() => setChangingMyMeal(true)} className="min-h-[44px] shrink-0 text-sm font-extrabold underline underline-offset-2">{t('tshirt.change')}</button>
+              </p>
+            ) : (
+              <div>
+                <FieldLabel>{mealTitle(mealRulesOf(tournament), t, i18n.language)}</FieldLabel>
+                {mealOf(mealRulesOf(tournament)).description && <p className="-mt-1 mb-2 text-xs text-ink-500">{mealOf(mealRulesOf(tournament)).description}</p>}
+                <MealPicker value={myMeal} onChange={setMyMeal} label={t('meal.title')} missing={touched && myMealMissing} />
+              </div>
+            )}
+            {mode === 'named' && name.trim() && (
+              <div>
+                <FieldLabel>{t('meal.guest_label', { name: guestFirst })}</FieldLabel>
+                <MealPicker value={guestMeal} onChange={setGuestMeal} label={t('meal.guest_label', { name: guestFirst })} missing={touched && guestMealMissing} />
+              </div>
+            )}
+            <div className="text-xs text-ink-500">
+              {mode === 'partner' && partnerId && !partnerMeal && (
+                <p>{t('meal.partner_answers', { name: (members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name?.split(/\s+/)[0] || '' })}</p>
+              )}
+              {tournament.entries_deadline && (
+                <p>{t('tshirt.change_until', { date: new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ') })}</p>
+              )}
+            </div>
           </div>
         )}
 
@@ -334,8 +409,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           <div>
             {/* Com t-shirts à venda pedidas, o total é da dupla (SPEC, ponto 2). */}
-            {price != null && (pairTotalLine(price / 100, shirtRulesOf(tournament), payingShirts, t, i18n.language)
-              ? <p className="font-extrabold">{pairTotalLine(price / 100, shirtRulesOf(tournament), payingShirts, t, i18n.language)}</p>
+            {price != null && (pairTotalWithMeal(price / 100, rulesForTotal, payingShirts, payingMeals, t, i18n.language)
+              ? <p className="font-extrabold">{pairTotalWithMeal(price / 100, rulesForTotal, payingShirts, payingMeals, t, i18n.language)}</p>
               : <p className="font-extrabold">{t('tsignup.price', { price: euroWords(price / 100, i18n.language), each: pricePerPlayer(price / 100, i18n.language) })}</p>)}
             {/* Preço especial de quem se inscreve (7 out): «Grátis para ti · …». */}
             <CategorySpecialLine category={chosen} className="font-extrabold text-ok-700" />
@@ -344,6 +419,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
         </div>
 
         {error && <p className="text-sm text-danger font-extrabold">{error}</p>}
+        {/* A razão colada por cima do botão (regra #798). */}
+        {touched && missingText && <p role="alert" className="text-sm text-danger font-extrabold">{missingText}</p>}
 
         <PrimaryButton onClick={confirm} disabled={!ready || busy} className="w-full">
           {busy ? t('gamedetails.joining') : t('tsignup.confirm')}

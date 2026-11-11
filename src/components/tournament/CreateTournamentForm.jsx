@@ -12,6 +12,7 @@ import { categoryCode, categoryName, categoryOutsideDay, stepProblem, saveProble
 import { localInputToIso, isoToLocalInput, endsNextDay, nextDateKey } from '../../lib/tournamentDay'
 import { FieldLabel, MonoLabel } from './TournamentBits'
 import { TshirtField } from './tshirt'
+import { MealField } from './meal'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { phasesWithResults } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
@@ -782,6 +783,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       {locked && ['rascunho', 'inscricoes'].includes(initial?.tournament?.status) && (
         <div className="card">
           <TshirtField rules={draft.rules} onChange={(v) => setRule('tshirt', v)} FieldLabel={FieldLabel} />
+          {/* A refeição, logo a seguir à t-shirt (#799). */}
+          <div className="mt-4"><MealField rules={draft.rules} onChange={(v) => setRule('meal', v)} FieldLabel={FieldLabel} /></div>
         </div>
       )}
       {locked && draft.categories.length > 0 && (
@@ -878,6 +881,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 
           {/* T-shirt do torneio inteiro, não da categoria (SPEC t-shirts, 8 out). */}
           <TshirtField rules={draft.rules} onChange={(v) => setRule('tshirt', v)} FieldLabel={FieldLabel} />
+          {/* Refeição do torneio, logo por baixo da t-shirt (#799). */}
+          <MealField rules={draft.rules} onChange={(v) => setRule('meal', v)} FieldLabel={FieldLabel} />
 
           {/* Só com dias e campos: antes disso a conta dava «0 h de campo» (QA,
               26 set). É uma explicação, por isso texto normal. */}
