@@ -22,6 +22,7 @@ import {
   saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload, qualifiersPerGroup,
 } from '../../lib/tournamentDraw'
 import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords } from '../../lib/tournamentFormat'
+import { dayMinutes } from '../../lib/tournamentCapacity'
 import { listTournamentClashes } from '../../lib/tournamentApi'
 import { ClashBanner, ClashCaseSheet, ClashListSheet, casesFor, startClashes, whenText } from './Clashes'
 import { PanelSkeleton } from './TournamentSkeleton'
@@ -160,11 +161,9 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
   const options = useMemo(() => {
     // `availableCourtHours` quer horas e campos em numero, nao a grelha do
     // horario: { hours, courts }.
-    const hoursOf = (d) => {
-      const [h1, m1] = String(d.starts_at).split(':').map(Number)
-      const [h2, m2] = String(d.ends_at).split(':').map(Number)
-      return Math.max(0, (h2 * 60 + m2 - (h1 * 60 + m1)) / 60)
-    }
+    // Um dia que acaba de madrugada (09:00 à 01:00) conta até à 01:00 do
+    // dia seguinte (#797): a conta é a do Dev 3, a mesma do Criar torneio.
+    const hoursOf = (d) => (dayMinutes({ starts_at: String(d.starts_at).slice(0, 5), ends_at: String(d.ends_at).slice(0, 5) }) || 0) / 60
     const days = (dayRows || []).map((d) => ({ hours: hoursOf(d), courts: Number(d.courts) || 1 }))
     return formatOptions(teamCount, {
       maxDurationMin: Number(rules?.duration_max) || 60,
