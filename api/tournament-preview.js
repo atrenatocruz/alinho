@@ -1,9 +1,7 @@
 // Pré-visualização do link do torneio no WhatsApp (Trello #363).
 //
-// ⚠️ PROPOSTA — NÃO ESTÁ LIGADA. Esta função existe no repositório mas
-// nada a chama: falta uma linha no vercel.json, e essa linha é do Renato
-// (ver "COMO SE LIGA", no fim). Enquanto não for ligada, a app fica
-// exatamente como está hoje.
+// Ligada no vercel.json a 12 nov 2026 (/torneio/:slug e /torneio/:slug/:rest*),
+// por decisão do Francisco, avisado o Renato pelo PO.
 //
 // PORQUÊ NO SERVIDOR. Quando se cola um link no WhatsApp, é o WhatsApp
 // que vai buscar a página — e ele não corre JavaScript. A nossa app é uma
@@ -64,8 +62,18 @@ async function loadTournament(slug) {
   return Array.isArray(rows) && rows[0] ? rows[0] : null
 }
 
-function metaTags({ tour, pageUrl, imageUrl }) {
-  const title = `${tour.name} · Alinho`
+// O index.html já traz o título e as etiquetas genéricas do alinho (logótipo).
+// O WhatsApp e o Facebook ficam com a PRIMEIRA og:image que encontram, por isso
+// as genéricas saem antes de entrarem as do torneio.
+export function stripDefaultTags(html) {
+  return html
+    .replace(/[ \t]*<title>[\s\S]*?<\/title>[ \t]*\r?\n?/i, '')
+    .replace(/[ \t]*<meta\s+name="description"[^>]*>[ \t]*\r?\n?/gi, '')
+    .replace(/[ \t]*<meta\s+(?:property|name)="(?:og|twitter):[^"]*"[^>]*>[ \t]*\r?\n?/gi, '')
+}
+
+export function metaTags({ tour, pageUrl, imageUrl, hasPoster }) {
+  const title = `${tour.name} · alinho`
   const description = [
     dateRange(tour.starts_on, tour.ends_on),
     tour.club_name,
@@ -74,15 +82,17 @@ function metaTags({ tour, pageUrl, imageUrl }) {
 
   const tags = [
     ['og:type', 'website'],
-    ['og:site_name', 'Alinho'],
+    ['og:site_name', 'alinho'],
     ['og:title', title],
     ['og:description', description],
     ['og:url', pageUrl],
     ['og:locale', 'pt_PT'],
     imageUrl ? ['og:image', imageUrl] : null,
-    ['twitter:card', imageUrl ? 'summary_large_image' : 'summary'],
+    imageUrl ? ['og:image:alt', title] : null,
+    ['twitter:card', hasPoster ? 'summary_large_image' : 'summary'],
     ['twitter:title', title],
     ['twitter:description', description],
+    imageUrl ? ['twitter:image', imageUrl] : null,
   ].filter(Boolean)
 
   return [
@@ -114,8 +124,11 @@ export default async function handler(req, res) {
     const tour = slug ? await loadTournament(slug) : null
     if (tour) {
       const pageUrl = `${origin}/torneio/${slug}`
-      const imageUrl = tour.poster_url || `${origin}/og-torneio.png`
-      html = html.replace('</head>', `    ${metaTags({ tour, pageUrl, imageUrl })}\n  </head>`)
+      // Sem cartaz: o logótipo do alinho, que é o que o link mostrava até aqui.
+      const hasPoster = /^https:\/\//.test(tour.poster_url || '')
+      const imageUrl = hasPoster ? tour.poster_url : `${origin}/pwa-512x512.png`
+      html = stripDefaultTags(html)
+        .replace('</head>', `    ${metaTags({ tour, pageUrl, imageUrl, hasPoster })}\n  </head>`)
       // 5 min no CDN, e até 1 h a servir a versão antiga enquanto revalida.
       res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600')
     }
@@ -129,22 +142,10 @@ export default async function handler(req, res) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// COMO SE LIGA (Renato) — uma linha no vercel.json, antes do catch-all:
-//
-//   "rewrites": [
-//     { "source": "/torneio/:slug",       "destination": "/api/tournament-preview?slug=:slug" },
-//     { "source": "/torneio/:slug/:rest*", "destination": "/api/tournament-preview?slug=:slug" },
-//     { "source": "/(.*)",                "destination": "/index.html" }
-//   ]
-//
-// Precisa também de VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nas
-// variáveis do projeto na Vercel (só de leitura, as mesmas do browser).
-//
-// Falta ainda uma imagem por omissão em public/og-torneio.png (1200×630),
-// para os torneios que não têm cartaz — é desenho, não é código.
-//
-// Não liguei isto por não ser meu: mexe no encaminhamento de TODA a
-// secção /torneio em produção. Depois de ligado, testar com
-// https://developers.facebook.com/tools/debug/ ou colando o link numa
-// conversa de WhatsApp.
+// COMO ESTÁ LIGADA — vercel.json, antes do catch-all:
+//   /torneio/:slug          → /api/tournament-preview?slug=:slug
+//   /torneio/:slug/:rest*   → /api/tournament-preview?slug=:slug
+// Usa VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (as mesmas do browser).
+// Sem elas, ou se o torneio não existir, devolve a app sem etiquetas novas.
+// Testar: curl -A "WhatsApp/2.23.20.0" <site>/torneio/<slug> | grep og:
 // ════════════════════════════════════════════════════════════════════════
