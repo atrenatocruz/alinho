@@ -310,7 +310,7 @@ function ValidateSheet({ partner, vouchers, loc, onClose, onUsed }) {
   const shortDate = (v) => dayMonth(v, loc)
   const preview = found && found.status === 'por_usar' ? found : null
   const localError = !found ? null
-    : found.status === 'usado' ? t('partneradmin.err_used', { date: shortDate(found.used_at), time: new Date(found.used_at).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) })
+    : found.status === 'usado' ? t('partneradmin.err_used', { date: shortDate(found.used_at), time: new Date(found.used_at).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) })
     : found.status === 'expirado' ? t('partneradmin.err_expired', { date: shortDate(`${String(found.valid_until).slice(0, 10)}T12:00:00`) })
     : found.status === 'anulado' ? t('partneradmin.err_not_found') : null
   const shown = error || localError
@@ -327,7 +327,7 @@ function ValidateSheet({ partner, vouchers, loc, onClose, onUsed }) {
       // O Dev 3 manda a data no hint: used_at (already_used) e valid_until (expired).
       const when = e?.hint ? new Date(String(e.hint).replace(' ', 'T').replace(/\+00$/, 'Z')) : null
       const ok = when && !Number.isNaN(when.getTime())
-      setError(k.includes('already_used') ? (ok ? t('partneradmin.err_used', { date: shortDate(when), time: when.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) }) : t('partneradmin.err_used_generic'))
+      setError(k.includes('already_used') ? (ok ? t('partneradmin.err_used', { date: shortDate(when), time: when.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) }) : t('partneradmin.err_used_generic'))
         : k.includes('expired') ? (ok ? t('partneradmin.err_expired', { date: shortDate(when) }) : t('partneradmin.err_expired_generic'))
         : k.includes('other_partner') ? t('partneradmin.err_other', { name: partner.name })
         : t('partneradmin.err_not_found'))

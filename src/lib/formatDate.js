@@ -6,11 +6,18 @@
 const LOCALE_MAP = { pt: 'pt-PT', en: 'en-GB', es: 'es-ES' }
 export const localeOf = (lang) => LOCALE_MAP[lang] || LOCALE_MAP[String(lang || '').slice(0, 2)] || 'pt-PT'
 
+// As horas do alinho são sempre de 24 horas: «16:00», nunca «04:00 PM»
+// (#811). O en-GB já as dá assim, mas uma língua que chegue sem passar pelo
+// localeOf (ou um browser com outra preferência) caía nas 12 horas do
+// inglês americano. Quem pedir hour12 ou hourCycle de propósito, fica com o
+// que pediu.
+const h23 = (options) => (options?.hour12 !== undefined || options?.hourCycle ? options : { ...options, hourCycle: 'h23' })
+
 export const formatDate = (date, lang, options) =>
-  new Date(date).toLocaleDateString(localeOf(lang), options)
+  new Date(date).toLocaleDateString(localeOf(lang), options?.hour || options?.timeStyle ? h23(options) : options)
 
 export const formatTime = (date, lang, options) =>
-  new Date(date).toLocaleTimeString(localeOf(lang), options)
+  new Date(date).toLocaleTimeString(localeOf(lang), h23(options))
 
 // Valores monetários. Intl trata do símbolo, da posição e do separador
 // decimal por locale: pt-PT dá "7,50 €", en-GB dá "€7.50". Antes disto o

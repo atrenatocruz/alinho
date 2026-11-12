@@ -257,7 +257,7 @@ function EventRow({ event, member }) {
     if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   } else {
     const g = event.game
-    time = new Date(event.when).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+    time = new Date(event.when).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
     timeAside = recurring ? recurring.toLowerCase() : null
     // Um evento fechado a quem não é membro não traz vagas nem inscritos.
     if (!event.locked && g.max_players) {
@@ -451,7 +451,7 @@ function ClubPlayed({ club }) {
   }
   const shown = all ? rows : rows.slice(0, PLAYED_FIRST)
   const dayOf = (iso) => new Date(iso).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '').replace(',', '')
-  const timeOf = (iso) => new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+  const timeOf = (iso) => new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   return (
     <div className="space-y-2.5">
       {shown.map((r) => {
