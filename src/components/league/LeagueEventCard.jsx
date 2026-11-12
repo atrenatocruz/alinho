@@ -13,7 +13,7 @@ export default function LeagueEventCard({ event, past }) {
   const r = event.raw
   const to = `/liga/${r.league_slug}/encontro/${r.id}`
   const time = event.hasTime
-    ? new Date(r.scheduled_at).toLocaleTimeString(localeOf(i18n.language), { hour: '2-digit', minute: '2-digit' })
+    ? new Date(r.scheduled_at).toLocaleTimeString(localeOf(i18n.language), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
     : t('league.enc_por_marcar')
   return (
     <HomeCard colors={kindColorsOf('league')} mine={!past} past={past} to={to} ariaLabel={`${r.home_name} vs ${r.away_name}`}

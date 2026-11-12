@@ -26,7 +26,7 @@ export default function ReceptionPass({ voucher, person, onClose, onMarkUsed }) 
   const month = voucher.prize_month ? new Date(`${String(voucher.prize_month).slice(0, 10)}T12:00:00`) : null
   const validUntil = voucher.valid_until ? new Date(`${String(voucher.valid_until).slice(0, 10)}T12:00:00`) : null
   const day = now.toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' })
-  const time = now.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const time = now.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label={t('reception.title')}
