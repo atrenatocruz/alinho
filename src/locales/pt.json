@@ -4992,7 +4992,7 @@
   "tournament.score.keeper_add": "Juntar marcador",
   "tournament.score.keepers_note": "Também podes abrir a tua conta noutro telemóvel ou num computador na receção. Funciona ao mesmo tempo.",
   "tournament.create.poster": "Cartaz (opcional)",
-  "tournament.create.poster_hint": "Aparece no topo da página do torneio, inclusive para quem não tem conta.",
+  "tournament.create.poster_hint": "Aparece no topo da página do torneio, também para quem não tem conta. Fica melhor numa imagem larga, de 1200 x 500 px.",
   "tournament.create.poster_pick": "Carregar imagem",
   "tournament.create.poster_uploading": "A carregar…",
   "tournament.create.poster_remove": "Tirar o cartaz",
