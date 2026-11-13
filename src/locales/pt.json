@@ -2042,7 +2042,7 @@
   "gerirclube.recurrence_ended_no_next": "A hora nova ficou gravada, mas esta recorrência já chegou ao fim: não há mais Mixes para sair.",
   "gerirclube.error_recurrence_no_next": "A hora nova ficou gravada, mas não foi possível criar o próximo Mix desta recorrência. Avisa-nos.",
   "gerirclube.copy_invite_link": "Copiar link de convite",
-  "gerirclube.court_time_label": "Tempo do court",
+  "gerirclube.court_time_label": "Tempo de campo",
   "gerirclube.courts_count": "{{count}} campo",
   "gerirclube.courts_count_other": "{{count}} campos",
   "gerirclube.create_button": "Criar",
