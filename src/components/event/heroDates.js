@@ -25,6 +25,19 @@ export function shortDay(value, locale) {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(d).replace('.', '').replace(' de ', ' ')
 }
 
+/** De um dia a outro: «27-29 nov» no mesmo mês, «30 nov-2 dez» quando muda
+ *  de mês; num dia só, «27 nov» (#811). Sempre dia e depois mês, em todas as
+ *  línguas: o pt-PT do Intl dava «27/11» e o «en» em cru «Nov 27». */
+export function shortRange(start, end, locale) {
+  const a = dayOnly(start)
+  if (!a) return null
+  const b = dayOnly(end) && dayOnly(end) !== a ? dayOnly(end) : null
+  const day = (iso) => Number(iso.slice(8, 10))
+  const mon = (iso) => noon(iso).toLocaleDateString(locale, { month: 'short' }).replace('.', '')
+  if (!b) return `${day(a)} ${mon(a)}`
+  return a.slice(0, 7) === b.slice(0, 7) ? `${day(a)}-${day(b)} ${mon(b)}` : `${day(a)} ${mon(a)}-${day(b)} ${mon(b)}`
+}
+
 /** Ao lado da hora grande: «sáb e dom», ou «sex a dom»; num dia só, nada. */
 export function daysAside(start, end, locale, t) {
   const a = dayOnly(start)
