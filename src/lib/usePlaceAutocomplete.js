@@ -15,16 +15,39 @@ const PHOTON_URL = 'https://photon.komoot.io/api/'
 const PT_BBOX = '-31.6,32.4,-6.1,42.2'
 const MIN_CHARS = 3
 const DEBOUNCE_MS = 300
+// O Photon chegou a demorar 30 s ou mais a responder (12 nov): sem limite, a
+// lista ficava à espera dele e não aparecia nada, nem o aviso. Passado este
+// tempo fica o que houver (os clubes do Alinho), ou o aviso se não houver nada.
+const PHOTON_TIMEOUT_MS = 4000
+
+/** Pedido ao Photon com tempo limite; `signal` cancela-o (letra nova). */
+async function photonFeatures(params, signal) {
+  const ctrl = new AbortController()
+  const stop = () => ctrl.abort()
+  signal?.addEventListener('abort', stop)
+  const timer = setTimeout(stop, PHOTON_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${PHOTON_URL}?${params}`, { signal: ctrl.signal })
+    if (!res.ok) throw new Error(`Photon ${res.status}`)
+    return (await res.json()).features || []
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', stop)
+  }
+}
 
 let placesUnavailable = false
 const subscribers = new Set()
-const markUnavailable = () => {
-  if (placesUnavailable) return
-  placesUnavailable = true
+const setUnavailable = (value) => {
+  if (placesUnavailable === value) return
+  placesUnavailable = value
   subscribers.forEach((fn) => fn())
 }
+const markUnavailable = () => setUnavailable(true)
 
-/** A procura de moradas falhou nesta visita (rede, serviço em baixo): o local escreve-se à mão. */
+/** A última procura de moradas falhou sem nada para mostrar (rede, serviço em
+ *  baixo): o local escreve-se à mão. Sai quando uma procura volta a dar
+ *  sugestões (UX, 12 nov: o aviso não fica por baixo de uma lista cheia). */
 export function usePlacesUnavailable() {
   return useSyncExternalStore(
     (fn) => { subscribers.add(fn); return () => subscribers.delete(fn) },
@@ -84,12 +107,11 @@ export async function geocodeAddress(text) {
   let found = null
   for (const q of tries) {
     try {
-      const res = await fetch(`${PHOTON_URL}?${new URLSearchParams({ q, limit: '1', bbox: PT_BBOX })}`)
-      if (!res.ok) return null // falha do serviço: não se guarda, tenta-se noutra visita
-      const [longitude, latitude] = (await res.json()).features?.[0]?.geometry?.coordinates || []
+      const features = await photonFeatures(new URLSearchParams({ q, limit: '1', bbox: PT_BBOX }))
+      const [longitude, latitude] = features[0]?.geometry?.coordinates || []
       if (latitude != null) { found = { latitude, longitude }; break }
     } catch {
-      return null
+      return null // falha ou demora do serviço: não se guarda, tenta-se noutra visita
     }
   }
   cache[key] = found
@@ -232,7 +254,8 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
 
   useEffect(() => {
     const input = inputRef.current
-    if (!active || !input || placesUnavailable) return undefined
+    // Mesmo depois do aviso, os clubes do Alinho continuam a aparecer (12 nov).
+    if (!active || !input) return undefined
 
     const list = document.createElement('ul')
     list.className = 'place-suggestions'
@@ -318,34 +341,38 @@ export function usePlaceAutocomplete(inputRef, active, onPlaceSelected, options 
       const params = new URLSearchParams({ q, limit: '6', bbox: PT_BBOX })
       if (cities) { params.append('layer', 'city'); params.append('layer', 'locality') }
       const signal = controller.signal
-      // Os clubes do Alinho primeiro (search_club_places); sem a função, só o Photon.
-      const clubsPromise = cities ? Promise.resolve([]) : searchClubPlaces(q)
-      try {
-        // Os sítios vêm da Google; se falhar, ou sem chave, do Photon.
-        let found = null
-        if (!googleFailed) {
-          sessionToken ||= await newSession()
-          found = await googleSearch(q, cities, sessionToken)
-          if (signal.aborted) return
-        }
-        if (!found) {
-          const res = await fetch(`${PHOTON_URL}?${params}`, { signal })
-          if (!res.ok) throw new Error(`Photon ${res.status}`)
-          found = ((await res.json()).features || []).map((f) => placeFromFeature(f, { cities }))
-        }
-        const clubs = await clubsPromise
+      const show = (clubs, found) => {
         if (signal.aborted) return
         const seen = new Set()
         items = [...clubs, ...found]
           .filter((it) => it.value && (it.latitude != null || it.club || it.placeId) && !seen.has(it.value) && seen.add(it.value))
           .slice(0, 7)
+        if (items.length) setUnavailable(false)
         if (document.activeElement === input) render()
-      } catch (error) {
-        if (error.name === 'AbortError') return
-        console.error('Error loading place suggestions:', error)
-        markUnavailable()
-        close()
       }
+      // Os clubes do Alinho primeiro (search_club_places), e logo: não esperam
+      // pela Google nem pelo Photon (12 nov). As outras sugestões juntam-se por
+      // baixo quando chegarem, sem mexer nas de cima.
+      const clubsPromise = cities ? Promise.resolve([]) : searchClubPlaces(q)
+      clubsPromise.then((clubs) => { if (clubs.length) show(clubs, []) })
+      let found = null
+      try {
+        // Os sítios vêm da Google; se falhar, ou sem chave, do Photon.
+        if (!googleFailed) {
+          sessionToken ||= await newSession()
+          found = await googleSearch(q, cities, sessionToken)
+          if (signal.aborted) return
+        }
+        if (!found) found = (await photonFeatures(params, signal)).map((f) => placeFromFeature(f, { cities }))
+      } catch (error) {
+        if (signal.aborted) return
+        console.error('Error loading place suggestions:', error)
+      }
+      const clubs = await clubsPromise
+      if (signal.aborted) return
+      // Sem sugestões nenhumas porque o serviço falhou: o aviso, e vale o que se escreveu.
+      if (!found && !clubs.length) { markUnavailable(); close(); return }
+      show(clubs, found || [])
     }
 
     const onInput = () => {
