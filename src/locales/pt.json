@@ -5713,6 +5713,7 @@
   "tournament.fact_days": "Dias",
   "tournament.fact_courts": "Campos",
   "tournament.fact_price": "Preço",
+  "tournament.fact_price_from": "Preço desde",
   "tournament.view_poster": "Ver cartaz",
   "tournament.fact_price_pair": "{{price}} € / dupla",
   "tournament.fact_tshirt": "T-shirt",

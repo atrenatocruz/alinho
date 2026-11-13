@@ -5698,6 +5698,7 @@
   "tournament.fact_days": "Days",
   "tournament.fact_courts": "Courts",
   "tournament.fact_price": "Price",
+  "tournament.fact_price_from": "Price from",
   "tournament.view_poster": "View poster",
   "tournament.fact_price_pair": "€{{price}} / pair",
   "tournament.fact_tshirt": "T-shirt",
