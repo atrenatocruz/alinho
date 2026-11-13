@@ -1,4 +1,4 @@
-import { withMyRef, refInText } from '../lib/myRef'
+import { refInText } from '../lib/myRef'
 // Página do torneio (Trello #361, «Torneio 1/6») — print 05 do desenho
 // aprovado (design-handoff/2026-09-19-torneios). É o ESQUELETO onde os
 // outros ecrãs se penduram: topo em cartão grande (mesma regra dos mixes),
@@ -17,7 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { useTranslation } from 'react-i18next'
 import i18n from '../lib/i18n'
 import { BackBar } from '../components/ui'
-import { shareMessage, tournamentUrl } from '../lib/tournamentPublic'
+import { shareMessage } from '../lib/tournamentPublic'
 import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, HelpCircle, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
@@ -217,7 +217,9 @@ export default function TournamentPage() {
     const tour = data?.tournament
     if (!tour) return
     const text = refInText(shareMessage(tour, appOrigin())) // ?ref= (19 out)
-    if (navigator.share) { navigator.share({ title: tour.name, text, url: withMyRef(tournamentUrl(tour, appOrigin())) }).catch(() => {}); return }
+    // Só o texto: já leva o link (com o ?ref=). Com o url à parte o iPhone
+    // juntava-o outra vez e a mensagem saía com o link duas vezes (12 nov).
+    if (navigator.share) { navigator.share({ title: tour.name, text }).catch(() => {}); return }
     window.open(whatsappShare(text), '_blank')
   }
   const showSkeleton = useSkeleton(!data && !failed)
