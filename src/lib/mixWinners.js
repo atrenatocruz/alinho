@@ -3,6 +3,7 @@
 // «TERMINADO · VENCEDORES» da página e o cartão de partilha (o do torneio,
 // com o clube ou grupo por baixo do logótipo). Só contas: nada de ecrã aqui.
 import { shortName, shortDate } from '../components/tournament/shareData'
+import { americanoRankBy, americanoSameRank } from './mixLogic'
 
 // Sem títulos por lugar (Padelista Lendário…) no pódio nem na imagem (Renato, 17 out).
 
@@ -55,7 +56,9 @@ export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
  *  11 out); na página ficam os nomes inteiros. */
 export function americanoWinners({ standings, firsts, myId, game, org, t, lang }) {
   if (!standings?.length) return null
-  const placeOf = (r) => standings.findIndex((x) => x.points === r.points && x.diff === r.diff) + 1
+  const rankBy = americanoRankBy(game)
+  const placeOf = (r) => standings.findIndex((x) => americanoSameRank(x, r, rankBy)) + 1
+  const scoreOf = (r) => (rankBy === 'wins' ? r.wins : r.points)
   const rows = standings.slice(0, 3).map((r) => ({ place: placeOf(r), name: r.player.name, mine: r.player.id === myId }))
   const me = standings.find((r) => r.player.id === myId)
   const place = me ? placeOf(me) : null
@@ -72,9 +75,9 @@ export function americanoWinners({ standings, firsts, myId, game, org, t, lang }
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
         rows: [
-          ...standings.slice(0, 3).map((r) => ({ place: placeOf(r), pair: r.player.id === myId ? r.player.name : shortName(r.player.name), score: r.points, mine: r.player.id === myId })),
+          ...standings.slice(0, 3).map((r) => ({ place: placeOf(r), pair: r.player.id === myId ? r.player.name : shortName(r.player.name), score: scoreOf(r), mine: r.player.id === myId })),
           // Do 4.º para baixo, a minha linha por baixo do pódio (UX, 11 out).
-          ...(place > 3 ? [{ place, pair: me.player.name, title: null, score: me.points, mine: true }] : []),
+          ...(place > 3 ? [{ place, pair: me.player.name, title: null, score: scoreOf(me), mine: true }] : []),
         ],
         record: record?.won > 0 ? t('mixwinners.record_americano', { won: record.won, played: record.played }) : null,
       },

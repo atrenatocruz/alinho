@@ -14,6 +14,8 @@ import { IS_NATIVE } from './lib/native'
 import { setupNativeShell } from './lib/nativeShell'
 import TestEnvBanner from './components/TestEnvBanner'
 import UpdatePill from './components/UpdatePill'
+import { Analytics } from '@vercel/analytics/react'
+import { analyticsBeforeSend } from './lib/analytics'
 
 // A versão nova: avisa com a app à frente (UpdatePill) e só entra sozinha
 // ao voltar à app depois de algum tempo fora (#569, revisto a 29 set).
@@ -47,6 +49,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <TestEnvBanner />
     <App />
     <UpdatePill />
+    {/* Contagem de visitas (#814): só no site; nas apps das lojas não. */}
+    {!IS_NATIVE && <Analytics beforeSend={analyticsBeforeSend} />}
   </React.StrictMode>,
 )
 // A app montou: o vigia do index.html já não mostra «Não foi possível abrir

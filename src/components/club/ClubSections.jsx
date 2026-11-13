@@ -23,9 +23,9 @@ import { KIND_STYLE, CardClub } from '../agenda/EventCard'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardButton, kindColorsOf } from '../agenda/HomeCard'
 import FaceCircles from '../event/FaceCircles'
 import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
-import { formatDate } from '../../lib/formatDate'
+import { formatDate, localeOf } from '../../lib/formatDate'
 import { SkeletonGate, SkBlock } from '../Skeleton'
-import { daysAside, shortDay } from '../event/heroDates'
+import { daysAside, shortDay, shortRange } from '../event/heroDates'
 import NoTime from '../NoTime'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
@@ -249,15 +249,13 @@ function EventRow({ event, member }) {
   let time, timeAside = null, count = null, chips = null, stateRow = null, free = null
   if (event.tournament) {
     const x = event.tournament
-    const a = shortDay(x.starts_on, i18n.language)
-    const b = x.ends_on && String(x.ends_on).slice(0, 10) !== String(x.starts_on || '').slice(0, 10) ? shortDay(x.ends_on, i18n.language) : null
-    time = b ? `${a.split(' ')[0]}-${b}` : a || <NoTime onBand label={t('ui.empty_day_tbd')} />
-    timeAside = daysAside(x.starts_on, x.ends_on, i18n.language, t)
+    time = shortRange(x.starts_on, x.ends_on, localeOf(i18n.language)) || <NoTime onBand label={t('ui.empty_day_tbd')} />
+    timeAside = daysAside(x.starts_on, x.ends_on, localeOf(i18n.language), t)
     chips = null
     if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   } else {
     const g = event.game
-    time = new Date(event.when).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    time = new Date(event.when).toLocaleTimeString(localeOf(i18n.language), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
     timeAside = recurring ? recurring.toLowerCase() : null
     // Um evento fechado a quem não é membro não traz vagas nem inscritos.
     if (!event.locked && g.max_players) {
@@ -450,8 +448,9 @@ function ClubPlayed({ club }) {
     )
   }
   const shown = all ? rows : rows.slice(0, PLAYED_FIRST)
-  const dayOf = (iso) => new Date(iso).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '').replace(',', '')
-  const timeOf = (iso) => new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  // Em inglês, «Tue 10 Nov» e não «Tue Nov 10»: o en-GB, pelo localeOf (#811).
+  const dayOf = (iso) => new Date(iso).toLocaleDateString(localeOf(i18n.language), { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '').replace(',', '')
+  const timeOf = (iso) => new Date(iso).toLocaleTimeString(localeOf(i18n.language), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   return (
     <div className="space-y-2.5">
       {shown.map((r) => {
@@ -475,7 +474,7 @@ function ClubPlayed({ club }) {
               // Ficou a meio num dia que já passou (23 out): «Por terminar».
               ? <span className="whitespace-nowrap rounded-full bg-[#B86E00] px-[9px] py-1 font-display text-[11px] font-bold normal-case leading-none tracking-normal text-white">{t('pastevents.unfinished')}</span>
               : <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
-            time={r.kind === 'tournament' ? shortDay(r.date, i18n.language) : timeOf(r.date)} past to={to} ariaLabel={title}>
+            time={r.kind === 'tournament' ? shortDay(r.date, localeOf(i18n.language)) : timeOf(r.date)} past to={to} ariaLabel={title}>
             <div className="flex items-baseline justify-between gap-2">
               <CardTitle past>{title}</CardTitle>
               {points != null && <b className={`shrink-0 text-sm font-extrabold ${points > 0 ? 'text-[#3F6212]' : 'text-muted'}`}>{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}

@@ -1,4 +1,4 @@
-import { withMyRef, refInText } from '../../lib/myRef'
+import { refInText } from '../../lib/myRef'
 import { MonoLabel } from './TournamentBits'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -6,7 +6,7 @@ import { Share2, Euro, Info } from 'lucide-react'
 import { PrimaryButton } from '../ui'
 import LocationOpenWith from '../LocationOpenWith'
 import { whatsappShare } from '../../lib/partnerInvite'
-import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } from '../../lib/tournamentPublic'
+import { formatWords, categoryWhen, slotsWords, shareMessage } from '../../lib/tournamentPublic'
 import { pricePerPlayer } from '../../lib/tournaments'
 import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
 import { CategoryPriceText } from './CategorySpecialPrice'
@@ -32,10 +32,11 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
 
-  const url = tournamentUrl(tournament, typeof window === 'undefined' ? '' : appOrigin())
   const share = () => {
     const text = refInText(shareMessage(tournament, appOrigin())) // ?ref= (19 out)
-    if (navigator.share) { navigator.share({ title: tournament.name, text, url: withMyRef(url) }).catch(() => {}) ; return }
+    // Só o texto: já leva o link (com o ?ref=). Com o url à parte o iPhone
+    // juntava-o outra vez e a mensagem saía com o link duas vezes (12 nov).
+    if (navigator.share) { navigator.share({ title: tournament.name, text }).catch(() => {}); return }
     window.open(whatsappShare(text), '_blank')
   }
 

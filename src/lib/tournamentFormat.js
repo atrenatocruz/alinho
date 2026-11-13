@@ -220,6 +220,94 @@ function finishOption(option, { maxDurationMin, availableHours, slack }) {
   }
 }
 
+// ── Quem vai ao Quadro B (#800, aprovado pelo Francisco a 12 nov) ────────
+
+/** Quantas duplas vão ao Quadro B quando vão os lugares `perGroup + 1` até
+    `upTo` de cada grupo. Com grupos desiguais, um 4.º só conta onde existe.
+    `upTo` null (ou ≤ perGroup) = ninguém. */
+export function secondaryTeamCount(sizes, perGroup, upTo) {
+  if (upTo == null || !(perGroup > 0)) return 0
+  return (sizes || []).reduce((total, n) => total + Math.max(0, Math.min(n, upTo) - perGroup), 0)
+}
+
+/** As escolhas do bloco «Quem vai ao Quadro B», para a opção de formato
+    escolhida (uma de `formatOptions`, calculada SEM `secondaryBracket`).
+    Pela ordem do ecrã: «Ninguém» e depois uma por cada lugar a mais, até
+    «todos os outros» (o lugar do maior grupo). Uma escolha que deixa só uma
+    dupla no Quadro B não entra; nem uma que não junta ninguém à anterior.
+    Sem grupos com quem fique de fora (grupo único, só eliminatória, ou
+    ninguém a passar) devolve uma lista vazia: o bloco não aparece.
+
+    Cada escolha: { upTo, places, last, teams, extraMatches, matches, hours,
+    fits, overHours }
+      - upTo: o último lugar que vai (null = Ninguém); é o que se guarda em
+        `format.secondary_upto`;
+      - places: os lugares que vão ([3, 4]; [] no Ninguém);
+      - last: vão todos os que não passam («os outros»);
+      - matches e hours: da categoria com essa escolha;
+      - fits: cabe no tempo de campo que sobra depois das outras categorias
+        (`availableHours − otherHours`, UX 12 nov); null sem dias marcados;
+      - overHours: as horas que passam desse tempo (0 se cabe).
+    `recommendedUpTo`: a escolha com mais duplas que cabe; se nenhuma com
+    Quadro B cabe, null (o «Ninguém»). Sem dias marcados, a com mais duplas. */
+export function secondaryOptions(option, {
+  maxDurationMin = 60,
+  availableHours = null,
+  otherHours = 0,
+} = {}) {
+  const sizes = option?.sizes || []
+  const perGroup = option?.qualifiersPerGroup || 0
+  if (option?.kind !== 'grupos' || sizes.length < 2 || perGroup <= 0) {
+    return { options: [], recommendedUpTo: null }
+  }
+  const biggest = Math.max(...sizes)
+  if (biggest <= perGroup) return { options: [], recommendedUpTo: null }
+
+  const hasLimit = availableHours != null
+  const left = hasLimit ? availableHours - (Number(otherHours) || 0) : null
+  const make = (upTo) => {
+    const teams = secondaryTeamCount(sizes, perGroup, upTo)
+    const extraMatches = teams > 1 ? knockoutMatchCount(teams) : 0
+    const matches = option.matches + extraMatches
+    const hours = courtHours(matches, maxDurationMin)
+    const places = []
+    for (let p = perGroup + 1; upTo != null && p <= upTo; p++) places.push(p)
+    return {
+      upTo,
+      places,
+      last: upTo != null && upTo >= biggest,
+      teams,
+      extraMatches,
+      matches,
+      hours,
+      fits: hasLimit ? hours <= left + 1e-9 : null,
+      overHours: hasLimit ? Math.max(0, hours - left) : 0,
+    }
+  }
+
+  const options = [make(null)]
+  let previous = 0
+  for (let upTo = perGroup + 1; upTo <= biggest; upTo++) {
+    const choice = make(upTo)
+    if (choice.teams < 2 || choice.teams === previous) continue
+    previous = choice.teams
+    options.push(choice)
+  }
+  if (options.length === 1) return { options: [], recommendedUpTo: null }
+
+  const withB = options.filter((o) => o.upTo != null && o.fits !== false)
+  const best = withB.reduce((top, o) => (!top || o.teams > top.teams ? o : top), null)
+  return { options, recommendedUpTo: best ? best.upTo : null }
+}
+
+/** Em que quadro fica um lugar do grupo: 'A', 'B' ou null (fica de fora).
+    É o que as marcas da tabela mostram, durante e depois dos grupos. */
+export function bracketOfPosition(position, perGroup, secondaryUpTo = null) {
+  if (position >= 1 && position <= perGroup) return 'A'
+  if (secondaryUpTo != null && position > perGroup && position <= secondaryUpTo) return 'B'
+  return null
+}
+
 /** O rótulo de uma opção de formato, como vão sair os grupos (Trello #540).
     «3 grupos de 4» só quando são todos iguais; senão «3 grupos: 4, 3 e 3»
     — antes dizia «3 grupos de 4» para 4+3+3. Devolve a chave e os números

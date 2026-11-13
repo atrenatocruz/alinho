@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   defaultMaxDuration, dayMinutes, dayCourtHours, groupRounds, optionRounds, categoryNeed,
   evaluateDay, evaluateTournament, maxTeamsFor, dayShortcuts, DAY_STATUS,
+  categoryCourtHours, otherCategoriesHours,
 } from './tournamentCapacity'
 
 const rules = { duration_max: 45, scoring: 'pro_set_9' }
@@ -185,5 +186,46 @@ describe('dia que acaba de madrugada (#797)', () => {
   })
   it('depois das 06:00 continua a ser erro', () => {
     expect(dayMinutes({ ...sat, ends_at: '07:00' })).toBeNull()
+  })
+})
+
+describe('No sorteio: as horas das outras categorias (#800, UX 12 nov)', () => {
+  const regras = { duration_max: 60 }
+
+  it('já sorteada: os jogos que o sorteio criou', () => {
+    expect(categoryCourtHours({ match_count: 34, status: 'sorteada' }, regras)).toBe(34)
+    expect(categoryCourtHours({ match_count: 10 }, { duration_max: 45 })).toBe(7.5)
+  })
+
+  it('com formato escolhido: os jogos desse formato, com o 3.º lugar e o Quadro B escolhido', () => {
+    const base = { status: 'fechada', selected_count: 16, slots: 16, match_count: 0 }
+    const f = (extra) => ({ ...base, format: { key: 'grupos-4x4-passam2', ...extra } })
+    expect(categoryCourtHours(f({}), regras)).toBe(31)
+    expect(categoryCourtHours(f({ third_place: true }), regras)).toBe(32)
+    expect(categoryCourtHours(f({ secondary_upto: 3 }), regras)).toBe(34)
+    expect(categoryCourtHours(f({ secondary_upto: 4 }), regras)).toBe(38)
+    expect(categoryCourtHours(f({ secondary_upto: null }), regras)).toBe(31)
+  })
+
+  it('sem formato: o recomendado com as escolhidas; em inscrições, com as vagas', () => {
+    const escolhidas = { status: 'fechada', selected_count: 8, slots: 16, match_count: 0, format: null }
+    expect(categoryCourtHours(escolhidas, regras)).toBe(categoryNeed(8, { maxDurationMin: 60 }).exactHours)
+    const inscricoes = { status: 'inscricoes', selected_count: 3, slots: 16, match_count: 0, secondary_bracket: true }
+    expect(categoryCourtHours(inscricoes, regras))
+      .toBe(categoryNeed(16, { maxDurationMin: 60, secondaryBracket: true }).exactHours)
+    // Um formato que já não serve às escolhidas (mudaram depois) conta como sem formato.
+    const velho = { status: 'fechada', selected_count: 8, slots: 16, format: { key: 'grupos-4x4-passam2' } }
+    expect(categoryCourtHours(velho, regras)).toBe(categoryNeed(8, { maxDurationMin: 60 }).exactHours)
+  })
+
+  it('soma as outras categorias, nunca a que se está a sortear', () => {
+    const cats = [
+      { id: 'm3', match_count: 0, status: 'fechada', selected_count: 16, format: { key: 'grupos-4x4-passam2' } },
+      { id: 'm4', match_count: 20, status: 'sorteada' },
+      { id: 'f3', match_count: 6, status: 'sorteada' },
+    ]
+    expect(otherCategoriesHours(cats, 'm3', regras)).toBe(26)
+    expect(otherCategoriesHours(cats, 'm4', regras)).toBe(37)
+    expect(otherCategoriesHours([], 'm3', regras)).toBe(0)
   })
 })

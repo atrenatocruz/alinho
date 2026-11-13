@@ -216,6 +216,8 @@ const EMPTY_GAME_FORM = {
   rotate_partners: false,
   // Pares quebrados (12 out): no Sobe e desce a trocar, esquerda com direita.
   respect_sides: false,
+  rank_by: 'points',
+  knockout: true,
   // Sobe e desce invertido (29 set): as mais fortes começam no último campo.
   seed_reverse: false,
   allow_pair_signup: false,
@@ -1328,6 +1330,9 @@ export default function GerirClube() {
     ...(typeof game.seed_reverse === 'boolean' ? { seed_reverse: game.seed_reverse } : {}),
     // «Respeitar os lados» (Dev 3, migration_mix_respeitar_lados.sql): o mesmo truque.
     ...(typeof game.respect_sides === 'boolean' ? { respect_sides: game.respect_sides } : {}),
+    // #711: a repetição copia as duas escolhas.
+    ...(typeof game.rank_by === 'string' ? { rank_by: game.rank_by } : {}),
+    ...(typeof game.knockout === 'boolean' ? { knockout: game.knockout } : {}),
     // O mesmo para o ranking: Não→Sim também tem de chegar à série (1.5).
     ...(typeof game.ranked === 'boolean' ? { ranked: game.ranked } : {}),
     // O `game` aqui é a linha que a base de dados devolveu: com a coluna, vai
@@ -1562,7 +1567,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, warmup_minutes: warmup, changeover_minutes: changeover, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, rank_by: _rankBy, knockout: _knockout, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, warmup_minutes: warmup, changeover_minutes: changeover, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1622,6 +1627,9 @@ export default function GerirClube() {
             ...(gameForm.seed_reverse && gameForm.format === 'sobe_desce' ? { seed_reverse: true } : {}),
             // «Respeitar os lados»: só vai ligado, e só no Sobe e desce a trocar.
             ...(gameForm.respect_sides && gameForm.rotate_partners && gameForm.format === 'sobe_desce' ? { respect_sides: true } : {}),
+            // #711: só vão quando saem do valor por omissão.
+            ...(gameForm.rank_by === 'wins' && gameForm.format === 'americano' ? { rank_by: 'wins' } : {}),
+            ...(gameForm.knockout === false && gameForm.format === 'todos_contra_todos' ? { knockout: false } : {}),
             // «Inscrição em dupla» (Renato, 24 set): só vai quando é «Sim» e as
             // duplas são fixas — antes de migration_mix_pair_signup.sql a
             // coluna não existe, e «Não» é o valor por omissão.
@@ -1837,7 +1845,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, warmup_minutes: warmup, changeover_minutes: changeover, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, rank_by: _rankBy, knockout: _knockout, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, place_district: placeDistrict, tiebreak_8_8: tieBreak88, deuce_mode: _deuceMode, image_url: imageUrl, special, warmup_minutes: warmup, changeover_minutes: changeover, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1895,6 +1903,8 @@ export default function GerirClube() {
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.seed_reverse || editingGame.seed_reverse) ? { seed_reverse: !!gameForm.seed_reverse && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.respect_sides || editingGame.respect_sides) ? { respect_sides: !!gameForm.respect_sides && !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
+          ...((gameForm.rank_by === 'wins' || editingGame.rank_by === 'wins') ? { rank_by: gameForm.rank_by === 'wins' && gameForm.format === 'americano' ? 'wins' : 'points' } : {}),
+          ...((gameForm.knockout === false || editingGame.knockout === false) ? { knockout: !(gameForm.knockout === false && gameForm.format === 'todos_contra_todos') } : {}),
           ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
           ...((gameForm.join_approval || editingGame.join_approval) ? { join_approval: !!gameForm.join_approval } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
@@ -2689,6 +2699,8 @@ export default function GerirClube() {
       pairing_mode: game.pairing_mode || 'por_nivel',
       rotate_partners: !!game.rotate_partners,
       respect_sides: !!game.respect_sides,
+      rank_by: game.rank_by === 'wins' ? 'wins' : 'points',
+      knockout: game.knockout !== false,
       seed_reverse: !!game.seed_reverse,
       allow_pair_signup: !!game.allow_pair_signup,
       join_approval: !!game.join_approval,

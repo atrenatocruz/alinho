@@ -971,7 +971,7 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
     never shows a different 1st place. wins is kept for display.
     `teams` must have embedded player1/player2 profile objects (same
     shape GameDetails.jsx's `teams` state already carries). */
-export function americanoStandings(matches, teams) {
+export function americanoStandings(matches, teams, { rankBy = 'points' } = {}) {
   const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
   const table = {}
   const rowFor = (player) => {
@@ -1003,8 +1003,23 @@ export function americanoStandings(matches, teams) {
     }
   }
 
-  return Object.values(table).sort((x, y) => y.points - x.points || y.diff - x.diff)
+  // «Mais jogos ganhos» (#711): ganhos, depois diferença, depois pontos marcados.
+  return Object.values(table).sort(rankBy === 'wins'
+    ? (x, y) => y.wins - x.wins || y.diff - x.diff || y.points - x.points
+    : (x, y) => y.points - x.points || y.diff - x.diff)
 }
+
+/** Dois jogadores do Americano no mesmo lugar (partilham o 1.º e a taça). */
+export const americanoSameRank = (a, b, rankBy = 'points') => (rankBy === 'wins'
+  ? a.wins === b.wins && a.diff === b.diff && a.points === b.points
+  : a.points === b.points && a.diff === b.diff)
+
+/** Americano por jogos ganhos (#711): games.rank_by = 'wins'. */
+export const americanoRankBy = (game) => (game?.format === 'americano' && game?.rank_by === 'wins' ? 'wins' : 'points')
+
+/** Todos contra todos «sem final» (#711): games.knockout = false. Todas as
+    rondas ficam para a tabela, sem meias-finais nem final. */
+export const isRoundRobinNoFinal = (game) => game?.format === 'todos_contra_todos' && game?.knockout === false
 
 export const PHASE_LABEL_KEY = {
   group: 'mixlogic.phase_group',

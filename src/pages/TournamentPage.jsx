@@ -1,4 +1,4 @@
-import { withMyRef, refInText } from '../lib/myRef'
+import { refInText } from '../lib/myRef'
 // Página do torneio (Trello #361, «Torneio 1/6») — print 05 do desenho
 // aprovado (design-handoff/2026-09-19-torneios). É o ESQUELETO onde os
 // outros ecrãs se penduram: topo em cartão grande (mesma regra dos mixes),
@@ -17,7 +17,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { useTranslation } from 'react-i18next'
 import i18n from '../lib/i18n'
 import { BackBar } from '../components/ui'
-import { shareMessage, tournamentUrl } from '../lib/tournamentPublic'
+import { shareMessage } from '../lib/tournamentPublic'
 import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, HelpCircle, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
@@ -35,6 +35,7 @@ import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import ScoringHelpSheet from '../components/tournament/ScoringHelpSheet'
 import { deuceModeOf } from '../lib/deuceMode'
+import { pricePerPlayer } from '../lib/tournaments'
 import { phaseScorings, scoringName } from '../components/tournament/scoringText'
 import ChampionsBlock from '../components/tournament/ChampionsBlock'
 import NextGameCard, { useMyNextGame } from '../components/tournament/NextGameCard'
@@ -217,7 +218,9 @@ export default function TournamentPage() {
     const tour = data?.tournament
     if (!tour) return
     const text = refInText(shareMessage(tour, appOrigin())) // ?ref= (19 out)
-    if (navigator.share) { navigator.share({ title: tour.name, text, url: withMyRef(tournamentUrl(tour, appOrigin())) }).catch(() => {}); return }
+    // Só o texto: já leva o link (com o ?ref=). Com o url à parte o iPhone
+    // juntava-o outra vez e a mensagem saía com o link duas vezes (12 nov).
+    if (navigator.share) { navigator.share({ title: tour.name, text }).catch(() => {}); return }
     window.open(whatsappShare(text), '_blank')
   }
   const showSkeleton = useSkeleton(!data && !failed)
@@ -398,6 +401,24 @@ export default function TournamentPage() {
   const meal = tour.meal ?? tour.rules?.meal
   const euros = (cents) => (cents / 100).toLocaleString(i18n.language, { maximumFractionDigits: 2 })
   const deuceMode = deuceModeOf({ deuce_mode: tour.rules?.deuce })
+  // O preço da inscrição. O Criar e o Editar guardam-no em cada categoria
+  // (price_cents), não no torneio: com só o entry_fee_cents, o quadrado
+  // «Preço» nunca aparecia nos torneios a sério (Francisco, 13 nov). Com um
+  // preço só, esse; com vários, o mais baixo, e o título passa a «Preço
+  // desde» (UX, 13 nov: no valor partia em quatro linhas a 360 px).
+  // Categorias grátis não contam. Por baixo, por pessoa, como diz o cartaz.
+  const catPrices = [...new Set(categories.map((c) => Number(c.price_cents)).filter((n) => n > 0))]
+  const priceCents = tour.entry_fee_cents > 0 ? tour.entry_fee_cents : catPrices.length ? Math.min(...catPrices) : null
+  const priceFrom = !(tour.entry_fee_cents > 0) && catPrices.length > 1
+  // Cada linha só parte logo a seguir ao preço: o número e o «€» nunca se
+  // separam, e «/ dupla» ou «por pessoa» passam inteiros para baixo.
+  const nbsp = (s) => s.replace(/ /g, '\u00A0').replace(/(\d(?:\u00A0€)?)\u00A0/, '$1 ')
+  const priceFact = priceCents ? (
+    <span className="flex flex-col">
+      <span>{nbsp(t('tournament.fact_price_pair', { price: euros(priceCents) }))}</span>
+      <span className="text-xs font-normal text-muted">{nbsp(t('tournament.create.price_person', { each: pricePerPlayer(priceCents / 100, i18n.language) }))}</span>
+    </span>
+  ) : null
   const scorings = phaseScorings(tour.rules)
   const heroFacts = [
     { key: 'days', label: t('tournament.fact_days'), value: dateRange(tour.starts_on, tour.ends_on, i18n.language) },
@@ -419,7 +440,7 @@ export default function TournamentPage() {
         </span>
       ),
       aside: <HelpCircle size={16} aria-label={t(scorings.same ? 'deuce.help_title' : 'tournament.scoring_help_title')} />, onClick: () => setDeuceHelp(true) },
-    { key: 'price', label: t('tournament.fact_price'), value: tour.entry_fee_cents ? t('tournament.fact_price_pair', { price: euros(tour.entry_fee_cents) }) : null },
+    { key: 'price', label: t(priceFrom ? 'tournament.fact_price_from' : 'tournament.fact_price'), value: priceFact },
     { key: 'tshirt', label: t('tournament.fact_tshirt'), value: shirt?.mode === 'gift' ? t('tournament.fact_tshirt_gift') : shirt?.mode === 'sale' ? t('tournament.fact_tshirt_sale', { price: euros(shirt.price_cents || 0) }) : null },
     // A refeição, ao lado da t-shirt (#799, SPEC ponto 6).
     { key: 'meal', label: t('tournament.fact_meal'), value: meal?.mode === 'gift' ? t('tournament.fact_meal_included') : meal?.mode === 'sale' ? t('tournament.fact_meal_sale', { price: euros(meal.price_cents || 0) }) : null },

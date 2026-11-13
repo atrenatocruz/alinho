@@ -7,6 +7,8 @@
 // inteira (a Pontuação com uma linha por fase, UX 29 out). Com `fillRows`, um
 // quadrado que ficaria sozinho na linha também a ocupa toda, sem mudar a
 // ordem (UX 29 out, só na página do torneio).
+// O conteúdo vai sempre pelo topo: o quadrado que é botão (a Pontuação)
+// centrava-o a meio quando o vizinho era mais alto (UX, 13 nov).
 export function wideFlags(items, fillRows = false) {
   let col = 0
   return items.map((it, i) => {
@@ -27,7 +29,7 @@ export default function EventFacts({ items = [], className = '', fillRows = fals
         const Box = it.onClick ? 'button' : 'div'
         return (
           <Box key={it.key || it.label} {...(it.onClick ? { type: 'button', onClick: it.onClick, 'aria-haspopup': 'dialog' } : {})}
-            className={`min-w-0 rounded-[14px] bg-[#F4F4F0] px-3.5 py-3 text-left ${wide[i] ? 'col-span-2' : ''}`}>
+            className={`flex min-w-0 flex-col justify-start rounded-[14px] bg-[#F4F4F0] px-3.5 py-3 text-left ${wide[i] ? 'col-span-2' : ''}`}>
             <div className="flex items-center justify-between gap-2">
               <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-ink-500">{it.label}</p>
               {it.aside && <span className="-my-1 shrink-0 text-ink-500">{it.aside}</span>}

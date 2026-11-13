@@ -303,13 +303,36 @@ export function Tabs({ options, value, onChange, label, className = '', small = 
  *  para uma segunda linha).
  *  `options`: [{ value, label }]. */
 export function Chips({ options, value, onChange, label, className = '' }) {
+  // A escolhida à vista (UX, 10 nov: no Editar, «Americano» ficava fora do
+  // ecrã). Corre quando a fila ganha largura: os passos escondidos do
+  // assistente só a têm quando aparecem. Só uma vez, para não lutar com o dedo.
+  const rowRef = useRef(null)
+  useEffect(() => {
+    const box = rowRef.current
+    if (!box || typeof ResizeObserver === 'undefined') return undefined
+    let done = false
+    const show = () => {
+      if (done || !box.clientWidth) return
+      done = true
+      const on = box.querySelector('[aria-pressed="true"]')
+      if (!on || box.scrollWidth <= box.clientWidth) return
+      const left = on.getBoundingClientRect().left - box.getBoundingClientRect().left + box.scrollLeft
+      if (left < box.scrollLeft || left + on.offsetWidth > box.scrollLeft + box.clientWidth) {
+        box.scrollLeft = Math.max(0, left - 16)
+      }
+    }
+    const ro = new ResizeObserver(show)
+    ro.observe(box)
+    show()
+    return () => ro.disconnect()
+  }, [])
   return (
     // -my-0.5: o botão tem 44 px e a pastilha 40 — a margem devolve os 2 px
     // de cada lado, e o espaço entre filas fica o mesmo.
     // No telemóvel, uma fila que desliza para o lado (o dedo faz scroll);
     // no computador não há como deslizar sem barra, e as pastilhas ficavam
     // cortadas (Ruben, 29 set) — a partir de sm embrulham em várias filas.
-    <div role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar sm:flex-wrap sm:overflow-visible ${className}`}>
+    <div ref={rowRef} role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar sm:flex-wrap sm:overflow-visible ${className}`}>
       {options.map((o) => {
         const on = o.value === value
         return (

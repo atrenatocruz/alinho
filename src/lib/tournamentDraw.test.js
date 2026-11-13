@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload, buildKnockoutPayload,
   bracketRounds, byDayAndTime, standingsOf, qualifiersPerGroup, qualifiedFromGroups,
-  secondaryLabels,
+  secondaryLabels, secondaryUpToFromMatches, secondaryUpToOf,
 } from './tournamentDraw'
-import { formatOptions } from './tournamentFormat'
+import { formatOptions, secondaryOptions, secondaryTeamCount, bracketOfPosition } from './tournamentFormat'
 
 const grupos = (n) => Array.from({ length: n }, (_, i) => ({
   number: i + 1, name: `Grupo ${String.fromCharCode(65 + i)}`,
@@ -580,5 +580,118 @@ describe('Quadro B para quem não passa dos grupos (#800)', () => {
     expect(comB.qualified).toHaveLength(5)
     expect(comB.ties).toHaveLength(1)
     expect(comB.ties[0].positions).toEqual([3, 5])
+  })
+})
+
+describe('Quem vai ao Quadro B, escolhido no sorteio (#800, 12 nov)', () => {
+  const opcao = (n, groupCount, perGroup) => formatOptions(n)
+    .find((o) => o.kind === 'grupos' && o.groupCount === groupCount && o.qualifiersPerGroup === perGroup)
+
+  it('16 duplas, 4 grupos de 4, passam 2: Ninguém, Os 3.ºs (cabe), Os 3.ºs e 4.ºs (passa 4 h)', () => {
+    const { options, recommendedUpTo } = secondaryOptions(opcao(16, 4, 2), { maxDurationMin: 60, availableHours: 34 })
+    expect(options.map((o) => [o.upTo, o.places, o.teams, o.extraMatches, o.matches, o.hours, o.fits, o.overHours, o.last])).toEqual([
+      [null, [], 0, 0, 31, 31, true, 0, false],
+      [3, [3], 4, 3, 34, 34, true, 0, false],
+      [4, [3, 4], 8, 7, 38, 38, false, 4, true],
+    ])
+    expect(recommendedUpTo).toBe(3)
+  })
+
+  it('nenhuma com Quadro B cabe: o recomendado é o Ninguém; sem dias marcados, a com mais duplas', () => {
+    expect(secondaryOptions(opcao(16, 4, 2), { maxDurationMin: 60, availableHours: 32 }).recommendedUpTo).toBeNull()
+    const livre = secondaryOptions(opcao(16, 4, 2), { maxDurationMin: 60 })
+    expect(livre.options.every((o) => o.fits === null)).toBe(true)
+    expect(livre.recommendedUpTo).toBe(4)
+  })
+
+  it('as horas são da categoria; o «cabe» compara com o que sobra depois das outras categorias', () => {
+    const { options } = secondaryOptions(opcao(16, 4, 2), { maxDurationMin: 60, availableHours: 40, otherHours: 5 })
+    expect(options.map((o) => [o.hours, o.fits, o.overHours])).toEqual([[31, true, 0], [34, true, 0], [38, false, 3]])
+  })
+
+  it('passa 1 com grupos de 4: Ninguém, Os 2.ºs, Os 2.ºs e 3.ºs, Os 2.ºs, 3.ºs e 4.ºs', () => {
+    const { options } = secondaryOptions(opcao(8, 2, 1), { maxDurationMin: 60 })
+    expect(options.map((o) => [o.upTo, o.places, o.teams])).toEqual([
+      [null, [], 0], [2, [2], 2], [3, [2, 3], 4], [4, [2, 3, 4], 6],
+    ])
+  })
+
+  it('grupos desiguais: os 4.ºs contam onde existem; uma dupla só no B não entra', () => {
+    // 11 duplas: 4, 4 e 3.
+    const onze = secondaryOptions(opcao(11, 3, 2), { maxDurationMin: 60 }).options
+    expect(onze.map((o) => [o.upTo, o.teams])).toEqual([[null, 0], [3, 3], [4, 5]])
+    expect(secondaryTeamCount([4, 4, 3], 2, 4)).toBe(5)
+    // 5 duplas: 3 e 2, passam 2. Sobra uma: não há bloco.
+    expect(secondaryOptions({ kind: 'grupos', sizes: [3, 2], qualifiersPerGroup: 2, matches: 4 }).options).toEqual([])
+  })
+
+  it('sem quem fique de fora, não há bloco: grupo único e só eliminatória', () => {
+    const todas = formatOptions(6, { singleGroup: true })
+    expect(secondaryOptions(todas.find((o) => o.kind === 'grupo_unico')).options).toEqual([])
+    expect(secondaryOptions(todas.find((o) => o.kind === 'eliminatoria')).options).toEqual([])
+    expect(secondaryOptions(null).options).toEqual([])
+  })
+
+  it('o sorteio só cria no B os lugares escolhidos, e o número de jogos bate com as contas', () => {
+    const tres = buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2, secondaryUpTo: 3 })
+    const b = tres.bracket.filter((m) => m.stage === 'secundario')
+    expect(b).toHaveLength(3)
+    const lugares = b.flatMap((m) => [m.source_a, m.source_b]).filter((x) => /º do/.test(x))
+    expect(lugares.sort()).toEqual(['3.º do Grupo A', '3.º do Grupo B', '3.º do Grupo C', '3.º do Grupo D'])
+    expect(tres.secondary_bracket).toBe(true)
+    expect(secondaryUpToFromMatches(tres.bracket)).toBe(3)
+
+    const ninguem = buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2, secondaryUpTo: null })
+    expect(ninguem.bracket.every((m) => m.stage === 'principal')).toBe(true)
+    expect(ninguem.secondary_bracket).toBe(false)
+
+    for (const [n, g, per] of [[16, 4, 2], [11, 3, 2], [8, 2, 1], [12, 3, 1]]) {
+      const { options } = secondaryOptions(opcao(n, g, per))
+      for (const o of options) {
+        const p = buildDrawPayload(duplas(n), { groupCount: g, perGroup: per, secondaryUpTo: o.upTo })
+        expect(p.bracket.filter((m) => m.stage === 'secundario').length).toBe(o.extraMatches)
+      }
+    }
+  })
+
+  it('ao passar ao quadro, quem fica depois do último lugar do B não entra, nem os empates dele', () => {
+    const groups = [
+      { id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3', 'a4', 'a5'] },
+      { id: 'gB', number: 2, name: 'Grupo B', teams: ['b1', 'b2', 'b3'] },
+    ]
+    const jogo = (g, x, y, sx, sy) => ({
+      stage: 'grupo', group_id: g, entry_a_id: x, entry_b_id: y, score_a: sx, score_b: sy,
+      status: 'terminado', winner_entry_id: sx > sy ? x : y,
+    })
+    const matches = [
+      jogo('gA', 'a1', 'a2', 6, 0), jogo('gA', 'a1', 'a3', 6, 0), jogo('gA', 'a1', 'a4', 6, 0), jogo('gA', 'a1', 'a5', 6, 0),
+      jogo('gA', 'a2', 'a3', 6, 0), jogo('gA', 'a2', 'a4', 6, 0), jogo('gA', 'a2', 'a5', 6, 0),
+      jogo('gA', 'a3', 'a4', 6, 0), jogo('gA', 'a3', 'a5', 6, 0),
+      // a4 e a5: um empate só entre quem já não vai a quadro nenhum.
+      jogo('gA', 'a4', 'a5', 6, 3),
+      jogo('gB', 'b1', 'b2', 6, 1), jogo('gB', 'b1', 'b3', 6, 1), jogo('gB', 'b2', 'b3', 6, 1),
+      { stage: 'secundario', round: 'F', source_a: '3.º do Grupo A', source_b: '3.º do Grupo B' },
+    ]
+    const r = qualifiedFromGroups(groups, matches, 2)
+    expect(r.qualified.map((q) => [q.label, q.stage])).toEqual([
+      ['1.º do Grupo A', 'principal'], ['2.º do Grupo A', 'principal'], ['3.º do Grupo A', 'secundario'],
+      ['1.º do Grupo B', 'principal'], ['2.º do Grupo B', 'principal'], ['3.º do Grupo B', 'secundario'],
+    ])
+    expect(r.ties).toEqual([])
+  })
+
+  it('quem vai ao B: antes do sorteio, a escolha guardada; depois, o que o sorteio criou', () => {
+    expect(secondaryUpToOf({ format: { secondary_upto: 3 } }, [])).toBe(3)
+    expect(secondaryUpToOf({ format: { secondary_upto: null } }, [])).toBeNull()
+    expect(secondaryUpToOf({ format: {} })).toBeNull()
+    const sorteado = [{ stage: 'grupo' }, { stage: 'secundario', source_a: '4.º do Grupo A', source_b: '3.º do Grupo B' }]
+    expect(secondaryUpToOf({ format: { secondary_upto: 3 } }, sorteado)).toBe(4)
+    expect(secondaryUpToOf({ format: { secondary_upto: 3 } }, [{ stage: 'grupo' }])).toBeNull()
+  })
+
+  it('a marca de cada lugar na tabela: A, B ou nenhuma', () => {
+    expect([1, 2, 3, 4, 5].map((p) => bracketOfPosition(p, 2, 3))).toEqual(['A', 'A', 'B', null, null])
+    expect([1, 2, 3].map((p) => bracketOfPosition(p, 2, null))).toEqual(['A', 'A', null])
+    expect([1, 2, 3, 4].map((p) => bracketOfPosition(p, 1, 4))).toEqual(['A', 'B', 'B', 'B'])
   })
 })
