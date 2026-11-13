@@ -4992,7 +4992,7 @@
   "tournament.score.keeper_add": "Añadir anotador",
   "tournament.score.keepers_note": "También puedes abrir tu cuenta en otro móvil o en un ordenador en recepción. Funciona a la vez.",
   "tournament.create.poster": "Cartel (opcional)",
-  "tournament.create.poster_hint": "Aparece arriba en la página del torneo, también para quien no tiene cuenta.",
+  "tournament.create.poster_hint": "Aparece arriba en la página del torneo, también para quien no tiene cuenta. Queda mejor con una imagen ancha, de 1200 x 500 px.",
   "tournament.create.poster_pick": "Subir imagen",
   "tournament.create.poster_uploading": "Subiendo…",
   "tournament.create.poster_remove": "Quitar el cartel",
