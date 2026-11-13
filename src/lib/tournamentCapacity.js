@@ -16,7 +16,7 @@
      antes das 8h. */
 
 import {
-  SLACK_DEFAULT, formatOptions, recommendFormat, knockoutRounds,
+  SLACK_DEFAULT, formatOptions, recommendFormat, knockoutRounds, courtHours, secondaryOptions,
 } from './tournamentFormat'
 import { endsNextDay } from './tournamentDay'
 
@@ -248,4 +248,49 @@ export function evaluateTournament(days = [], categories = [], rules = {}) {
     worstDate: worst && worst.status !== DAY_STATUS.verde ? worst.date : null,
     withoutDay: categories.filter((c) => !dates.has(c.day)).map((c) => c.code),
   }
+}
+
+// ── 8. No sorteio: o tempo que as outras categorias já levam ─────────────
+
+/** As horas de campo de uma categoria do torneio, para o sorteio saber
+    quanto tempo sobra às outras (#800, UX 12 nov). `cat` é uma linha do
+    `listCategoriesAdmin`. Pela ordem do que é mais certo:
+      1. já sorteada: os jogos que o sorteio criou (com o 3.º lugar e o B);
+      2. com formato escolhido: os jogos desse formato, com o 3.º lugar e o
+         Quadro B escolhido (`format.secondary_upto`);
+      3. sem formato: o formato que a app recomendaria, com as duplas
+         escolhidas; em inscrições (ou sem escolhidas), com as vagas, e o B
+         como está ligado no Criar. */
+export function categoryCourtHours(cat, rules = {}) {
+  const maxDurationMin = Number(rules?.duration_max) || defaultMaxDuration(rules?.scoring)
+  const drawn = Number(cat?.match_count) || 0
+  if (drawn > 0) return courtHours(drawn, maxDurationMin)
+
+  const format = cat?.format || {}
+  const selected = Number(cat?.selected_count) || 0
+  const thirdPlaceMatch = Boolean(format.third_place ?? cat?.third_place_match)
+  if (format.key && selected >= 2) {
+    const option = formatOptions(selected, { maxDurationMin, thirdPlaceMatch, singleGroup: true })
+      .find((o) => o.key === format.key)
+    if (option) {
+      const upTo = format.secondary_upto == null || format.secondary_upto === '' ? null : Number(format.secondary_upto)
+      const choice = secondaryOptions(option, { maxDurationMin }).options.find((o) => o.upTo === upTo)
+      return choice ? choice.hours : option.hours
+    }
+  }
+
+  const teams = cat?.status === 'inscricoes' || selected < 2 ? Number(cat?.slots) || 0 : selected
+  const need = categoryNeed(teams, {
+    maxDurationMin, thirdPlaceMatch, secondaryBracket: Boolean(cat?.secondary_bracket),
+  })
+  return need ? need.exactHours : 0
+}
+
+/** As horas de campo de todas as categorias do torneio menos `categoryId`.
+    O ecrã do sorteio tira-as ao tempo de campo do torneio e passa o que
+    sobra como `availableHours` ao `formatOptions` e ao `secondaryOptions`. */
+export function otherCategoriesHours(categories = [], categoryId, rules = {}) {
+  return (categories || [])
+    .filter((c) => c && c.id !== categoryId)
+    .reduce((total, c) => total + categoryCourtHours(c, rules), 0)
 }
