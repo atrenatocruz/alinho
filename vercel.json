@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/torneio/:slug", "destination": "/api/tournament-preview?slug=:slug" },
+    { "source": "/torneio/:slug/:rest*", "destination": "/api/tournament-preview?slug=:slug" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" },
     { "source": "/assets/(.*)", "destination": "/api/asset-em-falta" }
   ],
