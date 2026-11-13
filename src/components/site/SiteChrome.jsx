@@ -37,14 +37,20 @@ export function usePageTop() {
   }, [navigationType])
 }
 
-/** O «Entrar» guarda o ?org=<slug> do endereço (o convite de um clube). */
-export function useLoginHref() {
+/** O «Entrar» guarda o ?org=<slug> do endereço (o convite de um clube).
+ *  `back`: volta à página onde se está depois de entrar (?redirect=), com o
+ *  que estiver no endereço (a categoria do torneio, o ?ref=). Nas páginas
+ *  que abrem sem conta (torneio, liga, convites): pelo «Entrar» do topo,
+ *  quem entrava ia parar à Home e tinha de procurar o torneio (12 nov). */
+export function useLoginHref({ back = false } = {}) {
   const [params] = useSearchParams()
+  const { pathname, search } = useLocation()
   const org = params.get('org')
   return (mode) => {
     const q = new URLSearchParams()
     if (mode) q.set('mode', mode)
     if (org) q.set('org', org)
+    if (back) q.set('redirect', `${pathname}${search}`)
     const s = q.toString()
     return s ? `/login?${s}` : '/login'
   }
@@ -90,7 +96,7 @@ const toTop = (pathname, to) => () => { if (pathname === to) window.scrollTo(0, 
  *  sessão (torneio, convites) não se prende: sobe com a página, e a barra de
  *  vidro do evento começa por baixo dele e prende-se no topo quando ele sai
  *  (UX, 18 out). Para isso diz onde acaba, em --site-bottom. */
-export function SiteHeader({ sticky = true }) {
+export function SiteHeader({ sticky = true, loginBack = false }) {
   const { t } = useTranslation()
   const ref = useRef(null)
   // Preso: diz a sua altura em --site-head, para as barras presas da página
@@ -119,7 +125,7 @@ export function SiteHeader({ sticky = true }) {
     }
   }, [sticky])
   const { pathname } = useLocation()
-  const loginHref = useLoginHref()
+  const loginHref = useLoginHref({ back: loginBack })
   // Com sessão iniciada, a pastilha leva de volta à app, em vez de pedir
   // para entrar outra vez — o Francisco ficou preso nos Planos (UX, 18 out).
   const { user } = useAuth()

@@ -215,7 +215,8 @@ function AjudaRoute({ showSplash }) {
 function PublicShell({ children }) {
   return (
     <div className="min-h-screen flex flex-col bg-canvas">
-      <SiteHeader sticky={false} />
+      {/* O «Entrar» do topo volta a esta página depois de entrar (12 nov). */}
+      <SiteHeader sticky={false} loginBack />
       <main className="flex-1">
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 animate-fade-up">{children}</div>
       </main>
