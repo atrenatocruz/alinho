@@ -5621,6 +5621,7 @@
   "tournament.fact_days": "Días",
   "tournament.fact_courts": "Pistas",
   "tournament.fact_price": "Precio",
+  "tournament.fact_price_from": "Precio desde",
   "tournament.view_poster": "Ver cartel",
   "tournament.fact_price_pair": "{{price}} € / pareja",
   "tournament.fact_tshirt": "Camiseta",
