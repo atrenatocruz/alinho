@@ -22,7 +22,7 @@ export const RULE_FIELDS = [
 ]
 
 // O formato, na app, junta três colunas (sobe e desce, escalada, a rodar).
-const FORMAT_PARTS = ['format', 'seed_reverse', 'rotate_partners']
+const FORMAT_PARTS = ['format', 'seed_reverse', 'rotate_partners', 'rank_by', 'knockout']
 
 const norm = (field, v) => {
   if (v === undefined || v === '') v = null
@@ -52,7 +52,7 @@ export function mixChanges(before, after) {
   const out = []
   for (const field of RULE_FIELDS) {
     if (field === 'format') {
-      const pick = (g) => ({ format: g?.format || 'sobe_desce', seed_reverse: !!g?.seed_reverse, rotate_partners: !!g?.rotate_partners })
+      const pick = (g) => ({ format: g?.format || 'sobe_desce', seed_reverse: !!g?.seed_reverse, rotate_partners: !!g?.rotate_partners, rank_by: g?.rank_by === 'wins' ? 'wins' : 'points', knockout: g?.knockout !== false })
       const changed = FORMAT_PARTS.some((f) => pick(before)[f] !== pick(after)[f])
       if (changed) out.push({ field: 'format', value: { format: after.format, seed_reverse: !!after.seed_reverse, rotate_partners: !!after.rotate_partners } })
       continue

@@ -539,6 +539,8 @@ export default function MixWizard({
         {startedNote}
         <Field label={t('gerirclube.format_label')} locked={started}
           hint={t(`mixlogic.format_help_${uiFormatOf(form) === 'sobe_desce' && form.rotate_partners ? 'sobe_desce_rotate'
+            : form.format === 'americano' && form.rank_by === 'wins' ? 'americano_wins'
+            : form.format === 'todos_contra_todos' && form.knockout === false ? 'todos_contra_todos_no_final'
             : uiFormatOf(form) === 'americano' && scoringFormatOf(form) === 'set_sem_fim' ? 'americano_set_sem_fim' : uiFormatOf(form)}`)}>
           <Chips label={t('gerirclube.format_label')} value={uiFormatOf(form)} options={options.formats}
             onChange={(v) => set({
@@ -558,6 +560,21 @@ export default function MixWizard({
             ) : null
           })()}
         </Field>
+        {/* #711: logo por baixo da explicação, só no formato a que dizem respeito. */}
+        {form.format === 'americano' && (
+          <Field label={t('mixwizard.rank_by_label')} locked={started}>
+            <Chips label={t('mixwizard.rank_by_label')} value={form.rank_by === 'wins' ? 'wins' : 'points'}
+              onChange={(v) => set({ rank_by: v })}
+              options={[{ value: 'points', label: t('mixwizard.rank_by_points') }, { value: 'wins', label: t('mixwizard.rank_by_wins') }]} />
+          </Field>
+        )}
+        {form.format === 'todos_contra_todos' && (
+          <Field label={t('mixwizard.knockout_label')} locked={started}>
+            <Chips label={t('mixwizard.knockout_label')} value={form.knockout === false ? 'no' : 'yes'}
+              onChange={(v) => set({ knockout: v !== 'no' })}
+              options={[{ value: 'yes', label: t('mixwizard.knockout_yes') }, { value: 'no', label: t('mixwizard.knockout_no') }]} />
+          </Field>
+        )}
         {form.format === 'grupos_eliminatorias' && (
           <Field label={t('gerirclube.pool_size_label')} hint={t('gerirclube.pool_size_help')} locked={started}>
             <input type="number" min="3" max="8" value={form.pool_size}

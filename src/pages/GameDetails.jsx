@@ -27,7 +27,7 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, guestVirtualRating, totalRounds, mixPlan, mixHasPhases, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, mixPlan, mixHasPhases, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY, scoringFormatOf, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, americanoSameRank, americanoRankBy, isRoundRobinNoFinal, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -2438,7 +2438,9 @@ export default function GameDetails() {
   // (classificação por jogador, sem lista fixa de duplas).
   const isRotating = isSobeDesce && !!game?.rotate_partners
   const showIndividualStandings = isAmericano || isRotating
-  const groupRounds = isSobeDesce ? roundsTotal : Math.min(Math.max(teams.length - 1, 1), roundsTotal)
+  // Todos contra todos «sem final» (#711): todas as rondas ficam para a tabela.
+  const noFinal = isRoundRobinNoFinal(game)
+  const groupRounds = isSobeDesce || noFinal ? roundsTotal : Math.min(Math.max(teams.length - 1, 1), roundsTotal)
   // grupos_eliminatorias never uses this flat single-group derivation —
   // its group phase is entirely owned by PoolGroupStage (rendered instead
   // of this block below). Forced to false (rather than left to the
@@ -2458,7 +2460,7 @@ export default function GameDetails() {
   const advancingTeamCount = isGruposEliminatorias
     ? [...new Set(teams.map((tm) => tm.pool_number))].filter((n) => n != null).length * 2
     : teams.length
-  const elimPhases = (isSobeDesce || isAmericano)
+  const elimPhases = (isSobeDesce || isAmericano || noFinal)
     ? []
     : isGruposEliminatorias
       ? eliminationPhases(advancingTeamCount, Number.MAX_SAFE_INTEGER)
@@ -3368,7 +3370,9 @@ export default function GameDetails() {
   const orgSlug = gameOrg?.slug
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
-  const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
+  const rankBy = americanoRankBy(game)
+  const winsDiffLabel = (d) => t('gamedetails.wins_diff_points', { count: Math.abs(d) === 1 ? 1 : 2, diff: `${d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(d)}` })
+  const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams, { rankBy }) : []
   // Americano: quem ganhou é o 1.º por pessoa — o cartão do vencedor, o 🏆
   // da lista e o voucher (Francisco, 8 out, design-handoff/2026-10-08-
   // americano-voucher): mais pontos; com empate, a diferença de pontos
@@ -3376,7 +3380,7 @@ export default function GameDetails() {
   // americanoStandings já ordena por pontos e, no empate, pela diferença.
   const americanoTop = americanoStandingsResult[0] || null
   const americanoFirsts = americanoTop
-    ? americanoStandingsResult.filter((r) => r.points === americanoTop.points && r.diff === americanoTop.diff)
+    ? americanoStandingsResult.filter((r) => americanoSameRank(r, americanoTop, rankBy))
     : []
   const americanoFirstIds = new Set(americanoFirsts.map((r) => r.player.id))
   const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
@@ -3384,7 +3388,9 @@ export default function GameDetails() {
   const classif = (() => {
     let rows = []
     if (isAmericano) {
-      rows = americanoStandingsResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+      rows = americanoStandingsResult.map((s, i, all) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+        place: all.findIndex((x) => americanoSameRank(x, s, rankBy)) + 1,
+        ...(rankBy === 'wins' ? { wins: s.wins, diff: s.diff } : {}),
         extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.points} ${t('gamedetails.points_suffix')}` }))
     } else if (isRotating) {
       // Os dois do mesmo campo com o mesmo resultado partilham o lugar (pares quebrados, 12 out).
@@ -3429,8 +3435,10 @@ export default function GameDetails() {
   // qualquer dupla com 2 vitórias soma 24), e o desempate acabava por ser o
   // seed inicial, não os resultados (mix de 1 out, Ruben).
   const shareDuplas = (() => {
-    if (!isSobeDesce || isRotating) return duplaStats
-    const order = sobeDesceStandings(matches)
+    // Todos contra todos sem final: é a tabela que decide os lugares todos,
+    // não só o 1.º (QA #711: o 3.º do cartão estava em 4.º na tabela).
+    if (!noFinal && (!isSobeDesce || isRotating)) return duplaStats
+    const order = noFinal ? tctStandings.map((s) => s.team.id) : sobeDesceStandings(matches)
     if (!order.length) return duplaStats
     const byId = new Map(duplaStats.map((d) => [d.id, d]))
     return [
@@ -3488,9 +3496,13 @@ export default function GameDetails() {
       const firsts = americanoFirsts
       // O voucher (regra de 30 set: sem conta, sem voucher).
       const withAccount = firsts.filter((r) => !r.player.no_account)
-      const note = firsts.length > 1
-        ? t('gamedetails.americano_tied_first', { points: americanoTop.points })
-        : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: americanoTop.points })
+      const note = rankBy === 'wins'
+        ? (firsts.length > 1
+          ? t('gamedetails.americano_tied_first_wins', { count: americanoTop.wins })
+          : t('gamedetails.americano_first_wins', { count: americanoTop.wins, total: americanoStandingsResult.length }))
+        : firsts.length > 1
+          ? t('gamedetails.americano_tied_first', { points: americanoTop.points })
+          : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: americanoTop.points })
       const extra = game.has_voucher ? (withAccount.length > 0 ? (
         <p className="mt-1.5 text-sm font-extrabold text-white">
           {firsts.length > 1
@@ -3868,7 +3880,7 @@ export default function GameDetails() {
               { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
               { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}-${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
             ] : [
-              { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
+              { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}{rankBy === 'wins' ? ` · ${t('gamedetails.format_by_wins')}` : ''}{noFinal ? ` · ${t('gamedetails.format_no_final')}` : ''}</> },
               { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
               // Aquecimento, troca entre rondas e a hora a que acaba (#768). Sem
               // aquecimento ou sem troca, o quadrado não aparece.
@@ -3902,6 +3914,8 @@ export default function GameDetails() {
                 {!isOpenGame(game) && (
                   <p className="px-0.5 text-sm text-muted">
                     {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate'
+                      : rankBy === 'wins' ? 'americano_wins'
+                      : noFinal ? 'todos_contra_todos_no_final'
                       // O Americano em «Set sem fim» soma jogos (UX, 26 out).
                       : game.format === 'americano' && scoringFormatOf(game) === 'set_sem_fim' ? 'americano_set_sem_fim'
                       : (game.format || 'sobe_desce')}`)}
@@ -4085,7 +4099,7 @@ export default function GameDetails() {
         // legacy points_earned they were actually finalized with.
         // `points`: no americano, os pontos do mix (os mesmos do cartão do
         // vencedor), em vez do points_earned da tabela (QA, 10 out: 24 em vez de 48).
-        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won, points = null }) => {
+        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won, points = null, wins = null }) => {
           const s = statsByUser[id]
           const hasRating = s?.rating_delta != null
           const nameBlock = (
@@ -4132,11 +4146,13 @@ export default function GameDetails() {
                         <span className="text-lg font-extrabold text-ink-900 tabular-nums">{Math.round(s.rating_after)}</span>
                       )}
                     </p>
+                  ) : wins ? (
+                    <p className="font-display text-base font-extrabold text-ink-900 tabular-nums">{wins.wins}</p>
                   ) : (
                     <p className="text-lg font-extrabold text-ink-900 tabular-nums">{points ?? s.points_earned}</p>
                   )}
                   <p className="text-[11px] text-muted">
-                    {hasRating ? t('gamedetails.rating_label') : t('gamedetails.points_label')}
+                    {hasRating ? t('gamedetails.rating_label') : wins ? winsDiffLabel(wins.diff) : t('gamedetails.points_label')}
                   </p>
                 </div>
               )}
@@ -4231,7 +4247,7 @@ export default function GameDetails() {
               // não tem conta entra a cinzento, «sem conta», só com os pontos.
               <div className="space-y-1.5">
                 {americanoStandingsResult.map((r, i, all) => {
-                  const place = all.findIndex((x) => x.points === r.points && x.diff === r.diff) + 1
+                  const place = all.findIndex((x) => americanoSameRank(x, r, rankBy)) + 1
                   const s = statsByUser[r.player.id]
                   const first = place === 1
                   return (
@@ -4249,6 +4265,7 @@ export default function GameDetails() {
                           isGuest: !!isGuestById[r.player.id],
                           won: americanoFirstIds.has(r.player.id),
                           points: r.points,
+                          wins: rankBy === 'wins' ? r : null,
                         }) : (
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Avatar name={r.player.name} url={null} size="w-10 h-10 text-sm" />
@@ -4259,7 +4276,16 @@ export default function GameDetails() {
                               </p>
                               <p className="text-[11px] text-muted">{t('gamedetails.americano_no_account')}</p>
                             </div>
-                            <span className="shrink-0 text-sm text-muted tabular-nums">{t('gamedetails.americano_points', { count: r.points })}</span>
+                            {rankBy === 'wins' ? (
+                              // Igual às linhas com conta e à Classificação: os ganhos
+                              // em grande e a diferença por baixo (UX, 12 nov).
+                              <div className="text-right shrink-0">
+                                <p className="font-display text-base font-extrabold text-ink-900 tabular-nums">{r.wins}</p>
+                                <p className="text-[11px] text-muted">{winsDiffLabel(r.diff)}</p>
+                              </div>
+                            ) : (
+                              <span className="shrink-0 text-sm text-muted tabular-nums">{t('gamedetails.americano_points', { count: r.points })}</span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -4552,13 +4578,26 @@ export default function GameDetails() {
               </button>
               {classifOpen && (
                 <div className="space-y-1.5">
+                  {/* Americano por jogos ganhos (#711): o título da coluna e, em
+                      cada linha, os ganhos em grande e a diferença por baixo. */}
+                  {isAmericano && rankBy === 'wins' && (
+                    <p className="text-right font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-muted">{t('gamedetails.wins_column')}</p>
+                  )}
                   {classif.rows.map((row, i) => (
                     <div key={row.key} className={`flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0 ${row.mine ? 'font-extrabold' : ''}`}>
                       <span className="w-6 font-extrabold text-ink-900 tabular-nums">{row.place ?? i + 1}</span>
                       <span className="flex-1 font-extrabold text-ink-900 truncate">{row.name}</span>
-                      {row.extra && <span className="text-muted tabular-nums text-right whitespace-nowrap">{row.extra}</span>}
+                      {row.wins != null ? (
+                        <span className="shrink-0 text-right">
+                          <span className="block font-display text-base font-extrabold leading-tight text-ink-900 tabular-nums">{row.wins}</span>
+                          <span className="block text-[11px] font-normal text-muted tabular-nums">{winsDiffLabel(row.diff)}</span>
+                        </span>
+                      ) : row.extra && <span className="text-muted tabular-nums text-right whitespace-nowrap">{row.extra}</span>}
                     </div>
                   ))}
+                  {isAmericano && rankBy === 'wins' && <p className="pt-1.5 text-[12.5px] leading-snug text-muted">{t('gamedetails.wins_tie_rule')}</p>}
+                  {/* O desempate do Todos contra todos, com final e sem final (UX, 10 nov). */}
+                  {game.format === 'todos_contra_todos' && <p className="pt-1.5 text-[12.5px] leading-snug text-muted">{t('gamedetails.rr_tie_rule')}</p>}
                 </div>
               )}
             </div>
@@ -4787,7 +4826,7 @@ export default function GameDetails() {
                   {/* Classificação (todos contra todos) — never for grupos_eliminatorias, which gets its own per-pool standings from PoolGroupStage below */}
                   {!isSobeDesce && !isGruposEliminatorias && !isAmericano && roundsStarted && tctStandings.length > 0 && (
                     <div className="card">
-                      <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.group_standings_title')}</h3>
+                      <h3 className="text-lg text-ink-900 mb-3">{t(noFinal ? 'gamedetails.classif_title' : 'gamedetails.group_standings_title')}</h3>
                       <div className="space-y-1.5">
                         {tctStandings.map((s, i) => (
                           <div key={s.team.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
@@ -4800,6 +4839,7 @@ export default function GameDetails() {
                           </div>
                         ))}
                       </div>
+                      {game.format === 'todos_contra_todos' && <p className="mt-3 text-[12.5px] leading-snug text-muted">{t('gamedetails.rr_tie_rule')}</p>}
                     </div>
                   )}
 
@@ -4838,18 +4878,31 @@ export default function GameDetails() {
 
                   {isAmericano && americanoStandingsResult.length > 0 && (
                     <div className="card">
-                      <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
+                      <div className="mb-3 flex items-end justify-between gap-3">
+                        <h3 className="text-lg text-ink-900">{t('gamedetails.americano_ranking_title')}</h3>
+                        {rankBy === 'wins' && <span className="font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-muted">{t('gamedetails.wins_column')}</span>}
+                      </div>
                       <div className="space-y-1.5">
                         {americanoStandingsResult.map((s, i, all) => (
                           <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                            {/* Os empatados (pontos e diferença) partilham o lugar, como nas Estatísticas (QA, 10 out). */}
-                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{all.findIndex((x) => x.points === s.points && x.diff === s.diff) + 1}</span>
+                            {/* Os empatados partilham o lugar, como nas Estatísticas (QA, 10 out). */}
+                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{all.findIndex((x) => americanoSameRank(x, s, rankBy)) + 1}</span>
                             <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
-                            <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
-                            <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
+                            {rankBy === 'wins' ? (
+                              <span className="shrink-0 text-right">
+                                <span className="block font-display text-base font-extrabold leading-tight text-ink-900 tabular-nums">{s.wins}</span>
+                                <span className="block text-[11px] text-muted tabular-nums">{winsDiffLabel(s.diff)}</span>
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
+                                <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
+                      {rankBy === 'wins' && <p className="mt-3 text-[12.5px] leading-snug text-muted">{t('gamedetails.wins_tie_rule')}</p>}
                     </div>
                   )}
 
