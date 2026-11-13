@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
-import { Chips, DateField, PrimaryButton } from '../ui'
+import { Chips, ConfirmSheet, DateField, PrimaryButton } from '../ui'
 import { TIEBREAK_RULES } from './tieBreak'
 import { categoryCode, categoryName, categoryOutsideDay, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
 import { localInputToIso, isoToLocalInput, endsNextDay, nextDateKey } from '../../lib/tournamentDay'
@@ -305,6 +305,8 @@ function Locked({ title, reason, children }) {
 export default function CreateTournamentForm({ club, initial = null, locked = false, focusCode = null, onCancel, onCreate, saving, error }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
+  // A categoria que se vai tirar: o «×» pergunta antes (UX, 13 nov).
+  const [removing, setRemoving] = useState(null)
   // O máximo de categorias por pessoa que o torneio tinha ao abrir o Editar:
   // com inscritos, não se desce abaixo dele (#586, 13 out).
   const initialMax = maxCategories(initial?.tournament)
@@ -863,12 +865,21 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                 </span>
               </span>
               <button type="button" onClick={() => setEditing(i)} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 text-xs text-ink-500 hover:underline">{t('tournament.create.edit')}</button>
-              <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ categories: draft.categories.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 text-ink-300 hover:text-danger">
+              <button type="button" aria-label={t('tournament.create.remove')} onClick={() => setRemoving(i)} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 text-ink-300 hover:text-danger">
                 <Trash2 size={15} />
               </button>
             </div>
           ))}
           </div>}
+          {/* Tirar uma categoria pergunta primeiro, com o código e o nome (no
+              Editar só sai de vez com «Guardar alterações»). */}
+          <ConfirmSheet open={removing !== null && !!draft.categories[removing]} danger
+            title={removing !== null && draft.categories[removing]
+              ? t('tournament.create.remove_category_title', { code: draft.categories[removing].code, name: String(draft.categories[removing].name).replace(/ (\S+)$/, '\u00a0$1') }) : ''}
+            message={t('tournament.create.remove_category_message')}
+            confirmLabel={t('tournament.create.remove_category_confirm')} cancelLabel={t('tournament.create.cancel')}
+            onConfirm={() => set({ categories: draft.categories.filter((_, k) => k !== removing) })}
+            onClose={() => setRemoving(null)} />
 
           {editing !== null ? (
             <CategoryEditor

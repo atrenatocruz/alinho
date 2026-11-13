@@ -186,6 +186,15 @@ export default function StepPage({
             {edit.saving ? t('steps.saving') : t('steps.save_changes')}
           </button>
           {edit.saveDisabled && edit.saveHint && <p className="text-center text-xs text-muted">{edit.saveHint}</p>}
+          {/* A saída sem guardar à vista, só com alterações por guardar: abre a
+              mesma pergunta do «‹» de cima (UX, 13 nov; o Francisco tirou uma
+              categoria sem querer e não encontrou como desfazer). */}
+          {edit.dirty && (
+            <button type="button" onClick={() => setAsking(true)}
+              className="mx-auto block min-h-[40px] px-4 text-sm font-bold text-ink-500 underline underline-offset-2 hover:text-ink-900">
+              {t('steps.leave_without_saving')}
+            </button>
+          )}
           {/* As saídas juntas, longe do guardar (designer, 6 out), uma por
               baixo da outra a toda a largura — lado a lado não (Francisco). */}
           {(edit.extra || edit.danger) && (
