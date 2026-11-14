@@ -1023,22 +1023,32 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.court_names')} hint={t('tournament.create.court_names_hint')}>
             <div className="flex flex-wrap gap-1.5">
               {courtNames(draft.courts, draft.days, courtBase).map((name, i, shown) => (
-                <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm focus-within:border-ink-900">
+                <span key={i} className="inline-flex max-w-full items-center rounded-full border border-line py-1.5 pl-3 text-sm focus-within:border-ink-900">
                   {/* O nome edita-se no próprio chip — antes só dava para apagar
                       e voltar a juntar, e «Campo 1 · KIA» ficava impossível
                       (revisão dos torneios, 28 set). Vazio volta ao nome base. */}
-                  <input
-                    value={name}
-                    size={Math.max(String(name).length, 6)}
-                    aria-label={t('tournament.create.court_rename', { n: i + 1 })}
-                    onChange={(e) => set({ courts: shown.map((c, k) => (k === i ? e.target.value : c)) })}
-                    onBlur={(e) => {
-                      const clean = e.target.value.trim()
-                      set({ courts: shown.map((c, k) => (k === i ? (clean || courtBase(i + 1)) : c)) })
-                    }}
-                    className="min-w-0 bg-transparent text-sm text-ink-900 outline-none"
-                  />
-                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: shown.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2"><X size={13} /></button>
+                  {/* A caixa mede o próprio texto: um span invisível com o mesmo
+                      nome e a mesma letra, e o input por cima, na mesma célula.
+                      Com o size={letras}, o iPhone fazia a caixa mais estreita do
+                      que o texto e só se via «Campo» (Francisco, 13 nov). Sem
+                      espaço na linha, o nome parte com «…». */}
+                  <span className="inline-grid min-w-0">
+                    <span aria-hidden="true" className="invisible col-start-1 row-start-1 overflow-hidden whitespace-pre text-base md:text-sm">{name || ' '}</span>
+                    <input
+                      value={name}
+                      size={1}
+                      aria-label={t('tournament.create.court_rename', { n: i + 1 })}
+                      onChange={(e) => set({ courts: shown.map((c, k) => (k === i ? e.target.value : c)) })}
+                      onBlur={(e) => {
+                        const clean = e.target.value.trim()
+                        set({ courts: shown.map((c, k) => (k === i ? (clean || courtBase(i + 1)) : c)) })
+                      }}
+                      className="col-start-1 row-start-1 w-full min-w-0 text-ellipsis bg-transparent p-0 text-sm text-ink-900 outline-none"
+                    />
+                  </span>
+                  {/* O «×» à direita do nome, sem o tapar; a zona de toque de 44 px
+                      sai para fora da pastilha só em cima e em baixo. */}
+                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: shown.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center -my-3"><X size={13} /></button>
                 </span>
               ))}
               <Chip onClick={() => {
