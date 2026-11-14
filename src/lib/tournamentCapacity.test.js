@@ -102,13 +102,15 @@ describe('as duas verificações e a cor do dia', () => {
     const day = evaluateDay(friday, [cat('M4', 16)], rules)
     expect(day.status).toBe(DAY_STATUS.vermelho)
     expect(day.failing).toBe('horas')
-    expect(day.missing).toBe(11)
+    // 16 duplas em 10 h: a divisão mais curta (5 grupos, passa 1) pede
+    // 22 jogos = 16,5 h → faltam 7 h (antes contava 4 grupos de 4, 21 h).
+    expect(day.missing).toBe(7)
     const n = day.categories[0].maxTeams
     expect(n).toBeGreaterThanOrEqual(4)
     expect(evaluateDay(friday, [cat('M4', n)], rules).status).not.toBe(DAY_STATUS.vermelho)
     expect(evaluateDay(friday, [cat('M4', n + 1)], rules).status).toBe(DAY_STATUS.vermelho)
     expect(day.shortcuts).toContainEqual({ kind: 'vagas', code: 'M4', teams: n })
-    // Mais 1 campo (3 campos, 15 h) não chega para 21 h: não aparece.
+    // Mais 1 campo (3 campos, 15 h) não chega para 17 h: não aparece.
     expect(day.shortcuts.some((s) => s.kind === 'campo')).toBe(false)
   })
   it('vermelho por fases (exemplo da BA): 4 campos das 18h às 21h dão 12 h, mas 5 rondas de 45 min não cabem em 3 h', () => {
@@ -227,5 +229,69 @@ describe('No sorteio: as horas das outras categorias (#800, UX 12 nov)', () => {
     expect(otherCategoriesHours(cats, 'm3', regras)).toBe(26)
     expect(otherCategoriesHours(cats, 'm4', regras)).toBe(37)
     expect(otherCategoriesHours([], 'm3', regras)).toBe(0)
+  })
+})
+
+// Grupos desiguais quando os iguais não cabem, e «Cabem até N» sem buracos
+// (aprovado pelo Francisco a 13 nov; design-handoff/2026-11-13-grupos-
+// desiguais-quando-nao-cabe). 2 campos a partir das 12h, Quadro B ligado.
+describe('Grupos desiguais e «Cabem até» sem buracos (13 nov)', () => {
+  const sabado = (fim) => ({ date: '2026-11-28', starts_at: '12:00', ends_at: fim, courts: 2 })
+  const t5 = (n, b = true) => [cat('T5', n, '2026-11-28', { secondary_bracket: b })]
+  const r45 = { duration_max: 45, scoring: 'pro_set_9' }
+  const r60 = { duration_max: 60, scoring: 'pro_set_9' }
+  const cores = (fim, r, ns) => ns.map((n) => evaluateDay(sabado(fim), t5(n), r).status)
+
+  it('até à meia-noite, 45 min: 14 e 16 já cabem (antes ficavam a vermelho entre 13 e 15)', () => {
+    expect(cores('00:00', r45, [13, 14, 15, 16, 17]))
+      .toEqual(['verde', 'ambar', 'verde', 'ambar', 'vermelho'])
+    // 14 em 4 grupos (4, 4, 3 e 3) e 16 em 5 (4, 3, 3, 3 e 3): desiguais,
+    // porque os iguais (2 de 7, 4 de 4) não cabem.
+    const need = (n) => evaluateDay(sabado('00:00'), t5(n), r45).categories[0].need.option
+    expect(need(14).sizes).toEqual([4, 4, 3, 3])
+    expect(need(16).sizes).toEqual([4, 3, 3, 3, 3])
+    expect(maxTeamsFor(sabado('00:00'), t5(14), r45, 'T5')).toBe(16)
+  })
+
+  it('até às 23h, 45 min: o 14 continua sem caber e o 15 cabe; diz-se «cabem até 13»', () => {
+    expect(cores('23:00', r45, [12, 13, 14, 15, 16]))
+      .toEqual(['ambar', 'ambar', 'vermelho', 'ambar', 'vermelho'])
+    expect(maxTeamsFor(sabado('23:00'), t5(14), r45, 'T5')).toBe(13)
+  })
+
+  it('o torneio de 28 nov (60 min, 22 h, Quadro B): cabem até 10, faltam 10 h, e os atalhos', () => {
+    // De 4 a 10 cabem, 11 não, 12 cabe, 13 ou mais não (as contas da UX).
+    expect(cores('23:00', r60, [10, 11, 12, 13]).map((c) => c !== 'vermelho')).toEqual([true, false, true, false])
+    const day = evaluateDay(sabado('23:00'), t5(16), r60)
+    expect(day.status).toBe('vermelho')
+    expect(day.categories[0].maxTeams).toBe(10)
+    // A mais curta com grupos: 5 grupos, passa 1, com o B = 32 jogos, 32 h.
+    expect(day.missing).toBe(10)
+    expect(day.shortcuts).toEqual([
+      { kind: 'vagas', code: 'T5', teams: 10 },
+      { kind: 'sem_quadro_b', code: 'T5' },
+      { kind: 'campo', courts: 3 },
+    ])
+    // Sem Quadro B cabem as 16, à justa.
+    const semB = evaluateDay(sabado('23:00'), t5(16, false), r60)
+    expect(semB.status).toBe('ambar')
+    expect(semB.hoursNeeded).toBe(22)
+  })
+
+  it('«Sem Quadro B» só aparece quando é ele que faz caber', () => {
+    // 24 duplas, 23h, 45 min: nem sem o B cabe (24 h em 22).
+    const day = evaluateDay(sabado('23:00'), t5(24), r45)
+    expect(day.status).toBe('vermelho')
+    expect(day.shortcuts.some((s) => s.kind === 'sem_quadro_b')).toBe(false)
+    // Com 20, sem o B cabe (22 h, à justa): aparece.
+    expect(evaluateDay(sabado('23:00'), t5(20), r45).shortcuts).toContainEqual({ kind: 'sem_quadro_b', code: 'T5' })
+    // Uma categoria sem B nunca o tem.
+    const sem = evaluateDay(sabado('23:00'), t5(30, false), r45)
+    expect(sem.shortcuts.some((s) => s.kind === 'sem_quadro_b')).toBe(false)
+  })
+
+  it('categoryCourtHours conta um formato desigual já escolhido', () => {
+    const c = { status: 'fechada', selected_count: 16, slots: 16, match_count: 0, format: { key: 'grupos-5x4-passam1' } }
+    expect(categoryCourtHours(c, r60)).toBe(22)
   })
 })

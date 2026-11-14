@@ -5,7 +5,8 @@ import en from '../locales/en.json'
 import {
   groupSizes, possibleGroupCounts, groupMatchCount, groupStageMatchCount,
   guaranteedMatches, nextPowerOfTwo, knockoutMatchCount, knockoutRounds,
-  courtHours, availableCourtHours, formatOptions, recommendFormat, groupsWords,
+  courtHours, availableCourtHours, formatOptions, recommendFormat, groupsWords, formatOptionByKey,
+  secondaryOptions,
   pickSeeds, drawGroups, groupRoundRobin, groupStandings, headToHeadWins,
   bestOfPosition, buildFirstRound, noSameGroupClash, seededRandom,
   TIEBREAK_DEFAULT, TIEBREAK_BETWEEN_GROUPS, diffAmong, tiebreakOrder,
@@ -593,5 +594,67 @@ describe('passo 8: o desempate jogado no campo (23 out)', () => {
       { a: 'A', b: 'B', score_a: 10, score_b: 8 }, { a: 'B', b: 'C', score_a: 10, score_b: 8 }, { a: 'C', b: 'A', score_a: 10, score_b: 8 },
     ])
     expect(roda.tied).toEqual([['A', 'B', 'C']])
+  })
+})
+
+describe('Grupos desiguais quando os iguais não cabem (Francisco, 13 nov)', () => {
+  // O torneio de 28 nov: 16 duplas, 60 min, 2 campos das 12h às 23h = 22 h.
+  const dezasseis = formatOptions(16, { maxDurationMin: 60, availableHours: 22, singleGroup: true })
+
+  it('16 duplas em 22 h: os 4 grupos de 4 não cabem, e entram os 5 grupos (4, 3, 3, 3 e 3), à justa', () => {
+    expect(dezasseis.map((o) => [o.key, o.matches, o.fits, o.fitsWithSlack, Boolean(o.uneven)])).toEqual([
+      ['eliminatoria', 15, true, true, false],
+      ['grupos-4x4-passam1', 27, false, false, false],
+      ['grupos-4x4-passam2', 31, false, false, false],
+      // Passam 2 com 5 grupos (27 h) também não cabe: não entra.
+      ['grupos-5x4-passam1', 22, true, false, true],
+    ])
+    expect(dezasseis.find((o) => o.uneven).sizes).toEqual([4, 3, 3, 3, 3])
+  })
+
+  it('recomendado: o com mais jogos garantidos que cabe, mesmo à justa (antes era a eliminatória)', () => {
+    expect(recommendFormat(dezasseis).key).toBe('grupos-5x4-passam1')
+  })
+
+  it('quando uma divisão igual cabe, nada muda (#455): 12 duplas em 22 h', () => {
+    const doze = formatOptions(12, { maxDurationMin: 60, availableHours: 22, singleGroup: true })
+    expect(doze.some((o) => o.uneven)).toBe(false)
+    expect(doze.map((o) => o.key)).toEqual(formatOptions(12, { maxDurationMin: 60, singleGroup: true }).map((o) => o.key))
+  })
+
+  it('14 duplas em 22 h: 2 grupos de 7 não cabem, entram os 4 grupos (4, 4, 3 e 3); os 3 grupos (5, 5, 4) não cabem e ficam de fora', () => {
+    const catorze = formatOptions(14, { maxDurationMin: 60, availableHours: 22, singleGroup: true })
+    expect(catorze.filter((o) => o.uneven).map((o) => [o.key, o.sizes, o.hours])).toEqual([
+      ['grupos-4x4-passam1', [4, 4, 3, 3], 21],
+    ])
+    expect(recommendFormat(catorze).key).toBe('grupos-4x4-passam1')
+  })
+
+  it('sem horas marcadas não há desiguais; com `uneven: false` também não; com `all` entram mesmo sem caber', () => {
+    expect(formatOptions(16, { maxDurationMin: 60 }).some((o) => o.uneven)).toBe(false)
+    expect(formatOptions(16, { maxDurationMin: 60, availableHours: 22, uneven: false }).some((o) => o.uneven)).toBe(false)
+    const todas = formatOptions(16, { maxDurationMin: 60, availableHours: 10, uneven: 'all' }).filter((o) => o.uneven)
+    expect(todas.map((o) => o.key)).toEqual(['grupos-3x6-passam1', 'grupos-3x6-passam2', 'grupos-5x4-passam1', 'grupos-5x4-passam2'])
+    expect(todas.every((o) => o.fits === false)).toBe(true)
+  })
+
+  it('formatOptionByKey encontra também as desiguais, sem horas', () => {
+    expect(formatOptionByKey(16, 'grupos-5x4-passam1', { maxDurationMin: 60 })).toMatchObject({
+      sizes: [4, 3, 3, 3, 3], matches: 22, hours: 22, fits: null, uneven: true,
+    })
+    expect(formatOptionByKey(16, 'grupos-4x4-passam2', { maxDurationMin: 60 }).uneven).toBeUndefined()
+    expect(formatOptionByKey(16, 'nao-existe')).toBeNull()
+    expect(formatOptionByKey(16, null)).toBeNull()
+  })
+
+  it('Quem vai ao Quadro B: «cabe à justa» também, pela folga sobre o tempo que sobra', () => {
+    const op = dezasseis.find((o) => o.key === 'grupos-5x4-passam1')
+    const { options, recommendedUpTo } = secondaryOptions(op, { maxDurationMin: 60, availableHours: 22 })
+    expect(options.map((o) => [o.upTo, o.hours, o.fits, o.fitsWithSlack])).toEqual([
+      [null, 22, true, false], [2, 26, false, false], [3, 31, false, false], [4, 32, false, false],
+    ])
+    expect(recommendedUpTo).toBeNull()
+    expect(secondaryOptions(op, { maxDurationMin: 60, availableHours: 40 }).options.map((o) => o.fitsWithSlack))
+      .toEqual([true, true, true, true])
   })
 })
