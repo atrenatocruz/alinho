@@ -16,7 +16,7 @@
      antes das 8h. */
 
 import {
-  SLACK_DEFAULT, formatOptions, recommendFormat, knockoutRounds, courtHours, secondaryOptions,
+  SLACK_DEFAULT, formatOptions, formatOptionByKey, recommendFormat, knockoutRounds, courtHours, secondaryOptions,
 } from './tournamentFormat'
 import { endsNextDay } from './tournamentDay'
 
@@ -100,7 +100,11 @@ export function categoryNeed(teams, { maxDurationMin, availableHours = null, ava
   if (n < 2) return null
   // O grupo único (3 a 7 duplas) já vem do formatOptions, como no passo do
   // formato depois das inscrições.
-  const all = formatOptions(n, { maxDurationMin, availableHours, thirdPlaceMatch, secondaryBracket, slack, singleGroup: true })
+  // Com `uneven: 'all'`: quando nada com grupos cabe, as divisões desiguais
+  // entram todas. As que cabem podem ser a recomendada; se nenhuma couber,
+  // a mais curta diz quanto falta (16 duplas em 22 h com Quadro B: 32 h
+  // com 5 grupos, e não 38 h com 4 grupos de 4).
+  const all = formatOptions(n, { maxDurationMin, availableHours, thirdPlaceMatch, secondaryBracket, slack, singleGroup: true, uneven: 'all' })
   const enough = all.filter((o) => o.guaranteed >= MIN_GUARANTEED)
   const pool = enough.length ? enough : all
   const inTime = availableMinutes == null ? [] : pool.filter((o) => optionRounds(o) * maxDurationMin <= availableMinutes)
@@ -182,24 +186,36 @@ function measureDay(day, categories, rules) {
 
 const fitsDay = (day, categories, rules) => measureDay(day, categories, rules).status !== DAY_STATUS.vermelho
 
-/** O maior número de duplas para a categoria `code` com que o dia ainda
-    cabe (verde ou âmbar), com as outras como estão. null se nem com 4. */
+/** O maior N para a categoria `code` em que o dia cabe (verde ou âmbar)
+    com TODOS os números de duplas de `from` até N, com as outras como
+    estão. Sem buracos (UX, 13 nov): às 23h, 45 min e Quadro B, 13 cabe,
+    14 não e 15 cabe; diz-se «cabem até 13», porque «até 15» enganava.
+    null se nem com `from`. */
 export function maxTeamsFor(day, categories, rules, code, { from = MAX_TEAMS_SEARCH.from, to = MAX_TEAMS_SEARCH.to } = {}) {
-  for (let n = to; n >= from; n -= 1) {
+  let best = null
+  for (let n = from; n <= to; n += 1) {
     const changed = categories.map((c) => (c.code === code ? { ...c, slots: n } : c))
-    if (fitsDay(day, changed, rules)) return n
+    if (!fitsDay(day, changed, rules)) break
+    best = n
   }
-  return null
+  return best
 }
 
 /** Os atalhos do vermelho, só os que resolvem (o dia passa a verde ou
-    âmbar). Cada um: { kind: 'vagas', code, teams } | { kind: 'campo',
-    courts } | { kind: 'inicio', startsAt }. */
+    âmbar). Cada um: { kind: 'vagas', code, teams } | { kind:
+    'sem_quadro_b', code } | { kind: 'campo', courts } | { kind: 'inicio',
+    startsAt }. «Sem Quadro B» só quando é desligar o B dessa categoria
+    que faz caber (UX, 13 nov). */
 export function dayShortcuts(day, categories, rules, { maxTeams = {}, earliestStart = '08:00' } = {}) {
   const out = []
   for (const c of catsOfDay(day, categories)) {
     const n = maxTeams[c.code]
     if (n != null && n < Number(c.slots)) out.push({ kind: 'vagas', code: c.code, teams: n })
+  }
+  for (const c of catsOfDay(day, categories)) {
+    if (!c.secondary_bracket) continue
+    const withoutB = categories.map((x) => (x === c ? { ...x, secondary_bracket: false } : x))
+    if (fitsDay(day, withoutB, rules)) out.push({ kind: 'sem_quadro_b', code: c.code })
   }
   const courts = Number(day.courts) || 0
   if (fitsDay({ ...day, courts: courts + 1 }, categories, rules)) out.push({ kind: 'campo', courts: courts + 1 })
@@ -270,8 +286,7 @@ export function categoryCourtHours(cat, rules = {}) {
   const selected = Number(cat?.selected_count) || 0
   const thirdPlaceMatch = Boolean(format.third_place ?? cat?.third_place_match)
   if (format.key && selected >= 2) {
-    const option = formatOptions(selected, { maxDurationMin, thirdPlaceMatch, singleGroup: true })
-      .find((o) => o.key === format.key)
+    const option = formatOptionByKey(selected, format.key, { maxDurationMin, thirdPlaceMatch, singleGroup: true })
     if (option) {
       const upTo = format.secondary_upto == null || format.secondary_upto === '' ? null : Number(format.secondary_upto)
       const choice = secondaryOptions(option, { maxDurationMin }).options.find((o) => o.upTo === upTo)

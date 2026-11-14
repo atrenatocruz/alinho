@@ -122,8 +122,12 @@ export const availableCourtHours = (days) =>
     `qualifiersPerGroup` 1 ou 2 (SPEC §5). Inclui sempre "só eliminatória".
     Com `singleGroup`, também «um grupo só» de 3 a 7 duplas (passam 0).
 
+    Com limite de horas e nenhuma opção com grupos a caber, junta as divisões
+    desiguais (`uneven`: true só as que cabem, 'all' todas, false nenhuma).
+
     Cada opção: { key, kind, groupCount, sizes, qualifiersPerGroup, qualifiers,
-    byes, secondary, matches, guaranteed, phases, hours, fits, slack }. */
+    byes, secondary, matches, guaranteed, phases, hours, fits, fitsWithSlack,
+    uneven? }. «Cabe à justa» = fits && !fitsWithSlack. */
 export function formatOptions(teamCount, {
   maxDurationMin = 60,
   availableHours = null,
@@ -133,6 +137,7 @@ export function formatOptions(teamCount, {
   thirdPlaceMatch = false,
   secondaryBracket = false,
   singleGroup = false,
+  uneven = true,
 } = {}) {
   const options = []
 
@@ -155,8 +160,8 @@ export function formatOptions(teamCount, {
   }
 
   // Grupos + eliminatória.
-  for (const groupCount of possibleGroupCounts(teamCount, { min, max })) {
-    if (groupCount < 2) continue // 1 grupo só não leva eliminatória
+  const groupOptions = (groupCount) => {
+    const out = []
     const sizes = groupSizes(teamCount, groupCount)
     for (const perGroup of [1, 2]) {
       const qualifiers = groupCount * perGroup
@@ -167,7 +172,7 @@ export function formatOptions(teamCount, {
         + knockoutMatchCount(qualifiers)
         + (thirdPlaceMatch ? 1 : 0)
         + (secondaryTeams > 1 ? knockoutMatchCount(secondaryTeams) : 0)
-      options.push(finishOption({
+      out.push(finishOption({
         key: `grupos-${groupCount}x${sizes[0]}-passam${perGroup}`,
         kind: 'grupos',
         groupCount,
@@ -181,7 +186,10 @@ export function formatOptions(teamCount, {
         matches,
       }, { maxDurationMin, availableHours, slack }))
     }
+    return out
   }
+  const usedCounts = possibleGroupCounts(teamCount, { min, max }).filter((g) => g >= 2) // 1 grupo só não leva eliminatória
+  for (const groupCount of usedCounts) options.push(...groupOptions(groupCount))
 
   // Um grupo só, todos contra todos, sem final: ganha o 1.º da tabela, com o
   // desempate da FPP (BA, 23 out; aprovado pelo Francisco). De 3 a 7 duplas.
@@ -204,7 +212,36 @@ export function formatOptions(teamCount, {
     }, { maxDurationMin, availableHours, slack }))
   }
 
+  // Grupos desiguais quando os iguais não cabem (aprovado pelo Francisco a
+  // 13 nov; design-handoff/2026-11-13-grupos-desiguais-quando-nao-cabe).
+  // Só com limite de horas e só se nenhuma opção com grupos couber: aí
+  // juntam-se as outras divisões (16 → 5 grupos: 4, 3, 3, 3 e 3), marcadas
+  // com `uneven`. Na lista entram só as que cabem; com `uneven: 'all'`
+  // entram todas (o Criar usa-as para dizer quanto falta, pela mais curta).
+  const anyGroupFits = options.some((o) => o.groupCount >= 1 && o.fits)
+  if (availableHours != null && !anyGroupFits && uneven) {
+    for (let g = 2; g <= Math.floor(teamCount / min); g++) {
+      if (usedCounts.includes(g)) continue
+      const sizes = groupSizes(teamCount, g)
+      if (!sizes.length || Math.min(...sizes) < min || Math.max(...sizes) > max) continue
+      for (const o of groupOptions(g)) {
+        if (uneven === 'all' || o.fits) options.push({ ...o, uneven: true })
+      }
+    }
+  }
+
   return options
+}
+
+/** A opção de formato com a chave `key` (a que se guarda em `format.key`),
+    também as desiguais, que o formatOptions só junta quando nada cabe.
+    Sem horas: os campos `fits` não contam aqui. null se a chave já não
+    serve a este número de duplas. */
+export function formatOptionByKey(teamCount, key, opts = {}) {
+  if (!key) return null
+  const all = formatOptions(teamCount, { ...opts, availableHours: 0, uneven: 'all' })
+  const found = all.find((o) => o.key === key)
+  return found ? { ...found, fits: null, fitsWithSlack: null } : null
 }
 
 function finishOption(option, { maxDurationMin, availableHours, slack }) {
@@ -239,7 +276,7 @@ export function secondaryTeamCount(sizes, perGroup, upTo) {
     ninguém a passar) devolve uma lista vazia: o bloco não aparece.
 
     Cada escolha: { upTo, places, last, teams, extraMatches, matches, hours,
-    fits, overHours }
+    fits, fitsWithSlack, overHours }
       - upTo: o último lugar que vai (null = Ninguém); é o que se guarda em
         `format.secondary_upto`;
       - places: os lugares que vão ([3, 4]; [] no Ninguém);
@@ -247,6 +284,8 @@ export function secondaryTeamCount(sizes, perGroup, upTo) {
       - matches e hours: da categoria com essa escolha;
       - fits: cabe no tempo de campo que sobra depois das outras categorias
         (`availableHours − otherHours`, UX 12 nov); null sem dias marcados;
+      - fitsWithSlack: cabe com a folga de 10 % (fits sem isto = «cabe à
+        justa», 13 nov);
       - overHours: as horas que passam desse tempo (0 se cabe).
     `recommendedUpTo`: a escolha com mais duplas que cabe; se nenhuma com
     Quadro B cabe, null (o «Ninguém»). Sem dias marcados, a com mais duplas. */
@@ -254,6 +293,7 @@ export function secondaryOptions(option, {
   maxDurationMin = 60,
   availableHours = null,
   otherHours = 0,
+  slack = SLACK_DEFAULT,
 } = {}) {
   const sizes = option?.sizes || []
   const perGroup = option?.qualifiersPerGroup || 0
@@ -281,6 +321,8 @@ export function secondaryOptions(option, {
       matches,
       hours,
       fits: hasLimit ? hours <= left + 1e-9 : null,
+      // «Cabe à justa» = fits && !fitsWithSlack, como no formatOptions.
+      fitsWithSlack: hasLimit ? hours <= left * (1 - slack) + 1e-9 : null,
       overHours: hasLimit ? Math.max(0, hours - left) : 0,
     }
   }
@@ -332,9 +374,11 @@ export function groupsWords(option, locale = 'pt-PT') {
   }
 }
 
-/** A opção recomendada: a que dá mais jogos garantidos e ainda cabe com
-    folga. Se nenhuma couber com folga, a que cabe. Se nenhuma couber, a
-    mais curta — e o ecrã dirá que não cabe.
+/** A opção recomendada: a que dá mais jogos garantidos e cabe, mesmo que
+    só caiba à justa (Francisco, 13 nov: o «à justa» fica à vista de quem
+    organiza; antes exigia-se a folga e 16 duplas em 22 h davam a
+    eliminatória, com 1 jogo garantido). Se nenhuma couber, a mais curta — e
+    o ecrã dirá que não cabe.
     Empate nos garantidos: ganha a que leva mais duplas à eliminatória. É o
     que o print 09 recomenda para 16 duplas — «4 grupos de 4 → quartos»
     (passam 2) em vez de «→ meias» (passa 1), com os mesmos 3 garantidos. */
@@ -342,8 +386,7 @@ export function recommendFormat(options) {
   if (!options.length) return null
   const byBest = [...options].sort((a, b) =>
     (b.guaranteed - a.guaranteed) || (b.qualifiers - a.qualifiers) || (a.matches - b.matches))
-  return byBest.find((o) => o.fitsWithSlack)
-    || byBest.find((o) => o.fits)
+  return byBest.find((o) => o.fits)
     || [...options].sort((a, b) => a.hours - b.hours)[0]
 }
 
