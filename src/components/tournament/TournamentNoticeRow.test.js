@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { championText, drawnText, finishedText, prizeText, timeChangedText } from './TournamentNoticeRow'
+import { bracketText, championText, drawnText, finishedText, prizeText, timeChangedText } from './TournamentNoticeRow'
 
 const t = (key, v) => ({ 'tournament.notice_prize_first': `1.º ${v?.prize}`, 'tournament.notice_prize_second': `2.º ${v?.prize}` }[key])
 
@@ -51,5 +51,27 @@ describe('championText (UX, 14 out)', () => {
   it('equipa com nome fica; dupla sem nome com os nomes curtos', () => {
     expect(championText('Os Lobos', tt)).toBe('Os Lobos')
     expect(championText('Ana Moreira / Rui Costa', tt)).toBe('Ana M. e Rui C.')
+  })
+})
+
+describe('bracketText (#800: Quadro A ou B ao passar os grupos)', () => {
+  const tt = (key, v = {}) => `${key}|${v.code}|${v.when ?? ''}`
+  it('A com hora, B com hora', () => {
+    expect(bracketText({ bracket: 'A', category_code: 'M3', next_match_at: '2026-11-28T16:00:00Z' }, tt, 'pt')).toMatch(/^tournament\.notice_bracket_a\|M3\|.+16:00/)
+    expect(bracketText({ bracket: 'B', category_code: 'M3', next_match_at: '2026-11-28T16:00:00Z' }, tt, 'pt')).toMatch(/^tournament\.notice_bracket_b\|M3\|/)
+  })
+  it('sem hora, a frase acaba no quadro', () => {
+    expect(bracketText({ bracket: 'B', category_code: 'M3', next_match_at: null }, tt, 'pt')).toBe('tournament.notice_bracket_b_no_time|M3|')
+    expect(bracketText({ bracket: 'A', category_code: 'M3' }, tt, 'pt')).toBe('tournament.notice_bracket_a_no_time|M3|')
+  })
+})
+
+describe('horas em 24 horas em todas as línguas (#811)', () => {
+  const tt = (key, v = {}) => `${key}|${v.when ?? ''}`
+  it('em en sai «16:00», não «04:00 PM»', () => {
+    const en = bracketText({ bracket: 'A', category_code: 'M3', next_match_at: '2026-11-28T16:00:00Z' }, tt, 'en')
+    expect(en).toMatch(/16:00/)
+    expect(en).not.toMatch(/PM|AM/)
+    expect(drawnText({ category_code: 'M4', tournament_name: 'Open', first_match_at: '2026-10-17T09:00:00Z' }, tt, 'en')).toMatch(/10:00/)
   })
 })

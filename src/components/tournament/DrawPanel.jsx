@@ -44,9 +44,12 @@ export default function DrawPanel({ tournament, category, myEntries , emptyPose 
 
   // O quadro em árvore (#571). O secundário usa o mesmo desenho, por baixo
   // do principal (ponto 6).
-  const Bracket = ({ rounds, label }) => (
+  // Com Quadro B, «Quadro A» e «Quadro B» (#800, SPEC ponto 1), e por baixo
+  // do B quem lá joga.
+  const Bracket = ({ rounds, label, note }) => (
     <div className="mb-5">
       {secondary.length > 0 && <MonoLabel className="mb-1">{label}</MonoLabel>}
+      {note && <p className="mb-2 text-xs text-muted">{note}</p>}
       <BracketTree rounds={rounds} entries={entries} myIds={myIds} allMatches={matches} groups={groups} scoring={scoring} />
     </div>
   )
@@ -55,7 +58,7 @@ export default function DrawPanel({ tournament, category, myEntries , emptyPose 
     <div>
       {main.length ? <Bracket rounds={main} label={t('tournament.draw.bracket_main')} /> : null}
       {secondary.length ? (
-        <Bracket rounds={secondary} label={t('tournament.draw.bracket_secondary')} />
+        <Bracket rounds={secondary} label={t('tournament.draw.bracket_secondary')} note={t('tournament.bracket_b_note')} />
       ) : null}
     </div>
   )

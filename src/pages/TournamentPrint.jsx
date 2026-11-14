@@ -134,9 +134,10 @@ function BracketSheet({ matches, entries, title }) {
     return entries[id]?.name || sourceText(source, matches, t) || t('ui.empty_tbd')
   }
 
-  const Bracket = ({ list, label }) => (
+  const Bracket = ({ list, label, note }) => (
     <section className="mb-4 break-inside-avoid">
       <h3 className="mb-1 text-[13px] font-bold">{label}</h3>
+      {note && <p className="-mt-0.5 mb-1 text-[11px]">{note}</p>}
       <div className="flex flex-wrap gap-3">
         {list.map(({ round, matches: ms }) => (
           <div key={round} className="min-w-[180px] flex-1">
@@ -167,8 +168,9 @@ function BracketSheet({ matches, entries, title }) {
 
   return (
     <>
-      {rounds.length ? <Bracket list={rounds} label={title} /> : null}
-      {secondary.length ? <Bracket list={secondary} label={t('tprint.secondary')} /> : null}
+      {/* Com Quadro B, «Quadro A» e «Quadro B» (#800, SPEC ponto 1). */}
+      {rounds.length ? <Bracket list={rounds} label={secondary.length ? t('tournament.bracket_a') : title} /> : null}
+      {secondary.length ? <Bracket list={secondary} label={t('tprint.secondary')} note={t('tournament.bracket_b_note')} /> : null}
     </>
   )
 }

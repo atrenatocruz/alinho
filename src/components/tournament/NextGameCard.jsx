@@ -95,6 +95,15 @@ export default function NextGameCard({ game, onOpenList }) {
       : []
   const head = [...when, next.court || match?.court_name].filter(Boolean).join(' · ')
   const opponent = their?.name || next.opponent
+  // Quadro B (#800, SPEC ponto 4): com dois quadros, o jogo do quadro diz
+  // em qual está e a fase («Quadro A · Quartos de final»).
+  const hasB = (board.matches || []).some((m) => m.stage === 'secundario')
+  const bracketLine = hasB && match && !match.group_id && match.round
+    ? t('tournament.next_game_bracket', {
+      bracket: t(match.stage === 'secundario' ? 'tournament.bracket_b' : 'tournament.bracket_a'),
+      phase: t(`tournament.score.round_${match.round}`),
+    })
+    : null
 
   return (
     <div>
@@ -104,6 +113,7 @@ export default function NextGameCard({ game, onOpenList }) {
         <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-[#166534]">
           {t('tournament.next_game_label', { code: category?.code || '' })}
         </p>
+        {bracketLine && <p className="mt-1 text-sm font-extrabold text-ink-900">{bracketLine}</p>}
         {head && <p className="mt-1.5 font-display text-[22px] font-extrabold leading-tight text-ink-900">{head}</p>}
         {/* Sem adversário ainda: a frase no lugar das duplas (SPEC, ponto 4). */}
         {opponent ? (

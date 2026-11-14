@@ -36,7 +36,7 @@ import { shortPersonName } from '../../lib/mixLogic'
 // categoria terminou (com o meu lugar, se fiquei no pódio).
 export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed', 'tournament_cancelled', 'tournament_entries_closed',
   'tournament_removed_clash', 'tournament_partner_removed', 'tournament_clash', 'tournament_category_time_changed', 'tournament_unpublished',
-  'tournament_drawn', 'tournament_finished']
+  'tournament_drawn', 'tournament_finished', 'tournament_bracket']
 
 /** «150 € + troféu» ou, com os dois, «1.º 150 € · 2.º 50 €». */
 export function prizeText(first, second, t) {
@@ -86,7 +86,7 @@ function momentText(iso, locale) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   const part = (opts) => d.toLocaleDateString(locale, { ...opts, timeZone: TOURNAMENT_TZ }).replace(/\./g, '')
-  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ })
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TOURNAMENT_TZ })
   return `${part({ weekday: 'short' })} ${part({ day: 'numeric' })} ${part({ month: 'short' })}, ${time}`
 }
 
@@ -99,6 +99,16 @@ export function drawnText(d, t, locale) {
   return d.court_name
     ? t('tournament.notice_drawn_court', { ...vars, when, court: d.court_name })
     : t('tournament.notice_drawn', { ...vars, when })
+}
+
+/** 'tournament_bracket' (#800, Dev 3): os grupos passaram ao quadro e a
+ *  minha dupla ficou no Quadro A ou no Quadro B. O B em tom neutro (SPEC,
+ *  ponto 4). Sem hora marcada, a frase acaba no quadro. */
+export function bracketText(d, t, locale) {
+  const b = d.bracket === 'B' ? 'b' : 'a'
+  const vars = { code: d.category_code || '', tournament: d.tournament_name || '' }
+  if (!d.next_match_at) return t(`tournament.notice_bracket_${b}_no_time`, vars)
+  return t(`tournament.notice_bracket_${b}`, { ...vars, when: momentText(d.next_match_at, locale) })
 }
 
 /** Quem ganhou: o nome da equipa, se tiver; senão os dois nomes curtos
@@ -130,8 +140,8 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     kept: d.kept_code || '',
     a: d.code_a || '',
     b: d.code_b || '',
-    ta: d.at_a ? new Date(d.at_a).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ }) : '',
-    tb: d.at_b ? new Date(d.at_b).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ }) : '',
+    ta: d.at_a ? new Date(d.at_a).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TOURNAMENT_TZ }) : '',
+    tb: d.at_b ? new Date(d.at_b).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TOURNAMENT_TZ }) : '',
   }
   const correction = notice.kind === 'tournament_correction_requested'
   const prize = notice.kind === 'tournament_prize_changed' ? prizeText(d.prize_first, d.prize_second, t) : null
@@ -161,6 +171,8 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     ? drawnText(d, t, i18n.language)
     : notice.kind === 'tournament_finished'
     ? finishedText(d, t)
+    : notice.kind === 'tournament_bracket'
+    ? bracketText(d, t, i18n.language)
     : notice.kind === 'tournament_unpublished'
     ? t('tournament.notice_unpublished', vars)
     : notice.kind === 'tournament_category_time_changed'

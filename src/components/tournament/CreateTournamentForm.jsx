@@ -5,7 +5,7 @@
 // aqui não aparece, porque nesta altura ainda não se sabe quantas duplas há.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
+import { Check, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, ConfirmSheet, DateField, PrimaryButton } from '../ui'
 import { TIEBREAK_RULES } from './tieBreak'
 import { categoryCode, categoryName, categoryOutsideDay, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
@@ -348,6 +348,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
       slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
       prize_first: c.prize_first || '', prize_second: c.prize_second || '',
+      // Quadro B para quem não passa dos grupos (#800).
+      secondary_bracket: !!c.secondary_bracket,
     })),
     organizer_text: initial?.tournament?.organizer_text || '',
     // Lembretes no WhatsApp (27 set): null = ainda por escolher — o campo
@@ -775,6 +777,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
               <span className="shrink-0 text-xs text-ink-500">
                 {t('tournament.create.category_line', { slots: c.slots, price: Math.round((c.price_cents || 0) / 100) })}
+                {c.secondary_bracket ? ` · ${t('tournament.bracket_b')}` : ''}
               </span>
             </div>
           ))}
@@ -800,6 +803,36 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <TshirtField rules={draft.rules} onChange={(v) => setRule('tshirt', v)} FieldLabel={FieldLabel} />
           {/* A refeição, logo a seguir à t-shirt (#799). */}
           <div className="mt-4"><MealField rules={draft.rules} onChange={(v) => setRule('meal', v)} FieldLabel={FieldLabel} /></div>
+        </div>
+      )}
+      {/* Com inscritos, o Quadro B muda-se até ao sorteio da categoria; depois
+          tranca com a razão ao lado (#800, SPEC ponto 2; regra #798). */}
+      {locked && draft.categories.length > 0 && (
+        <div className="card">
+          <b className="block text-sm text-ink-900">{t('tournament.create.secondary_bracket')}</b>
+          <p className="mt-0.5 text-xs text-ink-500">{t('tournament.create.secondary_bracket_hint')}</p>
+          {draft.categories.map((c, i) => {
+            const open = !c.status || TIME_EDITABLE.includes(c.status)
+            return (
+              <label key={c.code || i} className={`mt-2 flex min-h-[44px] items-center gap-2.5 border-t border-line pt-2 ${open ? 'cursor-pointer' : ''}`}>
+                <input type="checkbox" disabled={!open} checked={!!c.secondary_bracket}
+                  onChange={(e) => set({ categories: draft.categories.map((x, j) => (j === i ? { ...x, secondary_bracket: e.target.checked } : x)) })}
+                  className={open ? 'h-[22px] w-[22px] shrink-0 accent-ink-900' : 'sr-only'} />
+                {/* Trancada: o estado à vista, a cinzento, com o visto se
+                    estiver ligada (UX, 11 nov). */}
+                {!open && (
+                  <span aria-hidden="true" className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] border-2 border-[#9CA3AF] bg-[#E5E7EB]">
+                    {c.secondary_bracket && <Check size={15} strokeWidth={3.2} className="text-[#6B7280]" />}
+                  </span>
+                )}
+                <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-ink-900">{c.name}</span>
+                  {!open && <span className="block text-xs text-ink-500">{t('tournament.create.secondary_bracket_locked')}</span>}
+                </span>
+              </label>
+            )
+          })}
         </div>
       )}
       {locked && draft.categories.length > 0 && (
@@ -861,6 +894,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                 <b className="block truncate text-sm font-semibold text-ink-900">{c.name}</b>
                 <span className="text-xs text-ink-500">
                   {t('tournament.create.category_line', { slots: c.slots, price: c.price || 0 })}
+                  {c.secondary_bracket ? ` · ${t('tournament.bracket_b')}` : ''}
                   {c.day ? ` · ${dayLabel(c.day)}${c.start_time ? ` ${c.start_time}` : ''}` : ''}
                 </span>
               </span>
@@ -1180,7 +1214,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave, club = null }) {
   const { t, i18n } = useTranslation()
   const [cat, setCat] = useState(value || {
-    gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25, prize_first: '', prize_second: '',
+    gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25, prize_first: '', prize_second: '', secondary_bracket: false,
   })
   const code = categoryCode(cat.gender, cat.level)
   const name = cat.name || categoryName(t, cat.gender, cat.level)
@@ -1237,6 +1271,16 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave, c
           )}
         </div>
       </div>
+      {/* Quadro B (#800, SPEC ponto 2): por baixo do preço, como o «Jogo de
+          3.º e 4.º lugar». Vem desligado. */}
+      <label className="mt-3 flex min-h-[44px] cursor-pointer items-start gap-2.5">
+        <input type="checkbox" checked={!!cat.secondary_bracket} onChange={(e) => set({ secondary_bracket: e.target.checked })}
+          className="mt-[11px] h-[22px] w-[22px] shrink-0 accent-ink-900" />
+        <span className="py-2.5">
+          <span className="block text-sm text-ink-700">{t('tournament.create.secondary_bracket')}</span>
+          <span className="block text-xs text-ink-500">{t('tournament.create.secondary_bracket_hint')}</span>
+        </span>
+      </label>
       {/* Preço especial (design-handoff/2026-10-07-preco-especial): o mesmo
           bloco do mix, por baixo do preço da categoria. O preço é por
           pessoa, como no cartaz. */}

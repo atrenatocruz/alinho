@@ -42,7 +42,7 @@ function whenDeadline(iso, locale) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   const day = d.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: TOURNAMENT_TZ }).replace('.', '').replace(' de ', ' ')
-  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ })
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TOURNAMENT_TZ })
   return `${day}, ${time}`
 }
 

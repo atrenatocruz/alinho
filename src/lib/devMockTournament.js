@@ -14,6 +14,8 @@
 
 const on = () => localStorage.getItem('mockTournament') === 'true'
 const empty = () => localStorage.getItem('mockTournamentEmpty') === 'true'
+import { quadroBOn, quadroBCategory } from './devMockQuadroB'
+
 const state = () => localStorage.getItem('mockTournamentState') || 'sorteado'
 
 // Cartaz fictício: é a imagem que o CLUBE carrega, não um desenho nosso.
@@ -160,6 +162,10 @@ const categories = () => {
     status: statusOf(c),
     day_date: iso(dayAfter(fri, day_index)),
     entry_count: empty() ? 0 : c.entry_count,
+    // Quadro B (#800, devMockQuadroB): a M4 a decorrer, com o Quadro B.
+    // mockTQuadroBM5 = 'true': a M5 com o Quadro B ligado (o Editar trancado, #800).
+    ...(c.code === 'M5' && localStorage.getItem('mockTQuadroBM5') === 'true' ? { secondary_bracket: true } : {}),
+    ...(c.code === 'M4' && quadroBOn() ? quadroBCategory() : {}),
     // Quadro de teste (devMockBracket): a M4 só com eliminatórias.
     ...(c.code === 'M4' && localStorage.getItem('mockTBracket') ? { format: { groups: 0 } } : {}),
     // Sorteio feito numa só categoria (ensaio do QA, 30 set): a M5 com formato.

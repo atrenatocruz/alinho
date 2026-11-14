@@ -21,13 +21,16 @@ import {
   listCategoriesAdmin, listCategorySeeding, closeCategoryEntries, reopenCategoryEntries,
   saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload, qualifiersPerGroup,
 } from '../../lib/tournamentDraw'
-import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords } from '../../lib/tournamentFormat'
-import { dayMinutes } from '../../lib/tournamentCapacity'
+import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords, secondaryOptions } from '../../lib/tournamentFormat'
+import { dayMinutes, otherCategoriesHours } from '../../lib/tournamentCapacity'
 import { listTournamentClashes } from '../../lib/tournamentApi'
 import { ClashBanner, ClashCaseSheet, ClashListSheet, casesFor, startClashes, whenText } from './Clashes'
 import { PanelSkeleton } from './TournamentSkeleton'
+import { placeList, secondaryUpTo } from './quadroBWords'
 
 const euros = (c) => (c == null ? null : `${(c / 100).toFixed(0)} €`)
+// Número e palavra não se separam no fim da linha («4 fases», «31 h»; UX, 12 nov).
+const nb = (text) => String(text).replace(/(\d) /g, '$1\u00a0')
 
 /* ── Passo 1: quem entra ────────────────────────────────────────────────
    Chega quase sempre mais gente do que lugares. O organizador escolhe, e
@@ -152,25 +155,39 @@ function CloseEntriesStep({ category, onDone, t, cases = [], onResolve = null, o
 /* ── Passo 2: o formato ─────────────────────────────────────────────────
    A app faz as contas com as duplas que entraram e o tempo de campo do
    torneio, e diz o que cabe. O organizador escolhe. */
-function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
+function FormatStep({ days: dayRows, rules, category, categories = [], teamCount, onDone, t }) {
   const { i18n } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [thirdPlace, setThirdPlace] = useState(Boolean(category.third_place_match))
+  // Quadro B para quem não passa dos grupos (#800, SPEC ponto 3, 12 nov):
+  // quem organiza escolhe aqui até que lugar vai ao B. Ligado no Criar,
+  // começa na recomendada; desligado, em «Ninguém».
+  const startsWithB = secondaryUpTo(category) != null
+  const [bPick, setBPick] = useState(undefined) // undefined = ainda não escolheu
 
-  const options = useMemo(() => {
-    // `availableCourtHours` quer horas e campos em numero, nao a grelha do
-    // horario: { hours, courts }.
-    // Um dia que acaba de madrugada (09:00 à 01:00) conta até à 01:00 do
-    // dia seguinte (#797): a conta é a do Dev 3, a mesma do Criar torneio.
+  // `availableCourtHours` quer horas e campos em número, não a grelha do
+  // horário: { hours, courts }. Um dia que acaba de madrugada (09:00 à 01:00)
+  // conta até à 01:00 do dia seguinte (#797): a conta é a do Dev 3.
+  const courtLimit = useMemo(() => {
     const hoursOf = (d) => (dayMinutes({ starts_at: String(d.starts_at).slice(0, 5), ends_at: String(d.ends_at).slice(0, 5) }) || 0) / 60
     const days = (dayRows || []).map((d) => ({ hours: hoursOf(d), courts: Number(d.courts) || 1 }))
+    if (!days.length) return null
+    // O que sobra depois das outras categorias do torneio (UX, 12 nov): o
+    // «Recomendado» e o «cabe»/«passa» contam com elas; as horas mostradas
+    // continuam a ser só as desta categoria.
+    return Math.max(0, availableCourtHours(days) - otherCategoriesHours(categories, category.id, rules))
+  }, [dayRows, categories, category.id, rules])
+
+  const options = useMemo(() => {
     return formatOptions(teamCount, {
       maxDurationMin: Number(rules?.duration_max) || 60,
       // Sem dias marcados nao ha limite de horas: mostra tudo e nao mente a
       // dizer que cabe.
-      availableHours: days.length ? availableCourtHours(days) : null,
+      availableHours: courtLimit,
       thirdPlaceMatch: thirdPlace,
+      // As linhas do formato já não contam o Quadro B: as horas dele estão
+      // no bloco «Quem vai ao Quadro B», por baixo.
       // «Um grupo só, todos contra todos» de 3 a 7 duplas (aprovado pelo
       // Francisco a 23 out; design-handoff/2026-10-23-torneio-um-grupo-so).
       singleGroup: true,
@@ -178,7 +195,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
     // opção (UX, 23 out).
     }).filter((o, _, all) => teamCount !== 3 || o.kind === 'grupo_unico' || !all.some((x) => x.kind === 'grupo_unico'))
       .sort((x, y) => (y.kind === 'grupo_unico') - (x.kind === 'grupo_unico'))
-  }, [dayRows, rules, teamCount, thirdPlace])
+  }, [rules, teamCount, thirdPlace, courtLimit])
 
   const best = useMemo(() => recommendFormat(options), [options])
   const [pick, setPick] = useState(null)
@@ -186,6 +203,17 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
   // Sem final não há 3.º lugar: com o grupo único escolhido, a caixa sai.
   const single = options.find((o) => o.key === chosen)?.kind === 'grupo_unico'
   const onlySingle = options.length === 1 && options[0].kind === 'grupo_unico'
+  // As opções do Quadro B saem do formato escolhido (contas do Dev 3). Sem
+  // quem fique de fora (grupo único, só eliminatórias) o bloco não aparece.
+  const chosenOption = options.find((o) => o.key === chosen)
+  const bChoice = useMemo(() => secondaryOptions(chosenOption, {
+    maxDurationMin: Number(rules?.duration_max) || 60,
+    availableHours: courtLimit,
+  }), [chosenOption, rules, courtLimit])
+  const bPossible = bChoice.options.length > 1
+  const bUpTo = !bPossible ? null
+    : bPick !== undefined && bChoice.options.some((o) => o.upTo === bPick) ? bPick
+      : startsWithB ? bChoice.recommendedUpTo : null
 
   const save = async () => {
     const option = options.find((o) => o.key === chosen)
@@ -199,6 +227,8 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
         qualifiers_per_group: option.qualifiersPerGroup,
         qualifiers: option.qualifiers,
         third_place: single ? false : thirdPlace,
+        secondary_bracket: bUpTo != null,
+        secondary_upto: bUpTo,
       })
       onDone()
     } catch (e) {
@@ -241,12 +271,12 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
               {o.key === best?.key && <StatePill tone="dark">{t('tournament.draw.recommended')}</StatePill>}
             </div>
             <p className="mt-0.5 font-mono text-xs text-muted">
-              {t('tournament.draw.opt_line', {
+              {nb(t('tournament.draw.opt_line', {
                 guaranteed: t('tournament.draw.opt_guaranteed', { count: o.guaranteed }),
                 matches: t('tournament.n.matches', { count: o.matches }),
                 hours: Math.round(o.hours),
                 phases: t('tournament.n.phases', { count: o.phases }),
-              })}
+              }))}
             </p>
             {o.kind === 'grupo_unico' && (
               <p className="mt-1 text-[12.5px] text-ink-700">{t('tournament.draw.opt_single_note')}</p>
@@ -268,12 +298,68 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
           {t('tournament.draw.third_place')}
         </label>
       )}
+      {/* Quem vai ao Quadro B, por baixo do 3.º lugar (#800, SPEC ponto 3). */}
+      {bPossible && (
+        <BChoiceBlock choice={bChoice} value={bUpTo} onPick={setBPick} t={t} lang={i18n.language}
+          outPlaces={outPlacesOf(chosenOption)} />
+      )}
       {single && <div className="mb-3" />}
 
       {error && <p className="mb-2 text-xs text-danger">{error}</p>}
       <PrimaryButton onClick={save} disabled={busy || !chosen}>
         {t('tournament.draw.format_confirm')}
       </PrimaryButton>
+    </div>
+  )
+}
+
+/* ── Quem vai ao Quadro B (#800, SPEC ponto 3, aprovado a 12 nov) ────────
+   Uma escolha só, como as opções de formato. Cada opção diz as duplas, os
+   jogos a mais e as horas do torneio todo, e se cabe no tempo de campo. O
+   vermelho avisa, não trava. Depois do sorteio vem trancado, com a razão. */
+// Os lugares que ficam de fora do Quadro A, para a linha do «Ninguém».
+const outPlacesOf = (option) => {
+  const per = option?.qualifiersPerGroup || 0
+  const biggest = Math.max(0, ...(option?.sizes || []))
+  return Array.from({ length: Math.max(0, biggest - per) }, (_, i) => per + 1 + i)
+}
+
+export function BChoiceCard({ o, outPlaces = [], active = false, recommended = false, onClick = null, t, lang, locked = false }) {
+  const title = o.upTo == null ? t('tournament.draw.b_none') : t('tournament.draw.b_places', { list: placeList(t, lang, o.places) })
+  const hours = t('tournament.draw.b_hours', { hours: Math.round(o.hours) })
+  const Tag = onClick ? 'button' : 'div'
+  return (
+    <Tag
+      {...(onClick ? { type: 'button', onClick, 'aria-pressed': active } : {})}
+      className={`mb-1.5 block w-full rounded-xl border px-3 py-2.5 text-left ${
+        active && !locked ? 'border-ink-900 bg-white' : locked ? 'border-ink-100 bg-ink-50' : 'border-ink-100 bg-white'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <b className={`text-sm font-extrabold ${locked ? 'text-ink-700' : 'text-ink-900'}`}>{title}</b>
+        {recommended && <StatePill tone="dark">{t('tournament.draw.recommended')}</StatePill>}
+      </div>
+      <p className="mt-0.5 font-mono text-xs text-muted">
+        {nb(o.upTo == null
+          ? [outPlaces.length ? t('tournament.draw.b_none_line', { list: placeList(t, lang, outPlaces) }) : null,
+            t('tournament.n.matches', { count: o.matches }), hours].filter(Boolean).join(' · ')
+          : [t('tournament.n.teams', { count: o.teams }), t('tournament.draw.b_extra', { count: o.extraMatches }), hours].join(' · '))}
+        {o.fits === true && <> · <span className="font-bold text-ok">{t('tournament.draw.b_fits')}</span></>}
+        {o.fits === false && <> · <span className="font-bold text-danger">{nb(t('tournament.draw.b_over', { hours: Math.ceil(o.overHours) }))}</span></>}
+      </p>
+    </Tag>
+  )
+}
+
+function BChoiceBlock({ choice, value, onPick, t, lang, outPlaces }) {
+  return (
+    <div className="mb-2 mt-2">
+      <MonoLabel className="mb-1.5">{t('tournament.draw.b_who')}</MonoLabel>
+      {choice.options.map((o) => (
+        <BChoiceCard key={String(o.upTo)} o={o} t={t} lang={lang} outPlaces={outPlaces}
+          active={o.upTo === value} recommended={o.upTo === choice.recommendedUpTo}
+          onClick={() => onPick(o.upTo)} />
+      ))}
     </div>
   )
 }
@@ -339,14 +425,19 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
   // Lia-se só a coluna, e a pré-visualização dizia «3 jogos de quadro» quando
   // o sorteio criava 4 (ensaio do QA, 30 set).
   const thirdPlace = Boolean(category.format?.third_place ?? category.third_place_match)
+  // O Quadro B escolhido no formato (#800); o sorteio só o cria quando há
+  // quem fique de fora (buildDrawPayload, Dev 3).
+  const upTo = secondaryUpTo(category)
   const payload = useMemo(() => {
     if (!teams) return null
     if (knockoutOnly) return buildKnockoutPayload(teams, { thirdPlace })
     if (teams.length < groupCount) return null
     return buildDrawPayload(teams, {
       groupCount, perGroup, seeds, seed, thirdPlace,
+      // Antigas, só com o Quadro B ligado: vão todos os outros.
+      secondaryUpTo: upTo,
     })
-  }, [teams, knockoutOnly, groupCount, perGroup, seeds, seed, thirdPlace])
+  }, [teams, knockoutOnly, groupCount, perGroup, seeds, seed, thirdPlace, upTo])
 
   const byId = useMemo(() => Object.fromEntries((teams || []).map((x) => [x.id, x])), [teams])
 
@@ -564,7 +655,17 @@ function ClosedBox({ category, onReopened, t }) {
 
 /* ── Depois de sorteado ─────────────────────────────────────────────── */
 function DoneStep({ tournament, category, onDone, t }) {
+  const { i18n } = useTranslation()
   const [asking, setAsking] = useState(false)
+  // Quem vai ao Quadro B fica como se escolheu no formato e já não se muda
+  // (#800, SPEC ponto 3; razão ao lado, regra #798).
+  const perGroup = qualifiersPerGroup(category)
+  const bShown = (Number(category.group_count) || 0) >= 2 && perGroup > 0
+  const upTo = secondaryUpTo(category)
+  const bTitle = upTo == null ? t('tournament.draw.b_none')
+    : Number.isFinite(upTo)
+      ? t('tournament.draw.b_places', { list: placeList(t, i18n.language, Array.from({ length: upTo - perGroup }, (_, i) => perGroup + 1 + i)) })
+      : t('tournament.create.secondary_bracket')
   const locked = (category.played_count || 0) > 0
 
   // Apaga grupos, jogos e horas da categoria: pergunta antes, como as outras
@@ -590,6 +691,16 @@ function DoneStep({ tournament, category, onDone, t }) {
           {locked ? t('tournament.draw.done_locked') : t('tournament.draw.done_can_undo')}
         </p>
       </div>
+
+      {bShown && (
+        <div className="mb-2">
+          <MonoLabel className="mb-1.5">{t('tournament.draw.b_who')}</MonoLabel>
+          <div className="rounded-xl border border-ink-100 bg-ink-50 px-3 py-2.5" aria-disabled="true">
+            <b className="text-sm font-extrabold text-ink-700">{bTitle}</b>
+            <p className="mt-0.5 text-xs text-muted">{t('tournament.create.secondary_bracket_locked')}</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Link
@@ -749,7 +860,7 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
           <ClosedBox category={picked} t={t}
             onReopened={(r) => { setReopenedLate(r?.deadline_passed ? picked.id : null); done() }} />
           {!picked.format || reformatId === picked.id
-            ? <FormatStep days={data.days} rules={data.rules} category={picked} teamCount={teamCount} onDone={done} t={t} />
+            ? <FormatStep days={data.days} rules={data.rules} category={picked} categories={data.categories} teamCount={teamCount} onDone={done} t={t} />
             : <DrawStep category={picked} onDone={done} onChangeFormat={() => setReformatId(picked.id)} t={t} />}
         </>
       ) : (

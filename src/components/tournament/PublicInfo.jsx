@@ -12,6 +12,8 @@ import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
 import { CategoryPriceText } from './CategorySpecialPrice'
 import { appOrigin } from '../../lib/native'
 import { localeOf } from '../../lib/formatDate'
+import { qualifiersPerGroup } from '../../lib/tournamentDraw'
+import { secondaryUpTo, placeList } from './quadroBWords'
 
 /** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
  *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
@@ -30,6 +32,18 @@ const eachOf = (cents, locale) => pricePerPlayer((cents || 0) / 100, locale)
 // em rascunho, na pré-visualização, e nos dias do torneio (QA, 26 set).
 export default function PublicInfo({ tournament, categories = [], entriesOpen = true, plain = false }) {
   const { t, i18n } = useTranslation()
+  // Antes do sorteio: «Quadro B para quem não passa dos grupos», se ligado no
+  // Criar. Depois: quem vai («…para os 3.ºs de cada grupo»); com «Ninguém»,
+  // nada (#800, SPEC ponto 4, 12 nov).
+  const bFact = (c) => {
+    if (!['sorteada', 'a_decorrer', 'terminada'].includes(c.status)) return c.secondary_bracket ? t('tournament.create.secondary_bracket') : null
+    const upTo = secondaryUpTo(c)
+    if (upTo == null) return null
+    const per = qualifiersPerGroup(c)
+    if (!Number.isFinite(upTo) || !per) return t('tournament.create.secondary_bracket')
+    const places = Array.from({ length: Math.max(0, upTo - per) }, (_, i) => per + 1 + i)
+    return places.length ? t('tournament.create.secondary_bracket_for', { list: placeList(t, i18n.language, places) }) : null
+  }
   const [open, setOpen] = useState(false)
 
   const share = () => {
@@ -100,6 +114,9 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
                     fallback={t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) })} /></>
                 )}
               </p>
+              {/* Quadro B (#800, SPEC ponto 4): quem se inscreve sabe que joga
+                  mais, mesmo sem passar dos grupos. */}
+              {bFact(c) && <p className="text-xs text-muted">{bFact(c)}</p>}
             </div>
           )
         })}

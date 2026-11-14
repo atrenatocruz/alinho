@@ -123,7 +123,7 @@ const CATS = () => [
     group_count: 0, match_count: 0, played_count: 0 },
   { id: 'cat-m3', code: 'M3', name: 'Masculinos 3', gender: 'masculino', level: '3', age_group: null,
     slots: 8, price_cents: 2500, day_date: '2026-10-09', start_time: '18:00', third_place_match: true,
-    format: { groups: 2, qualifiers_per_group: 2, third_place: true }, status: 'sorteada', position: 3,
+    format: { groups: 2, qualifiers_per_group: 2, third_place: true, ...(localStorage.getItem('mockTQuadroBUpTo') === '3' ? { secondary_bracket: true, secondary_upto: 3 } : {}) }, status: 'sorteada', position: 3,
     selected_count: 8, waiting_count: 0, waitlist_count: 1, incomplete_count: 0,
     group_count: 2, match_count: 15, played_count: 0 },
 ]
@@ -177,7 +177,11 @@ export const TOURNAMENT_DRAW_RPC_MOCKS = {
   },
   list_tournament_categories_admin: () => (on() ? {
     rules: { duration_max: 60, duration_min: 30, scoring: 'pro_set_9' },
-    days: [
+    // localStorage.mockTDayEnd = '20' (+ mockTCourts = '2'): um dia só, das
+    // 08:00 a essa hora, para ver o «cabe» e o «passa» do Quadro B (#800).
+    days: localStorage.getItem('mockTDayEnd') ? [
+      { id: 'd1', date: '2026-10-10', starts_at: '08:00:00', ends_at: `${localStorage.getItem('mockTDayEnd')}:00:00`, courts: Number(localStorage.getItem('mockTCourts')) || 1 },
+    ] : [
       { id: 'd1', date: '2026-10-09', starts_at: '18:00:00', ends_at: '23:00:00', courts: 4 },
       { id: 'd2', date: '2026-10-10', starts_at: '09:00:00', ends_at: '21:00:00', courts: 4 },
       { id: 'd3', date: '2026-10-11', starts_at: '09:00:00', ends_at: '18:00:00', courts: 3 },

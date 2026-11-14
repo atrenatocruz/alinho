@@ -11,7 +11,9 @@ import { EmptyState } from '../ui'
 import RuleHint from '../RuleHint'
 import { Me, MonoLabel } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
-import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
+import { standingsOf, qualifiersPerGroup, groupPoints, secondaryUpToOf } from '../../lib/tournamentDraw'
+import { bracketOfPosition } from '../../lib/tournamentFormat'
+import { groupNoteAB } from './quadroBWords'
 import { PanelSkeleton } from './TournamentSkeleton'
 import { shortName } from './shareData'
 import { phaseScorings, scoringName } from './scoringText'
@@ -125,7 +127,8 @@ function SingleGroup({ group, matches, entries, myEntryId, category, scoring, t 
 
 /** Uma tabela de grupo. As duplas que passam ficam marcadas à esquerda e
  *  com o lugar em destaque — é o que se lê de relance no telemóvel. */
-function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t }) {
+function GroupTable({ group, matches, entries, qualifiers, bUpTo = null, myEntryId, scoring, t, lang }) {
+  const hasB = bUpTo != null
   const rows = standingsOf(group, matches)
   const played = matches.filter(
     (m) => m.stage === 'grupo' && m.group_id === group.id && m.score_a != null,
@@ -164,7 +167,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="text-xs uppercase tracking-wide text-muted">
-            <th className="w-7 py-1.5 text-center font-semibold">#</th>
+            <th className={`${hasB ? 'w-10' : 'w-7'} py-1.5 text-center font-semibold`}>#</th>
             <th className="py-1.5 text-left font-semibold">{t('tournament.draw.col_team')}</th>
             <th className="w-8 py-1.5 text-center font-semibold" title={t('tournament.draw.col_played_full')}>
               {t('tournament.draw.col_played')}
@@ -191,6 +194,12 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t
             const team = entries[row.id]
             const passes = done && i < qualifiers
             const mine = myEntryId && row.id === myEntryId
+            // Quadro B (#800, SPEC ponto 4): A ou B ao lado do lugar, só em
+            // quem vai a um quadro. A meio do grupo é o lugar de agora, a
+            // cinzento; com o grupo acabado, a preto. Quem fica de fora não
+            // tem marca e, com o grupo acabado, a linha fica a cinzento.
+            const bracketMark = hasB ? bracketOfPosition(i + 1, qualifiers, bUpTo) : null
+            const out = hasB && done && !bracketMark
             return (
               <tr
                 key={row.id}
@@ -204,9 +213,12 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t
                   >
                     {row.id in firstOf ? `${firstOf[row.id] + 1}=` : i + 1}
                   </span>
+                  {bracketMark && (
+                    <span className={`ml-0.5 font-mono text-[11px] font-bold ${done ? 'text-ink-900' : 'text-muted'}`}>{bracketMark}</span>
+                  )}
                 </td>
                 <td className="py-1.5 pr-2">
-                  <span className={`text-xs ${passes ? 'font-bold text-ink-900' : 'text-ink-900'}`}>
+                  <span className={`text-xs ${passes ? 'font-bold text-ink-900' : out ? 'text-muted' : 'text-ink-900'}`}>
                     {team?.name || t('ui.empty_tbd')}
                   </span>
                   {team?.seed ? (
@@ -222,7 +234,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t
                   {row.diff > 0 ? `+${row.diff}` : row.diff}
                 </td>
                 <td className="py-1.5 text-center font-mono text-xs text-muted">{row.gamesWon}</td>
-                <td className="py-1.5 pr-2 text-center font-mono text-sm font-extrabold text-ink-900">{groupPoints(row)}</td>
+                <td className={`py-1.5 pr-2 text-center font-mono text-sm font-extrabold ${out ? 'text-muted' : 'text-ink-900'}`}>{groupPoints(row)}</td>
               </tr>
             )
           })}
@@ -233,7 +245,8 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t
           por baixo da tabela (UX, 14 out). */}
       <p className="border-t border-ink-50 px-3 pt-1.5 text-[12px] leading-snug text-muted">{t('tournament.draw.legend')}</p>
       <p className="px-3 py-1.5 text-xs text-muted">
-        {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
+        {(hasB && groupNoteAB(t, lang, qualifiers, bUpTo, rows.length))
+          || t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
       {anyTie && <p className="px-3 pb-1.5 text-xs text-muted">{t('tournament.draw.tied_for_now')}</p>}
       {/* O que é «Pts», recolhido num «?» (Francisco, 28 set). */}
@@ -247,7 +260,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, scoring, t
 }
 
 export default function GroupsPanel({ tournament, category, my, emptyPose }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // A pontuação dos grupos, por cima de cada tabela (pontuação por fase, 26 out).
   const scoring = scoringName(t, phaseScorings(tournament?.rules).groups, true)
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
@@ -268,6 +281,10 @@ export default function GroupsPanel({ tournament, category, my, emptyPose }) {
   }
 
   const qualifiers = qualifiersPerGroup(category)
+  // Há Quadro B quando o sorteio o criou (jogos 'secundario'); quem vai
+  // é o que se escolheu no formato (#800, 12 nov).
+  const hasB = qualifiers > 0 && matches.some((m) => m.stage === 'secundario')
+  const bUpTo = hasB ? secondaryUpToOf(category, matches) : null
   // Um grupo só, sem ninguém a passar: a tabela é o torneio todo.
   if (groups.length === 1 && qualifiers === 0) {
     return <SingleGroup group={groups[0]} matches={matches} entries={entries} myEntryId={my?.entry_id}
@@ -285,6 +302,8 @@ export default function GroupsPanel({ tournament, category, my, emptyPose }) {
           matches={matches}
           entries={entries}
           qualifiers={qualifiers}
+          bUpTo={bUpTo}
+          lang={i18n.language}
           myEntryId={my?.entry_id}
           scoring={scoring}
           t={t}
